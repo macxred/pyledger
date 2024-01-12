@@ -348,6 +348,81 @@ class LedgerEngine(ABC):
 
         return result
 
+    def account_history(self, account: int | str | dict,
+                        period: datetime.date = None) -> pd.DataFrame:
+        """
+        Transaction and balance history of an account or a list of accounts.
+
+        Parameters:
+        account (int, str, dict): The account(s) to be evaluated. Can be a
+            sequence of accounts separated by a column, e.g. "1000:1999", in
+            which case the combined balance of all accounts within the
+            specified range is returned. Multiple accounts and/or account
+            sequences can be separated by a plus or minus sign,
+            e.g. "1000+1020:1025", in which case the combined balance of all
+            accounts is returned, or "1020:1025-1000", in which case the
+            balance of account 1000 is deducted from the combined balance of
+            accounts 1020:1025.
+        period (datetime.date or str isoformat, optional): The date as of which
+            the account balance is calculated. If None, the current date is
+            used. Can be a single date or a time period.
+        """
+        start, end = interpret_period(period)
+        # Account balance per a single point in time
+        if represents_integer(account):
+            account = int(account)
+            if not account in self.account_chart().index:
+                raise ValueError(f"No account matching '{account}'.")
+            out = self._fetch_account_history(account, start=start, end=end)
+        elif (isinstance(account, dict)
+            and ('add' in account.keys())
+            and ('subtract' in account.keys())):
+            accounts = list(set(accounts['add']) - set(accounts['subtract']))
+            out = self._fetch_account_history(accounts, start=start, end=end)
+        elif isinstance(account, str):
+            accounts = self.account_range(account)
+            accounts = list(set(accounts['add']) - set(accounts['subtract']))
+            out = self._fetch_account_history(accounts, start=start, end=end)
+        elif isinstance(account, list):
+            not_integer = [i for i in account if not represents_integer(i)]
+            if any(not_integer):
+                raise ValueError(f"Non-integer list elements in `account`: "
+                                 f"{not_integer}.")
+            accounts = account=[int(i) for i in account]
+            out = self._fetch_account_history(accounts, start=start, end=end)
+        else:
+            raise ValueError(f"Account(s) '{account}' of type "
+                            f"{type(account).__name__} not identifiable.")
+
+        return out
+
+    def _fetch_account_history(self, account: int | list[int],
+                               start: datetime.date = None,
+                               end: datetime.date = None) -> pd.DataFrame:
+        """
+        Fetch transaction history of a list of accounts. Compute balance.
+        """
+        # TODO: Harmonize col_sequence with LEDGER_COLUMN_ORDER
+        col_sequence = ['id', 'date', 'account', 'counter_account',
+                        'currency', 'amount', 'balance',
+                        'base_currency_amount', 'base_currency_balance',
+                        'vat_code', 'text', 'document']
+        ledger = self.serialized_ledger()
+        if isinstance(account, list):
+            filter = ledger['account'] in account
+        else:
+            filter = ledger['account'] == account
+        if end is not None:
+            filter = filter & (ledger['date'] <= end)
+        df = ledger.loc[filter, :]
+        df = df.sort_values('date')
+        df['balance'] = df['amount'].cumsum()
+        df['base_currency_balance'] = df['base_currency_amount'].cumsum()
+        cols = [col for col in col_sequence if col in df.columns]
+        if start is not None:
+            df = df.loc[df['date'] >= start, :]
+        df = df.reset_index(drop=True)
+        return df[cols]
 
     def account_range(self, range: int | str) -> dict:
         add = []
@@ -592,21 +667,11 @@ class LedgerEngine(ABC):
         Args:
             file (str): The path where the Excel file will be saved.
         """
-        ledger = self.serialized_ledger()
-        accounts = np.sort(ledger['account'].unique())
+        # TODO: Move to accountbot
         out = {}
-        col_sequence = ['id', 'date', 'counter_account',
-                        'currency', 'amount', 'balance',
-                        'base_currency_amount', 'base_currency_balance',
-                        'vat_code', 'text', 'document']
-        for account in accounts:
-            df = ledger.loc[ledger['account'] == account, :]
-            df = df.sort_values('date')
-            df = df.drop(columns=['account'])
-            df['balance'] = df['amount'].cumsum()
-            df['base_currency_balance'] = df['base_currency_amount'].cumsum()
-            cols = [col for col in col_sequence if col in df.columns]
-            out[str(account)] = df[cols]
+        for account in self.account_chart().index.sort_values():
+            df = self._fetch_account_history(account)
+            out[str(account)] = df.drop(columns='account')
         excel.write_sheets(out, path=file)
 
     # Hack: abstract functionality to compute balance from serialized ledger,
