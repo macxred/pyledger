@@ -546,7 +546,7 @@ class TextLedger(LedgerEngine):
 
     @classmethod
     def write_ledger_file(cls, df: pd.DataFrame, path: str,
-                          short_names: bool = True,
+                          short_names: bool = False,
                           drop_unused_columns: bool = False,
                           digits=None) -> None:
         """
@@ -584,12 +584,12 @@ class TextLedger(LedgerEngine):
 
         # Default column order
         cols = (
-            [col for col in cls.LEDGER_COLUMN_ORDER if col in df.columns] +
-            [col for col in df.columns if col not in cls.LEDGER_COLUMN_ORDER])
+            [col for col in cls.LEDGER_COLUMN_SEQUENCE if col in df.columns] +
+            [col for col in df.columns if col not in cls.LEDGER_COLUMN_SEQUENCE])
         df = df[cols]
 
         fixed_width_cols = [
-            col for col in cls.LEDGER_COLUMN_ORDER
+            col for col in cls.LEDGER_COLUMN_SEQUENCE
             if (col in df.columns) and not (col in ['text', 'document'])]
 
         if digits is not None:

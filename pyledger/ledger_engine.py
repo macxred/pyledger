@@ -20,9 +20,10 @@ class LedgerEngine(ABC):
         'target': 'target_balance',
         'base_amount': 'base_currency_amount',
         'counter': 'counter_account'}
-    LEDGER_COLUMN_ORDER = [
-        'id', 'date', 'account', 'counter_account', 'vat_code', 'currency',
-        'amount', 'target_balance', 'base_currency_amount', 'text', 'document']
+    LEDGER_COLUMN_SEQUENCE = [
+        'id', 'date', 'account', 'counter_account', 'currency', 'amount',
+        'target_balance', 'balance', 'base_currency_amount',
+        'base_currency_balance', 'vat_code', 'text', 'document']
     REQUIRED_ACCOUNT_COLUMNS = ['account', 'currency', 'text', 'vat_code']
     REQUIRED_VAT_CODE_COLUMNS = ['id', 'rate', 'inclusive', 'account', 'text']
     OPTIONAL_VAT_CODE_COLUMNS = ['date', 'inverse_account']
@@ -402,11 +403,6 @@ class LedgerEngine(ABC):
         """
         Fetch transaction history of a list of accounts. Compute balance.
         """
-        # TODO: Harmonize col_sequence with LEDGER_COLUMN_ORDER
-        col_sequence = ['id', 'date', 'account', 'counter_account',
-                        'currency', 'amount', 'balance',
-                        'base_currency_amount', 'base_currency_balance',
-                        'vat_code', 'text', 'document']
         ledger = self.serialized_ledger()
         if isinstance(account, list):
             filter = ledger['account'] in account
@@ -418,7 +414,7 @@ class LedgerEngine(ABC):
         df = df.sort_values('date')
         df['balance'] = df['amount'].cumsum()
         df['base_currency_balance'] = df['base_currency_amount'].cumsum()
-        cols = [col for col in col_sequence if col in df.columns]
+        cols = [col for col in self.LEDGER_COLUMN_SEQUENCE if col in df.columns]
         if start is not None:
             df = df.loc[df['date'] >= start, :]
         df = df.reset_index(drop=True)
@@ -607,6 +603,8 @@ class LedgerEngine(ABC):
             raise ValueError(f"Missing required columns: {missing}")
 
         # Add optional columns if not present
+        if 'id' not in df.columns:
+            df['id'] = df['date'].notna().cumsum().astype(pd.StringDtype())
         for col in cls.OPTIONAL_LEDGER_COLUMNS:
             if col not in df.columns:
                 df[col] = None
@@ -624,8 +622,8 @@ class LedgerEngine(ABC):
         df['text'] = df['text'].astype(pd.StringDtype())
         df['document'] = df['document'].astype(pd.StringDtype())
 
-        # Order columns based on 'LEDGER_COLUMN_ORDER'
-        col_order = cls.LEDGER_COLUMN_ORDER
+        # Order columns based on 'LEDGER_COLUMN_SEQUENCE'
+        col_order = cls.LEDGER_COLUMN_SEQUENCE
         cols = ([col for col in col_order if col in df.columns]
                 + [col for col in df.columns if col not in col_order])
         df = df[cols]
