@@ -603,7 +603,9 @@ class TextLedger(LedgerEngine):
                                  cls.LEDGER_COLUMN_SHORTCUTS.items()}
             df = df.rename(columns=reverse_shortcuts)
 
-        write_fixed_width_csv(df, path=path, n = len(fixed_width_cols))
+        file = Path(path).expanduser()
+        file.parent.mkdir(parents=True, exist_ok=True)
+        write_fixed_width_csv(df, path=file, n = len(fixed_width_cols))
 
     def price(self, ticker: str, date: datetime.date = None,
               currency: str | None = None) -> (str, float):
