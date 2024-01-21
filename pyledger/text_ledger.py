@@ -4,7 +4,7 @@ from .ledger_engine import LedgerEngine
 from .helpers import write_fixed_width_csv
 
 # TODO:
-# - write functions stadardize_prices, standardize_vat_codes,
+# - write functions standardize_prices, standardize_vat_codes,
 #   standardize_account_chart, standardize_fx_adjustments,
 #   standardize_settings analogues to LedgerEnging.standardize_ledger.
 #   Decide whether functions should be available at the parent class
@@ -342,6 +342,7 @@ class TextLedger(LedgerEngine):
         vat_journal_entries = []
         account_chart = self.account_chart()
         for _, row in df.loc[df['vat_code'].notna()].iterrows():
+            vat = vat_definitions[row['vat_code']]
             account_vat_code = (account_chart['vat_code'][row['account']]
                                 if pd.notna(row['account']) else None)
             counter_vat_code = (account_chart['vat_code'][row['counter_account']]
@@ -351,20 +352,25 @@ class TextLedger(LedgerEngine):
                                      f"for {row['id']}: Neither account nor "
                                      f"counter account have a vat_code.")
             elif pd.isna(account_vat_code) and pd.notna(counter_vat_code):
-                account = row['counter_account']
                 multiplier = 1.0
+                if vat['inclusive']:
+                    account = row['counter_account']
+                else:
+                    account = row['account']
             elif pd.notna(account_vat_code) and pd.isna(counter_vat_code):
-                account = row['account']
                 multiplier = -1.0
+                if vat['inclusive']:
+                    account = row['account']
+                else:
+                    account = row['counter_account']
             else:
                 self._logger.warning(f"Skip vat code '{row['vat_code']}' "
                                      f"for {row['id']}: Both account and "
                                      f"counter accounts have vat_codes.")
 
-            # Fetch VAT rate and calculate VAT amount
-            vat = vat_definitions[row['vat_code']]
+            # Calculate VAT amount
             if vat['inclusive']:
-                amount = row['amount'] * vat['rate'] / (1 + vat['rate'])
+                amount = multiplier * row['amount'] * vat['rate'] / (1 + vat['rate'])
             else:
                 amount = row['amount'] * vat['rate']
             amount = amount * multiplier
