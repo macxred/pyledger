@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod, abstractproperty
 import datetime, logging, math, pandas as pd, numpy as np, os, re
 from pathlib import Path
-from .helpers import interpret_period, represents_integer
+from .helpers import represents_integer
+from .time import parse_date_span
 from . import excel
 
 class LedgerEngine(ABC):
@@ -316,7 +317,7 @@ class LedgerEngine(ABC):
             the account balance is calculated. If None, the current date is
             used. Can be a single date or a time period.
         """
-        start, end = interpret_period(date)
+        start, end = parse_date_span(date)
         if start is None:
             # Account balance per a single point in time
             if represents_integer(account):
@@ -368,7 +369,7 @@ class LedgerEngine(ABC):
             the account balance is calculated. If None, the current date is
             used. Can be a single date or a time period.
         """
-        start, end = interpret_period(period)
+        start, end = parse_date_span(period)
         # Account balance per a single point in time
         if represents_integer(account):
             account = int(account)

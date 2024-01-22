@@ -1,10 +1,5 @@
 import datetime, numpy as np, pandas as pd, re
 
-def last_day_of_month(date):
-    next_month = date.replace(day=1) + datetime.timedelta(days=31)
-    result = next_month.replace(day=1) - datetime.timedelta(days=1)
-    return result
-
 def represents_integer(x) -> bool:
     """
     Check if the input is an integer number and can be cast as an integer.
@@ -40,30 +35,6 @@ def represents_integer(x) -> bool:
             return int(x) == float(x)
         except (ValueError, TypeError):
             return False
-
-
-def interpret_period(x) -> (datetime.date | None, datetime.date | None):
-    if x is None:
-        result = (None, None)
-    elif type(x) is datetime.date:
-        result = (None, x)
-    elif type(x) is datetime.datetime:
-        result = (None, x.date())
-    elif type(x) is str:
-        x = x.strip()
-        if re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", x):
-            result = (None, datetime.date.fromisoformat(x))
-        elif re.fullmatch("[0-9]{4}-[0-9]{2}", x):
-            # Full month
-            start = datetime.date.fromisoformat(f"{x}-01")
-            end = last_day_of_month(start)
-            result = (start, end)
-        else:
-            raise ValueError(f"Can not interpret string '{x}' as interval.")
-    else:
-        raise ValueError(f"Can not interpret '{x}' of type {type(x).__name__} "
-                          "as interval.")
-    return result
 
 def write_fixed_width_csv(df, path=None, sep=', ', na_rep='', n=None, *args,
                           **kwargs):
