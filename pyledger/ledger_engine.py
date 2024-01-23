@@ -337,7 +337,8 @@ class LedgerEngine(ABC):
                                 f"{type(account).__name__} not identifiable.")
         else:
             # Account balance over a period
-            at_start = self.account_balance(account=account, date=start)
+            at_start = self.account_balance(account=account,
+                date=start-datetime.timedelta(days=1))
             at_end = self.account_balance(account=account, date=end)
             result = {
                 currency: at_end.get(currency, 0) - at_start.get(currency, 0)
