@@ -579,14 +579,17 @@ class TextLedger(LedgerEngine):
             raise ValueError(f"Missing required columns: {missing}")
 
         if 'id' in df.columns:
-            # Drop id: Ensure rows with the same 'id' follow each other,
-            # set 'date' to None in subsequent rows with the same 'id'.
-            df = df.sort_values(by='id')
-            df['date'] = df['date'].where(~df['id'].duplicated(), None)
-            if df.loc[~df['id'].duplicated(), 'date'].isna().any():
+            # Drop id: Ensure elements with the same 'id' immediately follow
+            # each other, then set 'date' to None in rows with duplicated 'id'.
+            unique_id = pd.DataFrame({'id': df['id'].unique()})
+            unique_id['__sequence__'] = range(len(unique_id))
+            df = df.merge(unique_id, on='id', how='left')
+            df = df.sort_values(by='__sequence__')
+            df['date'] = df['date'].where(~df['__sequence__'].duplicated(), None)
+            if df.loc[~df['__sequence__'].duplicated(), 'date'].isna().any():
                 raise ValueError("A valid 'date' is required in the first "
                                  "occurrence of every 'id'.")
-            df = df.drop(columns='id')
+            df = df.drop(columns=['id', '__sequence__'])
 
         if drop_unused_columns:
             all_na = df.columns[df.isna().all()]
