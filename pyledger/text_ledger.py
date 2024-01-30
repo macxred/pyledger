@@ -279,16 +279,16 @@ class TextLedger(LedgerEngine):
         :return: Combined price data as a DataFrame with columns 'ticker',
             'date', 'currency', 'price'.
         """
-        directory = Path(self._price_files).expanduser()
         df_list = []
-
-        for path in directory.rglob("*.csv"):
-            try:
-                file = path.relative_to(directory)
-                df = self.read_price_file(path)
-                df_list.append(df)
-            except Exception as e:
-                self._logger.warning(f"Skip {file}: {e}")
+        if self._price_files is not None:
+            directory = Path(self._price_files).expanduser()
+            for path in directory.rglob("*.csv"):
+                try:
+                    file = path.relative_to(directory)
+                    df = self.read_price_file(path)
+                    df_list.append(df)
+                except Exception as e:
+                    self._logger.warning(f"Skip {file}: {e}")
         if len(df_list) > 0:
             result = pd.concat(df_list, ignore_index=True)
         else:
