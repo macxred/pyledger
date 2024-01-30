@@ -408,7 +408,7 @@ class LedgerEngine(ABC):
         """
         ledger = self.serialized_ledger()
         if isinstance(account, list):
-            filter = ledger['account'] in account
+            filter = ledger['account'].isin(account)
         else:
             filter = ledger['account'] == account
         if end is not None:
