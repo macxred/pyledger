@@ -160,6 +160,11 @@ class TextLedger(LedgerEngine):
         if df['account'].isna().any():
             raise ValueError("Missing 'account' values in account chart.")
 
+        # Add missing columns
+        for col in cls.OPTIONAL_ACCOUNT_COLUMNS:
+            if col not in df.columns:
+                df[col] = None
+
         # Enforce data types
         def to_str_or_na(value):
             return str(value) if pd.notna(value) else value
