@@ -596,9 +596,13 @@ class LedgerEngine(ABC):
         :param ledger: Ledger data as a DataFrame.
         :return: Standardized DataFrame with enforced data types.
         """
-        # Standardize column names
-        df = ledger.copy()
-        df = df.rename(columns=cls.LEDGER_COLUMN_SHORTCUTS)
+        if ledger is None:
+            # Return empty DataFrame with identical structure
+            df = pd.DataFrame(columns=cls.REQUIRED_LEDGER_COLUMNS)
+        else:
+            df = ledger.copy()
+            # Standardize column names
+            df = df.rename(columns=cls.LEDGER_COLUMN_SHORTCUTS)
 
         # Ensure all required columns are present
         missing = set(cls.REQUIRED_LEDGER_COLUMNS) - set(df.columns)
