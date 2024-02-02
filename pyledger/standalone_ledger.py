@@ -368,7 +368,7 @@ class StandaloneLedger(LedgerEngine):
 
             # Calculate VAT amount
             if vat['inclusive']:
-                amount = multiplier * row['amount'] * vat['rate'] / (1 + vat['rate'])
+                amount = row['amount'] * vat['rate'] / (1 + vat['rate'])
             else:
                 amount = row['amount'] * vat['rate']
             amount = amount * multiplier
