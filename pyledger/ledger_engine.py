@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod, abstractproperty
 import datetime, logging, math, pandas as pd, numpy as np, os, re
+import openpyxl
 from pathlib import Path
 from .helpers import represents_integer
 from .time import parse_date_span
@@ -664,13 +665,16 @@ class LedgerEngine(ABC):
                             debit.loc[debit['account'].notna()]])
         return result[cols]
 
-    def export_account_sheets(self, file: str) -> None:
+    def export_account_sheets(self, file: str, root: str = None) -> None:
         """
         Export ledger as Excel file, with separate sheets containing
         transactions for each account.
 
         Args:
             file (str): The path where the Excel file will be saved.
+            root (str | None): Root directory for document paths.
+                If not None, valid document paths are formatted as hyperlinks
+                to the file in the root folder.
         """
         # TODO: Move to accountbot
         out = {}
@@ -678,6 +682,20 @@ class LedgerEngine(ABC):
             df = self._fetch_account_history(account)
             out[str(account)] = df.drop(columns='account')
         excel.write_sheets(out, path=file)
+
+        if root is not None:
+            # Add link to open documents locally
+            root_dir = Path(root).expanduser()
+            workbook = openpyxl.load_workbook(file)
+            for sheet in workbook.worksheets:
+                for cell in sheet['K']:
+                    # Column K corresponds to 'documents'
+                    if not cell.value is None:
+                        document = root_dir.joinpath(cell.value)
+                        if document.is_file():
+                            cell.hyperlink = f"file://{str(document)}"
+                            cell.style = "Hyperlink"
+            workbook.save(file)
 
     # Hack: abstract functionality to compute balance from serialized ledger,
     # that is used in two different branches of the dependency tree
