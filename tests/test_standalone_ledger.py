@@ -1,11 +1,11 @@
 import unittest
 import datetime
 import pandas as pd
-from pyledger import SandboxLedger
+from pyledger import TestLedger
 
 class TestStandaloneLedger(unittest.TestCase):
     def test_standardize_ledger(self):
-        ledger = SandboxLedger()
+        ledger = TestLedger()
         postings = pd.DataFrame({
             'date': [datetime.date.today(), pd.NA, pd.NA, "2024-01-01"],
             'account': [1020, pd.NA, pd.NA, 1020],
@@ -25,7 +25,7 @@ class TestStandaloneLedger(unittest.TestCase):
             standardized_posting = ledger.standardize_ledger(posting)
 
     def test_add_ledger_entry(self):
-        ledger = SandboxLedger()
+        ledger = TestLedger()
 
         # Add ledger entries
         for i in range(5):
@@ -60,7 +60,7 @@ class TestStandaloneLedger(unittest.TestCase):
         self.assertEqual(len(serialized_ledger), 10)
 
     def test_vat_journal_entries(self):
-        ledger = SandboxLedger()
+        ledger = TestLedger()
 
         postings = pd.DataFrame({
             'date': datetime.date.today(),

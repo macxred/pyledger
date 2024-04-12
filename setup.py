@@ -12,6 +12,6 @@ setup(
     description=('Python package to streamline implementation of or '
                  'connection to accounting systems.'),
     long_description=open('README.md').read(),
-    url='https://github.com/lasuk/pyledger',
+    url='https://github.com/macxred/pyledger',
     packages=['pyledger']
 )

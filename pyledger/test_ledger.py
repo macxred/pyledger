@@ -3,7 +3,7 @@ import re
 from io import StringIO
 from .standalone_ledger import StandaloneLedger
 
-class SandboxLedger(StandaloneLedger):
+class TestLedger(StandaloneLedger):
     """
     Implementation of the StandaloneLedger class that is initiated with
     hard-coded settings, account chart and VAT codes. Its purpose is to
@@ -81,7 +81,7 @@ class SandboxLedger(StandaloneLedger):
 
     def __init__(self):
         """
-        Initialize the SandboxLedger with hard coded settings, account chat and
+        Initialize the TestLedger with hard coded settings, account chat and
         VAT codes.
         """
         super().__init__(
@@ -107,6 +107,6 @@ class SandboxLedger(StandaloneLedger):
 
 
 # import pandas as pd
-# from pyledger import SandboxLedger
-# ledger = SandboxLedger()
+# from pyledger import TestLedger
+# ledger = TestLedger()
 # add_ledger_entry("")
