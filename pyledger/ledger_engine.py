@@ -605,6 +605,12 @@ class LedgerEngine(ABC):
             # Standardize column names
             df = df.rename(columns=cls.LEDGER_COLUMN_SHORTCUTS)
 
+        # In empty DataFrames, add required columns if not present
+        if isinstance(ledger, pd.DataFrame) and (len(ledger) == 0):
+            for col in cls.REQUIRED_LEDGER_COLUMNS:
+                if col not in df.columns:
+                    df[col] = None
+
         # Ensure all required columns are present
         missing = set(cls.REQUIRED_LEDGER_COLUMNS) - set(df.columns)
         if len(missing) > 0:

@@ -69,6 +69,8 @@ def write_fixed_width_csv(df, path=None, sep=', ', na_rep='', n=None, *args,
         # Fixed width formatting
         if i < fixed_width_cols:
             col_str = col_str.apply(lambda x: x.rjust(max_length))
+            if pd.isna(max_length):
+                max_length = 0
             colname = colname.rjust(max_length)
 
         # Separator for all but the first column
