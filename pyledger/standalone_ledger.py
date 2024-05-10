@@ -188,7 +188,7 @@ class StandaloneLedger(LedgerEngine):
                 df[col] = None
 
         # Enforce data types
-        inception = pd.Timestamp('0000-01-01')
+        inception = pd.Timestamp('1900-01-01')
         df['id'] = df['id'].astype(pd.StringDtype())
         df['text'] = df['text'].astype(pd.StringDtype())
         df['inclusive'] = df['inclusive'].astype(bool)
