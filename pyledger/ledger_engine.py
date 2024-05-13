@@ -27,7 +27,7 @@ class LedgerEngine(ABC):
         'target_balance', 'balance', 'base_currency_amount',
         'base_currency_balance', 'vat_code', 'text', 'document']
     REQUIRED_ACCOUNT_COLUMNS = ['account', 'currency', 'text']
-    OPTIONAL_ACCOUNT_COLUMNS = ['vat_code']
+    OPTIONAL_ACCOUNT_COLUMNS = ['vat_code', 'group']
     REQUIRED_VAT_CODE_COLUMNS = ['id', 'rate', 'inclusive', 'account', 'text']
     OPTIONAL_VAT_CODE_COLUMNS = ['date', 'inverse_account']
     REQUIRED_PRICE_COLUMNS = ['ticker', 'date', 'currency', 'price']
