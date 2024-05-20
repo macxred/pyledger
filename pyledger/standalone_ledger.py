@@ -153,8 +153,7 @@ class StandaloneLedger(LedgerEngine):
         df['text'] = df['text'].apply(to_str_or_na)
         df['vat_code'] = df['vat_code'].apply(to_str_or_na)
 
-        df.set_index('account', inplace=True)
-        return df
+        return df.set_index('account')
 
     @classmethod
     def standardize_vat_codes(cls, df: pd.DataFrame) -> pd.DataFrame:
