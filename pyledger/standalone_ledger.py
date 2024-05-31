@@ -151,7 +151,7 @@ class StandaloneLedger(LedgerEngine):
         df['account'] = df['account'].astype(int)
         df['currency'] = df['currency'].apply(to_str_or_na)
         df['text'] = df['text'].apply(to_str_or_na)
-        df['vat_code'] = df['vat_code'].apply(to_str_or_na)
+        df['vat_code'] = (df['vat_code'].apply(to_str_or_na)).astype(pd.StringDtype())
 
         return df.set_index('account')
 
