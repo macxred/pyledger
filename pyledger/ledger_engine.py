@@ -471,15 +471,26 @@ class LedgerEngine(ABC):
             raise ValueError(f"No account matching '{range}'.")
         return {'add': add, 'subtract': subtract}
 
+    def sanitize_acount_chart(self, accounts: pd.DataFrame) -> pd.DataFrame:
+        """
+        Discards inconsistent entries in the account chart.
+        Logs a warning for each discarded entry with reason for dropping.
+
+        :param accounts: Account chart as a DataFrame.
+        :return: DataFrame with sanitized account chart.
+        """
+        accounts = self.st
+
     def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
         """
         Discards inconsistent ledger entries and inconsistent vat codes.
-        Lag a warning explaining reasons why entries are discarded.
+        Logs a warning for each discarded entry with reason for dropping.
 
         :param ledger: Ledger data as a DataFrame.
         :return: DataFrame with sanitized ledger entries.
         """
         # Discard undefined VAT codes
+        ledger['vat_code'] = ledger['vat_code'].str.strip()
         invalid = (ledger['vat_code'].notna()
                    & ~ledger['vat_code'].isin(self.vat_codes().index))
         if invalid.any():
@@ -488,10 +499,10 @@ class LedgerEngine(ABC):
             for id, codes in zip(df.index, df['vat_code']):
                 if len(codes) > 1:
                     self._logger.warning(f"Discard unknown VAT codes "
-                        f"{', '.join([str(x) for x in codes])} at '{id}'.")
+                        f"{', '.join([f"'{x}'" for x in codes])} at '{id}'.")
                 else:
                     self._logger.warning(f"Discard unknown VAT code "
-                        f"{str(codes[0])} at '{id}'.")
+                        f"'{codes[0]}' at '{id}'.")
             ledger.loc[invalid, 'vat_code'] = None
 
         # Collect postings to be discarded as pd.DataFrame with columns 'id' and

@@ -1,3 +1,4 @@
+import logging
 import json, pandas as pd
 from pathlib import Path
 from .standalone_ledger import StandaloneLedger
@@ -31,6 +32,7 @@ class TextLedger(StandaloneLedger):
     def __init__(self, settings: str, accounts: str, ledger: str,
                  prices: str = None, vat_codes: str =  None,
                  fx_adjustments: str = None):
+        self._logger = logging.getLogger('ledger')
         super().__init__(
             settings=_read_json(settings),
             accounts=_read_csv_or_none(accounts),
