@@ -4,7 +4,7 @@ import pandas as pd
 from pyledger import TestLedger
 
 class TestStandaloneLedger(unittest.TestCase):
-    def test_standardize_ledger(self):
+    def test_standardize_ledger_columns(self):
         ledger = TestLedger()
         postings = pd.DataFrame({
             'date': [datetime.date.today(), pd.NA, pd.NA, "2024-01-01"],
@@ -13,7 +13,7 @@ class TestStandaloneLedger(unittest.TestCase):
             'currency': 'CHF',
             'text': ["Collective entry", pd.NA, pd.NA, "Simple entry"],
             'amount': [1000, 800, 200, 10]})
-        standardized_postings = ledger.standardize_ledger(postings)
+        ledger.standardize_ledger_columns(postings)
 
         with self.assertRaises(ValueError) as context:
             # Attempt to standardize an entry without required 'account' column
@@ -22,7 +22,7 @@ class TestStandaloneLedger(unittest.TestCase):
                 'currency': 'CHF',
                 'text': ["Entry without account column"],
                 'amount': [1000]})
-            standardized_posting = ledger.standardize_ledger(posting)
+            ledger.standardize_ledger_columns(posting)
 
     def test_add_ledger_entry(self):
         ledger = TestLedger()

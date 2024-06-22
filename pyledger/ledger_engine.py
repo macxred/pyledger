@@ -601,13 +601,25 @@ class LedgerEngine(ABC):
         return ledger
 
     @classmethod
-    def standardize_ledger(cls, ledger: pd.DataFrame) -> pd.DataFrame:
+    def standardize_ledger_columns(cls, ledger: pd.DataFrame | None) -> pd.DataFrame:
         """
         Standardizes and enforces type consistency for the ledger DataFrame.
-        Ensures required columns are present, adds missing optional columns with
-        None values, and enforces specific data types for each column.
-        :param ledger: Ledger data as a DataFrame.
-        :return: Standardized DataFrame with enforced data types.
+
+        Ensures that the required columns are present in the ledger DataFrame,
+        adds any missing optional columns with None values, and enforces
+        specific data types for each column.
+
+        Args:
+            ledger (pd.DataFrame): A data frame with ledger transactions. Can
+                be None, in which case an empty DataFrame with the required
+                structure is returned.
+
+        Returns:
+            pd.DataFrame: A standardized DataFrame with both the required and
+                optional columns with enforced data types.
+
+        Raises:
+            ValueError: If required columns are missing from the ledger DataFrame.
         """
         if ledger is None:
             # Return empty DataFrame with identical structure
@@ -656,6 +668,42 @@ class LedgerEngine(ABC):
 
         return df
 
+    def standardize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
+        """
+        Convert ledger entries to a canonical representation.
+
+        This method converts ledger entries into a standardized format. It
+        ensures uniformity where transactions can be defined in various
+        equivalent ways, allowing for easy identification of equivalent
+        entries.
+
+        Args:
+            ledger (pd.DataFrame): A data frame with ledger transactions.
+
+        Returns:
+            pd.DataFrame: A DataFrame with ledger entries in canonical form.
+
+        Notes:
+            - The method removes redundant 'base_currency_amount' values for
+            transactions in the base currency.
+            - It fills missing dates in collective transactions with dates from
+            other line items in the same collective transaction.
+
+        This method can be overridden by derived classes to adapt to specific
+        limitations of a ledger system. For example, some systems might allow
+        specifying documents only for entire collective transactions instead
+        of each line item.
+        """
+        df = self.standardize_ledger_columns(ledger)
+
+        # Fill missing (NA) dates
+        df['date'] = df.groupby('id')['date'].ffill()
+        df['date'] = df.groupby('id')['date'].bfill()
+
+        # Drop redundant base_currency_amount for transactions in base currency
+        is_base_currency = df['currency'] == self.base_currency
+        df.loc[is_base_currency, 'base_currency_amount'] = pd.NA
+        return df
 
     def serialize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
         """

@@ -53,7 +53,7 @@ class StandaloneLedger(LedgerEngine):
         super().__init__()
         self._settings = self.standardize_settings(settings)
         self._account_chart = self.standardize_account_chart(accounts)
-        self._ledger = self.standardize_ledger(ledger)
+        self._ledger = self.standardize_ledger_columns(ledger)
         self._prices = self.standardize_prices(prices)
         self._vat_codes = self.standardize_vat_codes(vat_codes)
         self._fx_adjustments = self.standardize_fx_adjustments(fx_adjustments)
@@ -509,12 +509,12 @@ class StandaloneLedger(LedgerEngine):
                         'text': row['text']
                     })
             if len(adjustments) > 0:
-                adjustments = self.standardize_ledger(pd.DataFrame(adjustments))
+                adjustments = self.standardize_ledger_columns(pd.DataFrame(adjustments))
                 df = pd.concat([df, adjustments])
 
         # Serializes ledger with separate credit and debit entries.
         result = self.serialize_ledger(df)
-        self._serialized_ledger = self.standardize_ledger(result)
+        self._serialized_ledger = self.standardize_ledger_columns(result)
 
 
     def price(self, ticker: str, date: datetime.date = None,
@@ -631,7 +631,7 @@ class StandaloneLedger(LedgerEngine):
                  data[first_key] = [data[first_key]]
         df = pd.DataFrame(data)
         automated_id = 'id' not in df.columns
-        df = self.standardize_ledger(df)
+        df = self.standardize_ledger_columns(df)
 
         # Ensure ID is not already in use
         duplicate = set(df['id']).intersection(self._ledger['id'])

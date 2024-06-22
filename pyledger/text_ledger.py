@@ -110,7 +110,7 @@ class TextLedger(StandaloneLedger):
         """
         df = pd.read_csv(path, skipinitialspace=True)
         has_id = 'id' in df.columns
-        df = cls.standardize_ledger(df)
+        df = cls.standardize_ledger_columns(df)
 
         # Add 'id' column representing file path and line number.
         # Rows without a date form a collective posting with preceding rows up
