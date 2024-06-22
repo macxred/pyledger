@@ -38,7 +38,8 @@ class LedgerEngine(ABC):
     def __init__(self):
         self._logger = logging.getLogger('ledger')
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def base_currency(self) -> str:
         """
         Returns the base currency used for financial reporting.
