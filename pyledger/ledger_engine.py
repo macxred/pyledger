@@ -600,8 +600,8 @@ class LedgerEngine(ABC):
 
         return ledger
 
-    @classmethod
-    def standardize_ledger_columns(cls, ledger: pd.DataFrame | None) -> pd.DataFrame:
+    @staticmethod
+    def standardize_ledger_columns(ledger: pd.DataFrame | None) -> pd.DataFrame:
         """
         Standardizes and enforces type consistency for the ledger DataFrame.
 
@@ -623,27 +623,27 @@ class LedgerEngine(ABC):
         """
         if ledger is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_LEDGER_COLUMNS)
+            df = pd.DataFrame(columns=LedgerEngine.REQUIRED_LEDGER_COLUMNS)
         else:
             df = ledger.copy()
             # Standardize column names
-            df = df.rename(columns=cls.LEDGER_COLUMN_SHORTCUTS)
+            df = df.rename(columns=LedgerEngine.LEDGER_COLUMN_SHORTCUTS)
 
         # In empty DataFrames, add required columns if not present
         if isinstance(ledger, pd.DataFrame) and (len(ledger) == 0):
-            for col in cls.REQUIRED_LEDGER_COLUMNS:
+            for col in LedgerEngine.REQUIRED_LEDGER_COLUMNS:
                 if col not in df.columns:
                     df[col] = None
 
         # Ensure all required columns are present
-        missing = set(cls.REQUIRED_LEDGER_COLUMNS) - set(df.columns)
+        missing = set(LedgerEngine.REQUIRED_LEDGER_COLUMNS) - set(df.columns)
         if len(missing) > 0:
             raise ValueError(f"Missing required columns: {missing}")
 
         # Add optional columns if not present
         if 'id' not in df.columns:
             df['id'] = df['date'].notna().cumsum().astype(pd.StringDtype())
-        for col in cls.OPTIONAL_LEDGER_COLUMNS:
+        for col in LedgerEngine.OPTIONAL_LEDGER_COLUMNS:
             if col not in df.columns:
                 df[col] = None
 
@@ -661,7 +661,7 @@ class LedgerEngine(ABC):
         df['document'] = df['document'].astype(pd.StringDtype())
 
         # Order columns based on 'LEDGER_COLUMN_SEQUENCE'
-        col_order = cls.LEDGER_COLUMN_SEQUENCE
+        col_order = LedgerEngine.LEDGER_COLUMN_SEQUENCE
         cols = ([col for col in col_order if col in df.columns]
                 + [col for col in df.columns if col not in col_order])
         df = df[cols]
