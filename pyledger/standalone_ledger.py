@@ -1,4 +1,8 @@
-import datetime, collections, numpy as np, pandas as pd
+import datetime
+import collections
+from warnings import warn
+import numpy as np
+import pandas as pd
 from .ledger_engine import LedgerEngine
 
 class StandaloneLedger(LedgerEngine):
@@ -441,6 +445,8 @@ class StandaloneLedger(LedgerEngine):
         # Calculate amount to match target balance
         # TODO: drop target_balance
         if 'target_balance' in df.columns:
+            warn("`target_balance` is deprecated and will be removed. "
+                 "Specify an amount instead.", DeprecationWarning)
             new_amount = []
             for i in np.where(df['target_balance'].notna())[0]:
                 date = df['date'].iloc[i]
