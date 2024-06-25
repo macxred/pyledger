@@ -703,6 +703,14 @@ class LedgerEngine(ABC):
         # Drop redundant base_currency_amount for transactions in base currency
         is_base_currency = df['currency'] == self.base_currency
         df.loc[is_base_currency, 'base_currency_amount'] = pd.NA
+
+        # Remove leading and trailing spaces in strings, convert -0.0 to 0.0
+        for col in df.columns:
+            if pd.StringDtype.is_dtype(df[col]):
+                df[col] = df[col].str.strip()
+            elif pd.Float64Dtype.is_dtype(df[col]):
+                df[col] = np.where(df[col].notna() & (df[col] == 0), 0.0, df[col])
+
         return df
 
     def serialize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
