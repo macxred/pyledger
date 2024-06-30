@@ -701,8 +701,9 @@ class LedgerEngine(ABC):
         df['date'] = df.groupby('id')['date'].bfill()
 
         # Drop redundant base_currency_amount for transactions in base currency
-        is_base_currency = df['currency'] == self.base_currency
-        df.loc[is_base_currency, 'base_currency_amount'] = pd.NA
+        set_na = ((df['currency'] == self.base_currency) &
+            (df['base_currency_amount'].isna() | (df['base_currency_amount'] == df['amount'])))
+        df.loc[set_na, 'base_currency_amount'] = pd.NA
 
         # Remove leading and trailing spaces in strings, convert -0.0 to 0.0
         for col in df.columns:
