@@ -154,3 +154,10 @@ execute `python setup.py develop` in the repository root folder. This approach
 adds a symbolic link to your development directory in Python's search path,
 ensuring immediate access to the latest code version upon (re-)loading the
 package.
+
+## Other Projects
+
+Below projects handle accounting tasks, but have a different purpose and scope. They might be of interest to some users or provide inspiration:
+
+- John Wiegley's [ledger](https://ledger-cli.org) is a command-line, double-entry accounting system.
+- [Ledger.py](https://github.com/mafm/ledger.py) is a simpler implementation of this concept in Python.
