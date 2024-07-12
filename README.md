@@ -33,7 +33,7 @@ LedgerEngine (Abstract Base Class)
    |         |
    |         +-- TestLedger
    |
-   +-- APILedger
+   +-- ExternalLedger
        |
 · · · · · · · · · · · · · · · · · · · · (External Packages Below)
        |
@@ -65,7 +65,7 @@ This class extends the StandaloneLedger to provide a fully featured but non-pers
 
 **Integration with External Software**
 
-7. **APILedger** classes connect to an external system or service. They delegate storage and all accounting operations. Subclasses of `APILedger` are interfaces that handle API communication and convert data between PyLedger and the external system's format. The `APILedger` class currently holds no methods or properties; it merely improves clarity of the class hierarchy.
+7. **ExternalLedger** classes delegate storage and all accounting operations to an external system or service. These classes connect to external systems, handle API communication and convert data between PyLedger and the external format. The `ExternalLedger` class currently holds no methods or properties; it merely improves clarity of the class hierarchy.
 
 1. **CashCtrlLedger** connects to the web-based CashCtrl accounting software. It implements accessor and mutator methods that use CashCtrl's REST API to manipulate and retrieve accounting data on a remote CashCtrl instance.
 
