@@ -1,0 +1,46 @@
+on:
+  # For all pushes run the tests
+  push:
+  # Also trigger on pull_request
+  pull_request:
+  # Run nightly tests at 04:00 UTC
+  schedule:
+    - cron: "0 4 * * *"
+  # Manually triggered
+  workflow_dispatch:
+
+name: Lint
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    container:
+      image: python:latest
+    if: |
+        (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]') ||
+        (github.event_name != 'pull_request_target' && github.actor != 'dependabot[bot]')
+    steps:
+      - name: Checkout
+        if: ${{ github.event_name != 'pull_request_target' }}
+        uses: actions/checkout@v4
+
+      - name: Checkout PR
+        if: ${{ github.event_name == 'pull_request_target' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup virtualenv
+        run: |
+          python -V  # Print out python version for debugging
+          pip install virtualenv pytest
+          virtualenv venv
+          . venv/bin/activate
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Flake8
+        run: flake8

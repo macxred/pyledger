@@ -13,5 +13,13 @@ setup(
                  'connection to accounting systems.'),
     long_description=open('README.md').read(),
     url='https://github.com/macxred/pyledger',
-    packages=['pyledger']
+    packages=['pyledger'],
+        extras_require={
+        "dev": [
+            "flake8",
+            "flake8-import-order",
+            "flake8-docstrings",
+            "flake8-bugbear",
+        ]
+    }
 )
