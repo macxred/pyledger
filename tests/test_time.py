@@ -1,46 +1,41 @@
 import datetime
-import unittest
+import pytest
 from pyledger import parse_date_span, last_day_of_month
 
-class TestTimeModule(unittest.TestCase):
+@pytest.mark.parametrize(
+    "input_date, expected_date",
+    [
+        (datetime.date(2023, 1, 1), datetime.date(2023, 1, 31)),
+        (datetime.date(2023, 2, 15), datetime.date(2023, 2, 28)),  # Non-leap year
+        (datetime.date(2024, 2, 15), datetime.date(2024, 2, 29)),  # Leap year
+        (datetime.date(2023, 12, 31), datetime.date(2023, 12, 31)),
+    ],
+)
+def test_last_day_of_month(input_date, expected_date):
+    assert last_day_of_month(input_date) == expected_date
 
-    def test_last_day_of_month(self):
-        self.assertEqual(last_day_of_month(datetime.date(2023, 1, 1)), datetime.date(2023, 1, 31))
-        self.assertEqual(last_day_of_month(datetime.date(2023, 2, 15)), datetime.date(2023, 2, 28))  # Non-leap year
-        self.assertEqual(last_day_of_month(datetime.date(2024, 2, 15)), datetime.date(2024, 2, 29))  # Leap year
-        self.assertEqual(last_day_of_month(datetime.date(2023, 12, 31)), datetime.date(2023, 12, 31))
+def test_parse_date_span_none():
+    assert parse_date_span(None) == (None, None)
 
-    def test_parse_date_span_none(self):
-        self.assertEqual(parse_date_span(None), (None, None))
+@pytest.mark.parametrize(
+    "input_date, expected_span",
+    [
+        (datetime.date(2023, 1, 1), (None, datetime.date(2023, 1, 1))),
+        (datetime.datetime(2023, 1, 1), (None, datetime.date(2023, 1, 1))),
+        ("2023-01-01", (None, datetime.date(2023, 1, 1))),
+        ("2023-01", (datetime.date(2023, 1, 1), datetime.date(2023, 1, 31))),
+        ("2023-Q1", (datetime.date(2023, 1, 1), datetime.date(2023, 3, 31))),
+        ("2023", (datetime.date(2023, 1, 1), datetime.date(2023, 12, 31))),
+        (2023, (datetime.date(2023, 1, 1), datetime.date(2023, 12, 31))),
+    ],
+)
+def test_parse_date_span_valid(input_date, expected_span):
+    assert parse_date_span(input_date) == expected_span
 
-    def test_parse_date_span_date(self):
-        self.assertEqual(parse_date_span(datetime.date(2023, 1, 1)), (None, datetime.date(2023, 1, 1)))
-
-    def test_parse_date_span_datetime(self):
-        self.assertEqual(parse_date_span(datetime.datetime(2023, 1, 1)), (None, datetime.date(2023, 1, 1)))
-
-    def test_parse_date_span_str_isoformat(self):
-        self.assertEqual(parse_date_span("2023-01-01"), (None, datetime.date(2023, 1, 1)))
-
-    def test_parse_date_span_str_month(self):
-        self.assertEqual(parse_date_span("2023-01"), (datetime.date(2023, 1, 1), datetime.date(2023, 1, 31)))
-
-    def test_parse_date_span_str_quarter(self):
-        self.assertEqual(parse_date_span("2023-Q1"), (datetime.date(2023, 1, 1), datetime.date(2023, 3, 31)))
-
-    def test_parse_date_span_str_year(self):
-        self.assertEqual(parse_date_span("2023"), (datetime.date(2023, 1, 1), datetime.date(2023, 12, 31)))
-
-    def test_parse_date_span_int_year(self):
-        self.assertEqual(parse_date_span(2023), (datetime.date(2023, 1, 1), datetime.date(2023, 12, 31)))
-
-    def test_parse_date_span_invalid_str(self):
-        with self.assertRaises(ValueError):
-            parse_date_span("invalid")
-
-    def test_parse_date_span_invalid_type(self):
-        with self.assertRaises(ValueError):
-            parse_date_span(123.456)
-
-if __name__ == '__main__':
-    unittest.main()
+@pytest.mark.parametrize(
+    "invalid_input",
+    ["invalid", 123.456],
+)
+def test_parse_date_span_invalid(invalid_input):
+    with pytest.raises(ValueError):
+        parse_date_span(invalid_input)
