@@ -1,6 +1,9 @@
+"""Tests for date processing helper functions in pyledger."""
+
 import datetime
+from pyledger import last_day_of_month, parse_date_span
 import pytest
-from pyledger import parse_date_span, last_day_of_month
+
 
 @pytest.mark.parametrize(
     "input_date, expected_date",
@@ -11,11 +14,15 @@ from pyledger import parse_date_span, last_day_of_month
         (datetime.date(2023, 12, 31), datetime.date(2023, 12, 31)),
     ],
 )
-def test_last_day_of_month(input_date, expected_date):
+def test_last_day_of_month(input_date: datetime.date, expected_date: datetime.date):
+    """Test the last_day_of_month function."""
     assert last_day_of_month(input_date) == expected_date
 
+
 def test_parse_date_span_none():
+    """Test the parse_date_span function with None input."""
     assert parse_date_span(None) == (None, None)
+
 
 @pytest.mark.parametrize(
     "input_date, expected_span",
@@ -29,13 +36,19 @@ def test_parse_date_span_none():
         (2023, (datetime.date(2023, 1, 1), datetime.date(2023, 12, 31))),
     ],
 )
-def test_parse_date_span_valid(input_date, expected_span):
+def test_parse_date_span_valid(
+    input_date: datetime.date | datetime.datetime | str | int,
+    expected_span: tuple[datetime.date | None, datetime.date | None]
+):
+    """Test the parse_date_span function with valid inputs."""
     assert parse_date_span(input_date) == expected_span
+
 
 @pytest.mark.parametrize(
     "invalid_input",
     ["invalid", 123.456],
 )
-def test_parse_date_span_invalid(invalid_input):
+def test_parse_date_span_invalid(invalid_input: str | float):
+    """Test the parse_date_span function with invalid inputs."""
     with pytest.raises(ValueError):
         parse_date_span(invalid_input)

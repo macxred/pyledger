@@ -1,9 +1,12 @@
+"""Tests for the StandaloneLedger class in pyledger."""
+
 import datetime
 from io import StringIO
 import pandas as pd
-import pytest
 from pyledger import TestLedger
+import pytest
 
+# flake8: noqa: E501
 
 POSTINGS_CSV = """
     date,          account, counter_account, currency, text,                                              vat_code, amount
@@ -14,11 +17,15 @@ POSTINGS_CSV = """
     2024-07-15   , 1030   , 6400           , CHF     , Amount Excluding Output Tax                      , OutStdEx, -1000
     2024-07-15   , 6500   , 1045           , CHF     , Amount Excluding Output Tax (accounts inverted)  , OutStdEx,  1000
 """
+
+# flake8: enable
+
 POSTINGS = pd.read_csv(StringIO(POSTINGS_CSV), skipinitialspace=True)
-POSTINGS['date'] = datetime.date.today()
+POSTINGS["date"] = datetime.date.today()
 
 
 def test_standardize_ledger_columns():
+    """Test the standardization of ledger columns."""
     ledger = TestLedger()
     postings = pd.DataFrame({
         "date": [datetime.date.today(), pd.NA, pd.NA, "2024-01-01"],
@@ -42,6 +49,7 @@ def test_standardize_ledger_columns():
 
 
 def test_add_ledger_entry():
+    """Test adding ledger entries."""
     ledger = TestLedger()
 
     # Add ledger entries
@@ -51,7 +59,7 @@ def test_add_ledger_entry():
             "account": 1020,
             "counter_account": 6000,
             "currency": "CHF",
-            "text": f"Entry {i+1}",
+            "text": f"Entry {i + 1}",
             "amount": 100 * (i + 1),
         })
 
@@ -91,8 +99,10 @@ def test_add_ledger_entry():
     ],
 )
 def test_vat_journal_entries(
-    index, expected_len, expected_account, expected_counter_account, expected_amount
+    index: int, expected_len: int, expected_account: int | None,
+    expected_counter_account: int | None, expected_amount: float | None
 ):
+    """Test VAT journal entries creation."""
     ledger = TestLedger()
     postings = ledger.standardize_ledger(POSTINGS)
     postings = ledger.sanitize_ledger(postings)
@@ -119,7 +129,8 @@ def test_vat_journal_entries(
         (1045, 2, -1 * round(1000 * (1 + 0.077), 2)),
     ],
 )
-def test_validate_account_balance(account, expected_length, expected_balance):
+def test_validate_account_balance(account: int, expected_length: int, expected_balance: float):
+    """Test the validation of account balances."""
     ledger = TestLedger()
     postings = ledger.standardize_ledger(POSTINGS)
     postings = ledger.sanitize_ledger(postings)

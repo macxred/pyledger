@@ -1,30 +1,36 @@
-import datetime, numpy as np, pandas as pd, re
+"""This module provides utilities for handling DataFrame operations such as
+writing fixed-width CSV files and checking if values can be represented as integers.
+"""
 
-def represents_integer(x) -> bool:
-    """
-    Check if the input is an integer number and can be cast as an integer.
+from typing import Any
+import numpy as np
+import pandas as pd
 
-    Parameters:
-    x (Any): The value to be checked.
+
+def represents_integer(x: Any) -> bool:
+    """Check if the input is an integer number and can be cast as an integer.
+
+    Args:
+        x (Any): The value to be checked.
 
     Returns:
-    bool: True if x is an integer number, False otherwise.
+        bool: True if x is an integer number, False otherwise.
 
     Examples:
-    >>> represents_integer(4)
-    True
-    >>> represents_integer(4.0)  # Float with an integer value
-    True
-    >>> represents_integer("4")
-    True
-    >>> represents_integer("4.5")
-    False
-    >>> represents_integer(None)
-    False
-    >>> represents_integer("abc")
-    False
-    >>> represents_integer([4])
-    False
+        >>> represents_integer(4)
+        True
+        >>> represents_integer(4.0)  # Float with an integer value
+        True
+        >>> represents_integer("4")
+        True
+        >>> represents_integer("4.5")
+        False
+        >>> represents_integer(None)
+        False
+        >>> represents_integer("abc")
+        False
+        >>> represents_integer([4])
+        False
     """
     if isinstance(x, int):
         return True
@@ -36,29 +42,40 @@ def represents_integer(x) -> bool:
         except (ValueError, TypeError):
             return False
 
-def write_fixed_width_csv(df, path=None, sep=', ', na_rep='', n=None, *args,
-                          **kwargs):
-    """
-    Generate a human readable CSV
+
+def write_fixed_width_csv(
+    df: pd.DataFrame,
+    path: str = None,
+    sep: str = ", ",
+    na_rep: str = "",
+    n: int = None,
+    *args,
+    **kwargs
+) -> str:
+    """Generate a human-readable CSV.
 
     Writes a pandas DataFrame to a CSV file, ensuring that the first n columns
-    have a fixed width determined by the longest entry in each column.
-    Text is right aligned and NA values are represented as specified.
-    If n is None, all columns except the last will have fixed width.
+    have a fixed width determined by the longest entry in each column. Text is
+    right-aligned, and NA values are represented as specified. If n is None,
+    all columns except the last will have fixed width.
 
-    Parameters:
-    df (pandas.DataFrame): DataFrame to be written to CSV.
-    path (str): Name/path of the CSV file to write. If None, returns the csv
-        output as string.
-    sep (str): Separator for CSV file, default is ', '. In contrast to
-        pd.to_csv, multi-char separators are supported.
-    na_rep (str): String representation for NA/NaN data. Default is ''.
-    n (int): Number of columns from start to have fixed width. If None,
-             applies to all columns except the last.
-    *args, **kwargs: Additional arguments for pandas to_csv method.
+    Args:
+        df (pandas.DataFrame): DataFrame to be written to CSV.
+        path (str): Name/path of the CSV file to write. If None, returns the CSV
+            output as a string.
+        sep (str): Separator for the CSV file, default is ', '. In contrast to
+            pd.to_csv, multi-char separators are supported.
+        na_rep (str): String representation for NA/NaN data. Default is ''.
+        n (int): Number of columns from the start to have fixed width. If None,
+            applies to all columns except the last.
+        *args: Additional arguments for pandas to_csv method.
+        **kwargs: Additional keyword arguments for pandas to_csv method.
+
+    Returns:
+        str: CSV output as a string if the path is None.
     """
     result = {}
-    fixed_width_cols = (df.shape[1] - 1 if n is None else n)
+    fixed_width_cols = df.shape[1] - 1 if n is None else n
 
     for i in range(len(df.columns)):
         col = df.iloc[:, i]
@@ -68,9 +85,7 @@ def write_fixed_width_csv(df, path=None, sep=', ', na_rep='', n=None, *args,
 
         # Fixed width formatting
         if i < fixed_width_cols:
-            col_str = col_str.apply(lambda x: x.rjust(max_length))
-            if pd.isna(max_length):
-                max_length = 0
+            col_str = col_str.apply(lambda x, ml=max_length: x.rjust(ml))
             colname = colname.rjust(max_length)
 
         # Separator for all but the first column
@@ -83,5 +98,4 @@ def write_fixed_width_csv(df, path=None, sep=', ', na_rep='', n=None, *args,
     result = pd.DataFrame(result)
 
     # Write to CSV
-    return result.to_csv(path, sep=sep[0], index=False, na_rep=na_rep,
-                         *args, **kwargs)
+    return result.to_csv(*args, path, sep=sep[0], index=False, na_rep=na_rep, **kwargs)

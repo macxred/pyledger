@@ -1,18 +1,36 @@
-import pandas as pd
-import re
+"""This module defines the TestLedger class, an extension of StandaloneLedger,
+designed for demos, experimentation, and testing purposes with hard-coded settings,
+account charts, and VAT codes.
+"""
+
 from io import StringIO
+import re
+import pandas as pd
 from .standalone_ledger import StandaloneLedger
 
+
 class TestLedger(StandaloneLedger):
+    """Implementation of the StandaloneLedger class that is initiated with
+    hard-coded settings, account chart, and VAT codes. Its purpose is to
+    facilitate demos, experimentation, and testing.
+
+    Usage example:
+        from pyledger import TestLedger
+        ledger = TestLedger()
+        add_ledger_entry("")
     """
-    Implementation of the StandaloneLedger class that is initiated with
-    hard-coded settings, account chart and VAT codes. Its purpose is to
-    facilitate demos, experimentation and testing.
-    """
+
     SETTINGS = {
-        'base_currency': 'CHF',
-        'precision': {'CAD': 0.01, 'CHF': 0.01, 'EUR': 0.01,
-                      'GBP': 0.01, 'HKD': 0.01, 'USD': 0.01}}
+        "base_currency": "CHF",
+        "precision": {
+            "CAD": 0.01,
+            "CHF": 0.01,
+            "EUR": 0.01,
+            "GBP": 0.01,
+            "HKD": 0.01,
+            "USD": 0.01,
+        },
+    }
 
     SWISS_SME_ACCOUNT_CHART = """
         account, currency, vat_code, text
@@ -66,6 +84,8 @@ class TestLedger(StandaloneLedger):
         6950,         CHF,    InStd, Financial income
         """
 
+    # flake8: noqa: E501
+
     SWISS_VAT = """
         id, date, account, inverse_account, rate, inclusive, text
         Exempt,   2001-01-01,     ,     , 0.0,    True, Exempt from VAT
@@ -77,36 +97,36 @@ class TestLedger(StandaloneLedger):
         InRed,    2001-01-01, 1170,     , 0.025,  True, Input Tax (Vorsteuer) at the reduced 2.5% rate on purchased goods or services
         InAcc,    2001-01-01, 1170,     , 0.037,  True, Input Tax (Vorsteuer) at the 3.7% accommodation rate on purchased goods or services
         AcqStd,   2001-01-01, 1170, 2200, 0.077, False, Acquisition tax (Bezugsteuer): VAT on services purchased abroad for which no VAT has been levied yet.
-        """
+    """
 
-    def __init__(self):
-        """
-        Initialize the TestLedger with hard coded settings, account chat and
-        VAT codes.
-        """
+    # flake8: enable
+
+    def __init__(self) -> None:
+        """Initialize the TestLedger with hard-coded settings, account chart and VAT codes."""
         super().__init__(
             settings=self.SETTINGS,
             accounts=pd.read_csv(
                 StringIO(self.drop_commented_lines(self.SWISS_SME_ACCOUNT_CHART)),
-                skipinitialspace=True),
+                skipinitialspace=True
+            ),
             vat_codes=pd.read_csv(
                 StringIO(self.drop_commented_lines(self.SWISS_VAT)),
-                skipinitialspace=True)
+                skipinitialspace=True
+            ),
         )
 
     @staticmethod
-    def drop_commented_lines(text):
-        """
-        Drop commented lines from a multi-line string.
+    def drop_commented_lines(text: str) -> str:
+        """Drop commented lines from a multi-line string.
         Commented lines are identified by a leading pound sign '#' following
         optional leading white space.
+
+        Args:
+            text (str): Multi-line string to process.
+
+        Returns:
+            str: String with commented lines removed.
         """
         lines = text.splitlines()
-        lines = [line for line in lines if not re.match("[ ]*#", line)]
-        return '\n'.join(lines)
-
-
-# import pandas as pd
-# from pyledger import TestLedger
-# ledger = TestLedger()
-# add_ledger_entry("")
+        lines = [line for line in lines if not re.match(r"[ ]*#", line)]
+        return "\n".join(lines)
