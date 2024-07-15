@@ -20,6 +20,8 @@ setup(
             "flake8-import-order",
             "flake8-docstrings",
             "flake8-bugbear",
+            "bandit",
+            "safety"
         ]
     }
 )

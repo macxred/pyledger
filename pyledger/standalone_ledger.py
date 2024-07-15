@@ -436,7 +436,7 @@ class StandaloneLedger(LedgerEngine):
                 f"{missing}."
             )
 
-    def complete_ledger(self) -> pd.DataFrame:
+    def complete_ledger(self) -> None:
         # Ledger definition
         df = self.standardize_ledger(self._ledger)
         df = self.sanitize_ledger(df)
@@ -489,7 +489,10 @@ class StandaloneLedger(LedgerEngine):
                 if currency != base_currency:
                     balance = self.account_balance(account, date=date)
                     fx_rate = self.price(currency, date=date, currency=base_currency)
-                    assert fx_rate[0] == base_currency
+                    if fx_rate[0] != base_currency:
+                        raise ValueError(
+                            f"FX rate currency mismatch: expected {base_currency}, got {fx_rate[0]}"
+                        )
                     target = balance[currency] * fx_rate[1]
                     amount = target - balance["base_currency"]
                     amount = self.round_to_precision(amount, ticker=base_currency, date=date)
