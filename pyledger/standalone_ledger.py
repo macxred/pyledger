@@ -45,6 +45,9 @@ class StandaloneLedger(LedgerEngine):
     _vat_codes = None
     _fx_adjustments = None
 
+    # ----------------------------------------------------------------------
+    # Constructor
+
     def __init__(
         self,
         settings: dict,
@@ -72,6 +75,9 @@ class StandaloneLedger(LedgerEngine):
         self._vat_codes = self.standardize_vat_codes(vat_codes)
         self._fx_adjustments = self.standardize_fx_adjustments(fx_adjustments)
         self.validate_accounts()
+
+    # ----------------------------------------------------------------------
+    # Settings
 
     @staticmethod
     def standardize_settings(settings: dict) -> dict:
@@ -123,47 +129,87 @@ class StandaloneLedger(LedgerEngine):
 
         return settings
 
+    # ----------------------------------------------------------------------
+    # FX Adjustments
+
     @classmethod
-    def standardize_account_chart(cls, df: pd.DataFrame) -> pd.DataFrame:
-        """Validates and standardizes the 'account_chart' DataFrame to ensure it contains
+    def standardize_fx_adjustments(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates and standardizes the 'fx_adjustments' DataFrame to ensure it contains
         the required columns and correct data types.
 
         Args:
-            df (pd.DataFrame): The DataFrame representing the account chart.
+            df (pd.DataFrame): The DataFrame representing the FX adjustments.
 
         Returns:
-            pd.DataFrame: The standardized account chart DataFrame.
+            pd.DataFrame: The standardized FX adjustments DataFrame.
 
         Raises:
-            ValueError: If required columns are missing, or if 'account' column
-                        contains NaN values, or if data types are incorrect.
+            ValueError: If required columns are missing or if data types are incorrect.
         """
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_ACCOUNT_COLUMNS)
+            df = pd.DataFrame(columns=cls.REQUIRED_FX_ADJUSTMENT_COLUMNS)
 
         # Ensure required columns and values are present
-        missing = set(cls.REQUIRED_ACCOUNT_COLUMNS) - set(df.columns)
+        missing = set(cls.REQUIRED_FX_ADJUSTMENT_COLUMNS) - set(df.columns)
         if missing:
-            raise ValueError(f"Required columns missing in account chart: {missing}.")
-        if df["account"].isna().any():
-            raise ValueError("Missing 'account' values in account chart.")
-
-        # Add missing columns
-        for col in cls.OPTIONAL_ACCOUNT_COLUMNS:
-            if col not in df.columns:
-                df[col] = None
+            raise ValueError(f"Required columns {', '.join(missing)} are missing.")
 
         # Enforce data types
-        def to_str_or_na(value):
-            return str(value) if pd.notna(value) else value
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        df["adjust"] = df["adjust"].astype(pd.StringDtype())
+        df["credit"] = df["credit"].astype(pd.Int64Dtype())
+        df["debit"] = df["debit"].astype(pd.Int64Dtype())
+        df["text"] = df["text"].astype(pd.StringDtype())
 
-        df["account"] = df["account"].astype(int)
-        df["currency"] = df["currency"].apply(to_str_or_na)
-        df["text"] = df["text"].apply(to_str_or_na)
-        df["vat_code"] = df["vat_code"].apply(to_str_or_na).astype(pd.StringDtype())
+        return df.sort_values("date")
 
-        return df.set_index("account")
+    def fx_adjustments(self) -> pd.DataFrame:
+        return self._fx_adjustments
+
+    # ----------------------------------------------------------------------
+    # VAT Codes
+
+    def vat_codes(self) -> pd.DataFrame:
+        return self._vat_codes
+
+    def vat_rate(self, vat_code: str) -> float:
+        """Retrieve the VAT rate for a given VAT code.
+
+        Args:
+            vat_code (str): VAT code to look up.
+
+        Returns:
+            float: VAT rate associated with the specified code.
+
+        Raises:
+            KeyError: If the VAT code is not defined.
+        """
+        if vat_code not in self._vat_codes.index:
+            raise KeyError(f"VAT code not defined: {vat_code}")
+        return self._vat_codes["rate"][vat_code]
+
+    def vat_accounts(self, vat_code: str) -> list[int]:
+        """Retrieve the accounts associated with a given VAT code.
+
+        Args:
+            vat_code (str): VAT code to look up.
+
+        Returns:
+            list[int]: List of accounts associated with the specified VAT code.
+
+        Raises:
+            KeyError: If the VAT code is not defined.
+        """
+        if vat_code not in self._vat_codes.index:
+            raise KeyError(f"VAT code not defined: {vat_code}")
+        return self._vat_codes["accounts"][vat_code]
+
+    def add_vat_code(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_vat_code is not implemented yet.")
+
+    def delete_vat_code(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_vat_code is not implemented yet.")
 
     @classmethod
     def standardize_vat_codes(cls, df: pd.DataFrame) -> pd.DataFrame:
@@ -210,123 +256,6 @@ class StandaloneLedger(LedgerEngine):
             raise ValueError(f"Account must be defined for non-zero rate in vat_codes: {missing}.")
 
         return df.set_index("id")
-
-    @classmethod
-    def standardize_fx_adjustments(cls, df: pd.DataFrame) -> pd.DataFrame:
-        """Validates and standardizes the 'fx_adjustments' DataFrame to ensure it contains
-        the required columns and correct data types.
-
-        Args:
-            df (pd.DataFrame): The DataFrame representing the FX adjustments.
-
-        Returns:
-            pd.DataFrame: The standardized FX adjustments DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing or if data types are incorrect.
-        """
-        if df is None:
-            # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_FX_ADJUSTMENT_COLUMNS)
-
-        # Ensure required columns and values are present
-        missing = set(cls.REQUIRED_FX_ADJUSTMENT_COLUMNS) - set(df.columns)
-        if missing:
-            raise ValueError(f"Required columns {', '.join(missing)} are missing.")
-
-        # Enforce data types
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["adjust"] = df["adjust"].astype(pd.StringDtype())
-        df["credit"] = df["credit"].astype(pd.Int64Dtype())
-        df["debit"] = df["debit"].astype(pd.Int64Dtype())
-        df["text"] = df["text"].astype(pd.StringDtype())
-
-        return df.sort_values("date")
-
-    @classmethod
-    def standardize_price_df(cls, df: pd.DataFrame) -> pd.DataFrame:
-        """Validates and standardizes the 'prices' DataFrame to ensure it contains
-        the required columns, correct data types, and no missing values in key fields.
-
-        Args:
-            df (pd.DataFrame): The DataFrame representing the prices.
-
-        Returns:
-            pd.DataFrame: The standardized prices DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing, if there are missing values
-                        in required columns, or if data types are incorrect.
-        """
-        if df is None:
-            # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_PRICE_COLUMNS)
-
-        # Check for missing required columns
-        missing = set(cls.REQUIRED_PRICE_COLUMNS) - set(df.columns)
-        if len(missing) > 0:
-            raise ValueError(f"Required columns {missing} missing.")
-
-        # Check for missing values in required columns
-        has_missing_value = [
-            column for column in cls.REQUIRED_PRICE_COLUMNS if df[column].isnull().any()
-        ]
-        if len(has_missing_value) > 0:
-            raise ValueError(f"Missing values in column {has_missing_value}.")
-
-        # Enforce data types
-        df["ticker"] = df["ticker"].astype(str)
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["currency"] = df["currency"].astype(str)
-        df["price"] = df["price"].astype(float)
-
-        return df
-
-    @classmethod
-    def standardize_prices(cls, df: pd.DataFrame) -> pd.DataFrame:
-        """Store prices in nested dict: Each prices[ticker][currency] is a DataFrame with
-        columns 'date' and 'price' that is sorted by 'date'.
-        """
-        df = cls.standardize_price_df(df)
-        result = {}
-        for (ticker, currency), group in df.groupby(["ticker", "currency"]):
-            group = group[["date", "price"]].sort_values("date")
-            group = group.reset_index(drop=True)
-            if ticker not in result.keys():
-                result[ticker] = {}
-            result[ticker][currency] = group
-        return result
-
-    def ledger(self) -> pd.DataFrame:
-        """Retrieves a DataFrame with all ledger transactions.
-
-        Returns:
-            pd.DataFrame: Combined DataFrame with ledger data.
-        """
-        return self._ledger
-
-    def serialized_ledger(self) -> pd.DataFrame:
-        """Retrieves a DataFrame with all ledger transactions in long format.
-
-        Returns:
-            pd.DataFrame: Combined DataFrame with ledger data.
-        """
-        if self._serialized_ledger is None:
-            self.complete_ledger()
-        return self._serialized_ledger
-
-    def _base_currency_amount(
-        self, amount: list[float], currency: list[str], date: list[datetime.date]
-    ) -> list[float]:
-        base_currency = self.base_currency
-        if not (len(amount) == len(currency) == len(date)):
-            raise ValueError("Vectors 'amount', 'currency', and 'date' must have the same length.")
-        result = [
-            self.round_to_precision(
-                a * self.price(t, date=d, currency=base_currency)[1],
-                base_currency, date=d)
-            for a, t, d in zip(amount, currency, date)]
-        return result
 
     def vat_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create journal entries to book VAT according to vat_codes.
@@ -409,6 +338,66 @@ class StandaloneLedger(LedgerEngine):
             result = pd.DataFrame(columns=cols)
         return result
 
+    # ----------------------------------------------------------------------
+    # Account chart
+
+    def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
+        return self._balance_from_serialized_ledger(account=account, date=date)
+
+    def account_chart(self) -> pd.DataFrame:
+        return self._account_chart
+
+    def add_account(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_account is not implemented yet.")
+
+    def modify_account(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_account is not implemented yet.")
+
+    def delete_account(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_account is not implemented yet.")
+
+    @classmethod
+    def standardize_account_chart(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates and standardizes the 'account_chart' DataFrame to ensure it contains
+        the required columns and correct data types.
+
+        Args:
+            df (pd.DataFrame): The DataFrame representing the account chart.
+
+        Returns:
+            pd.DataFrame: The standardized account chart DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing, or if 'account' column
+                        contains NaN values, or if data types are incorrect.
+        """
+        if df is None:
+            # Return empty DataFrame with identical structure
+            df = pd.DataFrame(columns=cls.REQUIRED_ACCOUNT_COLUMNS)
+
+        # Ensure required columns and values are present
+        missing = set(cls.REQUIRED_ACCOUNT_COLUMNS) - set(df.columns)
+        if missing:
+            raise ValueError(f"Required columns missing in account chart: {missing}.")
+        if df["account"].isna().any():
+            raise ValueError("Missing 'account' values in account chart.")
+
+        # Add missing columns
+        for col in cls.OPTIONAL_ACCOUNT_COLUMNS:
+            if col not in df.columns:
+                df[col] = None
+
+        # Enforce data types
+        def to_str_or_na(value):
+            return str(value) if pd.notna(value) else value
+
+        df["account"] = df["account"].astype(int)
+        df["currency"] = df["currency"].apply(to_str_or_na)
+        df["text"] = df["text"].apply(to_str_or_na)
+        df["vat_code"] = df["vat_code"].apply(to_str_or_na).astype(pd.StringDtype())
+
+        return df.set_index("account")
+
     def validate_accounts(self) -> None:
         """Validate coherence between account, VAT and FX adjustment definitions."""
         # Ensure all vat code accounts are defined in account chart
@@ -435,6 +424,69 @@ class StandaloneLedger(LedgerEngine):
                 f"Some accounts in FX adjustment definitions are not defined in the account chart: "
                 f"{missing}."
             )
+
+    # ----------------------------------------------------------------------
+    # Ledger
+
+    def ledger(self) -> pd.DataFrame:
+        """Retrieves a DataFrame with all ledger transactions.
+
+        Returns:
+            pd.DataFrame: Combined DataFrame with ledger data.
+        """
+        return self._ledger
+
+    def add_ledger_entry(self, data: dict) -> None:
+        """Add one or more entries to the general ledger."""
+        if isinstance(data, dict):
+            # Transform one dict value to a list to avoid an error in
+            # pd.DataFrame() when passing a dict of scalars:
+            # ValueError: If using all scalar values, you must pass an index.
+            first_key = next(iter(data))
+            if not isinstance(data[first_key], collections.abc.Sequence):
+                data[first_key] = [data[first_key]]
+        df = pd.DataFrame(data)
+        automated_id = "id" not in df.columns
+        df = self.standardize_ledger_columns(df)
+
+        # Ensure ID is not already in use
+        duplicate = set(df["id"]).intersection(self._ledger["id"])
+        if len(duplicate) > 0:
+            # breakpoint()
+            if automated_id:
+                # Replace ids by integers above the highest existing integer id
+                min_id = df["id"].astype(pd.Int64Dtype()).min(skipna=True)
+                max_id = self._ledger["id"].astype(pd.Int64Dtype()).max(skipna=True)
+                offset = max_id - min_id + 1
+                df["id"] = df["id"].astype(pd.Int64Dtype()) + offset
+                df["id"] = df["id"].astype(pd.StringDtype())
+            else:
+                if len(duplicate) == 0:
+                    message = f"Ledger id '{list(duplicate)[0]}' already used."
+                else:
+                    message = f"Ledger ids {duplicate} already used."
+                raise ValueError(message)
+
+        self._ledger = pd.concat([self._ledger, df], axis=0)
+
+    def delete_ledger_entry(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_ledger_entry is not implemented yet.")
+
+    def ledger_entry(self, *args, **kwargs) -> None:
+        raise NotImplementedError("ledger_entry is not implemented yet.")
+
+    def modify_ledger_entry(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_ledger_entry is not implemented yet.")
+
+    def serialized_ledger(self) -> pd.DataFrame:
+        """Retrieves a DataFrame with all ledger transactions in long format.
+
+        Returns:
+            pd.DataFrame: Combined DataFrame with ledger data.
+        """
+        if self._serialized_ledger is None:
+            self.complete_ledger()
+        return self._serialized_ledger
 
     def complete_ledger(self) -> None:
         # Ledger definition
@@ -523,6 +575,29 @@ class StandaloneLedger(LedgerEngine):
         result = self.serialize_ledger(df)
         self._serialized_ledger = self.standardize_ledger_columns(result)
 
+    # ----------------------------------------------------------------------
+    # Currency
+
+    @property
+    def base_currency(self) -> str:
+        return self._settings["base_currency"]
+
+    def _base_currency_amount(
+        self, amount: list[float], currency: list[str], date: list[datetime.date]
+    ) -> list[float]:
+        base_currency = self.base_currency
+        if not (len(amount) == len(currency) == len(date)):
+            raise ValueError("Vectors 'amount', 'currency', and 'date' must have the same length.")
+        result = [
+            self.round_to_precision(
+                a * self.price(t, date=d, currency=base_currency)[1],
+                base_currency, date=d)
+            for a, t, d in zip(amount, currency, date)]
+        return result
+
+    # ----------------------------------------------------------------------
+    # Price
+
     def price(
         self,
         ticker: str,
@@ -568,122 +643,71 @@ class StandaloneLedger(LedgerEngine):
 
         return (currency, prc.iloc[-1].item())
 
-    def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
-        return self._balance_from_serialized_ledger(account=account, date=date)
-
-    @property
-    def base_currency(self) -> str:
-        return self._settings["base_currency"]
-
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         return self._settings["precision"][ticker]
-
-    def account_chart(self) -> pd.DataFrame:
-        return self._account_chart
-
-    def vat_codes(self) -> pd.DataFrame:
-        return self._vat_codes
-
-    def vat_rate(self, vat_code: str) -> float:
-        """Retrieve the VAT rate for a given VAT code.
-
-        Args:
-            vat_code (str): VAT code to look up.
-
-        Returns:
-            float: VAT rate associated with the specified code.
-
-        Raises:
-            KeyError: If the VAT code is not defined.
-        """
-        if vat_code not in self._vat_codes.index:
-            raise KeyError(f"VAT code not defined: {vat_code}")
-        return self._vat_codes["rate"][vat_code]
-
-    def vat_accounts(self, vat_code: str) -> list[int]:
-        """Retrieve the accounts associated with a given VAT code.
-
-        Args:
-            vat_code (str): VAT code to look up.
-
-        Returns:
-            list[int]: List of accounts associated with the specified VAT code.
-
-        Raises:
-            KeyError: If the VAT code is not defined.
-        """
-        if vat_code not in self._vat_codes.index:
-            raise KeyError(f"VAT code not defined: {vat_code}")
-        return self._vat_codes["accounts"][vat_code]
-
-    def fx_adjustments(self) -> pd.DataFrame:
-        return self._fx_adjustments
-
-    def add_account(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_account is not implemented yet.")
-
-    def add_ledger_entry(self, data: dict) -> None:
-        """Add one or more entries to the general ledger."""
-        if isinstance(data, dict):
-            # Transform one dict value to a list to avoid an error in
-            # pd.DataFrame() when passing a dict of scalars:
-            # ValueError: If using all scalar values, you must pass an index.
-            first_key = next(iter(data))
-            if not isinstance(data[first_key], collections.abc.Sequence):
-                data[first_key] = [data[first_key]]
-        df = pd.DataFrame(data)
-        automated_id = "id" not in df.columns
-        df = self.standardize_ledger_columns(df)
-
-        # Ensure ID is not already in use
-        duplicate = set(df["id"]).intersection(self._ledger["id"])
-        if len(duplicate) > 0:
-            # breakpoint()
-            if automated_id:
-                # Replace ids by integers above the highest existing integer id
-                min_id = df["id"].astype(pd.Int64Dtype()).min(skipna=True)
-                max_id = self._ledger["id"].astype(pd.Int64Dtype()).max(skipna=True)
-                offset = max_id - min_id + 1
-                df["id"] = df["id"].astype(pd.Int64Dtype()) + offset
-                df["id"] = df["id"].astype(pd.StringDtype())
-            else:
-                if len(duplicate) == 0:
-                    message = f"Ledger id '{list(duplicate)[0]}' already used."
-                else:
-                    message = f"Ledger ids {duplicate} already used."
-                raise ValueError(message)
-
-        self._ledger = pd.concat([self._ledger, df], axis=0)
 
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")
 
-    def add_vat_code(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_vat_code is not implemented yet.")
-
-    def delete_account(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_account is not implemented yet.")
-
-    def delete_ledger_entry(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_ledger_entry is not implemented yet.")
-
     def delete_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_price is not implemented yet.")
-
-    def delete_vat_code(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_vat_code is not implemented yet.")
-
-    def ledger_entry(self, *args, **kwargs) -> None:
-        raise NotImplementedError("ledger_entry is not implemented yet.")
-
-    def modify_account(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_account is not implemented yet.")
-
-    def modify_ledger_entry(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_ledger_entry is not implemented yet.")
 
     def price_history(self, *args, **kwargs) -> None:
         raise NotImplementedError("price_history is not implemented yet.")
 
     def price_increment(self, *args, **kwargs) -> None:
         raise NotImplementedError("price_increment is not implemented yet.")
+
+    @classmethod
+    def standardize_price_df(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates and standardizes the 'prices' DataFrame to ensure it contains
+        the required columns, correct data types, and no missing values in key fields.
+
+        Args:
+            df (pd.DataFrame): The DataFrame representing the prices.
+
+        Returns:
+            pd.DataFrame: The standardized prices DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing, if there are missing values
+                        in required columns, or if data types are incorrect.
+        """
+        if df is None:
+            # Return empty DataFrame with identical structure
+            df = pd.DataFrame(columns=cls.REQUIRED_PRICE_COLUMNS)
+
+        # Check for missing required columns
+        missing = set(cls.REQUIRED_PRICE_COLUMNS) - set(df.columns)
+        if len(missing) > 0:
+            raise ValueError(f"Required columns {missing} missing.")
+
+        # Check for missing values in required columns
+        has_missing_value = [
+            column for column in cls.REQUIRED_PRICE_COLUMNS if df[column].isnull().any()
+        ]
+        if len(has_missing_value) > 0:
+            raise ValueError(f"Missing values in column {has_missing_value}.")
+
+        # Enforce data types
+        df["ticker"] = df["ticker"].astype(str)
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        df["currency"] = df["currency"].astype(str)
+        df["price"] = df["price"].astype(float)
+
+        return df
+
+    @classmethod
+    def standardize_prices(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Store prices in nested dict: Each prices[ticker][currency] is a DataFrame with
+        columns 'date' and 'price' that is sorted by 'date'.
+        """
+        df = cls.standardize_price_df(df)
+        result = {}
+        for (ticker, currency), group in df.groupby(["ticker", "currency"]):
+            group = group[["date", "price"]].sort_values("date")
+            group = group.reset_index(drop=True)
+            if ticker not in result.keys():
+                result[ticker] = {}
+            result[ticker][currency] = group
+        return result

@@ -47,120 +47,93 @@ class LedgerEngine(ABC):
 
     _logger = None
 
+    # ----------------------------------------------------------------------
+    # Constructor
+
     def __init__(self):
         self._logger = logging.getLogger("ledger")
 
-    @property
-    @abstractmethod
-    def base_currency(self) -> str:
-        """Returns the base currency used for financial reporting."""
+    # ----------------------------------------------------------------------
+    # File Operations
 
-    @abstractmethod
-    def precision(
-        self, ticker: str, date: datetime.date = None
-    ) -> float:
-        """Returns the smallest increment for quotation of prices of a given asset or currency.
-
-        This is the precision, to which prices should be rounded.
+    def export_account_sheets(self, file: str, root: str = None) -> None:
+        """Export ledger as Excel file, with separate sheets containing
+        transactions for each account.
 
         Args:
-            ticker (str): Reference to the associated document.
-            date (datetime.date, optional): Date for which to retrieve the precision.
-                                            Defaults to today's date.
+            file (str): The path where the Excel file will be saved.
+            root (str, optional): Root directory for document paths. If not None, valid document
+                                  paths are formatted as hyperlinks to the file in the root folder.
+                                  Defaults to None.
         """
+        out = {}
+        for account in self.account_chart().index.sort_values():
+            df = self._fetch_account_history(account)
+            out[str(account)] = df.drop(columns="account")
+        excel.write_sheets(out, path=file)
 
-    def round_to_precision(
-        self, amount: float, ticker: str, date: datetime.date = None
-    ) -> float:
-        """Round an amount to the precision of a specified asset or currency.
+        if root is not None:
+            # Add link to open documents locally
+            root_dir = Path(root).expanduser()
+            workbook = openpyxl.load_workbook(file)
+            for sheet in workbook.worksheets:
+                for cell in sheet["K"]:
+                    # Column K corresponds to 'documents'
+                    if cell.value is not None:
+                        document = root_dir.joinpath(cell.value)
+                        if document.is_file():
+                            cell.hyperlink = f"file://{str(document)}"
+                            cell.style = "Hyperlink"
+            workbook.save(file)
 
-        This method retrieves the precision for the specified ticker and date,
-        then rounds the amount to the nearest multiple of this precision.
-
-        Args:
-            amount (float): Value to be rounded.
-            ticker (str): Ticker symbol of the asset or currency.
-            date (datetime.date, optional): Date for precision determination.
-                                            Defaults to today's date.
-
-        Returns:
-            float: Rounded amount, adjusted to the specified asset's precision.
-        """
-        precision = self.precision(ticker=ticker, date=date)
-        result = round(amount / precision, 0) * precision
-        return round(result, -1 * math.floor(math.log10(precision)))
+    # ----------------------------------------------------------------------
+    # VAT Codes
 
     @abstractmethod
-    def ledger(self) -> pd.DataFrame:
-        """Retrieves a DataFrame representing all ledger transactions.
+    def vat_codes(self) -> pd.DataFrame:
+        """Retrieves all vat definitions.
 
         Returns:
-            pd.DataFrame: DataFrame with columns `id` (str), `date` (datetime),
-            `document` (str), `amounts` (DataFrame). `amounts` is a nested
-            pd.DataFrame with columns `account` (int), `counter_account`
-            (int or None), `currency` (str), `amount` (float),
-            `base_currency_amount` (float or None), and `vat_code` (str).
-        """
-
-    def serialized_ledger(self) -> pd.DataFrame:
-        """Retrieves a DataFrame with a long representation of all ledger transactions.
-
-        Simple transactions with a credit and debit account are represented twice,
-        one with 'account' corresponding to the credit account and one with
-        account corresponding to the debit account.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `id` (str), `date` (datetime),
-                         `account` (int), `counter_account` (int or None), `currency` (str),
-                         `amount` (float), `base_currency_amount` (float or None),
-                         `vat_code` (str), and `document` (str).
-        """
-        return self.serialize_ledger(self.ledger())
-
-    @abstractmethod
-    def ledger_entry(self, id: str) -> dict:
-        """Retrieves a specific ledger entry by its ID.
-
-        Args:
-            id (str): The unique identifier for the ledger entry.
-
-        Returns:
-            dict: A dictionary representing the ledger entry.
+            pd.DataFrame: DataFrame with columns `code` (str), `date` (datetime.date),
+                          `rate` (float), `included` (bool), `account` (int).
         """
 
     @abstractmethod
-    def add_ledger_entry(
-        self, date: datetime.date, document: str, amounts: pd.DataFrame
+    def add_vat_code(
+        self,
+        code: str,
+        rate: float,
+        account: str,
+        included: bool = True,
+        date: datetime.date = None
     ) -> None:
-        """Adds a new posting to the ledger.
+        """Append a vat code to the list of available vat_codes.
 
         Args:
-            date (datetime.date): Date of the transaction.
-            document (str): Reference to the associated document.
-            amounts (pd.DataFrame): DataFrame detailing transaction amounts.
-            Columns include: `account` (int), `counter_account` (int, optional),
-            `currency` (str), `amount` (float), `base_currency_amount` (float, optional),
-            `vat_code` (str, optional).
+            code (str): Identifier for the vat definition.
+            rate (float): The VAT rate to apply.
+            account (str): Account to which the VAT is applicable.
+            included (bool, optional): Specifies whether the VAT amount is included in the
+                                       transaction amount. Defaults to True.
+            date (datetime.date, optional): Date from which onward the vat definition is
+                                            applied. The definition is valid until the same
+                                            vat code is re-defined on a subsequent date.
+                                            Defaults to None.
         """
 
     @abstractmethod
-    def modify_ledger_entry(self, id: str, new_data: dict) -> None:
-        """Modifies an existing ledger entry.
+    def delete_vat_code(self, code: str, date: datetime.date = None) -> None:
+        """Removes a vat definition.
 
         Args:
-            id (str): Unique identifier of the ledger entry to be modified.
-            new_data (dict): Fields to be overwritten in the ledger entry.
-                             Keys typically include `date` (datetime.date),
-                             `document` (str), or `amounts` (pd.DataFrame).
+            code (str): Vat code to be removed.
+            date (datetime.date, optional): Date on which the vat code is removed.
+                                            If `None`, all entries with the given vat_code are
+                                            removed. Defaults to None.
         """
 
-    @abstractmethod
-    def delete_ledger_entry(self, id: str) -> None:
-        """Deletes a ledger entry by its ID.
-
-        Args:
-            id (str): The unique identifier of the ledger entry to delete.
-        """
+    # ----------------------------------------------------------------------
+    # Account chart
 
     @abstractmethod
     def account_chart(self) -> pd.DataFrame:
@@ -210,110 +183,6 @@ class LedgerEngine(ABC):
 
         Args:
             account (int): The account to be removed.
-        """
-
-    @abstractmethod
-    def price_history(self) -> pd.DataFrame:
-        """Retrieves a data frame with all price definitions.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `ticker` (str), `date` (datetime.date),
-                          `currency` (str), and `price` (float). Tickers can be arbitrarily
-                          chosen and can represent anything, including foreign currencies,
-                          securities, commodities, or inventory. Price observations are uniquely
-                          defined by a date/ticker/currency triple. Prices can be defined in
-                          any other currency and are applied up to the subsequent price
-                          definition for the same ticker/currency pair.
-        """
-
-    @abstractmethod
-    def price(
-        self, ticker: str, date: datetime.date, currency: str = None
-    ) -> tuple[str, float]:
-        """Retrieve price for a given ticker as of a specified date.
-
-        If no price is available on the exact date, return latest price
-        observation prior to the specified date.
-
-        Args:
-            ticker (str): Asset identifier.
-            date (datetime.date): Date for which the price is required.
-            currency (str, optional): Currency in which the price is desired.
-
-        Returns:
-            tuple: (currency, price) where 'currency' is a string indicating the currency
-                   of the price, and 'price' is a float representing the asset's price as
-                   of the specified date.
-        """
-
-    @abstractmethod
-    def add_price(
-        self, ticker: str, date: datetime.date, currency: str, price: float, overwrite: bool = False
-    ) -> None:
-        """Appends a price to the price history.
-
-        Args:
-            ticker (str): Asset identifier.
-            date (datetime.date): Date on which the price is recorded.
-            currency (str): Currency in which the price is quoted.
-            price (float): Value of the asset as of the given date.
-            overwrite (bool, optional): Overwrite an existing price definition with the same ticker,
-                                        date, and currency if one exists. Defaults to False.
-        """
-
-    @abstractmethod
-    def delete_price(self, ticker: str, date: datetime.date, currency: str = None) -> None:
-        """Removes a price definition from the history.
-
-        Args:
-            ticker (str): Asset identifier.
-            date (datetime.date): Date on which the price is recorded.
-            currency (str, optional): Currency in which the price is quoted. `None` indicates that
-                                      price definitions for this ticker in all currencies
-                                      should be removed.
-        """
-
-    @abstractmethod
-    def vat_codes(self) -> pd.DataFrame:
-        """Retrieves all vat definitions.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `code` (str), `date` (datetime.date),
-                          `rate` (float), `included` (bool), `account` (int).
-        """
-
-    @abstractmethod
-    def add_vat_code(
-        self,
-        code: str,
-        rate: float,
-        account: str,
-        included: bool = True,
-        date: datetime.date = None
-    ) -> None:
-        """Append a vat code to the list of available vat_codes.
-
-        Args:
-            code (str): Identifier for the vat definition.
-            rate (float): The VAT rate to apply.
-            account (str): Account to which the VAT is applicable.
-            included (bool, optional): Specifies whether the VAT amount is included in the
-                                       transaction amount. Defaults to True.
-            date (datetime.date, optional): Date from which onward the vat definition is
-                                            applied. The definition is valid until the same
-                                            vat code is re-defined on a subsequent date.
-                                            Defaults to None.
-        """
-
-    @abstractmethod
-    def delete_vat_code(self, code: str, date: datetime.date = None) -> None:
-        """Removes a vat definition.
-
-        Args:
-            code (str): Vat code to be removed.
-            date (datetime.date, optional): Date on which the vat code is removed.
-                                            If `None`, all entries with the given vat_code are
-                                            removed. Defaults to None.
         """
 
     @abstractmethod
@@ -557,6 +426,81 @@ class LedgerEngine(ABC):
             pd.DataFrame: DataFrame with sanitized account chart.
         """
         accounts = self.st  # noqa: F841
+
+    # ----------------------------------------------------------------------
+    # Ledger
+
+    @abstractmethod
+    def ledger(self) -> pd.DataFrame:
+        """Retrieves a DataFrame representing all ledger transactions.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns `id` (str), `date` (datetime),
+            `document` (str), `amounts` (DataFrame). `amounts` is a nested
+            pd.DataFrame with columns `account` (int), `counter_account`
+            (int or None), `currency` (str), `amount` (float),
+            `base_currency_amount` (float or None), and `vat_code` (str).
+        """
+
+    def serialized_ledger(self) -> pd.DataFrame:
+        """Retrieves a DataFrame with a long representation of all ledger transactions.
+
+        Simple transactions with a credit and debit account are represented twice,
+        one with 'account' corresponding to the credit account and one with
+        account corresponding to the debit account.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns `id` (str), `date` (datetime),
+                         `account` (int), `counter_account` (int or None), `currency` (str),
+                         `amount` (float), `base_currency_amount` (float or None),
+                         `vat_code` (str), and `document` (str).
+        """
+        return self.serialize_ledger(self.ledger())
+
+    @abstractmethod
+    def ledger_entry(self, id: str) -> dict:
+        """Retrieves a specific ledger entry by its ID.
+
+        Args:
+            id (str): The unique identifier for the ledger entry.
+
+        Returns:
+            dict: A dictionary representing the ledger entry.
+        """
+
+    @abstractmethod
+    def add_ledger_entry(
+        self, date: datetime.date, document: str, amounts: pd.DataFrame
+    ) -> None:
+        """Adds a new posting to the ledger.
+
+        Args:
+            date (datetime.date): Date of the transaction.
+            document (str): Reference to the associated document.
+            amounts (pd.DataFrame): DataFrame detailing transaction amounts.
+            Columns include: `account` (int), `counter_account` (int, optional),
+            `currency` (str), `amount` (float), `base_currency_amount` (float, optional),
+            `vat_code` (str, optional).
+        """
+
+    @abstractmethod
+    def modify_ledger_entry(self, id: str, new_data: dict) -> None:
+        """Modifies an existing ledger entry.
+
+        Args:
+            id (str): Unique identifier of the ledger entry to be modified.
+            new_data (dict): Fields to be overwritten in the ledger entry.
+                             Keys typically include `date` (datetime.date),
+                             `document` (str), or `amounts` (pd.DataFrame).
+        """
+
+    @abstractmethod
+    def delete_ledger_entry(self, id: str) -> None:
+        """Deletes a ledger entry by its ID.
+
+        Args:
+            id (str): The unique identifier of the ledger entry to delete.
+        """
 
     def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
         """Discards inconsistent ledger entries and inconsistent vat codes.
@@ -817,35 +761,109 @@ class LedgerEngine(ABC):
         ])
         return result[cols]
 
-    def export_account_sheets(self, file: str, root: str = None) -> None:
-        """Export ledger as Excel file, with separate sheets containing
-        transactions for each account.
+    # ----------------------------------------------------------------------
+    # Currency
+
+    @property
+    @abstractmethod
+    def base_currency(self) -> str:
+        """Returns the base currency used for financial reporting."""
+
+    @abstractmethod
+    def precision(
+        self, ticker: str, date: datetime.date = None
+    ) -> float:
+        """Returns the smallest increment for quotation of prices of a given asset or currency.
+
+        This is the precision, to which prices should be rounded.
 
         Args:
-            file (str): The path where the Excel file will be saved.
-            root (str, optional): Root directory for document paths. If not None, valid document
-                                  paths are formatted as hyperlinks to the file in the root folder.
-                                  Defaults to None.
+            ticker (str): Reference to the associated document.
+            date (datetime.date, optional): Date for which to retrieve the precision.
+                                            Defaults to today's date.
         """
-        out = {}
-        for account in self.account_chart().index.sort_values():
-            df = self._fetch_account_history(account)
-            out[str(account)] = df.drop(columns="account")
-        excel.write_sheets(out, path=file)
 
-        if root is not None:
-            # Add link to open documents locally
-            root_dir = Path(root).expanduser()
-            workbook = openpyxl.load_workbook(file)
-            for sheet in workbook.worksheets:
-                for cell in sheet["K"]:
-                    # Column K corresponds to 'documents'
-                    if cell.value is not None:
-                        document = root_dir.joinpath(cell.value)
-                        if document.is_file():
-                            cell.hyperlink = f"file://{str(document)}"
-                            cell.style = "Hyperlink"
-            workbook.save(file)
+    def round_to_precision(
+        self, amount: float, ticker: str, date: datetime.date = None
+    ) -> float:
+        """Round an amount to the precision of a specified asset or currency.
+
+        This method retrieves the precision for the specified ticker and date,
+        then rounds the amount to the nearest multiple of this precision.
+
+        Args:
+            amount (float): Value to be rounded.
+            ticker (str): Ticker symbol of the asset or currency.
+            date (datetime.date, optional): Date for precision determination.
+                                            Defaults to today's date.
+
+        Returns:
+            float: Rounded amount, adjusted to the specified asset's precision.
+        """
+        precision = self.precision(ticker=ticker, date=date)
+        result = round(amount / precision, 0) * precision
+        return round(result, -1 * math.floor(math.log10(precision)))
+
+    @abstractmethod
+    def price_history(self) -> pd.DataFrame:
+        """Retrieves a data frame with all price definitions.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns `ticker` (str), `date` (datetime.date),
+                          `currency` (str), and `price` (float). Tickers can be arbitrarily
+                          chosen and can represent anything, including foreign currencies,
+                          securities, commodities, or inventory. Price observations are uniquely
+                          defined by a date/ticker/currency triple. Prices can be defined in
+                          any other currency and are applied up to the subsequent price
+                          definition for the same ticker/currency pair.
+        """
+
+    @abstractmethod
+    def price(
+        self, ticker: str, date: datetime.date, currency: str = None
+    ) -> tuple[str, float]:
+        """Retrieve price for a given ticker as of a specified date.
+
+        If no price is available on the exact date, return latest price
+        observation prior to the specified date.
+
+        Args:
+            ticker (str): Asset identifier.
+            date (datetime.date): Date for which the price is required.
+            currency (str, optional): Currency in which the price is desired.
+
+        Returns:
+            tuple: (currency, price) where 'currency' is a string indicating the currency
+                   of the price, and 'price' is a float representing the asset's price as
+                   of the specified date.
+        """
+
+    @abstractmethod
+    def add_price(
+        self, ticker: str, date: datetime.date, currency: str, price: float, overwrite: bool = False
+    ) -> None:
+        """Appends a price to the price history.
+
+        Args:
+            ticker (str): Asset identifier.
+            date (datetime.date): Date on which the price is recorded.
+            currency (str): Currency in which the price is quoted.
+            price (float): Value of the asset as of the given date.
+            overwrite (bool, optional): Overwrite an existing price definition with the same ticker,
+                                        date, and currency if one exists. Defaults to False.
+        """
+
+    @abstractmethod
+    def delete_price(self, ticker: str, date: datetime.date, currency: str = None) -> None:
+        """Removes a price definition from the history.
+
+        Args:
+            ticker (str): Asset identifier.
+            date (datetime.date): Date on which the price is recorded.
+            currency (str, optional): Currency in which the price is quoted. `None` indicates that
+                                      price definitions for this ticker in all currencies
+                                      should be removed.
+        """
 
     # Hack: abstract functionality to compute balance from serialized ledger,
     # that is used in two different branches of the dependency tree
