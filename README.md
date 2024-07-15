@@ -1,5 +1,6 @@
 # Account Management and Integration in Python
 
+[![codecov](https://codecov.io/gh/macxred/pyledger/branch/main/graph/badge.svg)](https://codecov.io/gh/macxred/pyledger)
 
 **PyLedger** is a Python library to facilitate the implementation and integration of accounting systems. PyLedger provides abstract functionality that can be implemented either by connecting to existing accounting software or as a stand-alone accounting solution with your preferred data storage capabilities. Through its abstract interface, PyLedger offers interoperability between these different solutions.
 
