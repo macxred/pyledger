@@ -8,10 +8,18 @@ import datetime
 import logging
 import math
 from pathlib import Path
+from consistent_df import enforce_dtypes
 import re
 import numpy as np
 import openpyxl
 import pandas as pd
+from .constants import (
+    ACCOUNT_CHART_COLUMNS,
+    FX_ADJUSTMENTS_COLUMNS,
+    LEDGER_COLUMNS,
+    PRICE_COLUMNS,
+    VAT_CODE_COLUMNS
+)
 from . import excel
 from .helpers import represents_integer
 from .time import parse_date_span
@@ -132,13 +140,7 @@ class LedgerEngine(ABC):
         if missing:
             raise ValueError(f"Required columns {', '.join(missing)} are missing.")
 
-        # Enforce data types
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["adjust"] = df["adjust"].astype(pd.StringDtype())
-        df["credit"] = df["credit"].astype(pd.Int64Dtype())
-        df["debit"] = df["debit"].astype(pd.Int64Dtype())
-        df["text"] = df["text"].astype(pd.StringDtype())
-
+        df = enforce_dtypes(df, FX_ADJUSTMENTS_COLUMNS)
         return df.sort_values("date")
 
     # ----------------------------------------------------------------------
@@ -251,13 +253,9 @@ class LedgerEngine(ABC):
                 df[col] = None
 
         # Enforce data types
+        df = enforce_dtypes(df, VAT_CODE_COLUMNS)
         inception = pd.Timestamp("1900-01-01")
-        df["id"] = df["id"].astype(pd.StringDtype())
-        df["text"] = df["text"].astype(pd.StringDtype())
-        df["inclusive"] = df["inclusive"].astype(bool)
-        df["account"] = df["account"].astype(pd.Int64Dtype())
         df["date"] = pd.to_datetime(df["date"]).fillna(inception).dt.date
-        df["rate"] = df["rate"].astype(float)
 
         # Ensure account is defined if rate is other than zero
         missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
@@ -313,15 +311,7 @@ class LedgerEngine(ABC):
             if col not in df.columns:
                 df[col] = None
 
-        # Enforce data types
-        def to_str_or_na(value):
-            return str(value) if pd.notna(value) else value
-
-        df["account"] = df["account"].astype(int)
-        df["currency"] = df["currency"].apply(to_str_or_na)
-        df["text"] = df["text"].apply(to_str_or_na)
-        df["vat_code"] = df["vat_code"].apply(to_str_or_na).astype(pd.StringDtype())
-
+        df = enforce_dtypes(df, ACCOUNT_CHART_COLUMNS)
         return df.set_index("account")
 
     def account_currency(self, account: int) -> str:
@@ -843,16 +833,8 @@ class LedgerEngine(ABC):
                 df[col] = None
 
         # Enforce column data types
-        df["id"] = df["id"].astype(pd.StringDtype())
+        df = enforce_dtypes(df, LEDGER_COLUMNS)
         df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["account"] = df["account"].astype(pd.Int64Dtype())
-        df["counter_account"] = df["counter_account"].astype(pd.Int64Dtype())
-        df["currency"] = df["currency"].astype(pd.StringDtype())
-        df["amount"] = df["amount"].astype(pd.Float64Dtype())
-        df["base_currency_amount"] = df["base_currency_amount"].astype(pd.Float64Dtype())
-        df["vat_code"] = df["vat_code"].astype(pd.StringDtype())
-        df["text"] = df["text"].astype(pd.StringDtype())
-        df["document"] = df["document"].astype(pd.StringDtype())
 
         # Order columns based on 'LEDGER_COLUMN_SEQUENCE'
         col_order = LedgerEngine.LEDGER_COLUMN_SEQUENCE
@@ -1073,10 +1055,7 @@ class LedgerEngine(ABC):
             raise ValueError(f"Missing values in column {has_missing_value}.")
 
         # Enforce data types
-        df["ticker"] = df["ticker"].astype(str)
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["currency"] = df["currency"].astype(str)
-        df["price"] = df["price"].astype(float)
+        df = enforce_dtypes(df, PRICE_COLUMNS)
 
         return df
 

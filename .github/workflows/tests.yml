@@ -37,10 +37,10 @@ jobs:
           . venv/bin/activate
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install coverage pytest
+        run: pip install coverage pytest pandas .
+
+      - name: Install package
+        run: python setup.py develop
 
       - name: Run tests
         run: coverage run -m pytest
