@@ -54,6 +54,94 @@ class LedgerEngine(ABC):
         self._logger = logging.getLogger("ledger")
 
     # ----------------------------------------------------------------------
+    # Settings
+
+    @staticmethod
+    def standardize_settings(settings: dict) -> dict:
+        """Validates and standardizes the 'settings' dictionary. Ensures it
+        contains items 'base_currency' and 'precision'.
+
+        Example:
+            settings = {
+                'base_currency': 'USD',
+                'precision': {
+                    'CAD': 0.01, 'CHF': 0.01, 'EUR': 0.01,
+                    'GBP': 0.01, 'HKD': 0.01, 'USD': 0.01
+                }
+            }
+            LedgerEngine.standardize_settings(settings)
+
+        Args:
+            settings (dict): The settings dictionary to be standardized.
+
+        Returns:
+            dict: The standardized settings dictionary.
+
+        Raises:
+            ValueError: If 'settings' is not a dictionary, or if 'base_currency'
+                        is missing/not a string, or if 'precision' is missing/not a
+                        dictionary, or if any key/value in 'precision' is of invalid
+                        type.
+
+        Note:
+            Modifies 'precision' to include the 'base_currency' key.
+        """
+        if not isinstance(settings, dict):
+            raise ValueError("'settings' must be a dict.")
+
+        # Check for 'base_currency'
+        if "base_currency" not in settings or not isinstance(settings["base_currency"], str):
+            raise ValueError("Missing/invalid 'base_currency' in settings.")
+
+        # Check for 'precision'
+        if "precision" not in settings or not isinstance(settings["precision"], dict):
+            raise ValueError("Missing/invalid 'precision'.")
+
+        # Validate contents of 'precision'
+        for key, value in settings["precision"].items():
+            if not isinstance(key, str) or not isinstance(value, (float, int)):
+                raise ValueError("Invalid types in 'precision'.")
+
+        settings["precision"]["base_currency"] = settings["precision"][settings["base_currency"]]
+
+        return settings
+
+    # ----------------------------------------------------------------------
+    # FX Adjustments
+
+    @classmethod
+    def standardize_fx_adjustments(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates and standardizes the 'fx_adjustments' DataFrame to ensure it contains
+        the required columns and correct data types.
+
+        Args:
+            df (pd.DataFrame): The DataFrame representing the FX adjustments.
+
+        Returns:
+            pd.DataFrame: The standardized FX adjustments DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing or if data types are incorrect.
+        """
+        if df is None:
+            # Return empty DataFrame with identical structure
+            df = pd.DataFrame(columns=cls.REQUIRED_FX_ADJUSTMENT_COLUMNS)
+
+        # Ensure required columns and values are present
+        missing = set(cls.REQUIRED_FX_ADJUSTMENT_COLUMNS) - set(df.columns)
+        if missing:
+            raise ValueError(f"Required columns {', '.join(missing)} are missing.")
+
+        # Enforce data types
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        df["adjust"] = df["adjust"].astype(pd.StringDtype())
+        df["credit"] = df["credit"].astype(pd.Int64Dtype())
+        df["debit"] = df["debit"].astype(pd.Int64Dtype())
+        df["text"] = df["text"].astype(pd.StringDtype())
+
+        return df.sort_values("date")
+
+    # ----------------------------------------------------------------------
     # File Operations
 
     def export_account_sheets(self, file: str, root: str = None) -> None:
@@ -132,6 +220,52 @@ class LedgerEngine(ABC):
                                             removed. Defaults to None.
         """
 
+    @classmethod
+    def standardize_vat_codes(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates and standardizes the 'vat_codes' DataFrame to ensure it contains
+        the required columns, correct data types, and logical consistency in the data.
+
+        Args:
+            df (pd.DataFrame): The DataFrame representing the VAT codes.
+
+        Returns:
+            pd.DataFrame: The standardized VAT codes DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing, if data types are incorrect,
+                        or if logical inconsistencies are found (e.g., non-zero rates
+                        without defined accounts).
+        """
+        if df is None:
+            # Return empty DataFrame with identical structure
+            df = pd.DataFrame(columns=cls.REQUIRED_VAT_CODE_COLUMNS)
+
+        # Ensure required columns and values are present
+        missing = set(cls.REQUIRED_VAT_CODE_COLUMNS) - set(df.columns)
+        if missing:
+            raise ValueError(f"Required columns {', '.join(missing)} are missing.")
+
+        # Add missing columns
+        for col in cls.OPTIONAL_VAT_CODE_COLUMNS:
+            if col not in df.columns:
+                df[col] = None
+
+        # Enforce data types
+        inception = pd.Timestamp("1900-01-01")
+        df["id"] = df["id"].astype(pd.StringDtype())
+        df["text"] = df["text"].astype(pd.StringDtype())
+        df["inclusive"] = df["inclusive"].astype(bool)
+        df["account"] = df["account"].astype(pd.Int64Dtype())
+        df["date"] = pd.to_datetime(df["date"]).fillna(inception).dt.date
+        df["rate"] = df["rate"].astype(float)
+
+        # Ensure account is defined if rate is other than zero
+        missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
+        if len(missing) > 0:
+            raise ValueError(f"Account must be defined for non-zero rate in vat_codes: {missing}.")
+
+        return df.set_index("id")
+
     # ----------------------------------------------------------------------
     # Account chart
 
@@ -147,6 +281,48 @@ class LedgerEngine(ABC):
                           a `vat_code`. The value in the account chart serves as default
                           for new transactions.
         """
+
+    @classmethod
+    def standardize_account_chart(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates and standardizes the 'account_chart' DataFrame to ensure it contains
+        the required columns and correct data types.
+
+        Args:
+            df (pd.DataFrame): The DataFrame representing the account chart.
+
+        Returns:
+            pd.DataFrame: The standardized account chart DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing, or if 'account' column
+                        contains NaN values, or if data types are incorrect.
+        """
+        if df is None:
+            # Return empty DataFrame with identical structure
+            df = pd.DataFrame(columns=cls.REQUIRED_ACCOUNT_COLUMNS)
+
+        # Ensure required columns and values are present
+        missing = set(cls.REQUIRED_ACCOUNT_COLUMNS) - set(df.columns)
+        if missing:
+            raise ValueError(f"Required columns missing in account chart: {missing}.")
+        if df["account"].isna().any():
+            raise ValueError("Missing 'account' values in account chart.")
+
+        # Add missing columns
+        for col in cls.OPTIONAL_ACCOUNT_COLUMNS:
+            if col not in df.columns:
+                df[col] = None
+
+        # Enforce data types
+        def to_str_or_na(value):
+            return str(value) if pd.notna(value) else value
+
+        df["account"] = df["account"].astype(int)
+        df["currency"] = df["currency"].apply(to_str_or_na)
+        df["text"] = df["text"].apply(to_str_or_na)
+        df["vat_code"] = df["vat_code"].apply(to_str_or_na).astype(pd.StringDtype())
+
+        return df.set_index("account")
 
     def account_currency(self, account: int) -> str:
         account_chart = self.account_chart()
@@ -865,37 +1041,56 @@ class LedgerEngine(ABC):
                                       should be removed.
         """
 
-    # Hack: abstract functionality to compute balance from serialized ledger,
-    # that is used in two different branches of the dependency tree
-    # (TextLedger, CachedProffixLedger). Ideally these two classes would have
-    # a common ancestor that could accommodate below method.
-    def _balance_from_serialized_ledger(self, account: int, date: datetime.date = None) -> dict:
-        """Compute balance from serialized ledger.
-
-        This method is used in different branches of the dependency tree.
+    @classmethod
+    def standardize_price_df(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Validates and standardizes the 'prices' DataFrame to ensure it contains
+        the required columns, correct data types, and no missing values in key fields.
 
         Args:
-            account (int): The account number.
-            date (datetime.date, optional): The date up to which the balance is computed.
-                                            Defaults to None.
+            df (pd.DataFrame): The DataFrame representing the prices.
 
         Returns:
-            dict: Dictionary containing the balance of the account in various currencies.
+            pd.DataFrame: The standardized prices DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing, if there are missing values
+                        in required columns, or if data types are incorrect.
         """
-        df = self.serialized_ledger()
-        rows = df["account"] == int(account)
-        if date is not None:
-            rows = rows & (df["date"] <= date)
-        cols = ["amount", "base_currency_amount", "currency"]
-        if rows.sum() == 0:
-            result = {"base_currency": 0.0}
-            currency = self.account_currency(account)
-            if currency is not None:
-                result[currency] = 0.0
-        else:
-            sub = df.loc[rows, cols]
-            base_amount = sub["base_currency_amount"].sum()
-            amount = sub.groupby("currency").agg({"amount": "sum"})
-            amount = {currency: amount for currency, amount in zip(amount.index, amount["amount"])}
-            result = {"base_currency": base_amount} | amount
+        if df is None:
+            # Return empty DataFrame with identical structure
+            df = pd.DataFrame(columns=cls.REQUIRED_PRICE_COLUMNS)
+
+        # Check for missing required columns
+        missing = set(cls.REQUIRED_PRICE_COLUMNS) - set(df.columns)
+        if len(missing) > 0:
+            raise ValueError(f"Required columns {missing} missing.")
+
+        # Check for missing values in required columns
+        has_missing_value = [
+            column for column in cls.REQUIRED_PRICE_COLUMNS if df[column].isnull().any()
+        ]
+        if len(has_missing_value) > 0:
+            raise ValueError(f"Missing values in column {has_missing_value}.")
+
+        # Enforce data types
+        df["ticker"] = df["ticker"].astype(str)
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        df["currency"] = df["currency"].astype(str)
+        df["price"] = df["price"].astype(float)
+
+        return df
+
+    @classmethod
+    def standardize_prices(cls, df: pd.DataFrame) -> pd.DataFrame:
+        """Store prices in nested dict: Each prices[ticker][currency] is a DataFrame with
+        columns 'date' and 'price' that is sorted by 'date'.
+        """
+        df = cls.standardize_price_df(df)
+        result = {}
+        for (ticker, currency), group in df.groupby(["ticker", "currency"]):
+            group = group[["date", "price"]].sort_values("date")
+            group = group.reset_index(drop=True)
+            if ticker not in result.keys():
+                result[ticker] = {}
+            result[ticker][currency] = group
         return result
