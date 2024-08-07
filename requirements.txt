@@ -2,8 +2,3 @@ numpy
 pandas
 xlsxwriter
 openpyxl
-pytest
-flake8
-bandit
-safety
-coverage
