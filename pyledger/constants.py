@@ -1,47 +1,69 @@
 """Constants used throughout the application."""
 
-FX_ADJUSTMENTS_COLUMNS = {
-    "date": "datetime64[ns, Europe/Berlin]",
+REQUIRED_FX_ADJUSTMENT_COLUMNS = {
+    "date": "datetime64[ns]",
     "adjust": "string[python]",
     "credit": "Int64",
     "debit": "Int64",
     "text": "string[python]",
 }
 
-VAT_CODE_COLUMNS = {
+REQUIRED_VAT_CODE_COLUMNS = {
     "id": "string[python]",
-    "date": "datetime64[ns, Europe/Berlin]",
     "text": "string[python]",
     "inclusive": "bool",
     "account": "Int64",
-    "inverse_account": "Int64",
     "rate": "Float64",
 }
 
-ACCOUNT_CHART_COLUMNS = {
+OPTIONAL_VAT_CODE_COLUMNS = {
+    "date": "datetime64[ns]",
+    "inverse_account": "Int64",
+}
+
+REQUIRED_ACCOUNT_COLUMNS = {
     "account": "Int64",
     "currency": "string[python]",
     "text": "string[python]",
+}
+
+OPTIONAL_ACCOUNT_COLUMNS = {
     "vat_code": "string[python]",
     "group": "string[python]",
 }
 
-LEDGER_COLUMNS = {
-    "id": "string[python]",
-    "date": "datetime64[ns, Europe/Berlin]",
+REQUIRED_LEDGER_COLUMNS = {
+    "date": "datetime64[ns]",
     "account": "Int64",
-    "counter_account": "Int64",
     "currency": "string[python]",
     "amount": "Float64",
+    "text": "string[python]",
+}
+
+OPTIONAL_LEDGER_COLUMNS = {
+    "id": "string[python]",
+    "counter_account": "Int64",
     "base_currency_amount": "Float64",
     "vat_code": "string[python]",
-    "text": "string[python]",
     "document": "string[python]",
 }
 
-PRICE_COLUMNS = {
+LEDGER_COLUMN_SHORTCUTS = {
+    "cur": "currency",
+    "vat": "vat_code",
+    "target": "target_balance",
+    "base_amount": "base_currency_amount",
+    "counter": "counter_account",
+}
+LEDGER_COLUMN_SEQUENCE = [
+    "id", "date", "account", "counter_account", "currency", "amount",
+    "target_balance", "balance", "base_currency_amount",
+    "base_currency_balance", "vat_code", "text", "document",
+]
+
+REQUIRED_PRICE_COLUMNS = {
     "ticker": "string[python]",
     "currency": "string[python]",
     "price": "Float64",
-    "date": "datetime64[ns, Europe/Berlin]",
+    "date": "datetime64[ns]",
 }
