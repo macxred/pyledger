@@ -8,10 +8,23 @@ import datetime
 import logging
 import math
 from pathlib import Path
+from consistent_df import enforce_dtypes
 import re
 import numpy as np
 import openpyxl
 import pandas as pd
+from .constants import (
+    REQUIRED_ACCOUNT_COLUMNS,
+    OPTIONAL_ACCOUNT_COLUMNS,
+    REQUIRED_FX_ADJUSTMENT_COLUMNS,
+    REQUIRED_LEDGER_COLUMNS,
+    OPTIONAL_LEDGER_COLUMNS,
+    LEDGER_COLUMN_SHORTCUTS,
+    LEDGER_COLUMN_SEQUENCE,
+    REQUIRED_PRICE_COLUMNS,
+    REQUIRED_VAT_CODE_COLUMNS,
+    OPTIONAL_VAT_CODE_COLUMNS,
+)
 from . import excel
 from .helpers import represents_integer
 from .time import parse_date_span
@@ -21,29 +34,6 @@ class LedgerEngine(ABC):
     """Abstract base class defining the core interface for managing a ledger system,
     including account chart, VAT management, and arbitrary assets or currencies.
     """
-
-    REQUIRED_LEDGER_COLUMNS = ["date", "account", "amount", "currency", "text"]
-    OPTIONAL_LEDGER_COLUMNS = [
-        "id", "counter_account", "base_currency_amount", "vat_code", "document",
-    ]
-    LEDGER_COLUMN_SHORTCUTS = {
-        "cur": "currency",
-        "vat": "vat_code",
-        "target": "target_balance",
-        "base_amount": "base_currency_amount",
-        "counter": "counter_account",
-    }
-    LEDGER_COLUMN_SEQUENCE = [
-        "id", "date", "account", "counter_account", "currency", "amount",
-        "target_balance", "balance", "base_currency_amount",
-        "base_currency_balance", "vat_code", "text", "document",
-    ]
-    REQUIRED_ACCOUNT_COLUMNS = ["account", "currency", "text"]
-    OPTIONAL_ACCOUNT_COLUMNS = ["vat_code", "group"]
-    REQUIRED_VAT_CODE_COLUMNS = ["id", "rate", "inclusive", "account", "text"]
-    OPTIONAL_VAT_CODE_COLUMNS = ["date", "inverse_account"]
-    REQUIRED_PRICE_COLUMNS = ["ticker", "date", "currency", "price"]
-    REQUIRED_FX_ADJUSTMENT_COLUMNS = ["date", "adjust", "credit", "debit", "text"]
 
     _logger = None
 
@@ -125,20 +115,14 @@ class LedgerEngine(ABC):
         """
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_FX_ADJUSTMENT_COLUMNS)
+            df = pd.DataFrame(columns=REQUIRED_FX_ADJUSTMENT_COLUMNS.keys())
 
         # Ensure required columns and values are present
-        missing = set(cls.REQUIRED_FX_ADJUSTMENT_COLUMNS) - set(df.columns)
+        missing = set(REQUIRED_FX_ADJUSTMENT_COLUMNS.keys()) - set(df.columns)
         if missing:
             raise ValueError(f"Required columns {', '.join(missing)} are missing.")
 
-        # Enforce data types
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["adjust"] = df["adjust"].astype(pd.StringDtype())
-        df["credit"] = df["credit"].astype(pd.Int64Dtype())
-        df["debit"] = df["debit"].astype(pd.Int64Dtype())
-        df["text"] = df["text"].astype(pd.StringDtype())
-
+        df = enforce_dtypes(df, REQUIRED_FX_ADJUSTMENT_COLUMNS)
         return df.sort_values("date")
 
     # ----------------------------------------------------------------------
@@ -238,26 +222,22 @@ class LedgerEngine(ABC):
         """
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_VAT_CODE_COLUMNS)
+            df = pd.DataFrame(columns=REQUIRED_VAT_CODE_COLUMNS.keys())
 
         # Ensure required columns and values are present
-        missing = set(cls.REQUIRED_VAT_CODE_COLUMNS) - set(df.columns)
+        missing = set(REQUIRED_VAT_CODE_COLUMNS.keys()) - set(df.columns)
         if missing:
             raise ValueError(f"Required columns {', '.join(missing)} are missing.")
 
         # Add missing columns
-        for col in cls.OPTIONAL_VAT_CODE_COLUMNS:
+        for col in OPTIONAL_VAT_CODE_COLUMNS.keys():
             if col not in df.columns:
                 df[col] = None
 
         # Enforce data types
+        df = enforce_dtypes(df, {**REQUIRED_VAT_CODE_COLUMNS, **OPTIONAL_VAT_CODE_COLUMNS})
         inception = pd.Timestamp("1900-01-01")
-        df["id"] = df["id"].astype(pd.StringDtype())
-        df["text"] = df["text"].astype(pd.StringDtype())
-        df["inclusive"] = df["inclusive"].astype(bool)
-        df["account"] = df["account"].astype(pd.Int64Dtype())
-        df["date"] = pd.to_datetime(df["date"]).fillna(inception).dt.date
-        df["rate"] = df["rate"].astype(float)
+        df["date"] = pd.to_datetime(df["date"]).fillna(inception)
 
         # Ensure account is defined if rate is other than zero
         missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
@@ -299,29 +279,21 @@ class LedgerEngine(ABC):
         """
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_ACCOUNT_COLUMNS)
+            df = pd.DataFrame(columns=REQUIRED_ACCOUNT_COLUMNS.keys())
 
         # Ensure required columns and values are present
-        missing = set(cls.REQUIRED_ACCOUNT_COLUMNS) - set(df.columns)
+        missing = set(REQUIRED_ACCOUNT_COLUMNS.keys()) - set(df.columns)
         if missing:
             raise ValueError(f"Required columns missing in account chart: {missing}.")
         if df["account"].isna().any():
             raise ValueError("Missing 'account' values in account chart.")
 
         # Add missing columns
-        for col in cls.OPTIONAL_ACCOUNT_COLUMNS:
+        for col in OPTIONAL_ACCOUNT_COLUMNS.keys():
             if col not in df.columns:
                 df[col] = None
 
-        # Enforce data types
-        def to_str_or_na(value):
-            return str(value) if pd.notna(value) else value
-
-        df["account"] = df["account"].astype(int)
-        df["currency"] = df["currency"].apply(to_str_or_na)
-        df["text"] = df["text"].apply(to_str_or_na)
-        df["vat_code"] = df["vat_code"].apply(to_str_or_na).astype(pd.StringDtype())
-
+        df = enforce_dtypes(df, {**REQUIRED_ACCOUNT_COLUMNS, **OPTIONAL_ACCOUNT_COLUMNS})
         return df.set_index("account")
 
     def account_currency(self, account: int) -> str:
@@ -531,7 +503,7 @@ class LedgerEngine(ABC):
         df = df.sort_values("date")
         df["balance"] = df["amount"].cumsum()
         df["base_currency_balance"] = df["base_currency_amount"].cumsum()
-        cols = [col for col in self.LEDGER_COLUMN_SEQUENCE if col in df.columns]
+        cols = [col for col in LEDGER_COLUMN_SEQUENCE if col in df.columns]
         if start is not None:
             df = df.loc[df["date"] >= start, :]
         df = df.reset_index(drop=True)
@@ -818,44 +790,36 @@ class LedgerEngine(ABC):
         """
         if ledger is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=LedgerEngine.REQUIRED_LEDGER_COLUMNS)
+            df = pd.DataFrame(columns=REQUIRED_LEDGER_COLUMNS.keys())
         else:
             df = ledger.copy()
             # Standardize column names
-            df = df.rename(columns=LedgerEngine.LEDGER_COLUMN_SHORTCUTS)
+            df = df.rename(columns=LEDGER_COLUMN_SHORTCUTS)
 
         # In empty DataFrames, add required columns if not present
         if isinstance(ledger, pd.DataFrame) and len(ledger) == 0:
-            for col in LedgerEngine.REQUIRED_LEDGER_COLUMNS:
+            for col in REQUIRED_LEDGER_COLUMNS.keys():
                 if col not in df.columns:
                     df[col] = None
 
         # Ensure all required columns are present
-        missing = set(LedgerEngine.REQUIRED_LEDGER_COLUMNS) - set(df.columns)
+        missing = set(REQUIRED_LEDGER_COLUMNS.keys()) - set(df.columns)
         if len(missing) > 0:
             raise ValueError(f"Missing required columns: {missing}")
 
         # Add optional columns if not present
         if "id" not in df.columns:
             df["id"] = df["date"].notna().cumsum().astype(pd.StringDtype())
-        for col in LedgerEngine.OPTIONAL_LEDGER_COLUMNS:
+        for col in OPTIONAL_LEDGER_COLUMNS.keys():
             if col not in df.columns:
                 df[col] = None
 
         # Enforce column data types
-        df["id"] = df["id"].astype(pd.StringDtype())
+        df = enforce_dtypes(df, {**REQUIRED_LEDGER_COLUMNS, **OPTIONAL_LEDGER_COLUMNS})
         df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["account"] = df["account"].astype(pd.Int64Dtype())
-        df["counter_account"] = df["counter_account"].astype(pd.Int64Dtype())
-        df["currency"] = df["currency"].astype(pd.StringDtype())
-        df["amount"] = df["amount"].astype(pd.Float64Dtype())
-        df["base_currency_amount"] = df["base_currency_amount"].astype(pd.Float64Dtype())
-        df["vat_code"] = df["vat_code"].astype(pd.StringDtype())
-        df["text"] = df["text"].astype(pd.StringDtype())
-        df["document"] = df["document"].astype(pd.StringDtype())
 
         # Order columns based on 'LEDGER_COLUMN_SEQUENCE'
-        col_order = LedgerEngine.LEDGER_COLUMN_SEQUENCE
+        col_order = LEDGER_COLUMN_SEQUENCE
         cols = (
             [col for col in col_order if col in df.columns]
             + [col for col in df.columns if col not in col_order]
@@ -1058,25 +1022,22 @@ class LedgerEngine(ABC):
         """
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=cls.REQUIRED_PRICE_COLUMNS)
+            df = pd.DataFrame(columns=REQUIRED_PRICE_COLUMNS.keys())
 
         # Check for missing required columns
-        missing = set(cls.REQUIRED_PRICE_COLUMNS) - set(df.columns)
+        missing = set(REQUIRED_PRICE_COLUMNS.keys()) - set(df.columns)
         if len(missing) > 0:
             raise ValueError(f"Required columns {missing} missing.")
 
         # Check for missing values in required columns
         has_missing_value = [
-            column for column in cls.REQUIRED_PRICE_COLUMNS if df[column].isnull().any()
+            column for column in REQUIRED_PRICE_COLUMNS.keys() if df[column].isnull().any()
         ]
         if len(has_missing_value) > 0:
             raise ValueError(f"Missing values in column {has_missing_value}.")
 
         # Enforce data types
-        df["ticker"] = df["ticker"].astype(str)
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["currency"] = df["currency"].astype(str)
-        df["price"] = df["price"].astype(float)
+        df = enforce_dtypes(df, REQUIRED_PRICE_COLUMNS)
 
         return df
 
