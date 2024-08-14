@@ -944,6 +944,26 @@ class LedgerEngine(ABC):
         result = round(amount / precision, 0) * precision
         return round(result, -1 * math.floor(math.log10(precision)))
 
+    def round_series_to_precision(
+        self,
+        amount: pd.Series,
+        currency: pd.Series,
+    ) -> pd.Series:
+        """Round the amounts in the series to the specified precision based on the currency.
+
+        Args:
+            amount (pd.Series): Series of amounts to round.
+            currency (pd.Series): Series of currency codes corresponding to each amount.
+
+        Returns:
+            pd.Series: Series with amounts rounded to the specified precision.
+        """
+        rounded_values = [
+            pd.NA if pd.isna(amt) else self.round_to_precision(amt, curr)
+            for amt, curr in zip(amount, currency)
+        ]
+        return pd.Series(rounded_values, index=amount.index)
+
     @abstractmethod
     def price_history(self) -> pd.DataFrame:
         """Retrieves a data frame with all price definitions.

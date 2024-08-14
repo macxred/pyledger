@@ -138,3 +138,65 @@ def test_validate_account_balance(account: int, expected_length: int, expected_b
 
     assert len(ledger.account_history(account)) == expected_length
     assert ledger.account_balance(account)["CHF"] == expected_balance
+
+@pytest.mark.parametrize(
+    "amounts, currencies, expected",
+    [
+        (
+            pd.Series([100.234, 200.567, 300.891]),
+            pd.Series(["USD", "EUR", "GBP"]),
+            pd.Series([100.23, 200.57, 300.89])
+        ),
+        (
+            pd.Series([0.0, 0.0, 0.0]),
+            pd.Series(["USD", "EUR", "GBP"]),
+            pd.Series([0.0, 0.0, 0.0])
+        ),
+        (
+            pd.Series([123456.789, 987654.321, 111111.111]),
+            pd.Series(["USD", "EUR", "GBP"]),
+            pd.Series([123456.79, 987654.32, 111111.11])
+        ),
+        (
+            pd.Series([100.234, 200.567, 300.891, 400.789]),
+            pd.Series(["USD", "CHF", "CAD", "HKD"]),
+            pd.Series([100.23, 200.57, 300.89, 400.79])
+        ),
+    ]
+)
+def test_rounding(amounts, currencies, expected):
+    ledger = TestLedger()
+    result = ledger.round_series_to_precision(amounts, currencies)
+    pd.testing.assert_series_equal(result, expected)
+
+@pytest.mark.parametrize(
+    "amounts, currencies, expected",
+    [
+        (
+            pd.Series([100.234, pd.NA, 300.891]),
+            pd.Series(["USD", "EUR", "GBP"]),
+            pd.Series([100.23, pd.NA, 300.89])
+        ),
+        (
+            pd.Series([pd.NA, pd.NA, pd.NA]),
+            pd.Series(["USD", "EUR", "GBP"]),
+            pd.Series([pd.NA, pd.NA, pd.NA])
+        ),
+    ]
+)
+def test_rounding_with_nan(amounts, currencies, expected):
+    ledger = TestLedger()
+    result = ledger.round_series_to_precision(amounts, currencies)
+    pd.testing.assert_series_equal(result, expected)
+
+def test_rounding_with_different_precision():
+    ledger = TestLedger()
+    # Assuming a different precision setting, which might be manually set for the test
+    ledger._settings["precision"]["JPY"] = 1.0  # Example precision for JPY
+
+    amounts = pd.Series([100.234, 200.567, 300.891])
+    currencies = pd.Series(["USD", "JPY", "GBP"])
+    expected = pd.Series([100.23, 201.0, 300.89])
+
+    result = ledger.round_series_to_precision(amounts, currencies)
+    pd.testing.assert_series_equal(result, expected)
