@@ -128,3 +128,89 @@ class MemoryLedger(StandaloneLedger):
             self._vat_codes = self._vat_codes[self._vat_codes.index != code]
         elif not allow_missing:
             raise ValueError(f"VAT code '{code}' not found.")
+
+    # ----------------------------------------------------------------------
+    # Accounts
+
+    def account_chart(self) -> pd.DataFrame:
+        """Retrieves the local account chart.
+
+        Returns:
+            pd.DataFrame: A DataFrame with the account chart in pyledger format,
+                          including the 'account' as a column with its index values.
+        """
+        return self._account_chart.reset_index().rename(columns={"index": "account"})
+
+    def add_account(
+        self,
+        account: str,
+        currency: str,
+        text: str,
+        group: str,
+        vat_code: str = None,
+    ) -> None:
+        """Adds a new account to the local account chart.
+
+        Args:
+            account (str): The account number or identifier to be added (used as the index).
+            currency (str): The currency associated with the account.
+            text (str): Additional text or description associated with the account.
+            group (str): The category group to which the account belongs.
+            vat_code (str, optional): The VAT code to be applied to the account, if any.
+        """
+        if account in self._account_chart.index:
+            raise ValueError(f"Account '{account}' already exists in the local ledger.")
+
+        new_account = pd.DataFrame(
+            {
+                "currency": [currency],
+                "text": [text],
+                "vat_code": [vat_code],
+                "group": [group],
+            },
+            index=[account],
+        )
+        self._account_chart = pd.concat([self._account_chart, new_account])
+
+    def modify_account(
+        self,
+        account: str,
+        currency: str,
+        text: str,
+        group: str,
+        vat_code: str = None,
+    ) -> None:
+        """Updates an existing account in the local account chart.
+
+        Args:
+            account (str): The account number or identifier to be updated (used as the index).
+            currency (str): The currency associated with the account.
+            text (str): Additional text or description associated with the account.
+            group (str): The category group to which the account belongs.
+            vat_code (str, optional): The VAT code to be applied to the account, if any.
+        """
+        if account not in self._account_chart.index:
+            raise ValueError(f"Account '{account}' not found in the local ledger.")
+
+        self._account_chart.loc[account] = {
+            "currency": currency,
+            "text": text,
+            "vat_code": vat_code,
+            "group": group,
+        }
+
+    def delete_account(self, account: str, allow_missing: bool = False) -> None:
+        """Deletes an account from the local account chart.
+
+        Args:
+            account (str): The account number to be deleted (used as the index).
+            allow_missing (bool, optional): If True, do not raise an error if the
+                                            account is missing. Defaults to False.
+        """
+        if account not in self._account_chart.index:
+            if allow_missing:
+                return
+            else:
+                raise ValueError(f"Account '{account}' not found in the local ledger.")
+
+        self._account_chart = self._account_chart.drop(account)
