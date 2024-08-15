@@ -27,6 +27,8 @@ LedgerEngine (Abstract Base Class)
    |    +-- TextLedger
    |    |
    |    +-- TestLedger
+   |    |
+   |    +-- MemoryLedger
    |
 · · · · · · · · · · · · · · · · · · · · (External Packages Below)
    |
@@ -51,6 +53,9 @@ An extension of StandaloneLedger, TextLedger specializes in file-based data stor
 
 1. **TestLedger**\
 Designed for development and testing, TestLedger extends StandaloneLedger with pre-populated, hard-coded data and settings. It simplifies the initial setup, allowing developers and testers to focus on functionality without the configuration overhead.
+
+1. **MemoryLedger**\
+This class extends the StandaloneLedger to provide a non-persistent, in-memory ledger system. This implementation stores accounting data as DataFrame objects directly in memory, without relying on external data storage solutions. It is particularly useful for demonstration purposes and testing environments where persistence is not required.
 
 **Integration with External Software** (Implemented in separate packages)
 

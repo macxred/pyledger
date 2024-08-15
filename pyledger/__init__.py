@@ -22,6 +22,7 @@ See README.md at https://github.com/macxred/pyledger for setup instructions.
 from .ledger_engine import LedgerEngine
 from .standalone_ledger import StandaloneLedger
 from .test_ledger import TestLedger
+from .memory_ledger import MemoryLedger
 from .text_ledger import TextLedger
 from .helpers import *
 from .time import *
