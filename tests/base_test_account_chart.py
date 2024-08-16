@@ -11,8 +11,8 @@ class BaseTestAccountCharts(ABC):
         pass
 
     def test_account_mutators(self, ledger):
-        ledger.delete_account(1145, allow_missing=True)
-        ledger.delete_account(1146, allow_missing=True)
+        ledger.delete_account(1145)
+        ledger.delete_account(1146)
         account_chart = ledger.account_chart()
         assert 1145 not in account_chart.index
         assert 1146 not in account_chart.index

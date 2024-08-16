@@ -18,7 +18,7 @@ class BaseTestVatCode(ABC):
 
     def test_vat_code_accessors_mutators(self, ledger):
         # Ensure there is no 'TestCode' vat_code on the remote account
-        ledger.delete_vat_code("TestCode", allow_missing=True)
+        ledger.delete_vat_code("TestCode")
         assert "TestCode" not in ledger.vat_codes().index
 
         # Test adding a valid vat_code

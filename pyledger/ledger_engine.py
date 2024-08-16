@@ -177,7 +177,7 @@ class LedgerEngine(ABC):
         code: str,
         rate: float,
         account: str,
-        included: bool = True,
+        inclusive: bool = True,
         date: datetime.date = None
     ) -> None:
         """Append a vat code to the list of available vat_codes.
@@ -186,8 +186,8 @@ class LedgerEngine(ABC):
             code (str): Identifier for the vat definition.
             rate (float): The VAT rate to apply.
             account (str): Account to which the VAT is applicable.
-            included (bool, optional): Specifies whether the VAT amount is included in the
-                                       transaction amount. Defaults to True.
+            inclusive (bool, optional): Specifies whether the VAT amount is included in the
+                                        transaction amount. Defaults to True.
             date (datetime.date, optional): Date from which onward the vat definition is
                                             applied. The definition is valid until the same
                                             vat code is re-defined on a subsequent date.
@@ -305,15 +305,15 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def add_account(
-        self, account: int, description: str, currency: str, vat: bool = False
+        self, account: int, text: str, currency: str, vat_code: bool = False
     ) -> None:
         """Appends an account to the account chart.
 
         Args:
             account (int): Unique identifier for the account.
-            description (str): Description of the account.
+            text (str): Description of the account.
             currency (str): Currency of the account.
-            vat (bool, optional): Indicates if VAT is applicable. Defaults to False.
+            vat_code (bool, optional): Indicates if VAT is applicable. Defaults to False.
         """
 
     @abstractmethod

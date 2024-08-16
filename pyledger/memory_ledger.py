@@ -85,7 +85,9 @@ class MemoryLedger(StandaloneLedger):
                 "inclusive": [inclusive],
             })
         )
-        self._vat_codes = pd.concat([self._vat_codes, new_vat_code])
+        self._vat_codes = self.standardize_vat_codes(
+            pd.concat([self._vat_codes, new_vat_code]).reset_index()
+        )
 
     def update_vat_code(
         self,
@@ -116,7 +118,7 @@ class MemoryLedger(StandaloneLedger):
             "text": text,
         }
 
-    def delete_vat_code(self, code: str, allow_missing: bool = False) -> None:
+    def delete_vat_code(self, code: str) -> None:
         """Deletes a VAT code from the memory.
 
         Args:
@@ -125,9 +127,7 @@ class MemoryLedger(StandaloneLedger):
                                             found; if False, raises ValueError. Defaults to False.
         """
         if code in self._vat_codes.index.values:
-            self._vat_codes = self._vat_codes[self._vat_codes.index != code]
-        elif not allow_missing:
-            raise ValueError(f"VAT code '{code}' not found.")
+            self._vat_codes = self._vat_codes.drop(code)
 
     # ----------------------------------------------------------------------
     # Accounts
@@ -170,7 +170,10 @@ class MemoryLedger(StandaloneLedger):
             },
             index=[account],
         )
-        self._account_chart = pd.concat([self._account_chart, new_account])
+        account_chart = pd.concat(
+            [self._account_chart, new_account]
+        ).reset_index().rename(columns={"index": "account"})
+        self._account_chart = self.standardize_account_chart(account_chart)
 
     def modify_account(
         self,
@@ -199,18 +202,71 @@ class MemoryLedger(StandaloneLedger):
             "group": group,
         }
 
-    def delete_account(self, account: str, allow_missing: bool = False) -> None:
+    def delete_account(self, account: str) -> None:
         """Deletes an account from the local account chart.
 
         Args:
             account (str): The account number to be deleted (used as the index).
-            allow_missing (bool, optional): If True, do not raise an error if the
-                                            account is missing. Defaults to False.
         """
-        if account not in self._account_chart.index:
-            if allow_missing:
-                return
-            else:
-                raise ValueError(f"Account '{account}' not found in the local ledger.")
+        if account in self._account_chart.index:
+            self._account_chart = self._account_chart.drop(account)
 
-        self._account_chart = self._account_chart.drop(account)
+    # ----------------------------------------------------------------------
+    # Ledger
+
+    def ledger(self) -> pd.DataFrame:
+        """Retrieves the local ledger entries.
+
+        Returns:
+            pd.DataFrame: A DataFrame with LedgerEngine.ledger() column schema.
+        """
+        return self._ledger
+
+    def add_ledger_entry(self, entry: pd.DataFrame) -> int:
+        """Adds a new ledger entry to the local ledger.
+
+        Args:
+            entry (pd.DataFrame): DataFrame with ledger entry in pyledger schema.
+
+        Returns:
+            int: The Id of the created ledger entry.
+        """
+        if entry["id"].nunique() != 1:
+            raise ValueError("All rows in the entry must have the same ID.")
+
+        entry_id = entry["id"].iat[0]
+        if entry_id in self._ledger["id"].values:
+            raise ValueError(f"Ledger entry with id '{entry_id}' already exists.")
+
+        self._ledger = self.standardize_ledger(
+            pd.concat([self._ledger, entry], ignore_index=True)
+        )
+        return entry_id
+
+    def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
+        """Modifies an existing ledger entry in the local ledger.
+
+        Args:
+            entry (pd.DataFrame): DataFrame with ledger entry in pyledger schema.
+        """
+        if entry["id"].nunique() != 1:
+            raise ValueError(
+                "Id needs to be unique and present in all rows of a collective booking."
+            )
+
+        ledger_id = str(entry["id"].iat[0])
+        if ledger_id not in self._ledger["id"].values:
+            raise ValueError(f"Ledger entry with id '{ledger_id}' not found.")
+
+        self._ledger = self.standardize_ledger(pd.concat(
+            [self._ledger[self._ledger["id"] != ledger_id], entry], ignore_index=True
+        ))
+
+    def delete_ledger_entry(self, id: str) -> None:
+        """Deletes a ledger entry from the local ledger.
+
+        Args:
+            id (str): The Id of the ledger entry to be deleted.
+        """
+        if id in self._ledger["id"].values:
+            self._ledger = self._ledger[self._ledger["id"] != id]
