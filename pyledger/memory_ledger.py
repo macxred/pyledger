@@ -43,6 +43,13 @@ class MemoryLedger(StandaloneLedger):
         self._vat_codes = self.standardize_vat_codes(None)
 
     # ----------------------------------------------------------------------
+    # File Operations
+
+    def restore(self, archive_path: str):
+        """Not implemented yet."""
+        raise NotImplementedError
+
+    # ----------------------------------------------------------------------
     # VAT Codes
 
     def vat_codes(self) -> pd.DataFrame:

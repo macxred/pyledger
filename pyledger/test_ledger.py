@@ -130,3 +130,10 @@ class TestLedger(StandaloneLedger):
         lines = text.splitlines()
         lines = [line for line in lines if not re.match(r"[ ]*#", line)]
         return "\n".join(lines)
+
+    # ----------------------------------------------------------------------
+    # File Operations
+
+    def restore(self, archive_path: str):
+        """Not implemented yet."""
+        raise NotImplementedError

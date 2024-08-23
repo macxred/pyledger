@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 import datetime
 import logging
 import math
+import os
+import zipfile
 from pathlib import Path
 from typing import List
 from consistent_df import enforce_dtypes
@@ -158,6 +160,44 @@ class LedgerEngine(ABC):
                             cell.hyperlink = f"file://{str(document)}"
                             cell.style = "Hyperlink"
             workbook.save(file)
+
+    def dump(self, archive_path: str):
+        """Dumps the accounting data to a ZIP archive.
+
+        This method saves the ledger, account chart, and VAT codes to individual CSV
+        files and compresses them into a ZIP archive specified by `archive_path`.
+
+        Args:
+            archive_path (str): The path where the ZIP archive will be saved.
+
+        Raises:
+            OSError: If an error occurs while writing or removing files.
+        """
+        with zipfile.ZipFile(archive_path, 'w') as archive:
+            self.ledger().to_csv('ledger.csv', index=False)
+            archive.write('ledger.csv')
+
+            self.account_chart().to_csv('accounts.csv', index=False)
+            archive.write('accounts.csv')
+
+            self.vat_codes().to_csv('vat_codes.csv', index=False)
+            archive.write('vat_codes.csv')
+
+            os.remove('ledger.csv')
+            os.remove('accounts.csv')
+            os.remove('vat_codes.csv')
+
+    @abstractmethod
+    def restore(self, archive_path: str):
+        """Restores accounting data from a ZIP archive.
+
+        This method extracts the contents of the ZIP archive specified by
+        `archive_path` and loads the ledger, account chart, and VAT codes
+        from the corresponding CSV files into their respective DataFrames.
+
+        Args:
+            archive_path (str): The path of the ZIP archive to restore from.
+        """
 
     # ----------------------------------------------------------------------
     # VAT Codes
