@@ -14,10 +14,10 @@ class BaseTestAccountCharts(ABC):
         ledger.delete_account(1145)
         ledger.delete_account(1146)
         account_chart = ledger.account_chart()
-        assert 1145 not in account_chart.index
-        assert 1146 not in account_chart.index
+        assert 1145 not in account_chart["account"].values
+        assert 1146 not in account_chart["account"].values
 
-        initial_accounts = ledger.account_chart().reset_index()
+        initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1145,
             "currency": "CHF",
@@ -26,7 +26,7 @@ class BaseTestAccountCharts(ABC):
             "group": "/Assets/Anlagevermögen",
         }
         ledger.add_account(**new_account)
-        updated_accounts = ledger.account_chart().reset_index()
+        updated_accounts = ledger.account_chart()
         outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -38,7 +38,7 @@ class BaseTestAccountCharts(ABC):
         assert created_accounts["vat_code"].item() == "TestCodeAccounts"
         assert created_accounts["group"].item() == new_account["group"]
 
-        initial_accounts = ledger.account_chart().reset_index()
+        initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1146,
             "currency": "CHF",
@@ -47,7 +47,7 @@ class BaseTestAccountCharts(ABC):
             "group": "/Assets/Anlagevermögen",
         }
         ledger.add_account(**new_account)
-        updated_accounts = ledger.account_chart().reset_index()
+        updated_accounts = ledger.account_chart()
         outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -59,7 +59,7 @@ class BaseTestAccountCharts(ABC):
         assert pd.isna(created_accounts["vat_code"].item())
         assert created_accounts["group"].item() == new_account["group"]
 
-        initial_accounts = ledger.account_chart().reset_index()
+        initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1146,
             "currency": "CHF",
@@ -68,7 +68,7 @@ class BaseTestAccountCharts(ABC):
             "group": "/Assets/Anlagevermögen",
         }
         ledger.modify_account(**new_account)
-        updated_accounts = ledger.account_chart().reset_index()
+        updated_accounts = ledger.account_chart()
         outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
         modified_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -80,7 +80,7 @@ class BaseTestAccountCharts(ABC):
         assert modified_accounts["vat_code"].item() == "TestCodeAccounts"
         assert modified_accounts["group"].item() == new_account["group"]
 
-        initial_accounts = ledger.account_chart().reset_index()
+        initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1145,
             "currency": "USD",
@@ -89,7 +89,7 @@ class BaseTestAccountCharts(ABC):
             "group": "/Assets/Anlagevermögen",
         }
         ledger.modify_account(**new_account)
-        updated_accounts = ledger.account_chart().reset_index()
+        updated_accounts = ledger.account_chart()
         outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -104,5 +104,5 @@ class BaseTestAccountCharts(ABC):
         ledger.delete_account(account=1145)
         ledger.delete_account(account=1146)
         updated_accounts = ledger.account_chart()
-        assert 1145 not in updated_accounts.index
-        assert 1146 not in updated_accounts.index
+        assert 1145 not in account_chart["account"].values
+        assert 1146 not in account_chart["account"].values

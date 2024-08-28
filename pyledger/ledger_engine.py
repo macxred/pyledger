@@ -245,7 +245,7 @@ class LedgerEngine(ABC):
         if len(missing) > 0:
             raise ValueError(f"Account must be defined for non-zero rate in vat_codes: {missing}.")
 
-        return df.set_index("id")
+        return df
 
     # ----------------------------------------------------------------------
     # Account chart
@@ -294,14 +294,13 @@ class LedgerEngine(ABC):
             if col not in df.columns:
                 df[col] = None
 
-        df = enforce_dtypes(df, {**REQUIRED_ACCOUNT_COLUMNS, **OPTIONAL_ACCOUNT_COLUMNS})
-        return df.set_index("account")
+        return enforce_dtypes(df, {**REQUIRED_ACCOUNT_COLUMNS, **OPTIONAL_ACCOUNT_COLUMNS})
 
     def account_currency(self, account: int) -> str:
         account_chart = self.account_chart()
-        if not int(account) in account_chart.index:
+        if not int(account) in account_chart["account"].values:
             raise ValueError(f"Account {account} is not defined.")
-        return account_chart["currency"][account]
+        return account_chart.loc[account_chart["account"] == account, "currency"].values[0]
 
     @abstractmethod
     def add_account(
@@ -453,7 +452,7 @@ class LedgerEngine(ABC):
         # Account balance per a single point in time
         if represents_integer(account):
             account = int(account)
-            if account not in self.account_chart().index:
+            if account not in self.account_chart()[["account"]].values:
                 raise ValueError(f"No account matching '{account}'.")
             out = self._fetch_account_history(account, start=start, end=end)
         elif (
@@ -523,7 +522,7 @@ class LedgerEngine(ABC):
         subtract = []
         if represents_integer(range):
             account = int(range)
-            if abs(account) in self.account_chart().index:
+            if abs(account) in self.account_chart()["account"].values:
                 if account >= 0:
                     add = [account]
                 else:
@@ -546,8 +545,8 @@ class LedgerEngine(ABC):
                     first = int(sequence[0].strip())
                     last = int(sequence[1].strip())
                     chart = self.account_chart()
-                    in_range = (chart.index >= first) & (chart.index <= last)
-                    accounts = list(chart.index[in_range])
+                    in_range = (chart["account"] >= first) & (chart["account"] <= last)
+                    accounts = list(chart["account"][in_range])
                 elif re.match("[0-9]*", element.strip()):
                     accounts = [int(element.strip())]
                 else:
@@ -664,11 +663,11 @@ class LedgerEngine(ABC):
         """
         # Discard undefined VAT codes
         ledger["vat_code"] = ledger["vat_code"].str.strip()
-        invalid = ledger["vat_code"].notna() & ~ledger["vat_code"].isin(self.vat_codes().index)
+        invalid = ledger["vat_code"].notna() & ~ledger["vat_code"].isin(self.vat_codes()["id"])
         if invalid.any():
             df = ledger.loc[invalid, ["id", "vat_code"]]
             df = df.groupby("id").agg({"vat_code": lambda x: x.unique()})
-            for id, codes in zip(df.index, df["vat_code"]):
+            for id, codes in zip(df["id"].values, df["vat_code"]):
                 if len(codes) > 1:
                     self._logger.warning(
                         f"Discard unknown VAT codes {', '.join([f'{x}' for x in codes])} at '{id}'."
@@ -691,7 +690,7 @@ class LedgerEngine(ABC):
             to_discard.append(df.reset_index()[["id", "text"]])
 
         # 2. Discard journal entries with undefined accounts
-        valid_accounts = self.account_chart().index
+        valid_accounts = self.account_chart()["account"].values
         invalid_accounts = []
         for col in ["account", "counter_account"]:
             invalid = ledger[col].notna() & ~ledger[col].isin(valid_accounts)
