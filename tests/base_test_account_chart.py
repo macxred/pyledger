@@ -10,7 +10,21 @@ class BaseTestAccountCharts(ABC):
     def ledger(self):
         pass
 
-    def test_account_mutators(self, ledger):
+    @pytest.fixture
+    def setup_vat_code(self, ledger):
+        ledger.add_vat_code(
+            code="TestCodeAccounts",
+            text="VAT 2%",
+            account=2200,
+            rate=0.02,
+            inclusive=True,
+        )
+
+        yield
+
+        ledger.delete_vat_code(code="TestCodeAccounts")
+
+    def test_account_mutators(self, ledger, setup_vat_code):
         ledger.delete_account(1145)
         ledger.delete_account(1146)
         account_chart = ledger.account_chart()
@@ -106,3 +120,62 @@ class BaseTestAccountCharts(ABC):
         updated_accounts = ledger.account_chart()
         assert 1145 not in account_chart["account"].values
         assert 1146 not in account_chart["account"].values
+
+    def test_add_already_existed_raise_error(self, ledger, setup_vat_code):
+        def add_account():
+            ledger.add_account(
+                account=1200,
+                currency="EUR",
+                text="test account",
+                vat_code="TestCodeAccounts",
+                group="/Assets/Anlagevermögen",
+            )
+
+        add_account()
+        with pytest.raises(ValueError):
+            add_account()
+
+    def test_modify_non_existed_raise_error(self, ledger):
+        with pytest.raises(ValueError):
+            ledger.modify_account(
+                account=1200,
+                currency="EUR",
+                text="test account",
+                vat_code="TestCodeAccounts",
+                group="/Assets/Anlagevermögen",
+            )
+
+    def test_mirror_accounts(self, ledger, setup_vat_code):
+        initial_accounts = ledger.account_chart()
+        account = pd.DataFrame(
+            {
+                "account": [1, 2],
+                "currency": ["CHF", "EUR"],
+                "text": ["Test Account 1", "Test Account 2"],
+                "vat_code": ["TestCodeAccounts", None],
+                "group": ["/Assets", "/Assets/Anlagevermögen/xyz"],
+            }
+        )
+        target_df = pd.concat([account, initial_accounts])
+
+        ledger.mirror_account_chart(target_df, delete=False)
+        mirrored_df = ledger.account_chart()
+        m = target_df.merge(mirrored_df, how="left", indicator=True)
+        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
+
+        ledger.mirror_account_chart(target_df, delete=True)
+        mirrored_df = ledger.account_chart()
+        m = target_df.merge(mirrored_df, how="outer", indicator=True)
+        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
+
+        target_df = target_df.sample(frac=1)
+        target_df.loc[target_df["account"] == 2, "text"] = "New_Test_Text"
+        ledger.mirror_account_chart(target_df, delete=True)
+        mirrored_df = ledger.account_chart()
+        m = target_df.merge(mirrored_df, how="outer", indicator=True)
+        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
+
+        ledger.mirror_account_chart(initial_accounts, delete=True)
+        mirrored_df = ledger.account_chart()
+        m = initial_accounts.merge(mirrored_df, how="outer", indicator=True)
+        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
