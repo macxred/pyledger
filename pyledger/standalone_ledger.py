@@ -499,7 +499,7 @@ class StandaloneLedger(LedgerEngine):
             raise ValueError(f"No {currency} prices available for '{ticker}'.")
 
         prc = self._prices[ticker][currency]
-        prc = prc.loc[prc["date"] <= date, "price"]
+        prc = prc.loc[prc["date"].dt.normalize() <= pd.Timestamp(date), "price"]
 
         if prc.empty:
             raise ValueError(f"No {currency} prices available for '{ticker}' before {date}.")
