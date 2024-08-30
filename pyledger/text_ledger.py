@@ -8,6 +8,12 @@ from pathlib import Path
 import pandas as pd
 from .helpers import write_fixed_width_csv
 from .standalone_ledger import StandaloneLedger
+from .constants import (
+    REQUIRED_LEDGER_COLUMNS,
+    OPTIONAL_LEDGER_COLUMNS,
+    LEDGER_COLUMN_SEQUENCE,
+    LEDGER_COLUMN_SHORTCUTS
+)
 
 # TODO:
 # - Write functions standardize_prices, standardize_vat_codes,
@@ -132,7 +138,7 @@ class TextLedger(StandaloneLedger):
             result = pd.concat(df_list, ignore_index=True)
         else:
             # Empty DataFrame with identical structure
-            cols = self.REQUIRED_LEDGER_COLUMNS + self.OPTIONAL_LEDGER_COLUMNS
+            cols = REQUIRED_LEDGER_COLUMNS + OPTIONAL_LEDGER_COLUMNS
             result = self.standardize_ledger(pd.DataFrame(columns=cols))
 
         return result
@@ -195,7 +201,7 @@ class TextLedger(StandaloneLedger):
         Raises:
             ValueError: If required columns are missing.
         """
-        missing = set(cls.REQUIRED_LEDGER_COLUMNS) - set(df.columns)
+        missing = set(REQUIRED_LEDGER_COLUMNS) - set(df.columns)
         if missing:
             raise ValueError(f"Missing required columns: {missing}")
 
@@ -216,19 +222,19 @@ class TextLedger(StandaloneLedger):
         if drop_unused_columns:
             all_na = df.columns[df.isna().all()]
             df = df.drop(
-                columns=set(all_na) - set(cls.REQUIRED_LEDGER_COLUMNS)
+                columns=set(all_na) - set(REQUIRED_LEDGER_COLUMNS)
             )
 
         # Default column order
         cols = (
-            [col for col in cls.LEDGER_COLUMN_SEQUENCE if col in df.columns]
-            + [col for col in df.columns if col not in cls.LEDGER_COLUMN_SEQUENCE]
+            [col for col in LEDGER_COLUMN_SEQUENCE if col in df.columns]
+            + [col for col in df.columns if col not in LEDGER_COLUMN_SEQUENCE]
         )
         df = df[cols]
 
         fixed_width_cols = [
             col
-            for col in cls.LEDGER_COLUMN_SEQUENCE
+            for col in LEDGER_COLUMN_SEQUENCE
             if (col in df.columns) and not (col in ["text", "document"])
         ]
 
@@ -241,7 +247,7 @@ class TextLedger(StandaloneLedger):
 
         if short_names:
             reverse_shortcuts = {
-                v: k for k, v in cls.LEDGER_COLUMN_SHORTCUTS.items()
+                v: k for k, v in LEDGER_COLUMN_SHORTCUTS.items()
             }
             df = df.rename(columns=reverse_shortcuts)
 
