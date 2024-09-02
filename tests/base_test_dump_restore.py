@@ -36,8 +36,8 @@ STRIPPED_CSV = "\n".join([line.strip() for line in LEDGER_CSV.split("\n")])
 LEDGER_ENTRIES = pd.read_csv(
     StringIO(STRIPPED_CSV), skipinitialspace=True, skip_blank_lines=True
 )
-TEST_ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
-TEST_VAT_CODE = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
+ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
 
 
 # TODO: Use txn_to_str form the consistent_df package when it implemented
@@ -61,9 +61,9 @@ class BaseTestDumpAndRestore(ABC):
     @pytest.fixture()
     def restore_initial_state(self, ledger):
         # Fetch original state
+        initial_ledger = ledger.ledger()
         initial_vat_codes = ledger.vat_codes()
         initial_account_chart = ledger.account_chart()
-        initial_ledger = ledger.ledger()
 
         yield
 
@@ -72,52 +72,32 @@ class BaseTestDumpAndRestore(ABC):
         ledger.mirror_vat_codes(initial_vat_codes, delete=True)
         ledger.mirror_account_chart(initial_account_chart, delete=True)
 
+    def clear_ledger(self, ledger):
+        """Clears all data from the ledger system."""
+        ledger.mirror_ledger(None, delete=True)
+        ledger.mirror_vat_codes(None, delete=True)
+        ledger.mirror_account_chart(None, delete=True)
+
     def test_dump_and_restore(self, ledger, restore_initial_state):
-        # This test logic can be simplified:
-        #
-        # 1. Mirroring the desired state
-        # 2. Mirror empty DFs
-        # 3. Check is state now empty
-        # 4. Restore dumped data
-        # 5. Check is restored state matches desired
-        # 6. Restore the initial state with a fixture
-        #
-        # The only disadvantage is that a lot of data should be processed (even default accounts)
-        #
-        # Also we can add delete_zip: bool = False to the restore() method
-
-        # saving initial state
-        initial_vat_codes = ledger.vat_codes()
-        initial_account_chart = ledger.account_chart()
-        initial_ledger = ledger.ledger()
-
-        # mirroring desired state
-        ledger.mirror_vat_codes(TEST_VAT_CODE)
-        ledger.mirror_account_chart(TEST_ACCOUNTS)
+        # Mirroring desired state
+        ledger.mirror_vat_codes(VAT_CODES)
+        ledger.mirror_account_chart(ACCOUNTS)
         ledger.mirror_ledger(LEDGER_ENTRIES)
+
+        # Dumping current state
         vat_codes = ledger.vat_codes()
         account_chart = ledger.account_chart()
         ledger_entries = ledger.ledger()
         ledger.dump("ledger.zip")
 
-        # restoring initial state
-        ledger.mirror_ledger(initial_ledger, delete=True)
-        ledger.mirror_vat_codes(initial_vat_codes, delete=True)
-        ledger.mirror_account_chart(initial_account_chart, delete=True)
-        assert txn_to_str(initial_ledger) == txn_to_str(ledger.ledger())
-        assert_frame_equal(
-            initial_vat_codes, ledger.vat_codes(), ignore_index=True,
-        )
-        assert_frame_equal(
-            initial_account_chart, ledger.account_chart(), ignore_index=True,
-        )
+        # Clearing system data using a predefined method that can be overwritten
+        self.clear_ledger(ledger)
+        assert ledger.ledger().empty, "Ledger was not cleared"
+        assert ledger.vat_codes().empty, "VAT codes were not cleared"
+        assert ledger.account_chart().empty, "Account chart was not cleared"
 
-        # restoring desired state
+        # Restoring dumped state
         ledger.restore("ledger.zip")
         assert txn_to_str(ledger_entries) == txn_to_str(ledger.ledger())
-        assert_frame_equal(
-            vat_codes, ledger.vat_codes(), ignore_index=True,
-        )
-        assert_frame_equal(
-            account_chart, ledger.account_chart(), ignore_index=True,
-        )
+        assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)
+        assert_frame_equal(account_chart, ledger.account_chart(), ignore_index=True)
