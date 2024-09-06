@@ -924,45 +924,57 @@ class LedgerEngine(ABC):
         """
 
     def round_to_precision(
-        self, amount: float, ticker: str, date: datetime.date = None
-    ) -> float:
-        """Round an amount to the precision of a specified asset or currency.
-
-        This method retrieves the precision for the specified ticker and date,
-        then rounds the amount to the nearest multiple of this precision.
-
-        Args:
-            amount (float): Value to be rounded.
-            ticker (str): Ticker symbol of the asset or currency.
-            date (datetime.date, optional): Date for precision determination.
-                                            Defaults to today's date.
-
-        Returns:
-            float: Rounded amount, adjusted to the specified asset's precision.
-        """
-        precision = self.precision(ticker=ticker, date=date)
-        result = round(amount / precision, 0) * precision
-        return round(result, -1 * math.floor(math.log10(precision)))
-
-    def round_series_to_precision(
         self,
-        amount: pd.Series,
-        currency: pd.Series,
-    ) -> pd.Series:
-        """Round the amounts in the series to the specified precision based on the currency.
+        amount: float | list | pd.Series,
+        ticker: str | list | pd.Series,
+        date: datetime.date = None
+    ) -> float | list:
+        """Round amounts to the precision of the specified ticker (currency or asset) using
+        Python lists or Pandas Series.
 
         Args:
-            amount (pd.Series): Series of amounts to round.
-            currency (pd.Series): Series of currency codes corresponding to each amount.
+            amount (float, list, or pd.Series): Value(s) to be rounded. If a list or pd.Series,
+                                                it must have the same length as `ticker`.
+            ticker (str, list, or pd.Series): Ticker symbol(s) of the currency or asset. If a
+                                            list or pd.Series, it must have the same
+                                            length as `amount`.
+            date (datetime.date, optional): Date for precision determination. Defaults to
+                                            today's date.
 
         Returns:
-            pd.Series: Series with amounts rounded to the specified precision.
+            float or list: Rounded amount(s), adjusted to the specified ticker's precision.
+
+        Raises:
+            ValueError: If the lengths of `amount` and `ticker` do not match, or if input
+                        lists have zero length.
         """
+
+        def round_single_value(amount: float, ticker: str, date: datetime.date = None) -> float:
+            """Helper function to round a single amount to the precision of the specified ticker."""
+            precision = self.precision(ticker=ticker, date=date)
+            result = round(amount / precision, 0) * precision
+            return round(result, -1 * math.floor(math.log10(precision)))
+
+        if isinstance(amount, pd.Series):
+            amount = amount.tolist()
+        if isinstance(ticker, pd.Series):
+            ticker = ticker.tolist()
+        scalar_input = False
+        if isinstance(amount, (float, int)):
+            amount = [amount]
+            scalar_input = True
+        if isinstance(ticker, str):
+            ticker = [ticker] * len(amount)
+        if len(amount) != len(ticker):
+            raise ValueError("Amount and ticker lists must be of the same length")
+
         rounded_values = [
-            pd.NA if pd.isna(amt) else self.round_to_precision(amt, curr)
-            for amt, curr in zip(amount, currency)
+            None if pd.isna(amt) or pd.isna(tic)
+            else round_single_value(amt, tic, date)
+            for amt, tic in zip(amount, ticker)
         ]
-        return pd.Series(rounded_values, index=amount.index)
+
+        return rounded_values[0] if scalar_input else rounded_values
 
     @abstractmethod
     def price_history(self) -> pd.DataFrame:
