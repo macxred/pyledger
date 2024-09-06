@@ -8,6 +8,7 @@ import datetime
 import logging
 import math
 from pathlib import Path
+from typing import List
 from consistent_df import enforce_dtypes
 import re
 import numpy as np
@@ -925,19 +926,17 @@ class LedgerEngine(ABC):
 
     def round_to_precision(
         self,
-        amount: float | list | pd.Series,
-        ticker: str | list | pd.Series,
+        amount: float | List[float],
+        ticker: str | List[str],
         date: datetime.date = None
     ) -> float | list:
-        """Round amounts to the precision of the specified ticker (currency or asset) using
-        Python lists or Pandas Series.
+        """
+        Round amounts to the precision of the specified ticker (currency or asset).
 
         Args:
-            amount (float, list, or pd.Series): Value(s) to be rounded. If a list or pd.Series,
-                                                it must have the same length as `ticker`.
-            ticker (str, list, or pd.Series): Ticker symbol(s) of the currency or asset. If a
-                                            list or pd.Series, it must have the same
-                                            length as `amount`.
+            amount (float, List[float]): Value(s) to be rounded.
+            ticker (str, List[str]): Ticker symbol(s) of the currency or asset.
+                If amount and ticker are both vectors, they must be of same length.
             date (datetime.date, optional): Date for precision determination. Defaults to
                                             today's date.
 
@@ -948,33 +947,32 @@ class LedgerEngine(ABC):
             ValueError: If the lengths of `amount` and `ticker` do not match, or if input
                         lists have zero length.
         """
-
-        def round_single_value(amount: float, ticker: str, date: datetime.date = None) -> float:
-            """Helper function to round a single amount to the precision of the specified ticker."""
+        def round_scalar(amount: float, ticker: str, date: datetime.date = None) -> float:
+            """Round a scaler to the precision of the specified ticker."""
             precision = self.precision(ticker=ticker, date=date)
             result = round(amount / precision, 0) * precision
             return round(result, -1 * math.floor(math.log10(precision)))
 
-        if isinstance(amount, pd.Series):
-            amount = amount.tolist()
-        if isinstance(ticker, pd.Series):
-            ticker = ticker.tolist()
-        scalar_input = False
-        if isinstance(amount, (float, int)):
-            amount = [amount]
-            scalar_input = True
-        if isinstance(ticker, str):
-            ticker = [ticker] * len(amount)
-        if len(amount) != len(ticker):
-            raise ValueError("Amount and ticker lists must be of the same length")
-
-        rounded_values = [
-            None if pd.isna(amt) or pd.isna(tic)
-            else round_single_value(amt, tic, date)
-            for amt, tic in zip(amount, ticker)
-        ]
-
-        return rounded_values[0] if scalar_input else rounded_values
+        if np.isscalar(amount) and np.isscalar(ticker):
+            result = round_scalar(amount=amount, ticker=ticker, date=date)
+        elif np.isscalar(amount):
+            result = [None if pd.isna(tck)
+                      else round_scalar(amount=amount, ticker=tck, date=date)
+                      for tck in ticker]
+        elif np.isscalar(ticker):
+            result = [None if pd.isna(amt)
+                      else round_scalar(amount=amt, ticker=ticker, date=date)
+                      for amt in amount]
+        else:
+            # amount and ticker are both array-like
+            if len(amount) != len(ticker):
+                raise ValueError("Amount and ticker lists must be of the same length")
+            result = [
+                None if pd.isna(amt) or pd.isna(tck)
+                else round_scalar(amount=amt, ticker=tck, date=date)
+                for amt, tck in zip(amount, ticker)
+            ]
+        return result
 
     @abstractmethod
     def price_history(self) -> pd.DataFrame:
