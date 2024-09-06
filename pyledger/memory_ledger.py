@@ -1,24 +1,14 @@
-"""
-This module defines the MemoryLedger class, which extends StandaloneLedger to create
-a non-persistent ledger system. The MemoryLedger class stores accounting data as in-memory
-DataFrame objects, making it ideal for scenarios where data persistence is unnecessary.
-It is particularly useful for demonstrations and testing.
-"""
+"""This module implements the MemoryLedger class."""
 
 import pandas as pd
 from .standalone_ledger import StandaloneLedger
 
 
 class MemoryLedger(StandaloneLedger):
-    """An implementation of the StandaloneLedger class that operates as a non-persistent
-    ledger system. This class works with data stored as in-memory DataFrame objects,
-    using hard-coded settings. It is particularly useful for demonstration purposes
-    and testing scenarios.
-
-    Usage example:
-        from pyledger import MemoryLedger
-        ledger = MemoryLedger()
-        add_ledger_entry("")
+    """
+    MemoryLedger is a full-featured but non-persistent implementation of the
+    abstract pyledger interface. It stores accounting data as DataFrames in
+    memory and is particularly useful for demonstration and testing purposes.
     """
 
     SETTINGS = {
@@ -148,7 +138,7 @@ class MemoryLedger(StandaloneLedger):
     # Accounts
 
     def account_chart(self) -> pd.DataFrame:
-        """Retrieves the local account chart.
+        """Retrieves the account chart.
 
         Returns:
             pd.DataFrame: A DataFrame with the account chart in pyledger format
@@ -163,17 +153,17 @@ class MemoryLedger(StandaloneLedger):
         group: str,
         vat_code: str = None,
     ) -> None:
-        """Adds a new account to the local account chart.
+        """Adds a new account to the account chart.
 
         Args:
             account (str): The account number or identifier to be added.
             currency (str): The currency associated with the account.
-            text (str): Additional text or description associated with the account.
-            group (str): The category group to which the account belongs.
+            text (str): Description of the account.
+            group (str): The category with which the account is associated.
             vat_code (str, optional): The VAT code to be applied to the account, if any.
 
         Raises:
-            ValueError: If the Account already exists in the memory.
+            ValueError: If the `account` already exists.
         """
         if self._account_chart["account"].isin([account]).any():
             raise ValueError(f"Account '{account}' already exists")
@@ -203,12 +193,12 @@ class MemoryLedger(StandaloneLedger):
         Args:
             account (str): The account number or identifier to be updated.
             currency (str): The currency associated with the account.
-            text (str): Additional text or description associated with the account.
-            group (str): The category group to which the account belongs.
+            text (str): Description of the account.
+            group (str): The category with which the account is associated.
             vat_code (str, optional): The VAT code to be applied to the account, if any.
 
         Raises:
-            ValueError: If the Account is not found in the memory.
+            ValueError: If the `account` is not found.
         """
         if not self._account_chart["account"].isin([account]).any():
             raise ValueError(f"Account '{account}' not found")
@@ -219,16 +209,15 @@ class MemoryLedger(StandaloneLedger):
         ] = [currency, text, vat_code, group]
 
     def delete_account(self, account: str) -> None:
-        """Deletes an account from the local account chart.
+        """Remove an account from the account chart.
 
         Args:
-            account (str): The account number to be deleted.
+            account (str): The number or identifier of the account to be deleted.
         """
         self._account_chart = self._account_chart[self._account_chart["account"] != account]
 
     def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
-        """Synchronizes accounts in the memory with a desired target state
-        provided as a DataFrame.
+        """Synchronizes the account chart with a desired target state provided as a DataFrame.
 
         Args:
             target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
@@ -248,7 +237,7 @@ class MemoryLedger(StandaloneLedger):
     # Ledger
 
     def ledger(self) -> pd.DataFrame:
-        """Retrieves the local ledger entries.
+        """Retrieves all ledger entries.
 
         Returns:
             pd.DataFrame: A DataFrame with LedgerEngine.ledger() column schema.
@@ -256,7 +245,7 @@ class MemoryLedger(StandaloneLedger):
         return self.standardize_ledger(self._ledger)
 
     def add_ledger_entry(self, entry: pd.DataFrame) -> int:
-        """Adds a new ledger entry to the local ledger.
+        """Adds a new entry to the ledger.
 
         Args:
             entry (pd.DataFrame): DataFrame with ledger entry in pyledger schema.
@@ -281,7 +270,7 @@ class MemoryLedger(StandaloneLedger):
         return ledger_id
 
     def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
-        """Modifies an existing ledger entry in the local ledger.
+        """Modifies an existing entry in the ledger.
 
         Args:
             entry (pd.DataFrame): DataFrame with ledger entry in pyledger schema.
@@ -304,7 +293,7 @@ class MemoryLedger(StandaloneLedger):
         ))
 
     def delete_ledger_entry(self, id: str) -> None:
-        """Deletes a ledger entry from the local ledger.
+        """Deletes an entry from the ledger.
 
         Args:
             id (str): The Id of the ledger entry to be deleted.
@@ -313,8 +302,7 @@ class MemoryLedger(StandaloneLedger):
             self._ledger = self._ledger[self._ledger["id"] != id]
 
     def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
-        """Synchronizes ledger entries in the memory with a desired target state
-        provided as a DataFrame.
+        """Synchronizes ledger entries with a desired target state provided as a DataFrame.
 
         Args:
             target (pd.DataFrame): DataFrame with ledger entries in the pyledger format.
