@@ -8,6 +8,7 @@ import datetime
 import logging
 import math
 from pathlib import Path
+from typing import List
 from consistent_df import enforce_dtypes
 import re
 import numpy as np
@@ -924,25 +925,54 @@ class LedgerEngine(ABC):
         """
 
     def round_to_precision(
-        self, amount: float, ticker: str, date: datetime.date = None
-    ) -> float:
-        """Round an amount to the precision of a specified asset or currency.
-
-        This method retrieves the precision for the specified ticker and date,
-        then rounds the amount to the nearest multiple of this precision.
+        self,
+        amount: float | List[float],
+        ticker: str | List[str],
+        date: datetime.date = None
+    ) -> float | list:
+        """
+        Round amounts to the precision of the specified ticker (currency or asset).
 
         Args:
-            amount (float): Value to be rounded.
-            ticker (str): Ticker symbol of the asset or currency.
-            date (datetime.date, optional): Date for precision determination.
-                                            Defaults to today's date.
+            amount (float, List[float]): Value(s) to be rounded.
+            ticker (str, List[str]): Ticker symbol(s) of the currency or asset.
+                If amount and ticker are both vectors, they must be of same length.
+            date (datetime.date, optional): Date for precision determination. Defaults to
+                                            today's date.
 
         Returns:
-            float: Rounded amount, adjusted to the specified asset's precision.
+            float or list: Rounded amount(s), adjusted to the specified ticker's precision.
+
+        Raises:
+            ValueError: If the lengths of `amount` and `ticker` do not match, or if input
+                        lists have zero length.
         """
-        precision = self.precision(ticker=ticker, date=date)
-        result = round(amount / precision, 0) * precision
-        return round(result, -1 * math.floor(math.log10(precision)))
+        def round_scalar(amount: float, ticker: str, date: datetime.date = None) -> float:
+            """Round a scaler to the precision of the specified ticker."""
+            precision = self.precision(ticker=ticker, date=date)
+            result = round(amount / precision, 0) * precision
+            return round(result, -1 * math.floor(math.log10(precision)))
+
+        if np.isscalar(amount) and np.isscalar(ticker):
+            result = round_scalar(amount=amount, ticker=ticker, date=date)
+        elif np.isscalar(amount):
+            result = [None if pd.isna(tck)
+                      else round_scalar(amount=amount, ticker=tck, date=date)
+                      for tck in ticker]
+        elif np.isscalar(ticker):
+            result = [None if pd.isna(amt)
+                      else round_scalar(amount=amt, ticker=ticker, date=date)
+                      for amt in amount]
+        else:
+            # amount and ticker are both array-like
+            if len(amount) != len(ticker):
+                raise ValueError("Amount and ticker lists must be of the same length")
+            result = [
+                None if pd.isna(amt) or pd.isna(tck)
+                else round_scalar(amount=amt, ticker=tck, date=date)
+                for amt, tck in zip(amount, ticker)
+            ]
+        return result
 
     @abstractmethod
     def price_history(self) -> pd.DataFrame:

@@ -138,3 +138,56 @@ def test_validate_account_balance(account: int, expected_length: int, expected_b
 
     assert len(ledger.account_history(account)) == expected_length
     assert ledger.account_balance(account)["CHF"] == expected_balance
+
+
+@pytest.fixture
+def ledger():
+    PRECISION = {
+        "CHF": 0.01,
+        "USD": 0.01,
+        "EUR": 0.01,
+        "GBP": 0.01,
+        "JPY": 1.0,
+    }
+
+    ledger = TestLedger()
+    ledger._settings["precision"] = PRECISION
+    return ledger
+
+
+def test_rounding(ledger):
+    result = ledger.round_to_precision([100.234, 300.891], ["USD", "GBP"])
+    assert result == [100.23, 300.89], "Rounding failed."
+
+
+def test_rounding_with_nan(ledger):
+    result = ledger.round_to_precision([100.234, None, 300.891], ["USD", "EUR", "GBP"])
+    assert result == [100.23, None, 300.89], "Rounding with None failed."
+
+
+def test_rounding_with_different_precision(ledger):
+    result = ledger.round_to_precision([100.234, 200.567, 300.891], ["USD", "JPY", "GBP"])
+    assert result == [100.23, 201.0, 300.89], "Rounding with mixed precision failed."
+
+
+def test_arguments_of_differing_length_raises_error(ledger):
+    with pytest.raises(ValueError, match="Amount and ticker lists must be of the same length"):
+        ledger.round_to_precision([100.234, 200.567], ["USD"])
+
+
+def test_rounding_with_scalar_amount_and_ticker(ledger):
+    result = ledger.round_to_precision(100.234, "USD")
+    assert result == 100.23, "Rounding scalar amount failed."
+
+
+def test_rounding_with_list_amount_and_scalar_ticker(ledger):
+    result = ledger.round_to_precision([100.234, 200.567, 300.891], "USD")
+    assert result == [100.23, 200.57, 300.89], "Rounding scalar ticker failed."
+
+def test_rounding_with_empty_ticker(ledger):
+    with pytest.raises(KeyError):
+        ledger.round_to_precision([100.234], [""])
+
+def test_rounding_with_unknown_ticker(ledger):
+    with pytest.raises(KeyError):
+        ledger.round_to_precision([100.234], ["XYZ"])
