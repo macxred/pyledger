@@ -919,9 +919,12 @@ class LedgerEngine(ABC):
         This is the precision, to which prices should be rounded.
 
         Args:
-            ticker (str): Reference to the associated document.
+            ticker (str): Identifier of the currency or asset.
             date (datetime.date, optional): Date for which to retrieve the precision.
                                             Defaults to today's date.
+
+        Returns:
+            float: The smallest price increment.
         """
 
     def round_to_precision(
