@@ -47,19 +47,6 @@ class MemoryLedger(StandaloneLedger):
     # File Operations
 
     def restore(self, archive_path):
-        """Restores the ledger, account chart, and VAT codes from a specified archive.
-
-        This method extracts data from a zip archive and loads it into the ledger, account chart,
-        and VAT codes. After the data is loaded, the extracted CSV files are removed to clean up
-        the environment.
-
-        Args:
-            archive_path (str): The file path to the zip archive containing the ledger,
-                                account chart, and VAT codes CSV files.
-
-        Raises:
-            FileNotFoundError: If the archive or any of the expected CSV files are not found.
-        """
         required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv'}
 
         with zipfile.ZipFile(archive_path, 'r') as archive:

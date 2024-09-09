@@ -73,7 +73,15 @@ class BaseTestDumpAndRestore(ABC):
         ledger.mirror_account_chart(initial_account_chart, delete=True)
 
     def clear_ledger(self, ledger):
-        """Clears all data from the ledger system."""
+        """Clear all data from the ledger system.
+
+        This method removes all entries from the ledger, VAT codes, and account chart.
+        It is designed to be flexible and can be overridden by specific ledger
+        implementations to adapt to the clearing process requirements of the integrating system.
+
+        Args:
+            ledger: The ledger system instance to be cleared.
+        """
         ledger.mirror_ledger(None, delete=True)
         ledger.mirror_vat_codes(None, delete=True)
         ledger.mirror_account_chart(None, delete=True)

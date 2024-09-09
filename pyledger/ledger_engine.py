@@ -161,13 +161,14 @@ class LedgerEngine(ABC):
             workbook.save(file)
 
     def dump(self, archive_path: str):
-        """Dumps the accounting data to a ZIP archive.
+        """Dump ledger system data to a ZIP archive.
 
-        This method saves the ledger, account chart, and VAT codes to individual CSV
-        files and compresses them into a ZIP archive specified by `archive_path`.
+        Compresses the ledger, VAT codes, and account chart into individual CSV files
+        and saves them within the ZIP archive at `archive_path`. Each component of the ledger
+        system is stored in a separate CSV for modular restoration and analysis.
 
         Args:
-            archive_path (str): The path where the ZIP archive will be saved.
+            archive_path (str): The file path to save the ZIP archive.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
@@ -176,14 +177,14 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def restore(self, archive_path: str):
-        """Restores accounting data from a ZIP archive.
+        """Restore ledger system data from a ZIP archive.
 
-        This method extracts the contents of the ZIP archive specified by
-        `archive_path` and loads the ledger, account chart, and VAT codes
-        from the corresponding CSV files into their respective DataFrames.
+        Extracts ledger, VAT codes, and account chart from the ZIP archive at `archive_path`
+        and loads them into their respective DataFrames. This method ensures consistency
+        and accuracy in restoring the full ledger system state.
 
         Args:
-            archive_path (str): The path of the ZIP archive to restore from.
+            archive_path (str): The file path of the ZIP archive to restore.
         """
 
     # ----------------------------------------------------------------------
