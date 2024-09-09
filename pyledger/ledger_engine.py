@@ -11,7 +11,7 @@ import zipfile
 import json
 from pathlib import Path
 from typing import List
-from consistent_df import enforce_dtypes
+from consistent_df import enforce_dtypes, df_to_consistent_str, nest
 import re
 import numpy as np
 import openpyxl
@@ -1045,6 +1045,28 @@ class LedgerEngine(ABC):
             debit.loc[debit["account"].notna()]
         ])
         return result[cols]
+
+    def txn_to_str(self, df: pd.DataFrame) -> List[str]:
+        """Create a consistent, unique representation of ledger transactions.
+
+        This method converts each transaction into a string format and stores
+        them in a list. The result can be used to compare transactions, ensuring
+        consistency and uniqueness.
+
+        Args:
+            df (pd.DataFrame): The DataFrame containing ledger transactions.
+
+        Returns:
+            List[str]: A sorted list of unique strings, where each entry represents
+            a transaction.
+        """
+        df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
+        df = df.drop(columns=["id"])
+        result = [
+            f"{str(date)},{df_to_consistent_str(txn)}" for date, txn in zip(df["date"], df["txn"])
+        ]
+        result.sort()
+        return result
 
     # ----------------------------------------------------------------------
     # Currency

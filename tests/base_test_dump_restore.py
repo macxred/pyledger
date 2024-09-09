@@ -1,11 +1,10 @@
 """This module provides an abstract base class to test dump and restore operations."""
 
 from io import StringIO
-from typing import List
 import pytest
 import pandas as pd
 from abc import ABC, abstractmethod
-from consistent_df import assert_frame_equal, df_to_consistent_str, nest
+from consistent_df import assert_frame_equal
 
 
 ACCOUNT_CSV = """
@@ -30,17 +29,6 @@ LEDGER_CSV = """
 LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
-
-
-# TODO: Use txn_to_str form the consistent_df package when it implemented
-def txn_to_str(df: pd.DataFrame) -> List[str]:
-    df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
-    df = df.drop(columns=["id"])
-    result = [
-        f"{str(date)},{df_to_consistent_str(txn)}" for date, txn in zip(df["date"], df["txn"])
-    ]
-    result.sort()
-    return result
 
 
 class BaseTestDumpAndRestore(ABC):
@@ -76,7 +64,7 @@ class BaseTestDumpAndRestore(ABC):
         assert_frame_equal(
             ledger.standardize_account_chart(ACCOUNTS), ledger.account_chart(), ignore_index=True
         )
-        assert txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)) == txn_to_str(ledger.ledger())
+        assert ledger.txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)) == ledger.txn_to_str(ledger.ledger())
 
     def test_dump_and_restore_zip(self, ledger, tmp_path, restore_initial_state):
         # Populate with test data
@@ -95,6 +83,6 @@ class BaseTestDumpAndRestore(ABC):
         # Restoring dumped state
         ledger.restore_from_zip(tmp_path / "ledger.zip")
         assert ledger.base_currency == "USD", "Base currency were not restored"
-        assert txn_to_str(ledger_entries) == txn_to_str(ledger.ledger())
         assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)
         assert_frame_equal(account_chart, ledger.account_chart(), ignore_index=True)
+        assert ledger.txn_to_str(ledger_entries) == ledger.txn_to_str(ledger.ledger())
