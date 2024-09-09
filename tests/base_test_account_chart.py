@@ -25,8 +25,8 @@ class BaseTestAccountCharts(ABC):
         ledger.delete_vat_code(code="TestCodeAccounts")
 
     def test_account_mutators(self, ledger, setup_vat_code):
-        ledger.delete_account(1145)
-        ledger.delete_account(1146)
+        ledger.delete_account(1145, allow_missing=True)
+        ledger.delete_account(1146, allow_missing=True)
         account_chart = ledger.account_chart()
         assert 1145 not in account_chart["account"].values
         assert 1146 not in account_chart["account"].values

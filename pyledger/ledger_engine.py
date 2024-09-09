@@ -195,14 +195,33 @@ class LedgerEngine(ABC):
         """
 
     @abstractmethod
-    def delete_vat_code(self, code: str, date: datetime.date = None) -> None:
+    def modify_vat_code(
+        self,
+        code: str,
+        rate: float,
+        account: str,
+        inclusive: bool = True,
+        text: str = "",
+    ) -> None:
+        """
+        Update an existing VAT code.
+
+        Args:
+            code (str): VAT code to update.
+            rate (float): VAT rate (0 to 1).
+            account (str): Account identifier for the VAT.
+            inclusive (bool, optional): If True, VAT is 'NET' (default), else 'GROSS'.
+            text (str, optional): Description for the VAT code.
+        """
+
+    @abstractmethod
+    def delete_vat_code(self, code: str, allow_missing: bool = False) -> None:
         """Removes a vat definition.
 
         Args:
             code (str): Vat code to be removed.
-            date (datetime.date, optional): Date on which the vat code is removed.
-                                            If `None`, all entries with the given vat_code are
-                                            removed. Defaults to None.
+            allow_missing (bool, optional): If True, no error is raised if the VAT code is not
+                                            found; if False, raises error. Defaults to False.
         """
 
     @classmethod
@@ -326,11 +345,14 @@ class LedgerEngine(ABC):
         """
 
     @abstractmethod
-    def delete_account(self, account: int) -> None:
+    def delete_account(self, account: int, allow_missing: bool = False) -> None:
         """Removes an account from the account chart.
 
         Args:
             account (int): The account to be removed.
+            allow_missing (bool, optional): If True, no error is raised if the account is
+                                            not found; if False raises error if
+                                            the account is missing. Defaults to False.
         """
 
     @abstractmethod

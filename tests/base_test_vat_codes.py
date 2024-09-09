@@ -19,7 +19,7 @@ class BaseTestVatCode(ABC):
 
     def test_accessors_mutators(self, ledger):
         # Ensure there is no 'TestCode' vat_code on the remote account
-        ledger.delete_vat_code("TestCode")
+        ledger.delete_vat_code("TestCode", allow_missing=True)
         assert "TestCode" not in ledger.vat_codes()["id"].values
 
         # Test adding a valid vat_code
@@ -52,7 +52,7 @@ class BaseTestVatCode(ABC):
             "rate": 0.20,
             "inclusive": True,
         }
-        ledger.update_vat_code(**new_vat_code)
+        ledger.modify_vat_code(**new_vat_code)
         updated_vat_codes = ledger.vat_codes()
         outer_join = pd.merge(initial_vat_codes, updated_vat_codes, how="outer", indicator=True)
         modified_vat_codes = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
@@ -84,7 +84,7 @@ class BaseTestVatCode(ABC):
 
     def test_update_non_existent_raise_error(self, ledger):
         with pytest.raises(ValueError):
-            ledger.update_vat_code(
+            ledger.modify_vat_code(
                 code="TestCode", text="VAT 20%", account=2200, rate=0.02, inclusive=True
             )
 

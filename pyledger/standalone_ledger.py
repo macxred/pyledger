@@ -124,6 +124,9 @@ class StandaloneLedger(LedgerEngine):
     def add_vat_code(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_vat_code is not implemented yet.")
 
+    def modify_vat_code(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_vat_code is not implemented yet.")
+
     def delete_vat_code(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_vat_code is not implemented yet.")
 

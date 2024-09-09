@@ -11,26 +11,31 @@ class MemoryLedger(StandaloneLedger):
     memory and is particularly useful for demonstration and testing purposes.
     """
 
-    SETTINGS = {
-        "base_currency": "USD",
-        "precision": {
-            "AUD": 0.01,
-            "CAD": 0.01,
-            "CHF": 0.01,
-            "EUR": 0.01,
-            "GBP": 0.01,
-            "JPY": 1.00,
-            "NZD": 0.01,
-            "NOK": 0.01,
-            "SEK": 0.01,
-            "USD": 0.01,
-        },
+    PRECISION = {
+        "AUD": 0.01,
+        "CAD": 0.01,
+        "CHF": 0.01,
+        "EUR": 0.01,
+        "GBP": 0.01,
+        "JPY": 1.00,
+        "NZD": 0.01,
+        "NOK": 0.01,
+        "SEK": 0.01,
+        "USD": 0.01,
     }
 
-    def __init__(self) -> None:
-        """Initialize the MemoryLedger with hard-coded settings"""
+    def __init__(self, base_currency: str = "USD") -> None:
+        """Initialize the MemoryLedger with hard-coded settings
+
+        Args:
+            base_currency (str): The base currency for the system. Defaults to "USD".
+        """
+        settings = {
+            "precision": self.PRECISION,
+            "base_currency": base_currency,
+        }
         super().__init__(
-            settings=self.SETTINGS,
+            settings=settings,
             accounts=None,
         )
         self._ledger = self.standardize_ledger(None)
@@ -41,11 +46,6 @@ class MemoryLedger(StandaloneLedger):
     # VAT Codes
 
     def vat_codes(self) -> pd.DataFrame:
-        """Retrieves VAT codes from the memory
-
-        Returns:
-            pd.DataFrame: A DataFrame with pyledger.VAT_CODE column schema.
-        """
         return self.standardize_vat_codes(self._vat_codes)
 
     def add_vat_code(
@@ -56,34 +56,19 @@ class MemoryLedger(StandaloneLedger):
         inclusive: bool = True,
         text: str = "",
     ) -> None:
-        """Adds a new VAT code to the memory.
-
-        Args:
-            code (str): The VAT code to be added.
-            rate (float): The VAT rate, must be between 0 and 1.
-            account (str): The account identifier to which the VAT is applied.
-            inclusive (bool, optional): Determines whether the VAT is calculated as 'NET'
-                                        (True, default) or 'GROSS' (False). Defaults to True.
-            text (str, optional): Additional text or description associated with the VAT code.
-
-        Raises:
-            ValueError: If the VAT code already exists in the memory.
-        """
         if self._vat_codes["id"].isin([code]).any():
             raise ValueError(f"VAT code '{code}' already exists")
 
-        new_vat_code = pd.DataFrame({
+        new_vat_code = self.standardize_vat_codes(pd.DataFrame({
             "id": [code],
             "text": [text],
             "account": [account],
             "rate": [rate],
             "inclusive": [inclusive],
-        })
-        self._vat_codes = self.standardize_vat_codes(
-            pd.concat([self._vat_codes, new_vat_code])
-        )
+        }))
+        self._vat_codes = pd.concat([self._vat_codes, new_vat_code])
 
-    def update_vat_code(
+    def modify_vat_code(
         self,
         code: str,
         rate: float,
@@ -91,33 +76,19 @@ class MemoryLedger(StandaloneLedger):
         inclusive: bool = True,
         text: str = "",
     ) -> None:
-        """Updates an existing VAT code with new parameters.
-
-        Args:
-            code (str): The VAT code to be updated.
-            rate (float): The VAT rate, must be between 0 and 1.
-            account (str): The account identifier to which the VAT is applied.
-            inclusive (bool, optional): Determines whether the VAT is calculated as 'NET'
-                                        (True, default) or 'GROSS' (False). Defaults to True.
-            text (str, optional): Additional text or description associated with the VAT code.
-
-        Raises:
-            ValueError: If the VAT code is not found in the memory.
-        """
         if not self._vat_codes["id"].isin([code]).any():
             raise ValueError(f"VAT code '{code}' not found.")
 
         self._vat_codes.loc[
-            self._vat_codes["id"] == code,
-            ["rate", "account", "inclusive", "text"],
+            self._vat_codes["id"] == code, ["rate", "account", "inclusive", "text"]
         ] = [rate, account, inclusive, text]
 
-    def delete_vat_code(self, code: str) -> None:
-        """Deletes a VAT code from the memory.
+        self._vat_codes = self.standardize_vat_codes(self._vat_codes)
 
-        Args:
-            code (str): The VAT code name to be deleted.
-        """
+    def delete_vat_code(self, code: str, allow_missing: bool = False) -> None:
+        if not allow_missing and code not in self._vat_codes["id"].values:
+            raise ValueError(f"VAT code '{code}' not found in the memory.")
+
         self._vat_codes = self._vat_codes[self._vat_codes["id"] != code]
 
     def mirror_vat_codes(self, target: pd.DataFrame, delete: bool = False):
@@ -131,79 +102,51 @@ class MemoryLedger(StandaloneLedger):
         """
         target_df = self.standardize_vat_codes(target)
 
+        if target_df["id"].duplicated().any():
+            raise ValueError("Duplicate VAT codes 'id' values found")
+
         if delete:
             self._vat_codes = target_df
         else:
             self._vat_codes = self.standardize_vat_codes(
-                pd.concat([self._vat_codes, target_df]).drop_duplicates()
+                pd.concat([self._vat_codes, target_df])
+                .drop_duplicates(subset=["id"], keep="last")
             )
 
     # ----------------------------------------------------------------------
     # Accounts
 
     def account_chart(self) -> pd.DataFrame:
-        """Retrieves the account chart.
-
-        Returns:
-            pd.DataFrame: A DataFrame with the account chart in pyledger format
-        """
         return self.standardize_account_chart(self._account_chart)
 
     def add_account(
         self,
-        account: str,
+        account: int,
         currency: str,
         text: str,
         group: str,
         vat_code: str = None,
     ) -> None:
-        """Adds a new account to the account chart.
-
-        Args:
-            account (str): The account number or identifier to be added.
-            currency (str): The currency associated with the account.
-            text (str): Description of the account.
-            group (str): The category with which the account is associated.
-            vat_code (str, optional): The VAT code to be applied to the account, if any.
-
-        Raises:
-            ValueError: If the `account` already exists.
-        """
         if self._account_chart["account"].isin([account]).any():
             raise ValueError(f"Account '{account}' already exists")
 
-        new_account = pd.DataFrame({
+        new_account = self.standardize_account_chart(pd.DataFrame({
             "account": [account],
             "currency": [currency],
             "text": [text],
             "vat_code": [vat_code],
             "group": [group],
-        })
-
-        self._account_chart = self.standardize_account_chart(
-            pd.concat([self._account_chart, new_account])
-        )
+        }))
+        self._account_chart = pd.concat([self._account_chart, new_account])
 
     def modify_account(
         self,
-        account: str,
+        account: int,
         currency: str,
         text: str,
         group: str,
         vat_code: str = None,
     ) -> None:
-        """Updates an existing account in the local account chart.
-
-        Args:
-            account (str): The account number or identifier to be updated.
-            currency (str): The currency associated with the account.
-            text (str): Description of the account.
-            group (str): The category with which the account is associated.
-            vat_code (str, optional): The VAT code to be applied to the account, if any.
-
-        Raises:
-            ValueError: If the `account` is not found.
-        """
         if not self._account_chart["account"].isin([account]).any():
             raise ValueError(f"Account '{account}' not found")
 
@@ -211,13 +154,12 @@ class MemoryLedger(StandaloneLedger):
             self._account_chart["account"] == account,
             ["currency", "text", "vat_code", "group"]
         ] = [currency, text, vat_code, group]
+        self._account_chart = self.standardize_account_chart(self._account_chart)
 
-    def delete_account(self, account: str) -> None:
-        """Remove an account from the account chart.
+    def delete_account(self, account: str, allow_missing: bool = False) -> None:
+        if not allow_missing and account not in self._account_chart["account"].values:
+            raise KeyError(f"Account '{account}' not found in the account chart.")
 
-        Args:
-            account (str): The number or identifier of the account to be deleted.
-        """
         self._account_chart = self._account_chart[self._account_chart["account"] != account]
 
     def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
@@ -227,40 +169,30 @@ class MemoryLedger(StandaloneLedger):
             target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
             delete (bool, optional): If True, deletes accounts on the remote that are not
                                      present in the target DataFrame.
+        Raises:
+            ValueError: If duplicate account charts are found in the target DataFrame.
         """
         target_df = self.standardize_account_chart(target)
+
+        if target_df["account"].duplicated().any():
+            raise ValueError("Duplicate account charts found")
 
         if delete:
             self._account_chart = target_df
         else:
             self._account_chart = self.standardize_account_chart(
-                pd.concat([self._account_chart, target_df]).drop_duplicates()
+                pd.concat([self._account_chart, target_df])
+                .drop_duplicates(subset=["account"], keep="last")
             )
 
     # ----------------------------------------------------------------------
     # Ledger
 
     def ledger(self) -> pd.DataFrame:
-        """Retrieves all ledger entries.
-
-        Returns:
-            pd.DataFrame: A DataFrame with LedgerEngine.ledger() column schema.
-        """
         return self.standardize_ledger(self._ledger)
 
     def add_ledger_entry(self, entry: pd.DataFrame) -> int:
-        """Adds a new entry to the ledger.
-
-        Args:
-            entry (pd.DataFrame): DataFrame with ledger entry in pyledger schema.
-
-        Returns:
-            int: The Id of the created ledger entry.
-
-        Raises:
-            ValueError: If the entry does not have a unique 'id' across all rows.
-            ValueError: If a ledger entry with the same 'id' already exists in the ledger.
-        """
+        entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
             raise ValueError(
                 "Id needs to be unique and present in all rows of a collective booking."
@@ -270,19 +202,10 @@ class MemoryLedger(StandaloneLedger):
         if entry["id"].iat[0] in self._ledger["id"].values:
             raise ValueError(f"Ledger entry with id '{ledger_id}' already exists.")
 
-        self._ledger = self.standardize_ledger(pd.concat([self._ledger, entry]))
+        self._ledger = pd.concat([self._ledger, entry])
         return ledger_id
 
     def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
-        """Modifies an existing entry in the ledger.
-
-        Args:
-            entry (pd.DataFrame): DataFrame with ledger entry in pyledger schema.
-
-        Raises:
-            ValueError: If the entry does not have a unique 'id' across all rows.
-            ValueError: If the ledger entry with the specified 'id' does not exist in the ledger.
-        """
         if entry["id"].nunique() != 1:
             raise ValueError(
                 "Id needs to be unique and present in all rows of a collective booking."
@@ -297,11 +220,6 @@ class MemoryLedger(StandaloneLedger):
         ))
 
     def delete_ledger_entry(self, id: str) -> None:
-        """Deletes an entry from the ledger.
-
-        Args:
-            id (str): The Id of the ledger entry to be deleted.
-        """
         if id in self._ledger["id"].values:
             self._ledger = self._ledger[self._ledger["id"] != id]
 
