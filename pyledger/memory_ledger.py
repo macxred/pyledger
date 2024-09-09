@@ -2,7 +2,6 @@
 
 import pandas as pd
 from .standalone_ledger import StandaloneLedger
-import os
 import zipfile
 
 
@@ -60,19 +59,22 @@ class MemoryLedger(StandaloneLedger):
 
         Raises:
             FileNotFoundError: If the archive or any of the expected CSV files are not found.
-            pd.errors.EmptyDataError: If any of the CSV files are empty or cannot be parsed.
         """
+        required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv'}
+
         with zipfile.ZipFile(archive_path, 'r') as archive:
-            archive.extractall()
+            archive_files = set(archive.namelist())
+            missing_files = required_files - archive_files
+            if missing_files:
+                raise FileNotFoundError(
+                    f"Missing required files in the archive: {', '.join(missing_files)}"
+                )
 
-            self._ledger = self.standardize_ledger(pd.read_csv('ledger.csv'))
-            self._account_chart = self.standardize_account_chart(pd.read_csv('accounts.csv'))
-            self._vat_codes = self.standardize_vat_codes(pd.read_csv('vat_codes.csv'))
-
-            # Clean up extracted CSV files after loading
-            os.remove('ledger.csv')
-            os.remove('accounts.csv')
-            os.remove('vat_codes.csv')
+            self._ledger = self.standardize_ledger(pd.read_csv(archive.open('ledger.csv')))
+            self._vat_codes = self.standardize_vat_codes(pd.read_csv(archive.open('vat_codes.csv')))
+            self._account_chart = self.standardize_account_chart(
+                pd.read_csv(archive.open('accounts.csv'))
+            )
 
     # ----------------------------------------------------------------------
     # VAT Codes

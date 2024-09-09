@@ -7,7 +7,6 @@ from abc import ABC, abstractmethod
 import datetime
 import logging
 import math
-import os
 import zipfile
 from pathlib import Path
 from typing import List
@@ -169,23 +168,11 @@ class LedgerEngine(ABC):
 
         Args:
             archive_path (str): The path where the ZIP archive will be saved.
-
-        Raises:
-            OSError: If an error occurs while writing or removing files.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
-            self.ledger().to_csv('ledger.csv', index=False)
-            archive.write('ledger.csv')
-
-            self.account_chart().to_csv('accounts.csv', index=False)
-            archive.write('accounts.csv')
-
-            self.vat_codes().to_csv('vat_codes.csv', index=False)
-            archive.write('vat_codes.csv')
-
-            os.remove('ledger.csv')
-            os.remove('accounts.csv')
-            os.remove('vat_codes.csv')
+            archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
+            archive.writestr('vat_codes.csv', self.vat_codes().to_csv(index=False))
+            archive.writestr('accounts.csv', self.account_chart().to_csv(index=False))
 
     @abstractmethod
     def restore(self, archive_path: str):
