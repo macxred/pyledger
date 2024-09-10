@@ -160,7 +160,7 @@ class LedgerEngine(ABC):
                             cell.style = "Hyperlink"
             workbook.save(file)
 
-    def dump(self, archive_path: str):
+    def dump_to_zip(self, archive_path: str):
         """Dump ledger system data to a ZIP archive.
 
         Compresses the ledger, VAT codes, and account chart into individual CSV files
@@ -175,17 +175,70 @@ class LedgerEngine(ABC):
             archive.writestr('vat_codes.csv', self.vat_codes().to_csv(index=False))
             archive.writestr('accounts.csv', self.account_chart().to_csv(index=False))
 
-    @abstractmethod
-    def restore(self, archive_path: str):
+    def restore_from_zip(self, archive_path: str):
         """Restore ledger system data from a ZIP archive.
 
         Extracts ledger, VAT codes, and account chart from the ZIP archive at `archive_path`
-        and loads them into their respective DataFrames. This method ensures consistency
-        and accuracy in restoring the full ledger system state.
+        and loads them into their respective DataFrames. Then, the extracted data is passed
+        to the `restore` method to update the system.
 
         Args:
             archive_path (str): The file path of the ZIP archive to restore.
+
+        Raises:
+            FileNotFoundError: If the required files (ledger.csv, vat_codes.csv, accounts.csv)
+                            are not found in the ZIP archive.
         """
+        required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv'}
+
+        with zipfile.ZipFile(archive_path, 'r') as archive:
+            archive_files = set(archive.namelist())
+            missing_files = required_files - archive_files
+            if missing_files:
+                raise FileNotFoundError(
+                    f"Missing required files in the archive: {', '.join(missing_files)}"
+                )
+
+            ledger = pd.read_csv(archive.open('ledger.csv'))
+            vat_codes = pd.read_csv(archive.open('vat_codes.csv'))
+            accounts = pd.read_csv(archive.open('accounts.csv'))
+            self.restore(ledger=ledger, vat_codes=vat_codes, accounts=accounts)
+
+    def restore(
+        self,
+        base_currency: str | None = None,
+        vat_codes: pd.DataFrame | None = None,
+        accounts: pd.DataFrame | None = None,
+        ledger: pd.DataFrame | None = None,
+    ):
+        """Replaces the entire ledger system with data provided as arguments.
+
+        Args:
+            base_currency (str | None): Reporting currency. If `None`,
+                                        the reporting currency remains unchanged.
+            vat_codes (pd.DataFrame | None): VAT codes of the restored ledger system.
+                If `None`, VAT codes remain unchanged.
+            accounts (pd.DataFrame | None): Accounts of the restored ledger system.
+                If `None`, accounts remain unchanged.
+            ledger (pd.DataFrame | None): Ledger entries of the restored system.
+                If `None`, ledger remains unchanged.
+            price (pd.DataFrame | None): Price history of the restored system.
+                If `None`, price history remains unchanged.
+            precision (dict | None): Precision settings for currencies.
+                If `None`, precision settings remain unchanged.
+            fx_adjustment (pd.DataFrame | None): FX adjustments in the restored system.
+                If `None`, FX adjustments remain unchanged.
+        """
+        if base_currency is not None:
+            self.base_currency = base_currency
+        if vat_codes is not None:
+            self.mirror_vat_codes(vat_codes, delete=True)
+        if accounts is not None:
+            self.mirror_account_chart(accounts, delete=True)
+        if ledger is not None:
+            self.mirror_ledger(ledger, delete=True)
+        # TODO: Implement price history, precision settings,
+        # and FX adjustments restoration logic
 
     # ----------------------------------------------------------------------
     # VAT Codes
@@ -250,6 +303,17 @@ class LedgerEngine(ABC):
             code (str): Vat code to be removed.
             allow_missing (bool, optional): If True, no error is raised if the VAT code is not
                                             found; if False, raises error. Defaults to False.
+        """
+
+    @abstractmethod
+    def mirror_vat_codes(self, target: pd.DataFrame, delete: bool = False):
+        """Aligns VAT rates in the memory with the desired state provided as a DataFrame.
+
+        Args:
+            target (pd.DataFrame): DataFrame containing VAT rates in
+                                         the pyledger.vat_codes format.
+            delete (bool, optional): If True, deletes VAT codes on the remote account
+                                     that are not present in target_state.
         """
 
     @classmethod
@@ -381,6 +445,18 @@ class LedgerEngine(ABC):
             allow_missing (bool, optional): If True, no error is raised if the account is
                                             not found; if False raises error if
                                             the account is missing. Defaults to False.
+        """
+
+    @abstractmethod
+    def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
+        """Synchronizes the account chart with a desired target state provided as a DataFrame.
+
+        Args:
+            target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
+            delete (bool, optional): If True, deletes accounts on the remote that are not
+                                        present in the target DataFrame.
+        Raises:
+            ValueError: If duplicate account charts are found in the target DataFrame.
         """
 
     @abstractmethod
@@ -698,6 +774,16 @@ class LedgerEngine(ABC):
 
         Args:
             id (str): The unique identifier of the ledger entry to delete.
+        """
+
+    @abstractmethod
+    def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
+        """Synchronizes ledger entries with a desired target state provided as a DataFrame.
+
+        Args:
+            target (pd.DataFrame): DataFrame with ledger entries in the pyledger format.
+            delete (bool, optional): If True, deletes ledger entries in the memory that are not
+                                    present in the target DataFrame.
         """
 
     def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:

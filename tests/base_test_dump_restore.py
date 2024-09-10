@@ -86,7 +86,24 @@ class BaseTestDumpAndRestore(ABC):
         ledger.mirror_vat_codes(None, delete=True)
         ledger.mirror_account_chart(None, delete=True)
 
-    def test_dump_and_restore(self, ledger, restore_initial_state):
+    def test_restore(self, ledger, restore_initial_state):
+        # Clearing system data using a predefined method that can be overwritten
+        self.clear_ledger(ledger)
+        assert ledger.ledger().empty, "Ledger was not cleared"
+        assert ledger.vat_codes().empty, "VAT codes were not cleared"
+        assert ledger.account_chart().empty, "Account chart was not cleared"
+
+        # Restoring state from CSV files
+        ledger.restore(ledger=LEDGER_ENTRIES, vat_codes=VAT_CODES, accounts=ACCOUNTS)
+        assert_frame_equal(
+            ledger.standardize_vat_codes(VAT_CODES), ledger.vat_codes(), ignore_index=True
+        )
+        assert_frame_equal(
+            ledger.standardize_account_chart(ACCOUNTS), ledger.account_chart(), ignore_index=True
+        )
+        assert txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)) == txn_to_str(ledger.ledger())
+
+    def test_dump_and_restore_zip(self, ledger, restore_initial_state):
         # Mirroring desired state
         ledger.mirror_vat_codes(VAT_CODES)
         ledger.mirror_account_chart(ACCOUNTS)
@@ -96,7 +113,7 @@ class BaseTestDumpAndRestore(ABC):
         vat_codes = ledger.vat_codes()
         account_chart = ledger.account_chart()
         ledger_entries = ledger.ledger()
-        ledger.dump("ledger.zip")
+        ledger.dump_to_zip("ledger.zip")
 
         # Clearing system data using a predefined method that can be overwritten
         self.clear_ledger(ledger)
@@ -105,7 +122,7 @@ class BaseTestDumpAndRestore(ABC):
         assert ledger.account_chart().empty, "Account chart was not cleared"
 
         # Restoring dumped state
-        ledger.restore("ledger.zip")
+        ledger.restore_from_zip("ledger.zip")
         assert txn_to_str(ledger_entries) == txn_to_str(ledger.ledger())
         assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)
         assert_frame_equal(account_chart, ledger.account_chart(), ignore_index=True)
