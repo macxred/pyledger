@@ -1049,21 +1049,21 @@ class LedgerEngine(ABC):
     def txn_to_str(self, df: pd.DataFrame) -> List[str]:
         """Create a consistent, unique representation of ledger transactions.
 
-        This method converts each transaction into a string format and stores
-        them in a list. The result can be used to compare transactions, ensuring
-        consistency and uniqueness.
+        This method converts each transaction into a CSV-like string format and stores
+        them in a list. The result can be used to compare transactions, ensuring consistency
+        and uniqueness.
 
         Args:
             df (pd.DataFrame): The DataFrame containing ledger transactions.
 
         Returns:
-            List[str]: A sorted list of unique strings, where each entry represents
-            a transaction.
+            List[str]: A list of unique strings in a CSV-like format.
         """
         df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
         df = df.drop(columns=["id"])
         result = [
-            f"{str(date)},{df_to_consistent_str(txn)}" for date, txn in zip(df["date"], df["txn"])
+            f"{str(date)},{df_to_consistent_str(txn)}"
+            for date, txn in zip(df["date"], df["txn"])
         ]
         result.sort()
         return result
