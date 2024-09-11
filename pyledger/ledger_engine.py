@@ -161,14 +161,15 @@ class LedgerEngine(ABC):
             workbook.save(file)
 
     def dump_to_zip(self, archive_path: str):
-        """Dump ledger system data to a ZIP archive.
+        """Dump entire ledger system into a ZIP archive.
 
-        Compresses the ledger, VAT codes, and account chart into individual CSV files
-        and saves them within the ZIP archive at `archive_path`. Each component of the ledger
-        system is stored in a separate CSV for modular restoration and analysis.
+        Save all data and settings of an accounting system into a ZIP archive.
+        Each component of the ledger system (accounts, vat_codes, ledger
+        entries etc.) is stored as an individual CSV file inside the ZIP
+        archive for modular restoration and analysis.
 
         Args:
-            archive_path (str): The file path to save the ZIP archive.
+            archive_path (str): The file path of the ZIP archive.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
@@ -176,18 +177,14 @@ class LedgerEngine(ABC):
             archive.writestr('accounts.csv', self.account_chart().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
-        """Restore ledger system data from a ZIP archive.
+        """Restore ledger system from a ZIP archive.
 
-        Extracts ledger, VAT codes, and account chart from the ZIP archive at `archive_path`
-        and loads them into their respective DataFrames. Then, the extracted data is passed
-        to the `restore` method to update the system.
+        Restores a dumped ledger system from a ZIP archive.
+        Extracts the account chart, vat codes, ledger entries, etc. from the ZIP archive
+        Then, passes the extracted data to the `restore` method to update the system.
 
         Args:
             archive_path (str): The file path of the ZIP archive to restore.
-
-        Raises:
-            FileNotFoundError: If the required files (ledger.csv, vat_codes.csv, accounts.csv)
-                            are not found in the ZIP archive.
         """
         required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv'}
 
@@ -301,13 +298,12 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def mirror_vat_codes(self, target: pd.DataFrame, delete: bool = False):
-        """Aligns VAT rates in the memory with the desired state provided as a DataFrame.
+        """Aligns VAT rates with a desired target state.
 
         Args:
-            target (pd.DataFrame): DataFrame containing VAT rates in
-                                         the pyledger.vat_codes format.
-            delete (bool, optional): If True, deletes VAT codes on the remote account
-                                     that are not present in target_state.
+            target (pd.DataFrame): DataFrame containing VAT rates in the pyledger format.
+            delete (bool, optional): If True, deletes existing VAT codes that are
+                                     not present in the target data.
         """
 
     @classmethod
@@ -443,14 +439,12 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
-        """Synchronizes the account chart with a desired target state provided as a DataFrame.
+        """Aligns the account chart with a desired target state.
 
         Args:
             target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
-            delete (bool, optional): If True, deletes accounts on the remote that are not
-                                        present in the target DataFrame.
-        Raises:
-            ValueError: If duplicate account charts are found in the target DataFrame.
+            delete (bool, optional): If True, deletes existing accounts that are not
+                                     present in the target data.
         """
 
     @abstractmethod
@@ -772,12 +766,12 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
-        """Synchronizes ledger entries with a desired target state provided as a DataFrame.
+        """Aligns ledger entries with a desired target state.
 
         Args:
             target (pd.DataFrame): DataFrame with ledger entries in the pyledger format.
-            delete (bool, optional): If True, deletes ledger entries in the memory that are not
-                                    present in the target DataFrame.
+            delete (bool, optional): If True, deletes existing ledger that are not
+                                     present in the target data.
         """
 
     def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
@@ -1037,7 +1031,7 @@ class LedgerEngine(ABC):
     @property
     @abstractmethod
     def base_currency(self) -> str:
-        """Returns the base currency used for financial reporting."""
+        """Reporting currency of the ledger system."""
 
     @abstractmethod
     def precision(

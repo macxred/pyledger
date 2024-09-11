@@ -1,8 +1,4 @@
-"""This module provides an abstract base class for testing dump
-and restore operations. It defines common test case that can be inherited
-and used by specific ledger implementations. The actual ledger implementation
-must be provided by subclasses through the abstract ledger fixture.
-"""
+"""This module provides an abstract base class to test dump and restore operations."""
 
 from io import StringIO
 from typing import List
@@ -106,7 +102,7 @@ class BaseTestDumpAndRestore(ABC):
         assert txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)) == txn_to_str(ledger.ledger())
 
     def test_dump_and_restore_zip(self, ledger, restore_initial_state):
-        # Mirroring desired state
+        # Populate with test data
         ledger.mirror_vat_codes(VAT_CODES)
         ledger.mirror_account_chart(ACCOUNTS)
         ledger.mirror_ledger(LEDGER_ENTRIES)
