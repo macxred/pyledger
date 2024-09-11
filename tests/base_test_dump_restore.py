@@ -87,7 +87,7 @@ class BaseTestDumpAndRestore(ABC):
         assert ledger.account_chart().empty, "Account chart was not cleared"
 
         # Restoring state from CSV files
-        ledger.restore(ledger=LEDGER_ENTRIES, vat_codes=VAT_CODES, accounts=ACCOUNTS, base_currency="USD")
+        ledger.restore(ledger=LEDGER_ENTRIES, vat_codes=VAT_CODES, accounts=ACCOUNTS)
         assert ledger.base_currency == "USD", "Base currency were not restored"
         assert_frame_equal(
             ledger.standardize_vat_codes(VAT_CODES), ledger.vat_codes(), ignore_index=True
