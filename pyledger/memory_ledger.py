@@ -215,3 +215,24 @@ class MemoryLedger(StandaloneLedger):
             self._ledger = self.standardize_ledger(
                 pd.concat([self._ledger, target_df]).drop_duplicates()
             )
+
+    # ----------------------------------------------------------------------
+    # Currency
+
+    @property
+    def base_currency(self):
+        """Get the current base currency of the ledger system.
+
+        Returns:
+            str: The current base currency.
+        """
+        return self._settings["base_currency"]
+
+    @base_currency.setter
+    def base_currency(self, currency):
+        """Set a new base currency for the ledger system.
+
+        Args:
+            currency (str): The new base currency to be set.
+        """
+        self._settings["base_currency"] = currency

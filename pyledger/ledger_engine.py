@@ -222,12 +222,6 @@ class LedgerEngine(ABC):
                 If `None`, accounts remain unchanged.
             ledger (pd.DataFrame | None): Ledger entries of the restored system.
                 If `None`, ledger remains unchanged.
-            price (pd.DataFrame | None): Price history of the restored system.
-                If `None`, price history remains unchanged.
-            precision (dict | None): Precision settings for currencies.
-                If `None`, precision settings remain unchanged.
-            fx_adjustment (pd.DataFrame | None): FX adjustments in the restored system.
-                If `None`, FX adjustments remain unchanged.
         """
         if base_currency is not None:
             self.base_currency = base_currency

@@ -75,9 +75,10 @@ class BaseTestDumpAndRestore(ABC):
     def clear_ledger(self, ledger):
         """Clear all data from the ledger system.
 
-        This method removes all entries from the ledger, VAT codes, and account chart.
-        It is designed to be flexible and can be overridden by specific ledger
-        implementations to adapt to the clearing process requirements of the integrating system.
+        This method removes all entries from the ledger, VAT codes, and account chart,
+        restoring the system to a pristine state. It is designed to be flexible and can be
+        overridden by specific ledger implementations to adapt to the clearing process
+        requirements of the integrating system.
 
         Args:
             ledger: The ledger system instance to be cleared.
@@ -87,14 +88,15 @@ class BaseTestDumpAndRestore(ABC):
         ledger.mirror_account_chart(None, delete=True)
 
     def test_restore(self, ledger, restore_initial_state):
-        # Clearing system data using a predefined method that can be overwritten
+        # Clearing system to a pristine state to ensure restoring works
         self.clear_ledger(ledger)
         assert ledger.ledger().empty, "Ledger was not cleared"
         assert ledger.vat_codes().empty, "VAT codes were not cleared"
         assert ledger.account_chart().empty, "Account chart was not cleared"
 
         # Restoring state from CSV files
-        ledger.restore(ledger=LEDGER_ENTRIES, vat_codes=VAT_CODES, accounts=ACCOUNTS)
+        ledger.restore(ledger=LEDGER_ENTRIES, vat_codes=VAT_CODES, accounts=ACCOUNTS, base_currency="USD")
+        assert ledger.base_currency == "USD", "Base currency were not restored"
         assert_frame_equal(
             ledger.standardize_vat_codes(VAT_CODES), ledger.vat_codes(), ignore_index=True
         )
@@ -115,7 +117,7 @@ class BaseTestDumpAndRestore(ABC):
         ledger_entries = ledger.ledger()
         ledger.dump_to_zip("ledger.zip")
 
-        # Clearing system data using a predefined method that can be overwritten
+        # Clearing system to a pristine state to ensure restoring works
         self.clear_ledger(ledger)
         assert ledger.ledger().empty, "Ledger was not cleared"
         assert ledger.vat_codes().empty, "VAT codes were not cleared"
