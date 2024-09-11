@@ -1058,20 +1058,13 @@ class LedgerEngine(ABC):
 
         Returns:
             Dict[str, str]: A dictionary where keys are ledger 'id's and values are
-            unique string representations of the transactions, sorted by 'id'.
+            unique string representations of the transactions.
         """
         df = self.standardize_ledger(df)
-
-        # Ensure there are no collective transactions with the same id and different dates
-        duplicates = df.groupby("id")["date"].nunique().gt(1)
-        if duplicates.any():
-            duplicate_ids = df[df["id"].isin(duplicates.index[duplicates])]["id"].unique()
-            ids = ', '.join(map(str, duplicate_ids))
-            raise ValueError(
-                f"Collective transaction(s) with non-unique dates found for ids: {ids}"
-            )
-
         df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
+        if df['id'].duplicated().any():
+            raise ValueError("Some collective transaction(s) have non-unique date.")
+
         result = {
             str(ledger_id): f"{str(date)},{df_to_consistent_str(txn)}"
             for ledger_id, date, txn in zip(df["id"], df["date"], df["txn"])
