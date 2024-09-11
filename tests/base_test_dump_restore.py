@@ -64,7 +64,8 @@ class BaseTestDumpAndRestore(ABC):
         assert_frame_equal(
             ledger.standardize_account_chart(ACCOUNTS), ledger.account_chart(), ignore_index=True
         )
-        assert ledger.txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)) == ledger.txn_to_str(ledger.ledger())
+        expected_ledger = ledger.txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES))
+        assert expected_ledger == ledger.txn_to_str(ledger.ledger())
 
     def test_dump_and_restore_zip(self, ledger, tmp_path, restore_initial_state):
         # Populate with test data

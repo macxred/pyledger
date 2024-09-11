@@ -10,7 +10,7 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 from consistent_df import enforce_dtypes, df_to_consistent_str, nest
 import re
 import numpy as np
@@ -1046,27 +1046,37 @@ class LedgerEngine(ABC):
         ])
         return result[cols]
 
-    def txn_to_str(self, df: pd.DataFrame) -> List[str]:
+    def txn_to_str(self, df: pd.DataFrame) -> Dict[str, str]:
         """Create a consistent, unique representation of ledger transactions.
 
         This method converts each transaction into a CSV-like string format and stores
-        them in a list. The result can be used to compare transactions, ensuring consistency
+        them in a dict. The result can be used to compare transactions, ensuring consistency
         and uniqueness.
 
         Args:
-            df (pd.DataFrame): The DataFrame containing ledger transactions.
+            df (pd.DataFrame): DataFrame containing ledger transactions.
 
         Returns:
-            List[str]: A list of unique strings in a CSV-like format.
+            Dict[str, str]: A dictionary where keys are ledger 'id's and values are
+            unique string representations of the transactions, sorted by 'id'.
         """
+        df = self.standardize_ledger(df)
+
+        # Ensure there are no collective transactions with the same id and different dates
+        duplicates = df.groupby("id")["date"].nunique().gt(1)
+        if duplicates.any():
+            duplicate_ids = df[df["id"].isin(duplicates.index[duplicates])]["id"].unique()
+            ids = ', '.join(map(str, duplicate_ids))
+            raise ValueError(
+                f"Collective transaction(s) with non-unique dates found for ids: {ids}"
+            )
+
         df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
-        df = df.drop(columns=["id"])
-        result = [
-            f"{str(date)},{df_to_consistent_str(txn)}"
-            for date, txn in zip(df["date"], df["txn"])
-        ]
-        result.sort()
-        return result
+        result = {
+            str(ledger_id): f"{str(date)},{df_to_consistent_str(txn)}"
+            for ledger_id, date, txn in zip(df["id"], df["date"], df["txn"])
+        }
+        return dict(sorted(result.items()))
 
     # ----------------------------------------------------------------------
     # Currency
