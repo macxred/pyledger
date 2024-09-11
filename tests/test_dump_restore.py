@@ -8,7 +8,7 @@ from tests.base_test_dump_restore import BaseTestDumpAndRestore
 from pyledger import MemoryLedger
 
 
-class TestVatCodes(BaseTestDumpAndRestore):
+class TestDumpAndRestore(BaseTestDumpAndRestore):
 
     @pytest.fixture
     def ledger(self):

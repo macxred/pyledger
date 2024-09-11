@@ -172,21 +172,21 @@ class LedgerEngine(ABC):
             archive_path (str): The file path of the ZIP archive.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
+            archive.writestr('base_currency.txt', self.base_currency)
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
             archive.writestr('vat_codes.csv', self.vat_codes().to_csv(index=False))
             archive.writestr('accounts.csv', self.account_chart().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
-        """Restore ledger system from a ZIP archive.
+        """Restores ledger system from a ZIP archive.
 
-        Restores a dumped ledger system from a ZIP archive.
-        Extracts the account chart, vat codes, ledger entries, etc. from the ZIP archive
+        Extracts the account chart, vat codes, ledger entries, base_currency, etc.
         Then, passes the extracted data to the `restore` method to update the system.
 
         Args:
             archive_path (str): The file path of the ZIP archive to restore.
         """
-        required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv'}
+        required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv', 'base_currency.txt'}
 
         with zipfile.ZipFile(archive_path, 'r') as archive:
             archive_files = set(archive.namelist())
@@ -197,9 +197,12 @@ class LedgerEngine(ABC):
                 )
 
             ledger = pd.read_csv(archive.open('ledger.csv'))
-            vat_codes = pd.read_csv(archive.open('vat_codes.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
-            self.restore(ledger=ledger, vat_codes=vat_codes, accounts=accounts)
+            vat_codes = pd.read_csv(archive.open('vat_codes.csv'))
+            base_currency = archive.open('base_currency.txt').read().decode('utf-8')
+            self.restore(
+                base_currency=base_currency, ledger=ledger, vat_codes=vat_codes, accounts=accounts
+            )
 
     def restore(
         self,
@@ -230,6 +233,19 @@ class LedgerEngine(ABC):
             self.mirror_ledger(ledger, delete=True)
         # TODO: Implement price history, precision settings,
         # and FX adjustments restoration logic
+
+    def clear(self):
+        """Clear all data from the ledger system.
+
+        This method removes all entries from the ledger, VAT codes, account chart,
+        base_currency, etc. restoring the system to a pristine state.
+        It is designed to be flexible and adapt to the clearing process requirements.
+        """
+        self.base_currency = None
+        self.mirror_ledger(None, delete=True)
+        self.mirror_vat_codes(None, delete=True)
+        self.mirror_account_chart(None, delete=True)
+        # TODO: Implement price history, precision settings, and FX adjustments clearing logic
 
     # ----------------------------------------------------------------------
     # VAT Codes
@@ -1032,6 +1048,11 @@ class LedgerEngine(ABC):
     @abstractmethod
     def base_currency(self) -> str:
         """Reporting currency of the ledger system."""
+
+    @base_currency.setter
+    @abstractmethod
+    def base_currency(self, currency):
+        """Set the reporting currency of the ledger system."""
 
     @abstractmethod
     def precision(
