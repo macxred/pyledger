@@ -50,14 +50,6 @@ class BaseTestDumpAndRestore(ABC):
     def ledger(self):
         pass
 
-    @pytest.fixture
-    def temp_ledger_dir(self, tmp_path):
-        """Fixture that creates a temporary directory for ledger ZIP files."""
-        temp_dir = tmp_path / "ledger_data"
-        temp_dir.mkdir()
-        zip_path = temp_dir / "ledger.zip"
-        yield zip_path
-
     @pytest.fixture()
     def restore_initial_state(self, ledger):
         # Fetch original state
@@ -86,7 +78,7 @@ class BaseTestDumpAndRestore(ABC):
         )
         assert txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)) == txn_to_str(ledger.ledger())
 
-    def test_dump_and_restore_zip(self, ledger, temp_ledger_dir, restore_initial_state):
+    def test_dump_and_restore_zip(self, ledger, tmp_path, restore_initial_state):
         # Populate with test data
         ledger.base_currency = "USD"
         ledger.mirror_vat_codes(VAT_CODES)
@@ -97,11 +89,11 @@ class BaseTestDumpAndRestore(ABC):
         vat_codes = ledger.vat_codes()
         account_chart = ledger.account_chart()
         ledger_entries = ledger.ledger()
-        ledger.dump_to_zip(temp_ledger_dir)
+        ledger.dump_to_zip(tmp_path / "ledger.zip")
         ledger.clear()
 
         # Restoring dumped state
-        ledger.restore_from_zip(temp_ledger_dir)
+        ledger.restore_from_zip(tmp_path / "ledger.zip")
         assert ledger.base_currency == "USD", "Base currency were not restored"
         assert txn_to_str(ledger_entries) == txn_to_str(ledger.ledger())
         assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)

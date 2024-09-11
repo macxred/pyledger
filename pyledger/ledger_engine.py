@@ -247,7 +247,6 @@ class LedgerEngine(ABC):
         base_currency, etc. restoring the system to a pristine state.
         It is designed to be flexible and adapt to the clearing process requirements.
         """
-        self.base_currency = None
         self.mirror_ledger(None, delete=True)
         self.mirror_vat_codes(None, delete=True)
         self.mirror_account_chart(None, delete=True)
