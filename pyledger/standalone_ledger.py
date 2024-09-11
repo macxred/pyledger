@@ -130,6 +130,9 @@ class StandaloneLedger(LedgerEngine):
     def delete_vat_code(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_vat_code is not implemented yet.")
 
+    def mirror_vat_codes(self, *args, **kwargs) -> None:
+        raise NotImplementedError("mirror_vat_code is not implemented yet.")
+
     def vat_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create journal entries to book VAT according to vat_codes.
 
@@ -235,6 +238,9 @@ class StandaloneLedger(LedgerEngine):
     def delete_account(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_account is not implemented yet.")
 
+    def mirror_account_chart(self, *args, **kwargs) -> None:
+        raise NotImplementedError("mirror_account_chart is not implemented yet.")
+
     def validate_accounts(self) -> None:
         """Validate coherence between account, VAT and FX adjustment definitions."""
         # Ensure all vat code accounts are defined in account chart
@@ -313,6 +319,9 @@ class StandaloneLedger(LedgerEngine):
 
     def modify_ledger_entry(self, *args, **kwargs) -> None:
         raise NotImplementedError("modify_ledger_entry is not implemented yet.")
+
+    def mirror_ledger(self, *args, **kwargs) -> None:
+        raise NotImplementedError("mirror_ledger is not implemented yet.")
 
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with all ledger transactions in long format.

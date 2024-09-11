@@ -92,14 +92,6 @@ class MemoryLedger(StandaloneLedger):
         self._vat_codes = self._vat_codes[self._vat_codes["id"] != code]
 
     def mirror_vat_codes(self, target: pd.DataFrame, delete: bool = False):
-        """Aligns VAT rates in the memory with the desired state provided as a DataFrame.
-
-        Args:
-            target (pd.DataFrame): DataFrame containing VAT rates in
-                                         the pyledger.vat_codes format.
-            delete (bool, optional): If True, deletes VAT codes on the remote account
-                                     that are not present in target_state.
-        """
         target_df = self.standardize_vat_codes(target)
 
         if target_df["id"].duplicated().any():
@@ -163,15 +155,6 @@ class MemoryLedger(StandaloneLedger):
         self._account_chart = self._account_chart[self._account_chart["account"] != account]
 
     def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
-        """Synchronizes the account chart with a desired target state provided as a DataFrame.
-
-        Args:
-            target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
-            delete (bool, optional): If True, deletes accounts on the remote that are not
-                                     present in the target DataFrame.
-        Raises:
-            ValueError: If duplicate account charts are found in the target DataFrame.
-        """
         target_df = self.standardize_account_chart(target)
 
         if target_df["account"].duplicated().any():
@@ -224,13 +207,6 @@ class MemoryLedger(StandaloneLedger):
             self._ledger = self._ledger[self._ledger["id"] != id]
 
     def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
-        """Synchronizes ledger entries with a desired target state provided as a DataFrame.
-
-        Args:
-            target (pd.DataFrame): DataFrame with ledger entries in the pyledger format.
-            delete (bool, optional): If True, deletes ledger entries in the memory that are not
-                                    present in the target DataFrame.
-        """
         target_df = self.standardize_ledger(target)
 
         if delete:
@@ -239,3 +215,14 @@ class MemoryLedger(StandaloneLedger):
             self._ledger = self.standardize_ledger(
                 pd.concat([self._ledger, target_df]).drop_duplicates()
             )
+
+    # ----------------------------------------------------------------------
+    # Currency
+
+    @property
+    def base_currency(self):
+        return self._settings["base_currency"]
+
+    @base_currency.setter
+    def base_currency(self, currency):
+        self._settings["base_currency"] = currency
