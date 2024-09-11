@@ -88,9 +88,10 @@ class BaseTestDumpAndRestore(ABC):
 
     def test_dump_and_restore_zip(self, ledger, temp_ledger_dir, restore_initial_state):
         # Populate with test data
+        ledger.base_currency = "USD"
         ledger.mirror_vat_codes(VAT_CODES)
-        ledger.mirror_account_chart(ACCOUNTS)
         ledger.mirror_ledger(LEDGER_ENTRIES)
+        ledger.mirror_account_chart(ACCOUNTS)
 
         # Dumping current state
         vat_codes = ledger.vat_codes()
@@ -101,6 +102,7 @@ class BaseTestDumpAndRestore(ABC):
 
         # Restoring dumped state
         ledger.restore_from_zip(temp_ledger_dir)
+        assert ledger.base_currency == "USD", "Base currency were not restored"
         assert txn_to_str(ledger_entries) == txn_to_str(ledger.ledger())
         assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)
         assert_frame_equal(account_chart, ledger.account_chart(), ignore_index=True)

@@ -8,6 +8,7 @@ import datetime
 import logging
 import math
 import zipfile
+import json
 from pathlib import Path
 from typing import List
 from consistent_df import enforce_dtypes
@@ -164,29 +165,31 @@ class LedgerEngine(ABC):
         """Dump entire ledger system into a ZIP archive.
 
         Save all data and settings of an accounting system into a ZIP archive.
-        Each component of the ledger system (accounts, vat_codes, ledger
-        entries etc.) is stored as an individual CSV file inside the ZIP
-        archive for modular restoration and analysis.
+        Each component of the ledger system (accounts, vat_codes, ledger entries,
+        settings, etc.) is stored as an individual file inside the ZIP archive
+        for modular restoration and analysis.
 
         Args:
             archive_path (str): The file path of the ZIP archive.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
-            archive.writestr('base_currency.txt', self.base_currency)
+            settings = {"base_currency": self.base_currency}
+            archive.writestr('settings.json', json.dumps(settings))
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
             archive.writestr('vat_codes.csv', self.vat_codes().to_csv(index=False))
             archive.writestr('accounts.csv', self.account_chart().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
-        """Restores ledger system from a ZIP archive.
+        """Restore ledger system from a ZIP archive.
 
-        Extracts the account chart, vat codes, ledger entries, base_currency, etc.
-        Then, passes the extracted data to the `restore` method to update the system.
+        Restores a dumped ledger system from a ZIP archive.
+        Extracts the account chart, vat codes, ledger entries, base_currency, etc.,
+        from the ZIP archive and passes the extracted data to the `restore` method.
 
         Args:
             archive_path (str): The file path of the ZIP archive to restore.
         """
-        required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv', 'base_currency.txt'}
+        required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv', 'settings.json'}
 
         with zipfile.ZipFile(archive_path, 'r') as archive:
             archive_files = set(archive.namelist())
@@ -196,10 +199,13 @@ class LedgerEngine(ABC):
                     f"Missing required files in the archive: {', '.join(missing_files)}"
                 )
 
+            settings = json.loads(archive.open('settings.json').read().decode('utf-8'))
+            base_currency = settings.get("base_currency")
             ledger = pd.read_csv(archive.open('ledger.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
             vat_codes = pd.read_csv(archive.open('vat_codes.csv'))
-            base_currency = archive.open('base_currency.txt').read().decode('utf-8')
+
+            # Restore the ledger system using the extracted data
             self.restore(
                 base_currency=base_currency, ledger=ledger, vat_codes=vat_codes, accounts=accounts
             )
