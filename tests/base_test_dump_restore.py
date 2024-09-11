@@ -18,20 +18,16 @@ VAT_CSV = """
     Test_VAT_code,  0.02,   22000,      True, Input Tax 2%
 """
 
-# flake8: noqa: E501
-
 LEDGER_CSV = """
-    id,     date, account, counter_account, currency,     amount, base_currency_amount,      vat_code, text,                             document
-    1,  2024-05-24, 10023,           19993,      CHF,     100.00,                     , Test_VAT_code, pytest single transaction 1,      /file1.txt
+    id,     date, account, counter_account, currency,     amount, text,             document
+    1,  2024-05-24,  1000,            1999,      CHF,     100.00, single entry,     file_1.txt
+    42, 2024-06-21,  1020,                ,      USD,     100.00, collective entry, file_2.txt
+    42, 2024-06-21,      ,            4000,      USD,      50.00, collective entry, file_2.txt
+    42, 2024-06-21,      ,            5000,      USD,      50.00, collective entry, file_2.txt
 """
 
-# flake8: enable
 
-
-STRIPPED_CSV = "\n".join([line.strip() for line in LEDGER_CSV.split("\n")])
-LEDGER_ENTRIES = pd.read_csv(
-    StringIO(STRIPPED_CSV), skipinitialspace=True, skip_blank_lines=True
-)
+LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
 
