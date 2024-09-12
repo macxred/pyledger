@@ -1066,7 +1066,7 @@ class LedgerEngine(ABC):
             raise ValueError("Some collective transaction(s) have non-unique date.")
 
         result = {
-            str(ledger_id): f"{str(date)},{df_to_consistent_str(txn)}"
+            str(ledger_id): f"{str(date)}\n{df_to_consistent_str(txn)}"
             for ledger_id, date, txn in zip(df["id"], df["date"], df["txn"])
         }
         return result
