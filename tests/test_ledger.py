@@ -1,5 +1,5 @@
-"""This module contains the test suite for VAT code operations using the MemoryLedger
-implementation. It inherits the common VAT code tests from the BaseTestVatCode abstract base
+"""This module contains the test suite for Ledger entries operations using the MemoryLedger
+implementation. It inherits the common Ledger code tests from the BaseTestLedger abstract base
 class.
 """
 

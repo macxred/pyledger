@@ -10,8 +10,8 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import List
-from consistent_df import enforce_dtypes
+from typing import Dict, List
+from consistent_df import enforce_dtypes, df_to_consistent_str, nest
 import re
 import numpy as np
 import openpyxl
@@ -1045,6 +1045,31 @@ class LedgerEngine(ABC):
             debit.loc[debit["account"].notna()]
         ])
         return result[cols]
+
+    def txn_to_str(self, df: pd.DataFrame) -> Dict[str, str]:
+        """Create a consistent, unique representation of ledger transactions.
+
+        This method converts each transaction into a CSV-like string format and stores
+        them in a dict. The result can be used to compare transactions, ensuring consistency
+        and uniqueness.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing ledger transactions.
+
+        Returns:
+            Dict[str, str]: A dictionary where keys are ledger 'id's and values are
+            unique string representations of the transactions.
+        """
+        df = self.standardize_ledger(df)
+        df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
+        if df['id'].duplicated().any():
+            raise ValueError("Some collective transaction(s) have non-unique date.")
+
+        result = {
+            str(ledger_id): f"{str(date)}\n{df_to_consistent_str(txn)}"
+            for ledger_id, date, txn in zip(df["id"], df["date"], df["txn"])
+        }
+        return result
 
     # ----------------------------------------------------------------------
     # Currency

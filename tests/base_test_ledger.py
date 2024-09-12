@@ -6,11 +6,10 @@ by subclasses through the abstract ledger fixture.
 """
 
 from io import StringIO
-from typing import List
 import pytest
 import pandas as pd
 from abc import ABC, abstractmethod
-from consistent_df import assert_frame_equal, df_to_consistent_str, nest
+from consistent_df import assert_frame_equal
 
 ACCOUNT_CSV = """
     group, account, currency, vat_code, text
@@ -84,16 +83,6 @@ LEDGER_ENTRIES = pd.read_csv(
 )
 TEST_ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 TEST_VAT_CODE = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
-
-
-def txn_to_str(df: pd.DataFrame) -> List[str]:
-    df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
-    df = df.drop(columns=["id"])
-    result = [
-        f"{str(date)},{df_to_consistent_str(txn)}" for date, txn in zip(df["date"], df["txn"])
-    ]
-    result.sort()
-    return result
 
 
 class BaseTestLedger(ABC):
@@ -278,7 +267,8 @@ class BaseTestLedger(ABC):
         ledger.mirror_ledger(target=target, delete=True)
         expected = ledger.standardize_ledger(target)
         mirrored = ledger.ledger()
-        assert txn_to_str(mirrored) == txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror with duplicate transactions and delete=False
         target = pd.concat(
@@ -292,7 +282,8 @@ class BaseTestLedger(ABC):
         ledger.mirror_ledger(target=target, delete=True)
         expected = ledger.standardize_ledger(target)
         mirrored = ledger.ledger()
-        assert txn_to_str(mirrored) == txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror with complex transactions and delete=False
         target = LEDGER_ENTRIES.query("id in [15, 16, 17, 18]")
@@ -301,20 +292,23 @@ class BaseTestLedger(ABC):
         expected = ledger.sanitize_ledger(expected)
         expected = pd.concat([mirrored, expected])
         mirrored = ledger.ledger()
-        assert txn_to_str(mirrored) == txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror existing transactions with delete=False has no impact
         target = LEDGER_ENTRIES.query("id in [1, 2]")
         ledger.mirror_ledger(target=target, delete=False)
         mirrored = ledger.ledger()
-        assert txn_to_str(mirrored) == txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror with delete=True
         target = LEDGER_ENTRIES.query("id in [1, 2]")
         ledger.mirror_ledger(target=target, delete=True)
         mirrored = ledger.ledger()
         expected = ledger.standardize_ledger(target)
-        assert txn_to_str(mirrored) == txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror an empty target state
         ledger.mirror_ledger(target=pd.DataFrame({}), delete=True)
