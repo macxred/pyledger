@@ -76,13 +76,12 @@ class MemoryLedger(StandaloneLedger):
         inclusive: bool = True,
         text: str = "",
     ) -> None:
-        if not self._vat_codes["id"].isin([code]).any():
-            raise ValueError(f"VAT code '{code}' not found.")
+        if not self._vat_codes["id"].isin([code]).sum() == 1:
+            raise ValueError(f"VAT code '{code}' not found or have duplicates in the system.")
 
         self._vat_codes.loc[
             self._vat_codes["id"] == code, ["rate", "account", "inclusive", "text"]
         ] = [rate, account, inclusive, text]
-
         self._vat_codes = self.standardize_vat_codes(self._vat_codes)
 
     def delete_vat_code(self, code: str, allow_missing: bool = False) -> None:
@@ -139,8 +138,8 @@ class MemoryLedger(StandaloneLedger):
         group: str,
         vat_code: str = None,
     ) -> None:
-        if not self._account_chart["account"].isin([account]).any():
-            raise ValueError(f"Account '{account}' not found")
+        if not self._account_chart["account"].isin([account]).sum() == 1:
+            raise ValueError(f"Account '{account}' not found or have duplicates in the system.")
 
         self._account_chart.loc[
             self._account_chart["account"] == account,

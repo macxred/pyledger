@@ -1,10 +1,7 @@
-"""This module contains the test suite for account chart operations using the MemoryLedger
-implementation. It inherits the common account chart tests from the BaseTestAccountCharts
-abstract base class.
-"""
+"""Test suite for account chart operations"""
 
 import pytest
-from tests.base_test_account_chart import BaseTestAccountCharts
+from tests.base_account_chart import BaseTestAccountCharts
 from pyledger import MemoryLedger
 
 

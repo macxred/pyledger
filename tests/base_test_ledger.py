@@ -1,9 +1,4 @@
-"""
-This module provides an abstract base class for testing ledger operations.
-It defines common test cases that can be inherited and used by specific
-ledger implementations. The actual ledger implementation must be provided
-by subclasses through the abstract ledger fixture.
-"""
+"""Test suite for abstract base class for testing ledger operations."""
 
 from io import StringIO
 import pytest
@@ -21,11 +16,6 @@ ACCOUNT_CSV = """
     /Assets, 19993,      CHF,         , Transitory Account CHF
     /Assets, 19999,      CHF,         , Transitory Account CHF
     /Assets, 22000,      CHF,         , Input Tax
-"""
-
-VAT_CSV = """
-    id,             rate, account, inclusive, text
-    Test_VAT_code,  0.02,   22000,      True, Input Tax 2%
 """
 
 # flake8: noqa: E501
@@ -82,7 +72,6 @@ LEDGER_ENTRIES = pd.read_csv(
     StringIO(STRIPPED_CSV), skipinitialspace=True, comment="#", skip_blank_lines=True
 )
 TEST_ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
-TEST_VAT_CODE = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
 
 
 class BaseTestLedger(ABC):
@@ -92,28 +81,10 @@ class BaseTestLedger(ABC):
     def ledger(self):
         pass
 
-    @pytest.fixture()
-    def set_up_vat_and_account(self, ledger):
-        # Fetch original state
-        initial_vat_codes = ledger.vat_codes()
-        initial_account_chart = ledger.account_chart()
-        initial_ledger = ledger.ledger()
-
-        # Create test accounts and VAT code
-        ledger.mirror_account_chart(TEST_ACCOUNTS, delete=False)
-        ledger.mirror_vat_codes(TEST_VAT_CODE, delete=False)
-
-        yield
-
-        # Restore initial state
-        ledger.mirror_ledger(initial_ledger, delete=True)
-        ledger.mirror_vat_codes(initial_vat_codes, delete=True)
-        ledger.mirror_account_chart(initial_account_chart, delete=True)
-
     @pytest.mark.parametrize(
         "ledger_id", set(LEDGER_ENTRIES["id"].unique()).difference([15, 16, 17, 18])
     )
-    def test_add_ledger_entry(self, ledger, ledger_id, set_up_vat_and_account):
+    def test_add_ledger_entry(self, ledger, ledger_id):
         target = LEDGER_ENTRIES.query("id == @ledger_id")
         id = ledger.add_ledger_entry(target)
         remote = ledger.ledger()
@@ -123,7 +94,7 @@ class BaseTestLedger(ABC):
             created, expected, ignore_index=True, ignore_columns=["id"], check_exact=True
         )
 
-    def test_accessor_mutators_single_transaction(self, ledger, set_up_vat_and_account):
+    def test_accessor_mutators_single_transaction(self, ledger):
         # Test adding a ledger entry
         target = LEDGER_ENTRIES.query("id == 1")
         id = ledger.add_ledger_entry(target)
@@ -180,7 +151,7 @@ class BaseTestLedger(ABC):
         remote = ledger.ledger()
         assert all(remote["id"] != str(id)), f"Ledger entry {id} was not deleted"
 
-    def test_accessor_mutators_collective_transaction(self, ledger, set_up_vat_and_account):
+    def test_accessor_mutators_collective_transaction(self, ledger):
         # Test adding a collective ledger entry
         target = LEDGER_ENTRIES.query("id == 2")
         id = ledger.add_ledger_entry(target)
@@ -238,7 +209,7 @@ class BaseTestLedger(ABC):
         remote = ledger.ledger()
         assert all(remote["id"] != str(id)), f"Ledger entry {id} was not deleted"
 
-    def add_already_existed_raise_error(self, ledger, set_up_vat_and_account):
+    def add_already_existed_raise_error(self, ledger):
         target = LEDGER_ENTRIES.query("id == 1").copy()
         ledger.add_ledger(target)
         with pytest.raises(ValueError):
@@ -249,7 +220,7 @@ class BaseTestLedger(ABC):
         with pytest.raises(ValueError):
             ledger.add_ledger(target)
 
-    def test_modify_non_existed_raise_error(self, ledger, set_up_vat_and_account):
+    def test_modify_non_existed_raise_error(self, ledger):
         target = LEDGER_ENTRIES.query("id == 1").copy()
         target["id"] = 999999
         with pytest.raises(ValueError):
@@ -260,7 +231,7 @@ class BaseTestLedger(ABC):
         with pytest.raises(ValueError):
             ledger.modify_ledger_entry(target)
 
-    def test_mirror_ledger(self, ledger, set_up_vat_and_account):
+    def test_mirror_ledger(self, ledger):
         ledger.mirror_account_chart(TEST_ACCOUNTS, delete=False)
         # Mirror with one single and one collective transaction
         target = LEDGER_ENTRIES.query("id in [1, 2]")

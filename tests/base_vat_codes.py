@@ -1,13 +1,22 @@
-"""This module provides an abstract base class for testing VAT code operations.
-It defines common test cases that can be inherited and used by specific
-ledger implementations. The actual ledger implementation must be provided
-by subclasses through the abstract ledger fixture.
-"""
+"""Test suite for abstract base class handling VAT code operations."""
 
 from io import StringIO
 import pytest
 import pandas as pd
 from abc import ABC, abstractmethod
+
+
+VAT_CSV = """
+    id,       account, rate,  inclusive, text
+    OutStd,   2200,    0.038, True,      VAT at the regular 7.7% rate on goods or services
+    OutRed,   2200,    0.025, True,      VAT at the reduced 2.5% rate on goods or services
+    OutAcc,   2200,    0.038, True,      XXXXX
+    OutStdEx, 2200,    0.077, False,     VAT at the regular 7.7% rate on goods or services
+    InStd,    1170,    0.077, True,      Input Tax (Vorsteuer) at the regular 7.7% rate on
+    InRed,    1170,    0.025, True,      Input Tax (Vorsteuer) at the reduced 2.5% rate on
+    InAcc,    1170,    0.038, True,      YYYYY
+"""
+VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
 
 
 class BaseTestVatCode(ABC):
@@ -70,6 +79,37 @@ class BaseTestVatCode(ABC):
 
         assert "TestCode" not in updated_vat_codes["id"].values
 
+    def test_mirror(self, ledger):
+        # Mirror test vat codes onto server with delete=False
+        ledger.mirror_vat_codes(VAT_CODES, delete=False)
+        mirrored_df = ledger.vat_codes()
+        standardized_df = ledger.standardize_vat_codes(VAT_CODES)
+        m = standardized_df.merge(mirrored_df, how="left", indicator=True)
+        assert (m["_merge"] == "both").all(), (
+            "Mirroring error: Some target VAT codes were not mirrored"
+        )
+
+        # Mirror target vat codes onto server with delete=True
+        ledger.mirror_vat_codes(VAT_CODES, delete=True)
+        mirrored_df = ledger.vat_codes()
+        m = standardized_df.merge(mirrored_df, how="outer", indicator=True)
+        assert (m["_merge"] == "both").all(), (
+            "Mirroring error: Some target VAT codes were not mirrored"
+        )
+
+        # Reshuffle target data randomly
+        vat_codes_shuffled = VAT_CODES.sample(frac=1)
+
+        # Mirror target vat codes onto server with updating
+        vat_codes_shuffled.loc[vat_codes_shuffled["id"] == "OutStdEx", "rate"] = 0.9
+        ledger.mirror_vat_codes(vat_codes_shuffled, delete=True)
+        mirrored_df = ledger.vat_codes()
+        vat_codes_shuffled = ledger.standardize_vat_codes(vat_codes_shuffled)
+        m = vat_codes_shuffled.merge(mirrored_df, how='outer', indicator=True)
+        assert (m['_merge'] == 'both').all(), (
+            'Mirroring error: Some target VAT codes were not mirrored'
+        )
+
     def test_create_already_existed_raise_error(self, ledger):
         new_vat_code = {
             "code": "TestCode",
@@ -87,57 +127,3 @@ class BaseTestVatCode(ABC):
             ledger.modify_vat_code(
                 code="TestCode", text="VAT 20%", account=2200, rate=0.02, inclusive=True
             )
-
-    def test_mirror(self, ledger):
-        target_csv = """
-        id,account,rate,inclusive,text
-        OutStd,2200,0.038,True,VAT at the regular 7.7% rate on goods or services
-        OutRed,2200,0.025,True,VAT at the reduced 2.5% rate on goods or services
-        OutAcc,2200,0.038,True,XXXXX
-        OutStdEx,2200,0.077,False,VAT at the regular 7.7% rate on goods or services
-        InStd,1170,0.077,True,Input Tax (Vorsteuer) at the regular 7.7% rate on
-        InRed,1170,0.025,True,Input Tax (Vorsteuer) at the reduced 2.5% rate on
-        InAcc,1170,0.038,True,YYYYY
-        """
-        target_df = pd.read_csv(StringIO(target_csv), skipinitialspace=True)
-        standardized_df = ledger.standardize_vat_codes(target_df)
-
-        # Save initial VAT codes
-        initial_vat_codes = ledger.vat_codes()
-
-        # Mirror test vat codes onto server with delete=False
-        ledger.mirror_vat_codes(target_df, delete=False)
-        mirrored_df = ledger.vat_codes()
-        m = standardized_df.merge(mirrored_df, how="left", indicator=True)
-        assert (m["_merge"] == "both").all(), (
-            "Mirroring error: Some target VAT codes were not mirrored"
-        )
-
-        # Mirror target vat codes onto server with delete=True
-        ledger.mirror_vat_codes(target_df, delete=True)
-        mirrored_df = ledger.vat_codes()
-        m = standardized_df.merge(mirrored_df, how="outer", indicator=True)
-        assert (m["_merge"] == "both").all(), (
-            "Mirroring error: Some target VAT codes were not mirrored"
-        )
-
-        # Reshuffle target data randomly
-        target_df = target_df.sample(frac=1)
-
-        # Mirror target vat codes onto server with updating
-        target_df.loc[target_df["id"] == "OutStdEx", "rate"] = 0.9
-        ledger.mirror_vat_codes(target_df, delete=True)
-        mirrored_df = ledger.vat_codes()
-        target_df = ledger.standardize_vat_codes(target_df)
-        m = target_df.merge(mirrored_df, how='outer', indicator=True)
-        assert (m['_merge'] == 'both').all(), (
-            'Mirroring error: Some target VAT codes were not mirrored'
-        )
-
-        # Mirror initial vat codes onto server with delete=True to restore original state
-        ledger.mirror_vat_codes(initial_vat_codes, delete=True)
-        mirrored_df = ledger.vat_codes()
-        m = initial_vat_codes.merge(mirrored_df, how="outer", indicator=True)
-        assert (m["_merge"] == "both").all(), (
-            "Mirroring error: Some target VAT codes were not mirrored"
-        )

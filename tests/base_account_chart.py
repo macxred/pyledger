@@ -1,6 +1,16 @@
+"""Test suit for abstract base class testing Accounts operations."""
+
 import pytest
 import pandas as pd
 from abc import ABC, abstractmethod
+from io import StringIO
+
+
+VAT_CSV = """
+    id,                 account, rate,  inclusive, text
+    TestCodeAccounts,   2200,    0.02,  True,      VAT 2%
+"""
+VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
 
 
 class BaseTestAccountCharts(ABC):
@@ -10,27 +20,7 @@ class BaseTestAccountCharts(ABC):
     def ledger(self):
         pass
 
-    @pytest.fixture
-    def setup_vat_code(self, ledger):
-        ledger.add_vat_code(
-            code="TestCodeAccounts",
-            text="VAT 2%",
-            account=2200,
-            rate=0.02,
-            inclusive=True,
-        )
-
-        yield
-
-        ledger.delete_vat_code(code="TestCodeAccounts")
-
-    def test_account_mutators(self, ledger, setup_vat_code):
-        ledger.delete_account(1145, allow_missing=True)
-        ledger.delete_account(1146, allow_missing=True)
-        account_chart = ledger.account_chart()
-        assert 1145 not in account_chart["account"].values
-        assert 1146 not in account_chart["account"].values
-
+    def test_account_mutators(self, ledger):
         initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1145,
@@ -39,9 +29,10 @@ class BaseTestAccountCharts(ABC):
             "vat_code": "TestCodeAccounts",
             "group": "/Assets/Anlagevermögen",
         }
+        account_chart = ledger.account_chart()
         ledger.add_account(**new_account)
         updated_accounts = ledger.account_chart()
-        outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
+        outer_join = pd.merge(account_chart, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
         assert len(created_accounts) == 1, "Expected exactly one row to be added"
@@ -52,7 +43,7 @@ class BaseTestAccountCharts(ABC):
         assert created_accounts["vat_code"].item() == "TestCodeAccounts"
         assert created_accounts["group"].item() == new_account["group"]
 
-        initial_accounts = ledger.account_chart()
+        account_chart = ledger.account_chart()
         new_account = {
             "account": 1146,
             "currency": "CHF",
@@ -62,7 +53,7 @@ class BaseTestAccountCharts(ABC):
         }
         ledger.add_account(**new_account)
         updated_accounts = ledger.account_chart()
-        outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
+        outer_join = pd.merge(account_chart, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
         assert len(created_accounts) == 1, "Expected exactly one row to be added"
@@ -73,7 +64,7 @@ class BaseTestAccountCharts(ABC):
         assert pd.isna(created_accounts["vat_code"].item())
         assert created_accounts["group"].item() == new_account["group"]
 
-        initial_accounts = ledger.account_chart()
+        account_chart = ledger.account_chart()
         new_account = {
             "account": 1146,
             "currency": "CHF",
@@ -83,7 +74,7 @@ class BaseTestAccountCharts(ABC):
         }
         ledger.modify_account(**new_account)
         updated_accounts = ledger.account_chart()
-        outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
+        outer_join = pd.merge(account_chart, updated_accounts, how="outer", indicator=True)
         modified_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
         assert len(modified_accounts) == 1, "Expected exactly one updated row"
@@ -94,7 +85,7 @@ class BaseTestAccountCharts(ABC):
         assert modified_accounts["vat_code"].item() == "TestCodeAccounts"
         assert modified_accounts["group"].item() == new_account["group"]
 
-        initial_accounts = ledger.account_chart()
+        account_chart = ledger.account_chart()
         new_account = {
             "account": 1145,
             "currency": "USD",
@@ -104,7 +95,7 @@ class BaseTestAccountCharts(ABC):
         }
         ledger.modify_account(**new_account)
         updated_accounts = ledger.account_chart()
-        outer_join = pd.merge(initial_accounts, updated_accounts, how="outer", indicator=True)
+        outer_join = pd.merge(account_chart, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
         assert len(created_accounts) == 1, "Expected exactly one row to be added"
@@ -118,10 +109,10 @@ class BaseTestAccountCharts(ABC):
         ledger.delete_account(account=1145)
         ledger.delete_account(account=1146)
         updated_accounts = ledger.account_chart()
-        assert 1145 not in account_chart["account"].values
-        assert 1146 not in account_chart["account"].values
+        assert 1145 not in initial_accounts["account"].values
+        assert 1146 not in initial_accounts["account"].values
 
-    def test_add_already_existed_raise_error(self, ledger, setup_vat_code):
+    def test_add_already_existed_raise_error(self, ledger):
         def add_account():
             ledger.add_account(
                 account=1200,
@@ -130,7 +121,6 @@ class BaseTestAccountCharts(ABC):
                 vat_code="TestCodeAccounts",
                 group="/Assets/Anlagevermögen",
             )
-
         add_account()
         with pytest.raises(ValueError):
             add_account()
@@ -145,7 +135,7 @@ class BaseTestAccountCharts(ABC):
                 group="/Assets/Anlagevermögen",
             )
 
-    def test_mirror_accounts(self, ledger, setup_vat_code):
+    def test_mirror_accounts(self, ledger):
         initial_accounts = ledger.account_chart()
         account = pd.DataFrame(
             {
