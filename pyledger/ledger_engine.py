@@ -1069,7 +1069,7 @@ class LedgerEngine(ABC):
             str(ledger_id): f"{str(date)},{df_to_consistent_str(txn)}"
             for ledger_id, date, txn in zip(df["id"], df["date"], df["txn"])
         }
-        return dict(sorted(result.items()))
+        return result
 
     # ----------------------------------------------------------------------
     # Currency

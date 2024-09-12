@@ -52,23 +52,27 @@ class TestLedger(BaseTestLedger):
         # flake8: enable
         assert result == expected, "Transactions were not converted correctly."
 
-    def test_txn_to_str_sorted_transactions(self):
-            ledger = MemoryLedger()
-            df = LEDGER_ENTRIES
-            result = ledger.txn_to_str(df)
-            # flake8: noqa: E501
-            expected_first_txn = (
-                "2024-05-24,account,amount,base_currency_amount,counter_account,currency,document,text,vat_code\n"
-                "10023,100.0,,19993,CHF,/file1.txt,pytest single transaction 1,Test_VAT_code"
-            )
+    def test_txn_to_str_transactions_by_id(self):
+        ledger = MemoryLedger()
+        df = LEDGER_ENTRIES
+        result = ledger.txn_to_str(df)
+        # flake8: noqa: E501
+        expected_first_txn = (
+            "2024-05-24,account,amount,base_currency_amount,counter_account,currency,document,text,vat_code\n"
+            "10023,100.0,,19993,CHF,/file1.txt,pytest single transaction 1,Test_VAT_code"
+        )
+        expected_last_txn = (
+            "2024-05-25,account,amount,base_currency_amount,counter_account,currency,document,text,vat_code\n"
+            "10022,300.0,450.45,19992,USD,/document-alt.pdf,pytest single transaction 2,Test_VAT_code"
+        )
+        # flake8: enable
 
-            expected_last_txn = (
-                "2024-05-25,account,amount,base_currency_amount,counter_account,currency,document,text,vat_code\n"
-                "10022,300.0,450.45,19992,USD,/document-alt.pdf,pytest single transaction 2,Test_VAT_code"
-            )
-            # flake8: enable
-            assert result["1"] == expected_first_txn, "First transaction was not sorted correctly."
-            assert result["4"] == expected_last_txn, "Last transaction was not sorted correctly."
+        assert result["1"] == expected_first_txn, (
+            "The transaction with key '1' does not match the expected value."
+        )
+        assert result["4"] == expected_last_txn, (
+            "The transaction with key '4' does not match the expected value."
+        )
 
     def test_txn_to_str_empty_df(self):
         ledger = MemoryLedger()
