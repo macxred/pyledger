@@ -69,7 +69,7 @@ def test_txn_to_str_non_unique_dates():
 
 def test_txn_to_str_same_transactions_different_order_dtypes():
     ledger = MemoryLedger()
-    df1 = LEDGER_ENTRIES[LEDGER_ENTRIES["id"] == 1]
+    df1 = LEDGER_ENTRIES[LEDGER_ENTRIES["id"] == 2]
     # Reverse the column order
     df2 = df1[df1.columns[::-1]]
     # DataFrame with shuffled rows
