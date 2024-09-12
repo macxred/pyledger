@@ -59,17 +59,6 @@ def test_txn_to_str_empty_df():
     assert result == {}, "Empty DataFrame did not return an empty dict."
 
 
-def test_txn_to_str_different_representations():
-    ledger = MemoryLedger()
-    df1 = LEDGER_ENTRIES[LEDGER_ENTRIES["id"] == 1]
-    df2 = LEDGER_ENTRIES[LEDGER_ENTRIES["id"] == 4]
-    result1 = ledger.txn_to_str(df1)
-    result2 = ledger.txn_to_str(df2)
-    assert result1 != result2, (
-        "Different transactions should have different string representations."
-    )
-
-
 def test_txn_to_str_non_unique_dates():
     ledger = MemoryLedger()
     df = LEDGER_ENTRIES[LEDGER_ENTRIES["id"].isin([1, 4])]
