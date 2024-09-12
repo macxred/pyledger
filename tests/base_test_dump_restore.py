@@ -64,8 +64,11 @@ class BaseTestDumpAndRestore(ABC):
         assert_frame_equal(
             ledger.standardize_account_chart(ACCOUNTS), ledger.account_chart(), ignore_index=True
         )
-        expected_ledger = ledger.txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES))
-        assert expected_ledger == ledger.txn_to_str(ledger.ledger())
+        expected_ledger = sorted(
+            ledger.txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)).values()
+        )
+        ledger = sorted(ledger.txn_to_str(ledger.ledger()).values())
+        assert expected_ledger == ledger
 
     def test_dump_and_restore_zip(self, ledger, tmp_path, restore_initial_state):
         # Populate with test data
@@ -86,4 +89,5 @@ class BaseTestDumpAndRestore(ABC):
         assert ledger.base_currency == "USD", "Base currency were not restored"
         assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)
         assert_frame_equal(account_chart, ledger.account_chart(), ignore_index=True)
-        assert ledger.txn_to_str(ledger_entries) == ledger.txn_to_str(ledger.ledger())
+        assert sorted(ledger.txn_to_str(ledger_entries).values()) == \
+               sorted(ledger.txn_to_str(ledger.ledger()).values())

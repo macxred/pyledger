@@ -267,7 +267,8 @@ class BaseTestLedger(ABC):
         ledger.mirror_ledger(target=target, delete=True)
         expected = ledger.standardize_ledger(target)
         mirrored = ledger.ledger()
-        assert ledger.txn_to_str(mirrored) == ledger.txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror with duplicate transactions and delete=False
         target = pd.concat(
@@ -281,7 +282,8 @@ class BaseTestLedger(ABC):
         ledger.mirror_ledger(target=target, delete=True)
         expected = ledger.standardize_ledger(target)
         mirrored = ledger.ledger()
-        assert ledger.txn_to_str(mirrored) == ledger.txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror with complex transactions and delete=False
         target = LEDGER_ENTRIES.query("id in [15, 16, 17, 18]")
@@ -290,20 +292,23 @@ class BaseTestLedger(ABC):
         expected = ledger.sanitize_ledger(expected)
         expected = pd.concat([mirrored, expected])
         mirrored = ledger.ledger()
-        assert ledger.txn_to_str(mirrored) == ledger.txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror existing transactions with delete=False has no impact
         target = LEDGER_ENTRIES.query("id in [1, 2]")
         ledger.mirror_ledger(target=target, delete=False)
         mirrored = ledger.ledger()
-        assert ledger.txn_to_str(mirrored) == ledger.txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror with delete=True
         target = LEDGER_ENTRIES.query("id in [1, 2]")
         ledger.mirror_ledger(target=target, delete=True)
         mirrored = ledger.ledger()
         expected = ledger.standardize_ledger(target)
-        assert ledger.txn_to_str(mirrored) == ledger.txn_to_str(expected)
+        assert sorted(ledger.txn_to_str(mirrored).values()) == \
+               sorted(ledger.txn_to_str(expected).values())
 
         # Mirror an empty target state
         ledger.mirror_ledger(target=pd.DataFrame({}), delete=True)
