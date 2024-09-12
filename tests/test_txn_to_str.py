@@ -68,22 +68,26 @@ def test_txn_to_str_non_unique_dates():
         ledger.txn_to_str(df)
 
 
-def test_txn_to_str_same_transactions_different_order_dtypes():
+def test_txn_to_str_variations_of_same_transactions():
     ledger = MemoryLedger()
     df1 = LEDGER_ENTRIES[LEDGER_ENTRIES["id"] == 2]
     # Reverse the column order
     df2 = df1[df1.columns[::-1]]
-    # DataFrame with shuffled rows
+    # Shuffle rows
     df3 = df1.sample(frac=1).reset_index(drop=True)  # Shuffle the rows
-    # DataFrame with different dtypes (e.g., convert 'amount' to string, 'account' to float)
+    # Change dtypes
     df4 = df1.copy()
     df4["amount"] = df4["amount"].astype(str)
     df4["account"] = df4["account"].astype(float)
+    # Replace column short column name by full name
+    df5 = df1.copy()
+    df5 = df5.rename(columns={"base_currency": "base_currency_amount"})
 
     result1 = ledger.txn_to_str(df1)
     result2 = ledger.txn_to_str(df2)
     result3 = ledger.txn_to_str(df3)
     result4 = ledger.txn_to_str(df4)
-    assert result1 == result2 == result3 == result4, (
+    result5 = ledger.txn_to_str(df5)
+    assert result1 == result2 == result3 == result4 == result5, (
         "Same transactions should have identical string representations."
     )
