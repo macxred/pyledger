@@ -1,7 +1,4 @@
-"""This module contains the test suite for Ledger entries operations using the MemoryLedger
-implementation. It inherits the common Ledger code tests from the BaseTestLedger abstract base
-class.
-"""
+"""Test suite for txn_to_str(), a consistent text representations of ledger transactions."""
 
 import pytest
 import pandas as pd
