@@ -14,9 +14,7 @@ class BaseTestLedger(ABC):
     def ledger(self):
         pass
 
-    @pytest.mark.parametrize(
-        "ledger_id", set(LEDGER_ENTRIES["id"].unique())
-    )
+    @pytest.mark.parametrize("ledger_id", set(LEDGER_ENTRIES["id"].unique()))
     def test_add_ledger_entry(self, ledger, ledger_id):
         target = LEDGER_ENTRIES.query("id == @ledger_id")
         id = ledger.add_ledger_entry(target)

@@ -1,4 +1,4 @@
-"""Test suite for testing dump, restore, and clear operations"""
+"""Test suite for testing dump, restore, and clear operations."""
 
 import pytest
 from tests.base_test_dump_restore_clear import BaseTestDumpRestoreClear

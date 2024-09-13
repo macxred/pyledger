@@ -1,4 +1,4 @@
-"""Test suite for account chart operations"""
+"""Test suite for account chart operations."""
 
 import pytest
 from tests.base_accounts import BaseTestAccounts
