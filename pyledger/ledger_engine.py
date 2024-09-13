@@ -7,9 +7,11 @@ from abc import ABC, abstractmethod
 import datetime
 import logging
 import math
+import zipfile
+import json
 from pathlib import Path
-from typing import List
-from consistent_df import enforce_dtypes
+from typing import Dict, List
+from consistent_df import enforce_dtypes, df_to_consistent_str, nest
 import re
 import numpy as np
 import openpyxl
@@ -159,6 +161,96 @@ class LedgerEngine(ABC):
                             cell.style = "Hyperlink"
             workbook.save(file)
 
+    def dump_to_zip(self, archive_path: str):
+        """Dump entire ledger system into a ZIP archive.
+
+        Save all data and settings of an accounting system into a ZIP archive.
+        Each component of the ledger system (accounts, vat_codes, ledger entries,
+        settings, etc.) is stored as an individual file inside the ZIP archive
+        for modular restoration and analysis.
+
+        Args:
+            archive_path (str): The file path of the ZIP archive.
+        """
+        with zipfile.ZipFile(archive_path, 'w') as archive:
+            settings = {"base_currency": self.base_currency}
+            archive.writestr('settings.json', json.dumps(settings))
+            archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
+            archive.writestr('vat_codes.csv', self.vat_codes().to_csv(index=False))
+            archive.writestr('accounts.csv', self.account_chart().to_csv(index=False))
+
+    def restore_from_zip(self, archive_path: str):
+        """Restore ledger system from a ZIP archive.
+
+        Restores a dumped ledger system from a ZIP archive.
+        Extracts the account chart, vat codes, ledger entries, base_currency, etc.,
+        from the ZIP archive and passes the extracted data to the `restore` method.
+
+        Args:
+            archive_path (str): The file path of the ZIP archive to restore.
+        """
+        required_files = {'ledger.csv', 'vat_codes.csv', 'accounts.csv', 'settings.json'}
+
+        with zipfile.ZipFile(archive_path, 'r') as archive:
+            archive_files = set(archive.namelist())
+            missing_files = required_files - archive_files
+            if missing_files:
+                raise FileNotFoundError(
+                    f"Missing required files in the archive: {', '.join(missing_files)}"
+                )
+
+            settings = json.loads(archive.open('settings.json').read().decode('utf-8'))
+            base_currency = settings["base_currency"]
+            ledger = pd.read_csv(archive.open('ledger.csv'))
+            accounts = pd.read_csv(archive.open('accounts.csv'))
+            vat_codes = pd.read_csv(archive.open('vat_codes.csv'))
+
+            # Restore the ledger system using the extracted data
+            self.restore(
+                base_currency=base_currency, ledger=ledger, vat_codes=vat_codes, accounts=accounts
+            )
+
+    def restore(
+        self,
+        base_currency: str | None = None,
+        vat_codes: pd.DataFrame | None = None,
+        accounts: pd.DataFrame | None = None,
+        ledger: pd.DataFrame | None = None,
+    ):
+        """Replaces the entire ledger system with data provided as arguments.
+
+        Args:
+            base_currency (str | None): Reporting currency. If `None`,
+                                        the reporting currency remains unchanged.
+            vat_codes (pd.DataFrame | None): VAT codes of the restored ledger system.
+                If `None`, VAT codes remain unchanged.
+            accounts (pd.DataFrame | None): Accounts of the restored ledger system.
+                If `None`, accounts remain unchanged.
+            ledger (pd.DataFrame | None): Ledger entries of the restored system.
+                If `None`, ledger remains unchanged.
+        """
+        if base_currency is not None:
+            self.base_currency = base_currency
+        if vat_codes is not None:
+            self.mirror_vat_codes(vat_codes, delete=True)
+        if accounts is not None:
+            self.mirror_account_chart(accounts, delete=True)
+        if ledger is not None:
+            self.mirror_ledger(ledger, delete=True)
+        # TODO: Implement price history, precision settings,
+        # and FX adjustments restoration logic
+
+    def clear(self):
+        """Clear all data from the ledger system.
+
+        This method removes all entries from the ledger, VAT codes, account chart, etc.
+        restoring the system to a pristine state.
+        """
+        self.mirror_ledger(None, delete=True)
+        self.mirror_vat_codes(None, delete=True)
+        self.mirror_account_chart(None, delete=True)
+        # TODO: Implement price history, precision settings, and FX adjustments clearing logic
+
     # ----------------------------------------------------------------------
     # VAT Codes
 
@@ -177,7 +269,7 @@ class LedgerEngine(ABC):
         code: str,
         rate: float,
         account: str,
-        included: bool = True,
+        inclusive: bool = True,
         date: datetime.date = None
     ) -> None:
         """Append a vat code to the list of available vat_codes.
@@ -186,8 +278,8 @@ class LedgerEngine(ABC):
             code (str): Identifier for the vat definition.
             rate (float): The VAT rate to apply.
             account (str): Account to which the VAT is applicable.
-            included (bool, optional): Specifies whether the VAT amount is included in the
-                                       transaction amount. Defaults to True.
+            inclusive (bool, optional): Specifies whether the VAT amount is included in the
+                                        transaction amount. Defaults to True.
             date (datetime.date, optional): Date from which onward the vat definition is
                                             applied. The definition is valid until the same
                                             vat code is re-defined on a subsequent date.
@@ -195,14 +287,43 @@ class LedgerEngine(ABC):
         """
 
     @abstractmethod
-    def delete_vat_code(self, code: str, date: datetime.date = None) -> None:
+    def modify_vat_code(
+        self,
+        code: str,
+        rate: float,
+        account: str,
+        inclusive: bool = True,
+        text: str = "",
+    ) -> None:
+        """
+        Update an existing VAT code.
+
+        Args:
+            code (str): VAT code to update.
+            rate (float): VAT rate (0 to 1).
+            account (str): Account identifier for the VAT.
+            inclusive (bool, optional): If True, VAT is 'NET' (default), else 'GROSS'.
+            text (str, optional): Description for the VAT code.
+        """
+
+    @abstractmethod
+    def delete_vat_code(self, code: str, allow_missing: bool = False) -> None:
         """Removes a vat definition.
 
         Args:
             code (str): Vat code to be removed.
-            date (datetime.date, optional): Date on which the vat code is removed.
-                                            If `None`, all entries with the given vat_code are
-                                            removed. Defaults to None.
+            allow_missing (bool, optional): If True, no error is raised if the VAT code is not
+                                            found.
+        """
+
+    @abstractmethod
+    def mirror_vat_codes(self, target: pd.DataFrame, delete: bool = False):
+        """Aligns VAT rates with a desired target state.
+
+        Args:
+            target (pd.DataFrame): DataFrame containing VAT rates in the pyledger format.
+            delete (bool, optional): If True, deletes existing VAT codes that are
+                                     not present in the target data.
         """
 
     @classmethod
@@ -245,7 +366,7 @@ class LedgerEngine(ABC):
         if len(missing) > 0:
             raise ValueError(f"Account must be defined for non-zero rate in vat_codes: {missing}.")
 
-        return df.set_index("id")
+        return df
 
     # ----------------------------------------------------------------------
     # Account chart
@@ -294,26 +415,25 @@ class LedgerEngine(ABC):
             if col not in df.columns:
                 df[col] = None
 
-        df = enforce_dtypes(df, {**REQUIRED_ACCOUNT_COLUMNS, **OPTIONAL_ACCOUNT_COLUMNS})
-        return df.set_index("account")
+        return enforce_dtypes(df, {**REQUIRED_ACCOUNT_COLUMNS, **OPTIONAL_ACCOUNT_COLUMNS})
 
     def account_currency(self, account: int) -> str:
         account_chart = self.account_chart()
-        if not int(account) in account_chart.index:
+        if not int(account) in account_chart["account"].values:
             raise ValueError(f"Account {account} is not defined.")
-        return account_chart["currency"][account]
+        return account_chart.loc[account_chart["account"] == account, "currency"].values[0]
 
     @abstractmethod
     def add_account(
-        self, account: int, description: str, currency: str, vat: bool = False
+        self, account: int, text: str, currency: str, vat_code: bool = False
     ) -> None:
         """Appends an account to the account chart.
 
         Args:
             account (int): Unique identifier for the account.
-            description (str): Description of the account.
+            text (str): Description of the account.
             currency (str): Currency of the account.
-            vat (bool, optional): Indicates if VAT is applicable. Defaults to False.
+            vat_code (bool, optional): Indicates if VAT is applicable. Defaults to False.
         """
 
     @abstractmethod
@@ -327,11 +447,23 @@ class LedgerEngine(ABC):
         """
 
     @abstractmethod
-    def delete_account(self, account: int) -> None:
+    def delete_account(self, account: int, allow_missing: bool = False) -> None:
         """Removes an account from the account chart.
 
         Args:
             account (int): The account to be removed.
+            allow_missing (bool, optional): If True, no error is raised if the account is
+                                            not found.
+        """
+
+    @abstractmethod
+    def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
+        """Aligns the account chart with a desired target state.
+
+        Args:
+            target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
+            delete (bool, optional): If True, deletes existing accounts that are not
+                                     present in the target data.
         """
 
     @abstractmethod
@@ -453,7 +585,7 @@ class LedgerEngine(ABC):
         # Account balance per a single point in time
         if represents_integer(account):
             account = int(account)
-            if account not in self.account_chart().index:
+            if account not in self.account_chart()[["account"]].values:
                 raise ValueError(f"No account matching '{account}'.")
             out = self._fetch_account_history(account, start=start, end=end)
         elif (
@@ -523,7 +655,7 @@ class LedgerEngine(ABC):
         subtract = []
         if represents_integer(range):
             account = int(range)
-            if abs(account) in self.account_chart().index:
+            if abs(account) in self.account_chart()["account"].values:
                 if account >= 0:
                     add = [account]
                 else:
@@ -546,8 +678,8 @@ class LedgerEngine(ABC):
                     first = int(sequence[0].strip())
                     last = int(sequence[1].strip())
                     chart = self.account_chart()
-                    in_range = (chart.index >= first) & (chart.index <= last)
-                    accounts = list(chart.index[in_range])
+                    in_range = (chart["account"] >= first) & (chart["account"] <= last)
+                    accounts = list(chart["account"][in_range])
                 elif re.match("[0-9]*", element.strip()):
                     accounts = [int(element.strip())]
                 else:
@@ -651,6 +783,16 @@ class LedgerEngine(ABC):
             id (str): The unique identifier of the ledger entry to delete.
         """
 
+    @abstractmethod
+    def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
+        """Aligns ledger entries with a desired target state.
+
+        Args:
+            target (pd.DataFrame): DataFrame with ledger entries in the pyledger format.
+            delete (bool, optional): If True, deletes existing ledger that are not
+                                     present in the target data.
+        """
+
     def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
         """Discards inconsistent ledger entries and inconsistent vat codes.
 
@@ -664,11 +806,11 @@ class LedgerEngine(ABC):
         """
         # Discard undefined VAT codes
         ledger["vat_code"] = ledger["vat_code"].str.strip()
-        invalid = ledger["vat_code"].notna() & ~ledger["vat_code"].isin(self.vat_codes().index)
+        invalid = ledger["vat_code"].notna() & ~ledger["vat_code"].isin(self.vat_codes()["id"])
         if invalid.any():
             df = ledger.loc[invalid, ["id", "vat_code"]]
             df = df.groupby("id").agg({"vat_code": lambda x: x.unique()})
-            for id, codes in zip(df.index, df["vat_code"]):
+            for id, codes in zip(df["id"].values, df["vat_code"]):
                 if len(codes) > 1:
                     self._logger.warning(
                         f"Discard unknown VAT codes {', '.join([f'{x}' for x in codes])} at '{id}'."
@@ -691,7 +833,7 @@ class LedgerEngine(ABC):
             to_discard.append(df.reset_index()[["id", "text"]])
 
         # 2. Discard journal entries with undefined accounts
-        valid_accounts = self.account_chart().index
+        valid_accounts = self.account_chart()["account"].values
         invalid_accounts = []
         for col in ["account", "counter_account"]:
             invalid = ledger[col].notna() & ~ledger[col].isin(valid_accounts)
@@ -902,13 +1044,42 @@ class LedgerEngine(ABC):
         ])
         return result[cols]
 
+    def txn_to_str(self, df: pd.DataFrame) -> Dict[str, str]:
+        """Create a consistent, unique representation of ledger transactions.
+
+        Converts transactions into a dict of CSV-like string representation.
+        The result can be used to compare transactions.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing ledger transactions.
+
+        Returns:
+            Dict[str, str]: A dictionary where keys are ledger 'id's and values are
+            unique string representations of the transactions.
+        """
+        df = self.standardize_ledger(df)
+        df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
+        if df['id'].duplicated().any():
+            raise ValueError("Some collective transaction(s) have non-unique date.")
+
+        result = {
+            str(id): f"{str(date)}\n{df_to_consistent_str(txn)}"
+            for id, date, txn in zip(df["id"], df["date"], df["txn"])
+        }
+        return result
+
     # ----------------------------------------------------------------------
     # Currency
 
     @property
     @abstractmethod
     def base_currency(self) -> str:
-        """Returns the base currency used for financial reporting."""
+        """Reporting currency of the ledger system."""
+
+    @base_currency.setter
+    @abstractmethod
+    def base_currency(self, currency):
+        """Set the reporting currency of the ledger system."""
 
     @abstractmethod
     def precision(

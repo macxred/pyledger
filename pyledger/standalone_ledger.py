@@ -54,8 +54,8 @@ class StandaloneLedger(LedgerEngine):
 
     def __init__(
         self,
-        settings: dict,
-        accounts: pd.DataFrame,
+        settings: dict = None,
+        accounts: pd.DataFrame = None,
         ledger: pd.DataFrame = None,
         prices: pd.DataFrame = None,
         vat_codes: pd.DataFrame = None,
@@ -101,7 +101,7 @@ class StandaloneLedger(LedgerEngine):
         Raises:
             KeyError: If the VAT code is not defined.
         """
-        if vat_code not in self._vat_codes.index:
+        if vat_code not in self._vat_codes["id"].values:
             raise KeyError(f"VAT code not defined: {vat_code}")
         return self._vat_codes["rate"][vat_code]
 
@@ -117,15 +117,21 @@ class StandaloneLedger(LedgerEngine):
         Raises:
             KeyError: If the VAT code is not defined.
         """
-        if vat_code not in self._vat_codes.index:
+        if vat_code not in self._vat_codes["id"].values:
             raise KeyError(f"VAT code not defined: {vat_code}")
         return self._vat_codes["accounts"][vat_code]
 
     def add_vat_code(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_vat_code is not implemented yet.")
 
+    def modify_vat_code(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_vat_code is not implemented yet.")
+
     def delete_vat_code(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_vat_code is not implemented yet.")
+
+    def mirror_vat_codes(self, *args, **kwargs) -> None:
+        raise NotImplementedError("mirror_vat_code is not implemented yet.")
 
     def vat_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create journal entries to book VAT according to vat_codes.
@@ -141,15 +147,21 @@ class StandaloneLedger(LedgerEngine):
             pd.DataFrame: A new DataFrame with VAT journal entries.
             Returns empty DataFrame with the correct structure if no VAT codes are present.
         """
-        vat_definitions = self.vat_codes().to_dict("index")
+        vat_definitions = self.vat_codes().set_index("id").to_dict("index")
         vat_journal_entries = []
         account_chart = self.account_chart()
         for _, row in df.loc[df["vat_code"].notna()].iterrows():
             vat = vat_definitions[row["vat_code"]]
-            account_vat_code = (account_chart["vat_code"][row["account"]]
-                                if pd.notna(row["account"]) else None)
-            counter_vat_code = (account_chart["vat_code"][row["counter_account"]]
-                                if pd.notna(row["counter_account"]) else None)
+            account_vat_code = (
+                account_chart.loc[
+                    account_chart["account"] == row["account"], "vat_code"
+                ].values[0] if pd.notna(row["account"]) else None
+            )
+            counter_vat_code = (
+                account_chart.loc[
+                    account_chart["account"] == row["counter_account"], "vat_code"
+                ].values[0] if pd.notna(row["counter_account"]) else None
+            )
             if pd.isna(account_vat_code) and pd.isna(counter_vat_code):
                 self._logger.warning(
                     f"Skip vat code '{row['vat_code']}' for {row['id']}: Neither account nor "
@@ -226,16 +238,19 @@ class StandaloneLedger(LedgerEngine):
     def delete_account(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_account is not implemented yet.")
 
+    def mirror_account_chart(self, *args, **kwargs) -> None:
+        raise NotImplementedError("mirror_account_chart is not implemented yet.")
+
     def validate_accounts(self) -> None:
         """Validate coherence between account, VAT and FX adjustment definitions."""
         # Ensure all vat code accounts are defined in account chart
-        vat_codes = set(self._vat_codes.index)
+        vat_codes = set(self._vat_codes["id"])
         missing = set(self._account_chart["vat_code"].dropna()) - vat_codes
         if len(missing) > 0:
             raise ValueError(f"Some VAT codes in account chart not defined: {missing}.")
 
         # Ensure all account vat_codes are defined in vat_codes
-        accounts = set(self._account_chart.index)
+        accounts = set(self._account_chart["account"])
         missing = set(self._vat_codes["account"].dropna()) - accounts
         if len(missing) > 0:
             raise ValueError(
@@ -280,7 +295,6 @@ class StandaloneLedger(LedgerEngine):
         # Ensure ID is not already in use
         duplicate = set(df["id"]).intersection(self._ledger["id"])
         if len(duplicate) > 0:
-            # breakpoint()
             if automated_id:
                 # Replace ids by integers above the highest existing integer id
                 min_id = df["id"].astype(pd.Int64Dtype()).min(skipna=True)
@@ -305,6 +319,9 @@ class StandaloneLedger(LedgerEngine):
 
     def modify_ledger_entry(self, *args, **kwargs) -> None:
         raise NotImplementedError("modify_ledger_entry is not implemented yet.")
+
+    def mirror_ledger(self, *args, **kwargs) -> None:
+        raise NotImplementedError("mirror_ledger is not implemented yet.")
 
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with all ledger transactions in long format.
