@@ -1,4 +1,4 @@
-"""Definition of abstract base class for testing dump and restore operations."""
+"""Definition of abstract base class for testing dump, restore, and clear operations."""
 
 from io import StringIO
 import pytest
@@ -31,28 +31,14 @@ ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
 
 
-class BaseTestDumpAndRestore(ABC):
+class BaseTestDumpRestoreClear(ABC):
 
     @abstractmethod
     @pytest.fixture
     def ledger(self):
         pass
 
-    @pytest.fixture()
-    def restore_initial_state(self, ledger):
-        # Fetch original state
-        initial_ledger = ledger.ledger()
-        initial_vat_codes = ledger.vat_codes()
-        initial_account_chart = ledger.account_chart()
-
-        yield
-
-        # Restore initial state
-        ledger.mirror_ledger(initial_ledger, delete=True)
-        ledger.mirror_vat_codes(initial_vat_codes, delete=True)
-        ledger.mirror_account_chart(initial_account_chart, delete=True)
-
-    def test_restore(self, ledger, restore_initial_state):
+    def test_restore(self, ledger):
         ledger.clear()
         ledger.restore(
             ledger=LEDGER_ENTRIES, vat_codes=VAT_CODES, accounts=ACCOUNTS, base_currency="USD"
@@ -64,13 +50,11 @@ class BaseTestDumpAndRestore(ABC):
         assert_frame_equal(
             ledger.standardize_account_chart(ACCOUNTS), ledger.account_chart(), ignore_index=True
         )
-        expected_ledger = sorted(
-            ledger.txn_to_str(ledger.standardize_ledger(LEDGER_ENTRIES)).values()
-        )
-        ledger = sorted(ledger.txn_to_str(ledger.ledger()).values())
-        assert expected_ledger == ledger
+        target = ledger.txn_to_str(LEDGER_ENTRIES).values()
+        actual = ledger.txn_to_str(ledger.ledger()).values()
+        assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
 
-    def test_dump_and_restore_zip(self, ledger, tmp_path, restore_initial_state):
+    def test_dump_and_restore_zip(self, ledger, tmp_path):
         # Populate with test data
         ledger.base_currency = "USD"
         ledger.mirror_vat_codes(VAT_CODES)
@@ -94,3 +78,14 @@ class BaseTestDumpAndRestore(ABC):
         assert_frame_equal(account_chart, ledger.account_chart(), ignore_index=True)
         assert sorted(ledger.txn_to_str(ledger_entries).values()) == \
                sorted(ledger.txn_to_str(ledger.ledger()).values())
+
+    def test_clear(self, ledger):
+        ledger.restore(
+            ledger=LEDGER_ENTRIES, vat_codes=VAT_CODES, accounts=ACCOUNTS, base_currency="USD"
+        )
+        ledger.clear()
+        assert ledger.ledger().empty, "Ledger was not cleared"
+        assert ledger.vat_codes().empty, "VAT codes were not cleared"
+        assert ledger.account_chart().empty, "Account chart was not cleared"
+        # TODO: Expand test logic to test price history, precision settings,
+        # and FX adjustments when implemented

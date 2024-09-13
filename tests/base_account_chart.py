@@ -4,13 +4,23 @@ import pytest
 import pandas as pd
 from abc import ABC, abstractmethod
 from io import StringIO
+from consistent_df import assert_frame_equal
 
 
 VAT_CSV = """
     id,                 account, rate,  inclusive, text
     TestCodeAccounts,   2200,    0.02,  True,      VAT 2%
 """
+ACCOUNT_CSV = """
+    account, currency, text,                 vat_code,         group
+    9995,    CHF,      Cash Account,         TestCodeAccounts, /Assets
+    9996,    USD,      Bank Account USD,     TestCodeAccounts, /Assets
+    9997,    EUR,      Bank Account EUR,     TestCodeAccounts, /Assets
+    9998,    CHF,      Inventory,            ,                 /Assets
+    9999,    CHF,      Accounts Receivable,  ,                 /Assets
+"""
 VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
+TEST_ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 
 
 class BaseTestAccountCharts(ABC):
@@ -98,6 +108,9 @@ class BaseTestAccountCharts(ABC):
         outer_join = pd.merge(account_chart, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
+        assert len(account_chart) == len(updated_accounts), (
+            "Expected account chart to have same length before and after modification"
+        )
         assert len(created_accounts) == 1, "Expected exactly one row to be added"
         assert created_accounts["account"].item() == new_account["account"]
         assert created_accounts["text"].item() == new_account["text"]
@@ -136,35 +149,25 @@ class BaseTestAccountCharts(ABC):
 
     def test_mirror_accounts(self, ledger):
         initial_accounts = ledger.account_chart()
-        account = pd.DataFrame(
-            {
-                "account": [1, 2],
-                "currency": ["CHF", "EUR"],
-                "text": ["Test Account 1", "Test Account 2"],
-                "vat_code": ["TestCodeAccounts", None],
-                "group": ["/Assets", "/Assets/Anlagevermögen/xyz"],
-            }
-        )
-        target_df = pd.concat([account, initial_accounts])
+        accounts = ledger.standardize_account_chart(TEST_ACCOUNTS)
 
+        target_df = pd.concat([accounts, initial_accounts], ignore_index=True)
         ledger.mirror_account_chart(target_df, delete=False)
         mirrored_df = ledger.account_chart()
-        m = target_df.merge(mirrored_df, how="left", indicator=True)
-        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
+        assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
 
+        target_df = target_df[~target_df['account'].isin([9995, 9996])]
         ledger.mirror_account_chart(target_df, delete=True)
         mirrored_df = ledger.account_chart()
-        m = target_df.merge(mirrored_df, how="outer", indicator=True)
-        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
+        assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
 
-        target_df = target_df.sample(frac=1)
-        target_df.loc[target_df["account"] == 2, "text"] = "New_Test_Text"
+        target_df = target_df.sample(frac=1).reset_index(drop=True)
+        target_account = '2222'
+        target_df.loc[target_df["account"] == target_account, "text"] = "Updated Account Text"
         ledger.mirror_account_chart(target_df, delete=True)
         mirrored_df = ledger.account_chart()
-        m = target_df.merge(mirrored_df, how="outer", indicator=True)
-        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
+        assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
 
-        ledger.mirror_account_chart(initial_accounts, delete=True)
-        mirrored_df = ledger.account_chart()
-        m = initial_accounts.merge(mirrored_df, how="outer", indicator=True)
-        assert (m["_merge"] == "both").all(), "Some target accounts were not mirrored"
+    def test_mirror_empty_accounts(self, ledger):
+        ledger.mirror_account_chart(ledger.standardize_account_chart(None), delete=True)
+        assert ledger.account_chart().empty, "Mirroring empty df should erase all accounts"

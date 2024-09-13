@@ -28,7 +28,6 @@ class MemoryLedger(StandaloneLedger):
         self._account_chart = self.standardize_account_chart(None)
         # TODO: Similarly initialise assets when concept implemented
 
-
     # ----------------------------------------------------------------------
     # VAT Codes
 

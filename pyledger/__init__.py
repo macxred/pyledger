@@ -31,6 +31,5 @@ from tests import (
     BaseTestVatCode,
     BaseTestAccountCharts,
     BaseTestLedger,
-    BaseTestClear,
-    BaseTestDumpAndRestore,
+    BaseTestDumpRestoreClear,
 )
