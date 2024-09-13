@@ -156,13 +156,13 @@ class BaseTestAccountCharts(ABC):
         mirrored_df = ledger.account_chart()
         assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
 
-        target_df = target_df[~target_df['account'].isin([9995, 9996])]
+        target_df = target_df[~target_df["account"].isin([9995, 9996])]
         ledger.mirror_account_chart(target_df, delete=True)
         mirrored_df = ledger.account_chart()
         assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
 
         target_df = target_df.sample(frac=1).reset_index(drop=True)
-        target_account = '2222'
+        target_account = "2222"
         target_df.loc[target_df["account"] == target_account, "text"] = "Updated Account Text"
         ledger.mirror_account_chart(target_df, delete=True)
         mirrored_df = ledger.account_chart()
