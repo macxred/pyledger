@@ -212,23 +212,23 @@ class BaseTestLedger(ABC):
     def add_already_existed_raise_error(self, ledger):
         target = LEDGER_ENTRIES.query("id == 1").copy()
         ledger.add_ledger(target)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"already exists"):
             ledger.add_ledger(target)
 
     def add_with_ambiguous_id_raises_error(self, ledger):
         target = LEDGER_ENTRIES.query("id in [1, 2]").copy()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"Id needs to be unique and present"):
             ledger.add_ledger(target)
 
     def test_modify_non_existed_raises_error(self, ledger):
         target = LEDGER_ENTRIES.query("id == 1").copy()
         target["id"] = 999999
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"not found"):
             ledger.modify_ledger_entry(target)
 
     def add_modify_with_ambiguous_id_raises_error(self, ledger):
         target = LEDGER_ENTRIES.query("id in [1, 2]").copy()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"Id needs to be unique and present"):
             ledger.modify_ledger_entry(target)
 
     def test_mirror_ledger(self, ledger):

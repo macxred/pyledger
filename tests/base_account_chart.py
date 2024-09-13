@@ -113,20 +113,19 @@ class BaseTestAccountCharts(ABC):
         assert 1146 not in initial_accounts["account"].values
 
     def test_add_already_existed_raise_error(self, ledger):
-        def add_account():
-            ledger.add_account(
-                account=1200,
-                currency="EUR",
-                text="test account",
-                vat_code="TestCodeAccounts",
-                group="/Assets/Anlagevermögen",
-            )
-        add_account()
-        with pytest.raises(ValueError):
-            add_account()
+        new_account = {
+            "account": 77777,
+            "currency": "CHF",
+            "text": "test account",
+            "vat_code": None,
+            "group": "/Assets/Anlagevermögen",
+        }
+        ledger.add_account(**new_account)
+        with pytest.raises(ValueError, match=r"already exists"):
+            ledger.add_account(**new_account)
 
     def test_modify_non_existed_raise_error(self, ledger):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"not found or duplicated"):
             ledger.modify_account(
                 account=1200,
                 currency="EUR",

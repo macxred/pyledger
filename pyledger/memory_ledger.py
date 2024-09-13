@@ -2,6 +2,7 @@
 
 import pandas as pd
 from .standalone_ledger import StandaloneLedger
+from .constants import CURRENCY_PRECISION
 
 
 class MemoryLedger(StandaloneLedger):
@@ -11,18 +12,8 @@ class MemoryLedger(StandaloneLedger):
     memory and is particularly useful for demonstration and testing purposes.
     """
 
-    PRECISION = {
-        "AUD": 0.01,
-        "CAD": 0.01,
-        "CHF": 0.01,
-        "EUR": 0.01,
-        "GBP": 0.01,
-        "JPY": 1.00,
-        "NZD": 0.01,
-        "NOK": 0.01,
-        "SEK": 0.01,
-        "USD": 0.01,
-    }
+    _base_currency = None
+    _precision = CURRENCY_PRECISION
 
     def __init__(self, base_currency: str = "USD") -> None:
         """Initialize the MemoryLedger and sets the reporting currency.
@@ -30,17 +21,13 @@ class MemoryLedger(StandaloneLedger):
         Args:
             base_currency (str): The reporting currency. Defaults to "USD".
         """
-        settings = {
-            "precision": self.PRECISION,
-            "base_currency": base_currency,
-        }
-        super().__init__(
-            settings=settings,
-            accounts=None,
-        )
+        self._base_currency = base_currency
         self._ledger = self.standardize_ledger(None)
         self._prices = self.standardize_prices(None)
         self._vat_codes = self.standardize_vat_codes(None)
+        self._account_chart = self.standardize_account_chart(None)
+        # TODO: Similarly initialise assets when concept implemented
+
 
     # ----------------------------------------------------------------------
     # VAT Codes
@@ -56,7 +43,7 @@ class MemoryLedger(StandaloneLedger):
         inclusive: bool = True,
         text: str = "",
     ) -> None:
-        if self._vat_codes["id"].isin([code]).any():
+        if (self._vat_codes["id"] == code).any():
             raise ValueError(f"VAT code '{code}' already exists")
 
         new_vat_code = self.standardize_vat_codes(pd.DataFrame({
@@ -76,8 +63,8 @@ class MemoryLedger(StandaloneLedger):
         inclusive: bool = True,
         text: str = "",
     ) -> None:
-        if not self._vat_codes["id"].isin([code]).sum() == 1:
-            raise ValueError(f"VAT code '{code}' not found (or duplicated).")
+        if (self._vat_codes["id"] == code).sum() != 1:
+            raise ValueError(f"VAT code '{code}' not found or duplicated.")
 
         self._vat_codes.loc[
             self._vat_codes["id"] == code, ["rate", "account", "inclusive", "text"]
@@ -117,7 +104,7 @@ class MemoryLedger(StandaloneLedger):
         group: str,
         vat_code: str = None,
     ) -> None:
-        if self._account_chart["account"].isin([account]).any():
+        if (self._account_chart["account"] == account).any():
             raise ValueError(f"Account '{account}' already exists")
 
         new_account = self.standardize_account_chart(pd.DataFrame({
@@ -137,8 +124,8 @@ class MemoryLedger(StandaloneLedger):
         group: str,
         vat_code: str = None,
     ) -> None:
-        if not self._account_chart["account"].isin([account]).sum() == 1:
-            raise ValueError(f"Account '{account}' not found or have duplicates in the system.")
+        if (self._account_chart["account"] == account).sum() != 1:
+            raise ValueError(f"Account '{account}' not found or duplicated.")
 
         self._account_chart.loc[
             self._account_chart["account"] == account,
@@ -178,12 +165,12 @@ class MemoryLedger(StandaloneLedger):
                 "Id needs to be unique and present in all rows of a collective booking."
             )
 
-        ledger_id = entry["id"].iat[0]
-        if entry["id"].iat[0] in self._ledger["id"].values:
-            raise ValueError(f"Ledger entry with id '{ledger_id}' already exists.")
+        id = entry["id"].iat[0]
+        if (self._ledger["id"] == id).any():
+            raise ValueError(f"Ledger entry with id '{id}' already exists.")
 
         self._ledger = pd.concat([self._ledger, entry])
-        return ledger_id
+        return id
 
     def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
         if entry["id"].nunique() != 1:
@@ -199,9 +186,10 @@ class MemoryLedger(StandaloneLedger):
             [self._ledger[self._ledger["id"] != ledger_id], entry],
         ))
 
-    def delete_ledger_entry(self, id: str) -> None:
-        if id in self._ledger["id"].values:
-            self._ledger = self._ledger[self._ledger["id"] != id]
+    def delete_ledger_entry(self, id: str, allow_missing: bool = False) -> None:
+        if not allow_missing and id not in self._ledger["id"].values:
+            raise KeyError(f"Ledger entry with id '{id}' not found.")
+        self._ledger = self._ledger[self._ledger["id"] != id]
 
     def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
         target_df = self.standardize_ledger(target)
@@ -218,8 +206,8 @@ class MemoryLedger(StandaloneLedger):
 
     @property
     def base_currency(self):
-        return self._settings["base_currency"]
+        return self._base_currency
 
     @base_currency.setter
     def base_currency(self, currency):
-        self._settings["base_currency"] = currency
+        self._base_currency = currency

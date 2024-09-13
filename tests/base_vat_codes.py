@@ -119,11 +119,11 @@ class BaseTestVatCode(ABC):
             "inclusive": True,
         }
         ledger.add_vat_code(**new_vat_code)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"already exists"):
             ledger.add_vat_code(**new_vat_code)
 
     def test_update_non_existent_raise_error(self, ledger):
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=r"not found or duplicated"):
             ledger.modify_vat_code(
                 code="TestCode", text="VAT 20%", account=2200, rate=0.02, inclusive=True
             )

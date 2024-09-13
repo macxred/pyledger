@@ -54,8 +54,8 @@ class StandaloneLedger(LedgerEngine):
 
     def __init__(
         self,
-        settings: dict,
-        accounts: pd.DataFrame,
+        settings: dict = None,
+        accounts: pd.DataFrame = None,
         ledger: pd.DataFrame = None,
         prices: pd.DataFrame = None,
         vat_codes: pd.DataFrame = None,

@@ -200,7 +200,7 @@ class LedgerEngine(ABC):
                 )
 
             settings = json.loads(archive.open('settings.json').read().decode('utf-8'))
-            base_currency = settings.get("base_currency")
+            base_currency = settings["base_currency"]
             ledger = pd.read_csv(archive.open('ledger.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
             vat_codes = pd.read_csv(archive.open('vat_codes.csv'))
