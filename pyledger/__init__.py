@@ -29,7 +29,7 @@ from .time import *
 from .import constants
 from tests import (
     BaseTestVatCode,
-    BaseTestAccountCharts,
+    BaseTestAccounts,
     BaseTestLedger,
     BaseTestDumpRestoreClear,
 )

@@ -7,7 +7,7 @@ from consistent_df import assert_frame_equal
 from .constants import ACCOUNTS
 
 
-class BaseTestAccountCharts(ABC):
+class BaseTestAccounts(ABC):
 
     @abstractmethod
     @pytest.fixture
@@ -153,5 +153,7 @@ class BaseTestAccountCharts(ABC):
         assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
 
     def test_mirror_empty_accounts(self, ledger):
+        ledger.restore(accounts=ACCOUNTS)
+        assert not ledger.account_chart().empty, "Accounts were not populated"
         ledger.mirror_account_chart(ledger.standardize_account_chart(None), delete=True)
         assert ledger.account_chart().empty, "Mirroring empty df should erase all accounts"

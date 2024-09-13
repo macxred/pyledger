@@ -53,7 +53,7 @@ class BaseTestLedger(ABC):
         remote = ledger.ledger()
         updated = remote.loc[remote["id"] == str(id)]
         expected = ledger.standardize_ledger(target)
-        assert initial_ledger["id"].unique() == remote["id"].unique(), (
+        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
         assert_frame_equal(updated, expected, ignore_index=True)
@@ -82,7 +82,7 @@ class BaseTestLedger(ABC):
         remote = ledger.ledger()
         updated = remote.loc[remote["id"] == str(id)]
         expected = ledger.standardize_ledger(target)
-        assert initial_ledger["id"].unique() == remote["id"].unique(), (
+        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
         assert_frame_equal(updated, expected, ignore_index=True)
@@ -119,7 +119,7 @@ class BaseTestLedger(ABC):
         remote = ledger.ledger()
         updated = remote.loc[remote["id"] == str(id)]
         expected = ledger.standardize_ledger(target)
-        assert initial_ledger["id"].unique() == remote["id"].unique(), (
+        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
         assert_frame_equal(updated, expected, ignore_index=True)
@@ -148,7 +148,7 @@ class BaseTestLedger(ABC):
         remote = ledger.ledger()
         updated = remote.loc[remote["id"] == str(id)]
         expected = ledger.standardize_ledger(target)
-        assert initial_ledger["id"].unique() == remote["id"].unique(), (
+        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
         assert_frame_equal(updated, expected, ignore_index=True)
@@ -232,4 +232,4 @@ class BaseTestLedger(ABC):
 
         # Mirror an empty target state
         ledger.mirror_ledger(target=pd.DataFrame({}), delete=True)
-        assert ledger.ledger().empty
+        assert ledger.ledger().empty, "Mirroring empty DF should erase all ledgers"

@@ -116,5 +116,7 @@ class BaseTestVatCode(ABC):
         assert_frame_equal(vat_codes_shuffled, mirrored_df, ignore_index=True, check_like=True)
 
     def test_mirror_empty_vat_codes(self, ledger):
+        ledger.restore(vat_codes=VAT_CODES)
+        assert not ledger.vat_codes().empty, "VAT codes were not populated"
         ledger.mirror_vat_codes(ledger.standardize_vat_codes(None), delete=True)
         assert ledger.vat_codes().empty, "Mirroring empty df should erase all VAT codes"

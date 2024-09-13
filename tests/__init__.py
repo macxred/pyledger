@@ -4,6 +4,6 @@
 
 
 from .base_vat_codes import BaseTestVatCode
-from .base_account_chart import BaseTestAccountCharts
+from .base_accounts import BaseTestAccounts
 from .base_test_ledger import BaseTestLedger
 from .base_test_dump_restore_clear import BaseTestDumpRestoreClear
