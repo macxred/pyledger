@@ -3,24 +3,8 @@
 import pytest
 import pandas as pd
 from abc import ABC, abstractmethod
-from io import StringIO
 from consistent_df import assert_frame_equal
-
-
-VAT_CSV = """
-    id,                 account, rate,  inclusive, text
-    TestCodeAccounts,   2200,    0.02,  True,      VAT 2%
-"""
-ACCOUNT_CSV = """
-    account, currency, text,                 vat_code,         group
-    9995,    CHF,      Cash Account,         TestCodeAccounts, /Assets
-    9996,    USD,      Bank Account USD,     TestCodeAccounts, /Assets
-    9997,    EUR,      Bank Account EUR,     TestCodeAccounts, /Assets
-    9998,    CHF,      Inventory,            ,                 /Assets
-    9999,    CHF,      Accounts Receivable,  ,                 /Assets
-"""
-VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
-TEST_ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+from .constants import ACCOUNTS
 
 
 class BaseTestAccountCharts(ABC):
@@ -149,7 +133,7 @@ class BaseTestAccountCharts(ABC):
 
     def test_mirror_accounts(self, ledger):
         initial_accounts = ledger.account_chart()
-        accounts = ledger.standardize_account_chart(TEST_ACCOUNTS)
+        accounts = ledger.standardize_account_chart(ACCOUNTS)
 
         target_df = pd.concat([accounts, initial_accounts], ignore_index=True)
         ledger.mirror_account_chart(target_df, delete=False)

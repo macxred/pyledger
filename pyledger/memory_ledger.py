@@ -191,6 +191,7 @@ class MemoryLedger(StandaloneLedger):
         self._ledger = self._ledger[self._ledger["id"] != id]
 
     def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
+        # TODO: Refactor mirroring logic #25 issue
         target_df = self.standardize_ledger(target)
 
         if delete:

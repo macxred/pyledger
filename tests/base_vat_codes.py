@@ -1,23 +1,10 @@
 """Definition of abstract base class for testing VAT code operations."""
 
-from io import StringIO
 import pytest
 import pandas as pd
 from abc import ABC, abstractmethod
 from consistent_df import assert_frame_equal
-
-
-VAT_CSV = """
-    id,       account, rate,  inclusive, text
-    OutStd,   2200,    0.038, True,      VAT at the regular 7.7% rate on goods or services
-    OutRed,   2200,    0.025, True,      VAT at the reduced 2.5% rate on goods or services
-    OutAcc,   2200,    0.038, True,      XXXXX
-    OutStdEx, 2200,    0.077, False,     VAT at the regular 7.7% rate on goods or services
-    InStd,    1170,    0.077, True,      Input Tax (Vorsteuer) at the regular 7.7% rate on
-    InRed,    1170,    0.025, True,      Input Tax (Vorsteuer) at the reduced 2.5% rate on
-    InAcc,    1170,    0.038, True,      YYYYY
-"""
-VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
+from .constants import VAT_CODES
 
 
 class BaseTestVatCode(ABC):
