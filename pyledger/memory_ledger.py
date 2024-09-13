@@ -25,10 +25,10 @@ class MemoryLedger(StandaloneLedger):
     }
 
     def __init__(self, base_currency: str = "USD") -> None:
-        """Initialize the MemoryLedger with hard-coded settings
+        """Initialize the MemoryLedger and sets the reporting currency.
 
         Args:
-            base_currency (str): The base currency for the system. Defaults to "USD".
+            base_currency (str): The reporting currency. Defaults to "USD".
         """
         settings = {
             "precision": self.PRECISION,
@@ -77,7 +77,7 @@ class MemoryLedger(StandaloneLedger):
         text: str = "",
     ) -> None:
         if not self._vat_codes["id"].isin([code]).sum() == 1:
-            raise ValueError(f"VAT code '{code}' not found or have duplicates in the system.")
+            raise ValueError(f"VAT code '{code}' not found (or duplicated).")
 
         self._vat_codes.loc[
             self._vat_codes["id"] == code, ["rate", "account", "inclusive", "text"]
@@ -87,14 +87,13 @@ class MemoryLedger(StandaloneLedger):
     def delete_vat_code(self, code: str, allow_missing: bool = False) -> None:
         if not allow_missing and code not in self._vat_codes["id"].values:
             raise ValueError(f"VAT code '{code}' not found in the memory.")
-
         self._vat_codes = self._vat_codes[self._vat_codes["id"] != code]
 
     def mirror_vat_codes(self, target: pd.DataFrame, delete: bool = False):
         target_df = self.standardize_vat_codes(target)
 
         if target_df["id"].duplicated().any():
-            raise ValueError("Duplicate VAT codes 'id' values found")
+            raise ValueError("Duplicate VAT ids found in `target`.")
 
         if delete:
             self._vat_codes = target_df
@@ -150,14 +149,13 @@ class MemoryLedger(StandaloneLedger):
     def delete_account(self, account: str, allow_missing: bool = False) -> None:
         if not allow_missing and account not in self._account_chart["account"].values:
             raise KeyError(f"Account '{account}' not found in the account chart.")
-
         self._account_chart = self._account_chart[self._account_chart["account"] != account]
 
     def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
         target_df = self.standardize_account_chart(target)
 
         if target_df["account"].duplicated().any():
-            raise ValueError("Duplicate account charts found")
+            raise ValueError("Duplicate accounts found in `target`.")
 
         if delete:
             self._account_chart = target_df

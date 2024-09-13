@@ -243,9 +243,8 @@ class LedgerEngine(ABC):
     def clear(self):
         """Clear all data from the ledger system.
 
-        This method removes all entries from the ledger, VAT codes, account chart,
-        base_currency, etc. restoring the system to a pristine state.
-        It is designed to be flexible and adapt to the clearing process requirements.
+        This method removes all entries from the ledger, VAT codes, account chart, etc.
+        restoring the system to a pristine state.
         """
         self.mirror_ledger(None, delete=True)
         self.mirror_vat_codes(None, delete=True)
@@ -314,7 +313,7 @@ class LedgerEngine(ABC):
         Args:
             code (str): Vat code to be removed.
             allow_missing (bool, optional): If True, no error is raised if the VAT code is not
-                                            found; if False, raises error. Defaults to False.
+                                            found.
         """
 
     @abstractmethod
@@ -454,8 +453,7 @@ class LedgerEngine(ABC):
         Args:
             account (int): The account to be removed.
             allow_missing (bool, optional): If True, no error is raised if the account is
-                                            not found; if False raises error if
-                                            the account is missing. Defaults to False.
+                                            not found.
         """
 
     @abstractmethod
@@ -1049,9 +1047,8 @@ class LedgerEngine(ABC):
     def txn_to_str(self, df: pd.DataFrame) -> Dict[str, str]:
         """Create a consistent, unique representation of ledger transactions.
 
-        This method converts each transaction into a CSV-like string format and stores
-        them in a dict. The result can be used to compare transactions, ensuring consistency
-        and uniqueness.
+        Converts transactions into a dict of CSV-like string representation.
+        The result can be used to compare transactions.
 
         Args:
             df (pd.DataFrame): DataFrame containing ledger transactions.
@@ -1066,8 +1063,8 @@ class LedgerEngine(ABC):
             raise ValueError("Some collective transaction(s) have non-unique date.")
 
         result = {
-            str(ledger_id): f"{str(date)}\n{df_to_consistent_str(txn)}"
-            for ledger_id, date, txn in zip(df["id"], df["date"], df["txn"])
+            str(id): f"{str(date)}\n{df_to_consistent_str(txn)}"
+            for id, date, txn in zip(df["id"], df["date"], df["txn"])
         }
         return result
 

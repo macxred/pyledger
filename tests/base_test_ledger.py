@@ -1,4 +1,4 @@
-"""Test suite for abstract base class for testing ledger operations."""
+"""Definition of abstract base class for testing ledger operations."""
 
 from io import StringIO
 import pytest
@@ -215,18 +215,18 @@ class BaseTestLedger(ABC):
         with pytest.raises(ValueError):
             ledger.add_ledger(target)
 
-    def add_with_invalid_parameters_raise_error(self, ledger):
+    def add_with_ambiguous_id_raises_error(self, ledger):
         target = LEDGER_ENTRIES.query("id in [1, 2]").copy()
         with pytest.raises(ValueError):
             ledger.add_ledger(target)
 
-    def test_modify_non_existed_raise_error(self, ledger):
+    def test_modify_non_existed_raises_error(self, ledger):
         target = LEDGER_ENTRIES.query("id == 1").copy()
         target["id"] = 999999
         with pytest.raises(ValueError):
             ledger.modify_ledger_entry(target)
 
-    def add_modify_with_invalid_parameters_raise_error(self, ledger):
+    def add_modify_with_ambiguous_id_raises_error(self, ledger):
         target = LEDGER_ENTRIES.query("id in [1, 2]").copy()
         with pytest.raises(ValueError):
             ledger.modify_ledger_entry(target)

@@ -22,13 +22,13 @@ PyLedger is designed with a flexible and extensible architecture. Its class hier
 ```
 LedgerEngine (Abstract Base Class)
    |
-   +-- StandaloneLedger
+   +-- StandaloneLedger (Abstract)
+   |    |
+   |    +-- MemoryLedger
    |    |
    |    +-- TextLedger
    |    |
    |    +-- TestLedger
-   |    |
-   |    +-- MemoryLedger
    |
 · · · · · · · · · · · · · · · · · · · · (External Packages Below)
    |
@@ -48,14 +48,14 @@ The foundational element of the PyLedger library, the LedgerEngine class, specif
 1. **StandaloneLedger**\
 This class extends LedgerEngine to provide a self-sufficient ledger system independent of external accounting software. It implements specific business rules like VAT calculations and foreign exchange adjustments. Data storage is treated as an abstract concept, which allows for integration with any data storage solution, ensuring maximum flexibility.
 
+1. **MemoryLedger**\
+This class extends the StandaloneLedger to provide a fully featured but non-persistent ledger system. MemoryLedger stores accounting data as DataFrames directly in memory, without relying on external data storage solutions. It is particularly useful for demonstration and testing purposes where persistence is not required.
+
 1. **TextLedger**\
 An extension of StandaloneLedger, TextLedger specializes in file-based data storage using CSV files. This approach with data storage in text files allows to leverage git versioning to enhance data integrity and auditability, coupled with GitHub process management tools to facilitate collaboration.
 
 1. **TestLedger**\
 Designed for development and testing, TestLedger extends StandaloneLedger with pre-populated, hard-coded data and settings. It simplifies the initial setup, allowing developers and testers to focus on functionality without the configuration overhead.
-
-1. **MemoryLedger**\
-This class extends the StandaloneLedger to provide a fully featured but non-persistent in-memory ledger system. It stores accounting data as DataFrames directly in memory, without relying on external data storage solutions. It is particularly useful for demonstration purposes and testing environments where persistence is not required.
 
 **Integration with External Software** (Implemented in separate packages)
 

@@ -1,4 +1,4 @@
-"""Test suite for abstract base class handling VAT code operations."""
+"""Definition of abstract base class for testing VAT code operations."""
 
 from io import StringIO
 import pytest
@@ -27,7 +27,7 @@ class BaseTestVatCode(ABC):
         pass
 
     def test_accessors_mutators(self, ledger):
-        # Ensure there is no 'TestCode' vat_code on the remote account
+        # Ensure there is no 'TestCode' vat_code
         ledger.delete_vat_code("TestCode", allow_missing=True)
         assert "TestCode" not in ledger.vat_codes()["id"].values
 

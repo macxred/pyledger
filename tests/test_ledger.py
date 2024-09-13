@@ -1,4 +1,4 @@
-"""This module contains the test suite for Ledger entries operations."""
+"""Test suite for ledger operations."""
 
 import pytest
 from tests.base_test_ledger import BaseTestLedger

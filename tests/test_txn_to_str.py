@@ -1,4 +1,4 @@
-"""Test suite for txn_to_str(), a consistent text representations of ledger transactions."""
+"""Test suite for txn_to_str()."""
 
 import pytest
 import pandas as pd
@@ -71,7 +71,7 @@ def test_txn_to_str_variations_of_same_transactions():
     # Reverse the column order
     df2 = df1[df1.columns[::-1]]
     # Shuffle rows
-    df3 = df1.sample(frac=1).reset_index(drop=True)  # Shuffle the rows
+    df3 = df1.sample(frac=1).reset_index(drop=True)
     # Change dtypes
     df4 = df1.copy()
     df4["amount"] = df4["amount"].astype(str)

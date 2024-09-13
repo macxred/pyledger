@@ -1,4 +1,4 @@
-"""Test suit for abstract base class testing Accounts operations."""
+"""Definition of abstract base class for testing accounts operations."""
 
 import pytest
 import pandas as pd

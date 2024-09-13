@@ -1,4 +1,4 @@
-"""This module provides an abstract base class to test dump and restore operations."""
+"""Definition of abstract base class for testing dump and restore operations."""
 
 from io import StringIO
 import pytest
@@ -82,9 +82,12 @@ class BaseTestDumpAndRestore(ABC):
         account_chart = ledger.account_chart()
         ledger_entries = ledger.ledger()
         ledger.dump_to_zip(tmp_path / "ledger.zip")
-        ledger.clear()
 
-        # Restoring dumped state
+        # Remove or alter data
+        ledger.clear()
+        ledger.base_currency = "EUR"
+
+        # Restore dumped state
         ledger.restore_from_zip(tmp_path / "ledger.zip")
         assert ledger.base_currency == "USD", "Base currency were not restored"
         assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)
