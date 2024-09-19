@@ -1,20 +1,22 @@
-"""Constants used throughout the tests."""
+"""Definition of abstract base class for testing"""
+
 import pandas as pd
+from abc import ABC
 from io import StringIO
 
 
 VAT_CSV = """
     id,       account, rate,  inclusive, text
-    OutStd,   2200,    0.038, True,      VAT at the regular 7.7% rate on goods or services
-    OutRed,   2200,    0.025, True,      VAT at the reduced 2.5% rate on goods or services
-    OutAcc,   2200,    0.038, True,      XXXXX
-    OutStdEx, 2200,    0.077, False,     VAT at the regular 7.7% rate on goods or services
-    InStd,    1170,    0.077, True,      Input Tax (Vorsteuer) at the regular 7.7% rate on
-    InRed,    1170,    0.025, True,      Input Tax (Vorsteuer) at the reduced 2.5% rate on
-    InAcc,    1170,    0.038, True,      YYYYY
-    Test ,    9999,    0.038, True,      AAAAA
+    OutStd,   9990,    0.038, True,      VAT at the regular 7.7% rate on goods or services
+    OutRed,   9990,    0.025, True,      VAT at the reduced 2.5% rate on goods or services
+    OutAcc,   9990,    0.038, True,      XXXXX
+    OutStdEx, 9990,    0.077, False,     VAT at the regular 7.7% rate on goods or services
+    InStd,    9992,    0.077, True,      Input Tax (Vorsteuer) at the regular 7.7% rate on
+    InRed,    9992,    0.025, True,      Input Tax (Vorsteuer) at the reduced 2.5% rate on
+    InAcc,    9992,    0.038, True,      YYYYY
+    Test,     9999,    0.038, True,      AAAAA
 """
-VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
+
 
 ACCOUNT_CSV = """
     group, account, currency, vat_code, text
@@ -24,9 +26,8 @@ ACCOUNT_CSV = """
     /Assets, 9993,      EUR,         , Transitory Account EUR
     /Assets, 9994,      USD,         , Transitory Account USD
     /Assets, 9995,      CHF,         , Transitory Account CHF
-    /Assets, 9999,      CHF,   Test  , Test Account with VAT
+    /Assets, 9999,      CHF,         , Test Account with VAT
 """
-ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
 
@@ -78,6 +79,12 @@ LEDGER_CSV = """
 # flake8: enable
 
 STRIPPED_CSV = "\n".join([line.strip() for line in LEDGER_CSV.split("\n")])
-LEDGER_ENTRIES = pd.read_csv(
-    StringIO(STRIPPED_CSV), skipinitialspace=True, comment="#", skip_blank_lines=True
-)
+
+
+class BaseTest(ABC):
+    SETTINGS = {"BASE_CURRENCY": "CHF"}
+    VAT_CODES = pd.read_csv(StringIO(VAT_CSV), skipinitialspace=True)
+    ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    LEDGER_ENTRIES = pd.read_csv(
+        StringIO(STRIPPED_CSV), skipinitialspace=True, comment="#", skip_blank_lines=True
+    )

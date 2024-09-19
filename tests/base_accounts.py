@@ -2,12 +2,12 @@
 
 import pytest
 import pandas as pd
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from consistent_df import assert_frame_equal
-from .constants import ACCOUNTS
+from .base_test import BaseTest
 
 
-class BaseTestAccounts(ABC):
+class BaseTestAccounts(BaseTest):
 
     @abstractmethod
     @pytest.fixture
@@ -15,13 +15,14 @@ class BaseTestAccounts(ABC):
         pass
 
     def test_account_mutators(self, ledger):
+        ledger.restore(vat_codes=self.VAT_CODES.tail(1), accounts=self.ACCOUNTS.tail(1))
         initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1145,
             "currency": "CHF",
             "text": "test create account",
-            "vat_code": "TestCodeAccounts",
-            "group": "/Assets/Anlagevermögen",
+            "vat_code": "Test",
+            "group": "/Assets",
         }
         account_chart = ledger.account_chart()
         ledger.add_account(**new_account)
@@ -34,7 +35,7 @@ class BaseTestAccounts(ABC):
         assert created_accounts["text"].item() == new_account["text"]
         assert created_accounts["account"].item() == new_account["account"]
         assert created_accounts["currency"].item() == new_account["currency"]
-        assert created_accounts["vat_code"].item() == "TestCodeAccounts"
+        assert created_accounts["vat_code"].item() == "Test"
         assert created_accounts["group"].item() == new_account["group"]
 
         account_chart = ledger.account_chart()
@@ -43,7 +44,7 @@ class BaseTestAccounts(ABC):
             "currency": "CHF",
             "text": "test create account",
             "vat_code": None,
-            "group": "/Assets/Anlagevermögen",
+            "group": "/Assets",
         }
         ledger.add_account(**new_account)
         updated_accounts = ledger.account_chart()
@@ -63,8 +64,8 @@ class BaseTestAccounts(ABC):
             "account": 1146,
             "currency": "CHF",
             "text": "test update account",
-            "vat_code": "TestCodeAccounts",
-            "group": "/Assets/Anlagevermögen",
+            "vat_code": "Test",
+            "group": "/Assets",
         }
         ledger.modify_account(**new_account)
         updated_accounts = ledger.account_chart()
@@ -76,7 +77,7 @@ class BaseTestAccounts(ABC):
         assert modified_accounts["text"].item() == new_account["text"]
         assert modified_accounts["account"].item() == new_account["account"]
         assert modified_accounts["currency"].item() == new_account["currency"]
-        assert modified_accounts["vat_code"].item() == "TestCodeAccounts"
+        assert modified_accounts["vat_code"].item() == "Test"
         assert modified_accounts["group"].item() == new_account["group"]
 
         account_chart = ledger.account_chart()
@@ -85,7 +86,7 @@ class BaseTestAccounts(ABC):
             "currency": "USD",
             "text": "test update account without VAT",
             "vat_code": None,
-            "group": "/Assets/Anlagevermögen",
+            "group": "/Assets",
         }
         ledger.modify_account(**new_account)
         updated_accounts = ledger.account_chart()
@@ -109,51 +110,58 @@ class BaseTestAccounts(ABC):
         assert 1145 not in initial_accounts["account"].values
         assert 1146 not in initial_accounts["account"].values
 
-    def test_add_already_existed_raise_error(self, ledger):
+    def test_add_already_existed_raise_error(
+        self, ledger, error_class=ValueError, error_message="already exists"
+    ):
         new_account = {
             "account": 77777,
             "currency": "CHF",
             "text": "test account",
             "vat_code": None,
-            "group": "/Assets/Anlagevermögen",
+            "group": "/Assets",
         }
         ledger.add_account(**new_account)
-        with pytest.raises(ValueError, match=r"already exists"):
+        with pytest.raises(error_class, match=error_message):
             ledger.add_account(**new_account)
 
-    def test_modify_non_existed_raise_error(self, ledger):
-        with pytest.raises(ValueError, match=r"not found or duplicated"):
+    def test_modify_non_existed_raise_error(
+        self, ledger, error_class=ValueError, error_message="not found or duplicated"
+    ):
+        with pytest.raises(error_class, match=error_message):
             ledger.modify_account(
-                account=1200,
+                account=77777,
                 currency="EUR",
                 text="test account",
-                vat_code="TestCodeAccounts",
-                group="/Assets/Anlagevermögen",
+                vat_code="Test",
+                group="/Assets",
             )
 
     def test_mirror_accounts(self, ledger):
         initial_accounts = ledger.account_chart()
-        accounts = ledger.standardize_account_chart(ACCOUNTS)
-
+        accounts = ledger.standardize_account_chart(self.ACCOUNTS)
         target_df = pd.concat([accounts, initial_accounts], ignore_index=True)
+        target_df = ledger.standardize_account_chart(target_df)
+        initial = target_df.copy()
         ledger.mirror_account_chart(target_df, delete=False)
         mirrored_df = ledger.account_chart()
-        assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
+        assert_frame_equal(target_df, mirrored_df, check_like=True)
+        # Mirroring should not change the initial df
+        assert_frame_equal(initial, target_df, check_like=True)
 
         target_df = target_df[~target_df["account"].isin([9995, 9996])]
-        ledger.mirror_account_chart(target_df, delete=True)
+        ledger.mirror_account_chart(target_df.copy(), delete=True)
         mirrored_df = ledger.account_chart()
-        assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
+        assert_frame_equal(target_df, mirrored_df, check_like=True)
 
         target_df = target_df.sample(frac=1).reset_index(drop=True)
         target_account = "2222"
         target_df.loc[target_df["account"] == target_account, "text"] = "Updated Account Text"
-        ledger.mirror_account_chart(target_df, delete=True)
+        ledger.mirror_account_chart(target_df.copy(), delete=True)
         mirrored_df = ledger.account_chart()
-        assert_frame_equal(target_df, mirrored_df, ignore_index=True, check_like=True)
+        assert_frame_equal(target_df, mirrored_df, check_like=True)
 
     def test_mirror_empty_accounts(self, ledger):
-        ledger.restore(accounts=ACCOUNTS)
+        ledger.restore(accounts=self.ACCOUNTS)
         assert not ledger.account_chart().empty, "Accounts were not populated"
         ledger.mirror_account_chart(ledger.standardize_account_chart(None), delete=True)
         assert ledger.account_chart().empty, "Mirroring empty df should erase all accounts"
