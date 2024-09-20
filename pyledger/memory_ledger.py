@@ -1,6 +1,7 @@
 """This module implements the MemoryLedger class."""
 
 import pandas as pd
+from typing import List, Union
 from .standalone_ledger import StandaloneLedger
 from .constants import CURRENCY_PRECISION
 
@@ -75,20 +76,6 @@ class MemoryLedger(StandaloneLedger):
             raise ValueError(f"VAT code '{code}' not found in the memory.")
         self._vat_codes = self._vat_codes[self._vat_codes["id"] != code]
 
-    def mirror_vat_codes(self, target: pd.DataFrame, delete: bool = False):
-        target_df = self.standardize_vat_codes(target)
-
-        if target_df["id"].duplicated().any():
-            raise ValueError("Duplicate VAT ids found in `target`.")
-
-        if delete:
-            self._vat_codes = target_df
-        else:
-            self._vat_codes = self.standardize_vat_codes(
-                pd.concat([self._vat_codes, target_df])
-                .drop_duplicates(subset=["id"], keep="last")
-            )
-
     # ----------------------------------------------------------------------
     # Accounts
 
@@ -132,24 +119,18 @@ class MemoryLedger(StandaloneLedger):
         ] = [currency, text, vat_code, group]
         self._account_chart = self.standardize_account_chart(self._account_chart)
 
-    def delete_account(self, account: str, allow_missing: bool = False) -> None:
-        if not allow_missing and account not in self._account_chart["account"].values:
-            raise KeyError(f"Account '{account}' not found in the account chart.")
-        self._account_chart = self._account_chart[self._account_chart["account"] != account]
+    def delete_accounts(
+        self, accounts: Union[int, List[int]] = [], allow_missing: bool = False
+    ) -> None:
+        if isinstance(accounts, int):
+            accounts = [accounts]
 
-    def mirror_account_chart(self, target: pd.DataFrame, delete: bool = False):
-        target_df = self.standardize_account_chart(target)
+        if not allow_missing:
+            missing = set(accounts) - set(self._account_chart["account"])
+            if missing:
+                raise KeyError(f"Account(s) '{', '.join(missing)}' not found.")
 
-        if target_df["account"].duplicated().any():
-            raise ValueError("Duplicate accounts found in `target`.")
-
-        if delete:
-            self._account_chart = target_df
-        else:
-            self._account_chart = self.standardize_account_chart(
-                pd.concat([self._account_chart, target_df])
-                .drop_duplicates(subset=["account"], keep="last")
-            )
+        self._account_chart = self._account_chart[~self._account_chart["account"].isin(accounts)]
 
     # ----------------------------------------------------------------------
     # Ledger
@@ -185,10 +166,16 @@ class MemoryLedger(StandaloneLedger):
             [self._ledger[self._ledger["id"] != ledger_id], entry],
         ))
 
-    def delete_ledger_entry(self, id: str, allow_missing: bool = False) -> None:
-        if not allow_missing and id not in self._ledger["id"].values:
-            raise KeyError(f"Ledger entry with id '{id}' not found.")
-        self._ledger = self._ledger[self._ledger["id"] != id]
+    def delete_ledger_entry(self, ids: Union[str, List[str]], allow_missing: bool = False) -> None:
+        if isinstance(ids, str):
+            ids = [ids]
+
+        if not allow_missing:
+            missing_ids = set(ids) - set(self._ledger["id"])
+            if missing_ids:
+                raise KeyError(f"Ledger entries with ids '{', '.join(missing_ids)}' not found.")
+
+        self._ledger = self._ledger[~self._ledger["id"].isin(ids)]
 
     def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
         # TODO: Refactor mirroring logic #25 issue
