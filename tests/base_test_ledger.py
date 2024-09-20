@@ -27,7 +27,7 @@ class BaseTestLedger(BaseTest):
         created = remote.loc[remote["id"] == str(id)]
         expected = ledger_engine.standardize_ledger(target)
         assert_frame_equal(
-            created, expected, ignore_index=True, ignore_columns=["id"], check_exact=True
+            created, expected, ignore_columns=["id"], ignore_row_order=True, check_exact=True
         )
 
     def test_accessor_mutators_single_transaction(self, ledger_engine):
@@ -37,7 +37,9 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         created = remote.loc[remote["id"] == str(id)]
         expected = ledger_engine.standardize_ledger(target)
-        assert_frame_equal(created, expected, ignore_index=True, ignore_columns=["id"])
+        assert_frame_equal(
+            created, expected, ignore_row_order=True, ignore_columns=["id"]
+        )
 
         # Test updating the ledger entry
         initial_ledger = ledger_engine.ledger()
@@ -47,7 +49,7 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         updated = remote.loc[remote["id"] == str(id)]
         expected = ledger_engine.standardize_ledger(target)
-        assert_frame_equal(updated, expected, ignore_index=True)
+        assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test replacing with a collective ledger entry
         target = self.LEDGER_ENTRIES.query("id == 2").copy()
@@ -59,7 +61,7 @@ class BaseTestLedger(BaseTest):
         assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
-        assert_frame_equal(updated, expected, ignore_index=True)
+        assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the created ledger entry
         ledger_engine.delete_ledger_entry(str(id))
@@ -74,7 +76,7 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         created = remote.loc[remote["id"] == str(id)]
         expected = ledger_engine.standardize_ledger(target)
-        assert_frame_equal(created, expected, ignore_index=True, ignore_columns=["id"])
+        assert_frame_equal(created, expected, ignore_row_order=True, ignore_columns=["id"])
 
         # Test updating the ledger entry
         initial_ledger = ledger_engine.ledger()
@@ -88,7 +90,7 @@ class BaseTestLedger(BaseTest):
         assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
-        assert_frame_equal(updated, expected, ignore_index=True)
+        assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
         ledger_engine.delete_ledger_entry(str(id))
@@ -102,7 +104,7 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         created = remote.loc[remote["id"] == str(id)]
         expected = ledger_engine.standardize_ledger(target)
-        assert_frame_equal(created, expected, ignore_index=True, ignore_columns=["id"])
+        assert_frame_equal(created, expected, ignore_row_order=True, ignore_columns=["id"])
 
         # Test updating the ledger entry
         initial_ledger = ledger_engine.ledger()
@@ -112,7 +114,7 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         updated = remote.loc[remote["id"] == str(id)]
         expected = ledger_engine.standardize_ledger(target)
-        assert_frame_equal(updated, expected, ignore_index=True)
+        assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test replacing with an individual ledger entry
         target = self.LEDGER_ENTRIES.iloc[[0]].copy()
@@ -125,7 +127,7 @@ class BaseTestLedger(BaseTest):
         assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
-        assert_frame_equal(updated, expected, ignore_index=True)
+        assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
         ledger_engine.delete_ledger_entry(str(id))
@@ -140,7 +142,7 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         created = remote.loc[remote["id"] == str(id)]
         expected = ledger_engine.standardize_ledger(target)
-        assert_frame_equal(created, expected, ignore_index=True, ignore_columns=["id"])
+        assert_frame_equal(created, expected, ignore_row_order=True, ignore_columns=["id"])
 
         # Test updating the ledger entry
         initial_ledger = ledger_engine.ledger()
@@ -154,7 +156,7 @@ class BaseTestLedger(BaseTest):
         assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
             "The number of unique 'id' values should be the same."
         )
-        assert_frame_equal(updated, expected, ignore_index=True)
+        assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
         ledger_engine.delete_ledger_entry(str(id))

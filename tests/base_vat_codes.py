@@ -101,15 +101,18 @@ class BaseTestVatCode(BaseTest):
         initial = standardized_df.copy()
         ledger.mirror_vat_codes(standardized_df, delete=False)
         mirrored_df = ledger.vat_codes()
-        assert_frame_equal(standardized_df, mirrored_df, check_like=True)
+        assert_frame_equal(standardized_df, mirrored_df, ignore_row_order=True, check_like=True)
         # Mirroring should not change initial df
-        assert_frame_equal(initial, mirrored_df, check_like=True)
+        assert_frame_equal(initial, mirrored_df, ignore_row_order=True, check_like=True)
 
         # Mirror target VAT codes onto server with delete=True
         vat_codes = self.VAT_CODES[~self.VAT_CODES["id"].isin(["OutStd", "OutRed"])]
         ledger.mirror_vat_codes(vat_codes, delete=True)
         mirrored_df = ledger.vat_codes()
-        assert_frame_equal(ledger.standardize_vat_codes(vat_codes), mirrored_df, check_like=True)
+        expected = ledger.standardize_vat_codes(vat_codes)
+        assert_frame_equal(
+            expected, mirrored_df, ignore_row_order=True, check_like=True
+        )
 
         # Reshuffle target data randomly and modify one of the VAT rates
         vat_codes_shuffled = self.VAT_CODES.sample(frac=1).reset_index(drop=True)
@@ -119,7 +122,7 @@ class BaseTestVatCode(BaseTest):
         # Mirror target VAT codes onto server with updating
         ledger.mirror_vat_codes(vat_codes_shuffled, delete=True)
         mirrored_df = ledger.vat_codes()
-        assert_frame_equal(vat_codes_shuffled, mirrored_df, check_like=True)
+        assert_frame_equal(vat_codes_shuffled, mirrored_df, ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_vat_codes(self, ledger):
         ledger.restore(vat_codes=self.VAT_CODES, accounts=self.ACCOUNTS)

@@ -22,9 +22,11 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assert ledger.base_currency == "CHF", "Base currency were not restored"
         vat_codes = ledger.standardize_vat_codes(self.VAT_CODES)
-        assert_frame_equal(vat_codes, ledger.vat_codes(), check_like=True)
+        assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_row_order=True, check_like=True)
         accounts = ledger.standardize_account_chart(self.ACCOUNTS)
-        assert_frame_equal(accounts, ledger.account_chart(), check_like=True)
+        assert_frame_equal(
+            accounts, ledger.account_chart(), ignore_row_order=True, check_like=True
+        )
         target = ledger.txn_to_str(LEDGER).values()
         actual = ledger.txn_to_str(ledger.ledger()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
@@ -49,8 +51,10 @@ class BaseTestDumpRestoreClear(BaseTest):
         # Restore dumped state
         ledger.restore_from_zip(tmp_path / "ledger.zip")
         assert ledger.base_currency == "CHF", "Base currency were not restored"
-        assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_index=True)
-        assert_frame_equal(account_chart, ledger.account_chart(), ignore_index=True)
+        assert_frame_equal(vat_codes, ledger.vat_codes(), ignore_row_order=True, ignore_index=True)
+        assert_frame_equal(
+            account_chart, ledger.account_chart(), ignore_row_order=True, ignore_index=True
+        )
         assert sorted(ledger.txn_to_str(ledger_entries).values()) == \
                sorted(ledger.txn_to_str(ledger.ledger()).values())
 

@@ -144,21 +144,21 @@ class BaseTestAccounts(BaseTest):
         initial = target_df.copy()
         ledger.mirror_account_chart(target_df, delete=False)
         mirrored_df = ledger.account_chart()
-        assert_frame_equal(target_df, mirrored_df, check_like=True)
+        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
         # Mirroring should not change the initial df
-        assert_frame_equal(initial, target_df, check_like=True)
+        assert_frame_equal(initial, target_df, ignore_row_order=True, check_like=True)
 
         target_df = target_df[~target_df["account"].isin([9995, 9996])]
         ledger.mirror_account_chart(target_df.copy(), delete=True)
         mirrored_df = ledger.account_chart()
-        assert_frame_equal(target_df, mirrored_df, check_like=True)
+        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
 
         target_df = target_df.sample(frac=1).reset_index(drop=True)
         target_account = "2222"
         target_df.loc[target_df["account"] == target_account, "text"] = "Updated Account Text"
         ledger.mirror_account_chart(target_df.copy(), delete=True)
         mirrored_df = ledger.account_chart()
-        assert_frame_equal(target_df, mirrored_df, check_like=True)
+        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_accounts(self, ledger):
         ledger.restore(accounts=self.ACCOUNTS)
