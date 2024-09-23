@@ -6,9 +6,6 @@ from consistent_df import assert_frame_equal
 from .base_test import BaseTest
 
 
-LEDGER = BaseTest.LEDGER_ENTRIES.head(7)
-
-
 class BaseTestDumpRestoreClear(BaseTest):
 
     @abstractmethod
@@ -18,7 +15,10 @@ class BaseTestDumpRestoreClear(BaseTest):
 
     def test_restore(self, ledger):
         ledger.restore(
-            ledger=LEDGER, vat_codes=self.VAT_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS
+            settings=self.SETTINGS,
+            accounts=self.ACCOUNTS,
+            vat_codes=self.VAT_CODES,
+            ledger=self.LEDGER_ENTRIES,
         )
         assert ledger.base_currency == "CHF", "Base currency were not restored"
         vat_codes = ledger.standardize_vat_codes(self.VAT_CODES)
@@ -27,7 +27,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert_frame_equal(
             accounts, ledger.account_chart(), ignore_row_order=True, check_like=True
         )
-        target = ledger.txn_to_str(LEDGER).values()
+        target = ledger.txn_to_str(self.LEDGER_ENTRIES).values()
         actual = ledger.txn_to_str(ledger.ledger()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
 
@@ -36,7 +36,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         ledger.base_currency = "CHF"
         ledger.mirror_account_chart(self.ACCOUNTS)
         ledger.mirror_vat_codes(self.VAT_CODES)
-        ledger.mirror_ledger(LEDGER)
+        ledger.mirror_ledger(self.LEDGER_ENTRIES)
 
         # Dumping current state
         account_chart = ledger.account_chart()
@@ -60,7 +60,10 @@ class BaseTestDumpRestoreClear(BaseTest):
 
     def test_clear(self, ledger):
         ledger.restore(
-            ledger=LEDGER, vat_codes=self.VAT_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS
+            settings=self.SETTINGS,
+            accounts=self.ACCOUNTS,
+            vat_codes=self.VAT_CODES,
+            ledger=self.LEDGER_ENTRIES,
         )
         ledger.clear()
         assert ledger.ledger().empty, "Ledger was not cleared"

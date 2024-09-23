@@ -227,10 +227,8 @@ class LedgerEngine(ABC):
             ledger (pd.DataFrame | None): Ledger entries of the restored system.
                 If `None`, ledger remains unchanged.
         """
-        if settings is not None:
-            base_currency = settings.get("BASE_CURRENCY", None)
-            if base_currency is not None:
-                self.base_currency = base_currency
+        if settings is not None and "BASE_CURRENCY" in settings:
+            self.base_currency = settings["BASE_CURRENCY"]
         if vat_codes is not None:
             self.mirror_vat_codes(vat_codes, delete=True)
         if accounts is not None:

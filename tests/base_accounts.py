@@ -15,7 +15,9 @@ class BaseTestAccounts(BaseTest):
         pass
 
     def test_account_mutators(self, ledger):
-        ledger.restore(vat_codes=self.VAT_CODES.tail(1), accounts=self.ACCOUNTS.tail(1))
+        vat_codes = self.VAT_CODES[self.VAT_CODES["id"] == "Test"]
+        accounts = self.ACCOUNTS[self.ACCOUNTS["account"] == 9999]
+        ledger.restore(vat_codes=vat_codes, accounts=accounts)
         initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1145,
