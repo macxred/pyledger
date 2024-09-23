@@ -17,7 +17,7 @@ class BaseTestAccounts(BaseTest):
     def test_account_mutators(self, ledger):
         vat_codes = self.VAT_CODES[self.VAT_CODES["id"] == "Test"]
         accounts = self.ACCOUNTS[self.ACCOUNTS["account"] == 9999]
-        ledger.restore(vat_codes=vat_codes, accounts=accounts)
+        ledger.restore(vat_codes=vat_codes, accounts=accounts, settings=self.SETTINGS)
         initial_accounts = ledger.account_chart()
         new_account = {
             "account": 1145,
@@ -163,7 +163,7 @@ class BaseTestAccounts(BaseTest):
         assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_accounts(self, ledger):
-        ledger.restore(accounts=self.ACCOUNTS)
+        ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
         assert not ledger.account_chart().empty, "Accounts were not populated"
         ledger.mirror_account_chart(ledger.standardize_account_chart(None), delete=True)
         assert ledger.account_chart().empty, "Mirroring empty df should erase all accounts"

@@ -18,7 +18,7 @@ class BaseTestVatCode(BaseTest):
         # Ensure there is no 'TestCode' vat_code
         ledger.delete_vat_code("TestCode", allow_missing=True)
         assert "TestCode" not in ledger.vat_codes()["id"].values
-        ledger.restore(accounts=self.ACCOUNTS)
+        ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
 
         # Test adding a valid vat_code
         initial_vat_codes = ledger.vat_codes()
@@ -125,7 +125,7 @@ class BaseTestVatCode(BaseTest):
         assert_frame_equal(vat_codes_shuffled, mirrored_df, ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_vat_codes(self, ledger):
-        ledger.restore(vat_codes=self.VAT_CODES, accounts=self.ACCOUNTS)
+        ledger.restore(vat_codes=self.VAT_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS)
         assert not ledger.vat_codes().empty, "VAT codes were not populated"
         ledger.mirror_vat_codes(ledger.standardize_vat_codes(None), delete=True)
         assert ledger.vat_codes().empty, "Mirroring empty df should erase all VAT codes"
