@@ -173,7 +173,8 @@ class LedgerEngine(ABC):
             archive_path (str): The file path of the ZIP archive.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
-            settings = {"base_currency": self.base_currency}
+            settings = {}
+            settings["BASE_CURRENCY"] = self.base_currency
             archive.writestr('settings.json', json.dumps(settings))
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
             archive.writestr('vat_codes.csv', self.vat_codes().to_csv(index=False))
@@ -200,19 +201,17 @@ class LedgerEngine(ABC):
                 )
 
             settings = json.loads(archive.open('settings.json').read().decode('utf-8'))
-            base_currency = settings["base_currency"]
             ledger = pd.read_csv(archive.open('ledger.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
             vat_codes = pd.read_csv(archive.open('vat_codes.csv'))
 
-            # Restore the ledger system using the extracted data
             self.restore(
-                base_currency=base_currency, ledger=ledger, vat_codes=vat_codes, accounts=accounts
+                settings=settings, ledger=ledger, vat_codes=vat_codes, accounts=accounts
             )
 
     def restore(
         self,
-        base_currency: str | None = None,
+        settings: dict | None = None,
         vat_codes: pd.DataFrame | None = None,
         accounts: pd.DataFrame | None = None,
         ledger: pd.DataFrame | None = None,
@@ -220,8 +219,7 @@ class LedgerEngine(ABC):
         """Replaces the entire ledger system with data provided as arguments.
 
         Args:
-            base_currency (str | None): Reporting currency. If `None`,
-                                        the reporting currency remains unchanged.
+            settings (dict | None): System settings. If `None`, settings remains unchanged.
             vat_codes (pd.DataFrame | None): VAT codes of the restored ledger system.
                 If `None`, VAT codes remain unchanged.
             accounts (pd.DataFrame | None): Accounts of the restored ledger system.
@@ -229,8 +227,8 @@ class LedgerEngine(ABC):
             ledger (pd.DataFrame | None): Ledger entries of the restored system.
                 If `None`, ledger remains unchanged.
         """
-        if base_currency is not None:
-            self.base_currency = base_currency
+        if settings is not None and "BASE_CURRENCY" in settings:
+            self.base_currency = settings["BASE_CURRENCY"]
         if vat_codes is not None:
             self.mirror_vat_codes(vat_codes, delete=True)
         if accounts is not None:
