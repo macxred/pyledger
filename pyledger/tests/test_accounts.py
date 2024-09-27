@@ -1,7 +1,7 @@
 """Test suite for account chart operations."""
 
 import pytest
-from tests.base_accounts import BaseTestAccounts
+from .base_accounts import BaseTestAccounts
 from pyledger import MemoryLedger
 
 

@@ -27,7 +27,7 @@ from .text_ledger import TextLedger
 from .helpers import *
 from .time import *
 from .import constants
-from tests import (
+from .tests import (
     BaseTestVatCode,
     BaseTestAccounts,
     BaseTestLedger,

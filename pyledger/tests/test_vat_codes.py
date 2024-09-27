@@ -1,7 +1,7 @@
 """Test suite for VAT code operations"""
 
 import pytest
-from tests.base_vat_codes import BaseTestVatCode
+from .base_vat_codes import BaseTestVatCode
 from pyledger import MemoryLedger
 
 

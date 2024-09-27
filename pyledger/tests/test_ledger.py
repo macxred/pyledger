@@ -1,7 +1,7 @@
 """Test suite for ledger operations."""
 
 import pytest
-from tests.base_test_ledger import BaseTestLedger
+from .base_test_ledger import BaseTestLedger
 from pyledger import MemoryLedger
 
 
