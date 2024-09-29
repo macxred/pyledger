@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='pyledger',
@@ -16,8 +16,8 @@ setup(
                  'connection to accounting systems.'),
     long_description=open('README.md').read(),
     url='https://github.com/macxred/pyledger',
-    packages=['pyledger'],
-        extras_require={
+    packages=find_packages(),
+    extras_require={
         "dev": [
             "flake8",
             "flake8-import-order",
