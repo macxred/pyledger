@@ -8,10 +8,7 @@ import datetime
 from warnings import warn
 import numpy as np
 import pandas as pd
-from .constants import (
-    REQUIRED_LEDGER_COLUMNS,
-    OPTIONAL_LEDGER_COLUMNS,
-)
+from .constants import LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 
 
@@ -213,8 +210,9 @@ class StandaloneLedger(LedgerEngine):
             result = pd.DataFrame(vat_journal_entries)
         else:
             # Empty DataFrame with identical structure
-            cols = {**REQUIRED_LEDGER_COLUMNS, **OPTIONAL_LEDGER_COLUMNS}
-            result = pd.DataFrame(columns=cols)
+            result = pd.DataFrame(
+                columns=dict(zip(LEDGER_SCHEMA['column_name'], LEDGER_SCHEMA['dtype']))
+            )
         return result
 
     # ----------------------------------------------------------------------

@@ -8,12 +8,7 @@ from pathlib import Path
 import pandas as pd
 from .helpers import write_fixed_width_csv
 from .standalone_ledger import StandaloneLedger
-from .constants import (
-    REQUIRED_LEDGER_COLUMNS,
-    OPTIONAL_LEDGER_COLUMNS,
-    LEDGER_COLUMN_SEQUENCE,
-    LEDGER_COLUMN_SHORTCUTS
-)
+from .constants import LEDGER_SCHEMA
 
 # TODO:
 # - Write functions standardize_prices, standardize_vat_codes,
@@ -138,7 +133,7 @@ class TextLedger(StandaloneLedger):
             result = pd.concat(df_list, ignore_index=True)
         else:
             # Empty DataFrame with identical structure
-            cols = REQUIRED_LEDGER_COLUMNS + OPTIONAL_LEDGER_COLUMNS
+            cols = LEDGER_SCHEMA["column_name"]
             result = self.standardize_ledger(pd.DataFrame(columns=cols))
 
         return result
@@ -180,7 +175,6 @@ class TextLedger(StandaloneLedger):
         cls,
         df: pd.DataFrame,
         path: str,
-        short_names: bool = False,
         drop_unused_columns: bool = False,
         digits: int | None = None,
     ) -> None:
@@ -201,7 +195,9 @@ class TextLedger(StandaloneLedger):
         Raises:
             ValueError: If required columns are missing.
         """
-        missing = set(REQUIRED_LEDGER_COLUMNS) - set(df.columns)
+        REQUIRED = LEDGER_SCHEMA[LEDGER_SCHEMA['mandatory']]['column_name']
+        LEDGER_COLUMN_SEQUENCE = LEDGER_SCHEMA["column_name"]
+        missing = set(REQUIRED) - set(df.columns)
         if missing:
             raise ValueError(f"Missing required columns: {missing}")
 
@@ -222,7 +218,7 @@ class TextLedger(StandaloneLedger):
         if drop_unused_columns:
             all_na = df.columns[df.isna().all()]
             df = df.drop(
-                columns=set(all_na) - set(REQUIRED_LEDGER_COLUMNS)
+                columns=set(all_na) - set(REQUIRED)
             )
 
         # Default column order
@@ -244,12 +240,6 @@ class TextLedger(StandaloneLedger):
                 lambda x: f"{x:.{digits}f}" if pd.notna(x) else None
             )
             df[float_cols] = df[float_cols].astype(pd.StringDtype())
-
-        if short_names:
-            reverse_shortcuts = {
-                v: k for k, v in LEDGER_COLUMN_SHORTCUTS.items()
-            }
-            df = df.rename(columns=reverse_shortcuts)
 
         file = Path(path).expanduser()
         file.parent.mkdir(parents=True, exist_ok=True)

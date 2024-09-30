@@ -17,16 +17,11 @@ import numpy as np
 import openpyxl
 import pandas as pd
 from .constants import (
-    REQUIRED_ACCOUNT_COLUMNS,
-    OPTIONAL_ACCOUNT_COLUMNS,
-    REQUIRED_FX_ADJUSTMENT_COLUMNS,
-    REQUIRED_LEDGER_COLUMNS,
-    OPTIONAL_LEDGER_COLUMNS,
-    LEDGER_COLUMN_SHORTCUTS,
-    LEDGER_COLUMN_SEQUENCE,
-    REQUIRED_PRICE_COLUMNS,
-    REQUIRED_VAT_CODE_COLUMNS,
-    OPTIONAL_VAT_CODE_COLUMNS,
+    PRICE_SCHEMA,
+    LEDGER_SCHEMA,
+    ACCOUNT_SCHEMA,
+    VAT_CODE_SCHEMA,
+    FX_ADJUSTMENT_SCHEMA,
 )
 from . import excel
 from .helpers import represents_integer
@@ -116,16 +111,18 @@ class LedgerEngine(ABC):
         Raises:
             ValueError: If required columns are missing or if data types are incorrect.
         """
+        columns = FX_ADJUSTMENT_SCHEMA["column_name"].to_list()
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=REQUIRED_FX_ADJUSTMENT_COLUMNS.keys())
+            df = pd.DataFrame(columns=columns)
 
         # Ensure required columns and values are present
-        missing = set(REQUIRED_FX_ADJUSTMENT_COLUMNS.keys()) - set(df.columns)
+        missing = set(columns) - set(df.columns)
         if missing:
             raise ValueError(f"Required columns {', '.join(missing)} are missing.")
 
-        df = enforce_dtypes(df, REQUIRED_FX_ADJUSTMENT_COLUMNS)
+        col_types = dict(zip(FX_ADJUSTMENT_SCHEMA['column_name'], FX_ADJUSTMENT_SCHEMA['dtype']))
+        df = enforce_dtypes(df, col_types)
         return df.sort_values("date")
 
     # ----------------------------------------------------------------------
@@ -392,22 +389,25 @@ class LedgerEngine(ABC):
                         or if logical inconsistencies are found (e.g., non-zero rates
                         without defined accounts).
         """
+        required_cols = VAT_CODE_SCHEMA[VAT_CODE_SCHEMA['mandatory']]['column_name']
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=REQUIRED_VAT_CODE_COLUMNS.keys())
+            df = pd.DataFrame(columns=required_cols)
 
         # Ensure required columns and values are present
-        missing = set(REQUIRED_VAT_CODE_COLUMNS.keys()) - set(df.columns)
+        missing = set(required_cols) - set(df.columns)
         if missing:
             raise ValueError(f"Required columns {', '.join(missing)} are missing.")
 
         # Add missing columns
-        for col in OPTIONAL_VAT_CODE_COLUMNS.keys():
+        optional_cols = VAT_CODE_SCHEMA[~VAT_CODE_SCHEMA['mandatory']]['column_name']
+        for col in optional_cols:
             if col not in df.columns:
                 df[col] = None
 
         # Enforce data types
-        df = enforce_dtypes(df, {**REQUIRED_VAT_CODE_COLUMNS, **OPTIONAL_VAT_CODE_COLUMNS})
+        column_types = dict(zip(VAT_CODE_SCHEMA['column_name'], VAT_CODE_SCHEMA['dtype']))
+        df = enforce_dtypes(df, column_types)
         inception = pd.Timestamp("1900-01-01")
         df["date"] = pd.to_datetime(df["date"]).fillna(inception)
 
@@ -416,7 +416,7 @@ class LedgerEngine(ABC):
         if len(missing) > 0:
             raise ValueError(f"Account must be defined for non-zero rate in vat_codes: {missing}.")
 
-        return df
+        return df.sort_values("id")
 
     # ----------------------------------------------------------------------
     # Account chart
@@ -449,23 +449,26 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing, or if 'account' column
                         contains NaN values, or if data types are incorrect.
         """
+        required_cols = ACCOUNT_SCHEMA[ACCOUNT_SCHEMA['mandatory']]['column_name']
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=REQUIRED_ACCOUNT_COLUMNS.keys())
+            df = pd.DataFrame(columns=required_cols)
 
         # Ensure required columns and values are present
-        missing = set(REQUIRED_ACCOUNT_COLUMNS.keys()) - set(df.columns)
+        missing = set(required_cols) - set(df.columns)
         if missing:
             raise ValueError(f"Required columns missing in account chart: {missing}.")
         if df["account"].isna().any():
             raise ValueError("Missing 'account' values in account chart.")
 
         # Add missing columns
-        for col in OPTIONAL_ACCOUNT_COLUMNS.keys():
+        optional_cols = ACCOUNT_SCHEMA[~ACCOUNT_SCHEMA['mandatory']]['column_name']
+        for col in optional_cols:
             if col not in df.columns:
                 df[col] = None
+        df = enforce_dtypes(df, dict(zip(ACCOUNT_SCHEMA['column_name'], ACCOUNT_SCHEMA['dtype'])))
 
-        return enforce_dtypes(df, {**REQUIRED_ACCOUNT_COLUMNS, **OPTIONAL_ACCOUNT_COLUMNS})
+        return df.sort_values("account")
 
     def account_currency(self, account: int) -> str:
         account_chart = self.account_chart()
@@ -739,7 +742,7 @@ class LedgerEngine(ABC):
         df = df.sort_values("date")
         df["balance"] = df["amount"].cumsum()
         df["base_currency_balance"] = df["base_currency_amount"].cumsum()
-        cols = [col for col in LEDGER_COLUMN_SEQUENCE if col in df.columns]
+        cols = [col for col in LEDGER_SCHEMA["column_name"] if col in df.columns]
         if start is not None:
             df = df.loc[df["date"] >= start, :]
         df = df.reset_index(drop=True)
@@ -1111,45 +1114,40 @@ class LedgerEngine(ABC):
         Raises:
             ValueError: If required columns are missing from the ledger DataFrame.
         """
+        required_cols = LEDGER_SCHEMA[LEDGER_SCHEMA['mandatory']]['column_name']
         if ledger is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=REQUIRED_LEDGER_COLUMNS.keys())
+            df = pd.DataFrame(columns=required_cols)
         else:
             df = ledger.copy()
-            # Standardize column names
-            df = df.rename(columns=LEDGER_COLUMN_SHORTCUTS)
 
         # In empty DataFrames, add required columns if not present
         if isinstance(ledger, pd.DataFrame) and len(ledger) == 0:
-            for col in REQUIRED_LEDGER_COLUMNS.keys():
+            for col in required_cols:
                 if col not in df.columns:
                     df[col] = None
 
         # Ensure all required columns are present
-        missing = set(REQUIRED_LEDGER_COLUMNS.keys()) - set(df.columns)
+        missing = set(required_cols) - set(df.columns)
         if len(missing) > 0:
             raise ValueError(f"Missing required columns: {missing}")
 
         # Add optional columns if not present
         if "id" not in df.columns:
             df["id"] = df["date"].notna().cumsum().astype(pd.StringDtype())
-        for col in OPTIONAL_LEDGER_COLUMNS.keys():
+        optional_cols = LEDGER_SCHEMA[~LEDGER_SCHEMA['mandatory']]['column_name']
+        for col in optional_cols:
             if col not in df.columns:
                 df[col] = None
 
         # Enforce column data types
-        df = enforce_dtypes(df, {**REQUIRED_LEDGER_COLUMNS, **OPTIONAL_LEDGER_COLUMNS})
+        df = enforce_dtypes(df, dict(zip(LEDGER_SCHEMA['column_name'], LEDGER_SCHEMA['dtype'])))
         df["date"] = pd.to_datetime(df["date"]).dt.date
 
-        # Order columns based on 'LEDGER_COLUMN_SEQUENCE'
-        col_order = LEDGER_COLUMN_SEQUENCE
-        cols = (
-            [col for col in col_order if col in df.columns]
-            + [col for col in df.columns if col not in col_order]
-        )
-        df = df[cols]
+        # Order columns
+        df = df[LEDGER_SCHEMA['column_name']]
 
-        return df
+        return df.sort_values("date")
 
     def standardize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
         """Convert ledger entries to a canonical representation.
@@ -1404,26 +1402,28 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing, if there are missing values
                         in required columns, or if data types are incorrect.
         """
+        columns = PRICE_SCHEMA["column_name"]
         if df is None:
             # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=REQUIRED_PRICE_COLUMNS.keys())
+            df = pd.DataFrame(columns=columns)
 
         # Check for missing required columns
-        missing = set(REQUIRED_PRICE_COLUMNS.keys()) - set(df.columns)
+        missing = set(columns) - set(df.columns)
         if len(missing) > 0:
             raise ValueError(f"Required columns {missing} missing.")
 
         # Check for missing values in required columns
         has_missing_value = [
-            column for column in REQUIRED_PRICE_COLUMNS.keys() if df[column].isnull().any()
+            column for column in columns if df[column].isnull().any()
         ]
         if len(has_missing_value) > 0:
             raise ValueError(f"Missing values in column {has_missing_value}.")
 
         # Enforce data types
-        df = enforce_dtypes(df, REQUIRED_PRICE_COLUMNS)
+        df = enforce_dtypes(df, dict(zip(PRICE_SCHEMA['column_name'], PRICE_SCHEMA['dtype'])))
+        df = df[columns]
 
-        return df
+        return df.sort_values("date")
 
     @classmethod
     def standardize_prices(cls, df: pd.DataFrame) -> pd.DataFrame:
