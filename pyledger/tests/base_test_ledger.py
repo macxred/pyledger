@@ -64,7 +64,7 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the created ledger entry
-        ledger_engine.delete_ledger_entry(str(id))
+        ledger_engine.delete_ledger_entries([str(id)])
         remote = ledger_engine.ledger()
         assert all(remote["id"] != str(id)), f"Ledger entry {id} was not deleted"
 
@@ -93,7 +93,7 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
-        ledger_engine.delete_ledger_entry(str(id))
+        ledger_engine.delete_ledger_entries([str(id)])
         remote = ledger_engine.ledger()
         assert all(remote["id"] != str(id)), f"Ledger entry {id} was not deleted"
 
@@ -130,7 +130,7 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
-        ledger_engine.delete_ledger_entry(str(id))
+        ledger_engine.delete_ledger_entries([str(id)])
         remote = ledger_engine.ledger()
         assert all(remote["id"] != str(id)), f"Ledger entry {id} was not deleted"
 
@@ -159,7 +159,7 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
-        ledger_engine.delete_ledger_entry(str(id))
+        ledger_engine.delete_ledger_entries([str(id)])
         remote = ledger_engine.ledger()
         assert all(remote["id"] != str(id)), f"Ledger entry {id} was not deleted"
 

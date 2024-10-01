@@ -16,7 +16,7 @@ class BaseTestVatCode(BaseTest):
 
     def test_accessors_mutators(self, ledger):
         # Ensure there is no 'TestCode' vat_code
-        ledger.delete_vat_code("TestCode", allow_missing=True)
+        ledger.delete_vat_codes(["TestCode"], allow_missing=True)
         assert "TestCode" not in ledger.vat_codes()["id"].values
         ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
 
@@ -66,7 +66,7 @@ class BaseTestVatCode(BaseTest):
         assert modified_vat_codes["inclusive"].item() == new_vat_code["inclusive"]
 
         # Test deleting an existent VAT code.
-        ledger.delete_vat_code(code="TestCode")
+        ledger.delete_vat_codes(codes=["TestCode"])
         updated_vat_codes = ledger.vat_codes()
 
         assert "TestCode" not in updated_vat_codes["id"].values

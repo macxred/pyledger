@@ -1,7 +1,7 @@
 """This module implements the MemoryLedger class."""
 
 import pandas as pd
-from typing import List, Union
+from typing import List
 from .standalone_ledger import StandaloneLedger
 from .constants import CURRENCY_PRECISION
 
@@ -71,10 +71,15 @@ class MemoryLedger(StandaloneLedger):
         ] = [rate, account, inclusive, text]
         self._vat_codes = self.standardize_vat_codes(self._vat_codes)
 
-    def delete_vat_code(self, code: str, allow_missing: bool = False) -> None:
-        if not allow_missing and code not in self._vat_codes["id"].values:
-            raise ValueError(f"VAT code '{code}' not found in the memory.")
-        self._vat_codes = self._vat_codes[self._vat_codes["id"] != code]
+    def delete_vat_codes(
+        self, codes: List[str] = [], allow_missing: bool = False
+    ) -> None:
+        if not allow_missing:
+            missing = set(codes) - set(self._vat_codes["id"])
+            if missing:
+                raise ValueError(f"VAT code(s) '{', '.join(missing)}' not found in the memory.")
+
+        self._vat_codes = self._vat_codes[~self._vat_codes["id"].isin(codes)]
 
     # ----------------------------------------------------------------------
     # Accounts
@@ -120,11 +125,8 @@ class MemoryLedger(StandaloneLedger):
         self._account_chart = self.standardize_account_chart(self._account_chart)
 
     def delete_accounts(
-        self, accounts: Union[int, List[int]] = [], allow_missing: bool = False
+        self, accounts: List[int] = [], allow_missing: bool = False
     ) -> None:
-        if isinstance(accounts, int):
-            accounts = [accounts]
-
         if not allow_missing:
             missing = set(accounts) - set(self._account_chart["account"])
             if missing:
@@ -166,10 +168,7 @@ class MemoryLedger(StandaloneLedger):
             [self._ledger[self._ledger["id"] != ledger_id], entry],
         ))
 
-    def delete_ledger_entry(self, ids: Union[str, List[str]], allow_missing: bool = False) -> None:
-        if isinstance(ids, str):
-            ids = [ids]
-
+    def delete_ledger_entries(self, ids: List[str] = [], allow_missing: bool = False) -> None:
         if not allow_missing:
             missing_ids = set(ids) - set(self._ledger["id"])
             if missing_ids:
