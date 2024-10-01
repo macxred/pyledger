@@ -21,7 +21,6 @@ VAT_CODE_SCHEMA_CSV = """
     account,            Int64,                True
     contra,             Int64,                False
     rate,               Float64,              True
-    date,               datetime64[ns],       False
 """
 VAT_CODE_SCHEMA = pd.read_csv(StringIO(VAT_CODE_SCHEMA_CSV), skipinitialspace=True)
 
