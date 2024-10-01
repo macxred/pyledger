@@ -98,31 +98,28 @@ class LedgerEngine(ABC):
     # FX Adjustments
 
     @classmethod
-    def standardize_fx_adjustments(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def standardize_fx_adjustments(cls, df: pd.DataFrame,
+                                   keep_extra_columns: bool = False) -> pd.DataFrame:
         """Validates and standardizes the 'fx_adjustments' DataFrame to ensure it contains
         the required columns and correct data types.
 
         Args:
             df (pd.DataFrame): The DataFrame representing the FX adjustments.
-
+            keep_extra_columns (bool): If True, columns that do not appear in the data frame
+                                       schema are left in the resulting DataFrame.
         Returns:
             pd.DataFrame: The standardized FX adjustments DataFrame.
 
         Raises:
             ValueError: If required columns are missing or if data types are incorrect.
         """
-        columns = FX_ADJUSTMENT_SCHEMA["column_name"].to_list()
-        if df is None:
-            # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=columns)
-
-        # Ensure required columns and values are present
-        missing = set(columns) - set(df.columns)
-        if missing:
-            raise ValueError(f"Required columns {', '.join(missing)} are missing.")
-
-        col_types = dict(zip(FX_ADJUSTMENT_SCHEMA['column_name'], FX_ADJUSTMENT_SCHEMA['dtype']))
-        df = enforce_dtypes(df, col_types)
+        # Add 'drop_extra_columns' as
+        schema = FX_ADJUSTMENT_SCHEMA.set_index("column_name")
+        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
+        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
+        df = enforce_dtypes(df, required=required, optional=optional,
+                            keep_extra_columns=keep_extra_columns)
+        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
         return df.sort_values("date")
 
     # ----------------------------------------------------------------------
@@ -374,12 +371,15 @@ class LedgerEngine(ABC):
         return stats
 
     @classmethod
-    def standardize_vat_codes(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def standardize_vat_codes(cls, df: pd.DataFrame,
+                              keep_extra_columns: bool = False) -> pd.DataFrame:
         """Validates and standardizes the 'vat_codes' DataFrame to ensure it contains
         the required columns, correct data types, and logical consistency in the data.
 
         Args:
             df (pd.DataFrame): The DataFrame representing the VAT codes.
+            keep_extra_columns (bool): If True, columns that do not appear in the data frame
+                                       schema are left in the resulting DataFrame.
 
         Returns:
             pd.DataFrame: The standardized VAT codes DataFrame.
@@ -389,31 +389,22 @@ class LedgerEngine(ABC):
                         or if logical inconsistencies are found (e.g., non-zero rates
                         without defined accounts).
         """
-        required_cols = VAT_CODE_SCHEMA[VAT_CODE_SCHEMA['mandatory']]['column_name']
-        if df is None:
-            # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=required_cols)
+        # Enforce data frame schema
+        schema = VAT_CODE_SCHEMA.set_index("column_name")
+        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
+        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
+        df = enforce_dtypes(df, required=required, optional=optional,
+                            keep_extra_columns=keep_extra_columns)
+        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
 
-        # Ensure required columns and values are present
-        missing = set(required_cols) - set(df.columns)
-        if missing:
-            raise ValueError(f"Required columns {', '.join(missing)} are missing.")
-
-        # Add missing columns
-        optional_cols = VAT_CODE_SCHEMA[~VAT_CODE_SCHEMA['mandatory']]['column_name']
-        for col in optional_cols:
-            if col not in df.columns:
-                df[col] = None
-
-        # Enforce data types
-        column_types = dict(zip(VAT_CODE_SCHEMA['column_name'], VAT_CODE_SCHEMA['dtype']))
-        df = enforce_dtypes(df, column_types)
+        # Set missing dates
         inception = pd.Timestamp("1900-01-01")
         df["date"] = pd.to_datetime(df["date"]).fillna(inception)
 
         # Ensure account is defined if rate is other than zero
         missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
         if len(missing) > 0:
+            # TODO: Drop entries with missing account with a warning, rather than raising an error
             raise ValueError(f"Account must be defined for non-zero rate in vat_codes: {missing}.")
 
         return df.sort_values("id")
@@ -435,12 +426,15 @@ class LedgerEngine(ABC):
         """
 
     @classmethod
-    def standardize_account_chart(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def standardize_account_chart(cls, df: pd.DataFrame,
+                                  keep_extra_columns: bool = True) -> pd.DataFrame:
         """Validates and standardizes the 'account_chart' DataFrame to ensure it contains
         the required columns and correct data types.
 
         Args:
             df (pd.DataFrame): The DataFrame representing the account chart.
+            keep_extra_columns (bool): If True, columns that do not appear in the data frame
+                                       schema are left in the resulting DataFrame.
 
         Returns:
             pd.DataFrame: The standardized account chart DataFrame.
@@ -449,24 +443,18 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing, or if 'account' column
                         contains NaN values, or if data types are incorrect.
         """
-        required_cols = ACCOUNT_SCHEMA[ACCOUNT_SCHEMA['mandatory']]['column_name']
-        if df is None:
-            # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=required_cols)
+        # Enforce data frame schema
+        schema = ACCOUNT_SCHEMA.set_index("column_name")
+        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
+        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
+        df = enforce_dtypes(df, required=required, optional=optional,
+                            keep_extra_columns=keep_extra_columns)
+        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
 
-        # Ensure required columns and values are present
-        missing = set(required_cols) - set(df.columns)
-        if missing:
-            raise ValueError(f"Required columns missing in account chart: {missing}.")
+        # Ensure required values are present
         if df["account"].isna().any():
+            # TODO: Drop entries with missing accounts with a warning, rather than raising an error
             raise ValueError("Missing 'account' values in account chart.")
-
-        # Add missing columns
-        optional_cols = ACCOUNT_SCHEMA[~ACCOUNT_SCHEMA['mandatory']]['column_name']
-        for col in optional_cols:
-            if col not in df.columns:
-                df[col] = None
-        df = enforce_dtypes(df, dict(zip(ACCOUNT_SCHEMA['column_name'], ACCOUNT_SCHEMA['dtype'])))
 
         return df.sort_values("account")
 
@@ -1096,7 +1084,8 @@ class LedgerEngine(ABC):
         return ledger
 
     @staticmethod
-    def standardize_ledger_columns(ledger: pd.DataFrame = None) -> pd.DataFrame:
+    def standardize_ledger_columns(ledger: pd.DataFrame = None,
+                                   keep_extra_columns: bool = True) -> pd.DataFrame:
         """Standardizes and enforces type consistency for the ledger DataFrame.
 
         Ensures that the required columns are present in the ledger DataFrame,
@@ -1106,6 +1095,8 @@ class LedgerEngine(ABC):
         Args:
             ledger (pd.DataFrame, optional): A data frame with ledger transactions
                                              Defaults to None.
+            keep_extra_columns (bool): If True, columns that do not appear in the data frame
+                                       schema are left in the resulting DataFrame.
 
         Returns:
             pd.DataFrame: A standardized DataFrame with both the required and
@@ -1114,42 +1105,24 @@ class LedgerEngine(ABC):
         Raises:
             ValueError: If required columns are missing from the ledger DataFrame.
         """
-        required_cols = LEDGER_SCHEMA[LEDGER_SCHEMA['mandatory']]['column_name']
-        if ledger is None:
-            # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=required_cols)
-        else:
-            df = ledger.copy()
+        # Enforce data frame schema
+        schema = LEDGER_SCHEMA.set_index("column_name")
+        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
+        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
+        df = enforce_dtypes(ledger, required=required, optional=optional,
+                            keep_extra_columns=keep_extra_columns)
+        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
 
-        # In empty DataFrames, add required columns if not present
-        if isinstance(ledger, pd.DataFrame) and len(ledger) == 0:
-            for col in required_cols:
-                if col not in df.columns:
-                    df[col] = None
-
-        # Ensure all required columns are present
-        missing = set(required_cols) - set(df.columns)
-        if len(missing) > 0:
-            raise ValueError(f"Missing required columns: {missing}")
-
-        # Add optional columns if not present
-        if "id" not in df.columns:
-            df["id"] = df["date"].notna().cumsum().astype(pd.StringDtype())
-        optional_cols = LEDGER_SCHEMA[~LEDGER_SCHEMA['mandatory']]['column_name']
-        for col in optional_cols:
-            if col not in df.columns:
-                df[col] = None
+        # Add id column if missing: Entries without a date share id of the last entry with a date
+        if (ledger is not None) and ("id" not in ledger.columns):
+            df["id"] = df["date"].notna().cumsum().astype(schema["id"]["dtype"])
 
         # Enforce column data types
-        df = enforce_dtypes(df, dict(zip(LEDGER_SCHEMA['column_name'], LEDGER_SCHEMA['dtype'])))
         df["date"] = pd.to_datetime(df["date"]).dt.date
-
-        # Order columns
-        df = df[LEDGER_SCHEMA['column_name']]
 
         return df.sort_values("date")
 
-    def standardize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
+    def standardize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
         """Convert ledger entries to a canonical representation.
 
         This method converts ledger entries into a standardized format. It
@@ -1158,7 +1131,7 @@ class LedgerEngine(ABC):
         entries.
 
         Args:
-            ledger (pd.DataFrame): A data frame with ledger transactions.
+            df (pd.DataFrame): A data frame with ledger transactions.
 
         Returns:
             pd.DataFrame: A DataFrame with ledger entries in canonical form.
@@ -1169,7 +1142,7 @@ class LedgerEngine(ABC):
             - It fills missing dates in collective transactions with dates from
             other line items in the same collective transaction.
         """
-        df = self.standardize_ledger_columns(ledger)
+        df = self.standardize_ledger_columns(df).copy()
 
         # Fill missing (NA) dates
         df["date"] = df.groupby("id")["date"].ffill()
@@ -1388,12 +1361,15 @@ class LedgerEngine(ABC):
         """
 
     @classmethod
-    def standardize_price_df(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def standardize_price_df(cls, df: pd.DataFrame,
+                             keep_extra_columns: bool = True) -> pd.DataFrame:
         """Validates and standardizes the 'prices' DataFrame to ensure it contains
         the required columns, correct data types, and no missing values in key fields.
 
         Args:
             df (pd.DataFrame): The DataFrame representing the prices.
+            keep_extra_columns (bool): If True, columns that do not appear in the data frame
+                                       schema are left in the resulting DataFrame.
 
         Returns:
             pd.DataFrame: The standardized prices DataFrame.
@@ -1402,26 +1378,21 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing, if there are missing values
                         in required columns, or if data types are incorrect.
         """
-        columns = PRICE_SCHEMA["column_name"]
-        if df is None:
-            # Return empty DataFrame with identical structure
-            df = pd.DataFrame(columns=columns)
-
-        # Check for missing required columns
-        missing = set(columns) - set(df.columns)
-        if len(missing) > 0:
-            raise ValueError(f"Required columns {missing} missing.")
+        # Enforce data frame schema
+        schema = PRICE_SCHEMA.set_index("column_name")
+        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
+        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
+        df = enforce_dtypes(df, required=required, optional=optional,
+                            keep_extra_columns=keep_extra_columns)
+        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
 
         # Check for missing values in required columns
         has_missing_value = [
-            column for column in columns if df[column].isnull().any()
+            column for column in required.keys() if df[column].isnull().any()
         ]
         if len(has_missing_value) > 0:
+            # TODO: drop entries with missing values with a warning, rather than raising an error
             raise ValueError(f"Missing values in column {has_missing_value}.")
-
-        # Enforce data types
-        df = enforce_dtypes(df, dict(zip(PRICE_SCHEMA['column_name'], PRICE_SCHEMA['dtype'])))
-        df = df[columns]
 
         return df.sort_values("date")
 
