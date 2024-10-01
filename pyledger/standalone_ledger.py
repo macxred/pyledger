@@ -127,11 +127,8 @@ class StandaloneLedger(LedgerEngine):
     def modify_vat_code(self, *args, **kwargs) -> None:
         raise NotImplementedError("modify_vat_code is not implemented yet.")
 
-    def delete_vat_code(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_vat_code is not implemented yet.")
-
-    def mirror_vat_codes(self, *args, **kwargs) -> None:
-        raise NotImplementedError("mirror_vat_code is not implemented yet.")
+    def delete_vat_codes(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_vat_codes is not implemented yet.")
 
     def vat_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create journal entries to book VAT according to vat_codes.
@@ -235,11 +232,8 @@ class StandaloneLedger(LedgerEngine):
     def modify_account(self, *args, **kwargs) -> None:
         raise NotImplementedError("modify_account is not implemented yet.")
 
-    def delete_account(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_account is not implemented yet.")
-
-    def mirror_account_chart(self, *args, **kwargs) -> None:
-        raise NotImplementedError("mirror_account_chart is not implemented yet.")
+    def delete_accounts(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_accounts is not implemented yet.")
 
     def validate_accounts(self) -> None:
         """Validate coherence between account, VAT and FX adjustment definitions."""
@@ -311,17 +305,14 @@ class StandaloneLedger(LedgerEngine):
 
         self._ledger = pd.concat([self._ledger, df], axis=0)
 
-    def delete_ledger_entry(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_ledger_entry is not implemented yet.")
+    def delete_ledger_entries(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_ledger_entries is not implemented yet.")
 
     def ledger_entry(self, *args, **kwargs) -> None:
         raise NotImplementedError("ledger_entry is not implemented yet.")
 
     def modify_ledger_entry(self, *args, **kwargs) -> None:
         raise NotImplementedError("modify_ledger_entry is not implemented yet.")
-
-    def mirror_ledger(self, *args, **kwargs) -> None:
-        raise NotImplementedError("mirror_ledger is not implemented yet.")
 
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with all ledger transactions in long format.

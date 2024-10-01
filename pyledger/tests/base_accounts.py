@@ -106,8 +106,8 @@ class BaseTestAccounts(BaseTest):
         assert pd.isna(created_accounts["vat_code"].item())
         assert created_accounts["group"].item() == new_account["group"]
 
-        ledger.delete_account(account=1145)
-        ledger.delete_account(account=1146)
+        ledger.delete_accounts(accounts=[1145])
+        ledger.delete_accounts(accounts=[1146])
         updated_accounts = ledger.account_chart()
         assert 1145 not in initial_accounts["account"].values
         assert 1146 not in initial_accounts["account"].values
