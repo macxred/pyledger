@@ -77,7 +77,7 @@ class MemoryLedger(StandaloneLedger):
         if not allow_missing:
             missing = set(codes) - set(self._vat_codes["id"])
             if missing:
-                raise ValueError(f"VAT code(s) '{', '.join(missing)}' not found in the memory.")
+                raise ValueError(f"VAT code(s) '{', '.join(missing)}' not found.")
 
         self._vat_codes = self._vat_codes[~self._vat_codes["id"].isin(codes)]
 

@@ -318,28 +318,25 @@ class LedgerEngine(ABC):
         """Aligns VAT rates with a desired target state.
 
         Args:
-            target (pd.DataFrame): DataFrame containing VAT rates in the pyledger.vat_codes format.
-            delete (bool, optional): If True, deletes VAT codes on the remote account that are
-                                     not present in target_state.
+            target (pd.DataFrame): DataFrame with VAT rates in the pyledger.vat_codes format.
+            delete (bool, optional): If True, deletes existing VAT codes that are
+                                     not present in the target data.
 
         Returns:
             dict: A dictionary containing statistics about the mirroring process:
-                - **pre-existing** (int): The number of VAT codes already present.
-                - **targeted** (int): The total number of VAT codes expected to be in the system
-                                      after mirroring.
-                - **added** (int): The number of new VAT codes that were added.
-                - **deleted** (int): The number of deleted VAT codes.
-                - **updated** (int): The number of VAT codes that were modified.
+                - pre-existing (int): The number of VAT codes present before mirroring.
+                - targeted (int): The number of VAT codes in the target data.
+                - added (int): The number of VAT codes added by the mirroring method.
+                - deleted (int): The number of deleted VAT codes.
+                - updated (int): The number of VAT codes modified during mirroring.
         """
         target_df = self.standardize_vat_codes(target)
         current_state = self.vat_codes()
 
         # Delete superfluous VAT codes on remote
-        n_deleted = 0
         if delete:
             to_delete = set(current_state["id"]).difference(set(target_df["id"]))
             self.delete_vat_codes(to_delete)
-            n_deleted = len(to_delete)
 
         # Create new VAT codes on remote
         ids = set(target_df["id"]).difference(set(current_state["id"]))
@@ -373,7 +370,7 @@ class LedgerEngine(ABC):
             "pre-existing": len(current_state),
             "targeted": len(target_df),
             "added": len(to_add),
-            "deleted": n_deleted if delete else 0,
+            "deleted": len(to_delete) if delete else 0,
             "updated": len(to_update),
         }
 
@@ -504,7 +501,7 @@ class LedgerEngine(ABC):
         """Removes an account from the account chart.
 
         Args:
-            accounts (List[int]): The account number(s) to be deleted.
+            accounts (List[int]): The numbers of the accounts to be deleted.
             allow_missing (bool, optional): If True, no error is raised if the account is
                                             not found.
         """
@@ -514,18 +511,16 @@ class LedgerEngine(ABC):
 
         Args:
             target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
-            delete (bool, optional): If True, deletes accounts on the remote that are not
-                                     present in the target DataFrame.
+            delete (bool, optional): If True, deletes existing accounts that are not
+                                     present in the target data.
 
         Returns:
             dict: A dictionary containing statistics about the mirroring process:
-                - **pre-existing** (int): The number of accounts already present.
-                - **targeted** (int): The total number of accounts expected
-                                      to be in the chart after mirroring.
-                - **added** (int): The number of new accounts that were added.
-                - **deleted** (int): The number of deleted accounts.
-                - **updated** (int): The number of accounts that were modified.
-
+                - pre-existing (int): The number of accounts present before mirroring.
+                - targeted (int): The number of accounts in the target data.
+                - added (int): The number of accounts added by the mirroring method.
+                - deleted (int): The number of accounts codes.
+                - updated (int): The number of accounts modified during mirroring.
         """
         if target is not None:
             target = target.copy()
@@ -533,11 +528,9 @@ class LedgerEngine(ABC):
         current_state = self.account_chart()
 
         # Delete superfluous accounts on remote
-        n_deleted = 0
         if delete:
             to_delete = set(current_state["account"]).difference(set(target_df["account"]))
             self.delete_accounts(to_delete)
-            n_deleted = len(to_delete)
 
         # Create new accounts on remote
         accounts = set(target_df["account"]).difference(set(current_state["account"]))
@@ -557,7 +550,6 @@ class LedgerEngine(ABC):
         right = current_state.loc[current_state["account"].isin(both)]
         merged = pd.merge(left, right, how="outer", indicator=True)
         to_update = merged[merged["_merge"] == "left_only"]
-
         for row in to_update.to_dict("records"):
             self.modify_account(
                 account=row["account"],
@@ -572,7 +564,7 @@ class LedgerEngine(ABC):
             "pre-existing": len(current_state),
             "targeted": len(target_df),
             "added": len(to_add),
-            "deleted": n_deleted if delete else 0,
+            "deleted": len(to_delete) if delete else 0,
             "updated": len(to_update),
         }
         return stats
@@ -891,24 +883,23 @@ class LedgerEngine(ABC):
         """Deletes a ledger entry by its ID.
 
         Args:
-            ids (List[str]): The Ids of the ledger entries to be deleted.
+            ids (List[str]): The ids of the ledger entries to be deleted.
         """
 
     def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
         """Aligns ledger entries with a desired target state.
 
         Args:
-            target (pd.DataFrame): DataFrame containing ledger data in pyledger format.
-            delete (bool, optional): If True, deletes ledger entries on the remote that are
-                                     not present in the target DataFrame.
+            target (pd.DataFrame): DataFrame with ledger entries in pyledger format.
+            delete (bool, optional): If True, deletes existing ledger that are not
+                                     present in the target data.
 
         Returns:
             dict: A dictionary containing statistics about the mirroring process:
-                - **pre-existing** (int): The number of transactions already present.
-                - **targeted** (int): The total number of transactions expected
-                                      to be after mirroring.
-                - **added** (int): The number of new transactions that were added.
-                - **deleted** (int): The number of deleted transactions.
+                - pre-existing (int): The number of transactions present before mirroring.
+                - targeted (int): The number of transactions in the target data.
+                - added (int): The number of new transactions that were added.
+                - deleted (int): The number of deleted transactions.
         """
         # Standardize data frame schema, discard incoherent entries with a warning
         target = self.standardize_ledger(target)
