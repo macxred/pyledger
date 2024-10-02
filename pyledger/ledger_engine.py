@@ -11,7 +11,7 @@ import zipfile
 import json
 from pathlib import Path
 from typing import Dict, List
-from consistent_df import enforce_dtypes, df_to_consistent_str, nest, unnest
+from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
 import re
 import numpy as np
 import openpyxl
@@ -118,13 +118,7 @@ class LedgerEngine(ABC):
         Raises:
             ValueError: If required columns are missing or if data types are incorrect.
         """
-        # Add 'drop_extra_columns' as
-        schema = FX_ADJUSTMENT_SCHEMA.set_index("column_name")
-        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
-        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
-        df = enforce_dtypes(df, required=required, optional=optional,
-                            keep_extra_columns=keep_extra_columns)
-        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
+        df = enforce_schema(df, FX_ADJUSTMENT_SCHEMA, keep_extra_columns=keep_extra_columns)
         return df.sort_values("date")
 
     # ----------------------------------------------------------------------
@@ -390,12 +384,7 @@ class LedgerEngine(ABC):
                         without defined accounts).
         """
         # Enforce data frame schema
-        schema = TAX_CODE_SCHEMA.set_index("column_name")
-        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
-        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
-        df = enforce_dtypes(df, required=required, optional=optional,
-                            keep_extra_columns=keep_extra_columns)
-        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
+        df = enforce_schema(df, TAX_CODE_SCHEMA, keep_extra_columns=keep_extra_columns)
 
         # Ensure account is defined if rate is other than zero
         missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
@@ -440,12 +429,7 @@ class LedgerEngine(ABC):
                         contains NaN values, or if data types are incorrect.
         """
         # Enforce data frame schema
-        schema = ACCOUNT_SCHEMA.set_index("column_name")
-        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
-        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
-        df = enforce_dtypes(df, required=required, optional=optional,
-                            keep_extra_columns=keep_extra_columns)
-        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
+        df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=keep_extra_columns)
 
         # Ensure required values are present
         if df["account"].isna().any():
@@ -1105,17 +1089,12 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing from the ledger DataFrame.
         """
         # Enforce data frame schema
-        schema = LEDGER_SCHEMA.set_index("column_name")
-        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
-        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
-        df = enforce_dtypes(
-            df, required=required, optional=optional, keep_extra_columns=keep_extra_columns
-        )
-        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
+        df = enforce_schema(df, LEDGER_SCHEMA)
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
-        if df["id"].isna().any():
-            df["id"] = df["date"].notna().cumsum().astype(schema.loc["id", "dtype"])
+        if "id" not in df.columns or df["id"].isna().any():
+            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column_name'] == 'id', 'dtype'].values[0]
+            df["id"] = df["date"].notna().cumsum().astype(id_type)
 
         # Enforce column data types
         df["date"] = pd.to_datetime(df["date"]).dt.date
@@ -1375,14 +1354,11 @@ class LedgerEngine(ABC):
                         in required columns, or if data types are incorrect.
         """
         # Enforce data frame schema
-        schema = PRICE_SCHEMA.set_index("column_name")
-        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
-        optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
-        df = enforce_dtypes(df, required=required, optional=optional,
-                            keep_extra_columns=keep_extra_columns)
-        df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
+        df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
 
         # Check for missing values in required columns
+        schema = PRICE_SCHEMA.set_index("column_name")
+        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
         has_missing_value = [
             column for column in required.keys() if df[column].isnull().any()
         ]
