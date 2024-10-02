@@ -79,8 +79,7 @@ def test_add_ledger_entry():
     original_ledger = ledger.ledger()
     assert isinstance(original_ledger, pd.DataFrame)
     assert len(original_ledger) == 5
-    # TODO: Below assertion fails. Please fix.
-    # assert not original_ledger["id"].duplicated().any()
+    assert not original_ledger["id"].duplicated().any()
 
     # Retrieve serialized ledger
     serialized_ledger = ledger.serialized_ledger()

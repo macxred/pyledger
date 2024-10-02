@@ -939,6 +939,7 @@ class LedgerEngine(ABC):
                 txn = unnest(
                     target.loc[target["txn_str"] == txn_str, :].head(1), "txn"
                 )
+                txn.drop(columns="txn_str", inplace=True)
                 if txn["id"].dropna().nunique() > 0:
                     id = txn["id"].dropna().unique()[0]
                 else:
@@ -1082,7 +1083,7 @@ class LedgerEngine(ABC):
         return ledger
 
     @staticmethod
-    def standardize_ledger_columns(ledger: pd.DataFrame = None,
+    def standardize_ledger_columns(df: pd.DataFrame = None,
                                    keep_extra_columns: bool = True) -> pd.DataFrame:
         """Standardizes and enforces type consistency for the ledger DataFrame.
 
@@ -1107,13 +1108,14 @@ class LedgerEngine(ABC):
         schema = LEDGER_SCHEMA.set_index("column_name")
         required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
         optional = schema.loc[~schema["mandatory"], 'dtype'].to_dict()
-        df = enforce_dtypes(ledger, required=required, optional=optional,
-                            keep_extra_columns=keep_extra_columns)
+        df = enforce_dtypes(
+            df, required=required, optional=optional, keep_extra_columns=keep_extra_columns
+        )
         df = df[schema.index.tolist() + df.columns[~df.columns.isin(schema.index)].tolist()]
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
-        if (ledger is not None) and ("id" not in ledger.columns):
-            df["id"] = df["date"].notna().cumsum().astype(schema["id"]["dtype"])
+        if df["id"].isna().any():
+            df["id"] = df["date"].notna().cumsum().astype(schema.loc["id", "dtype"])
 
         # Enforce column data types
         df["date"] = pd.to_datetime(df["date"]).dt.date

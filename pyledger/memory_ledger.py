@@ -176,17 +176,6 @@ class MemoryLedger(StandaloneLedger):
 
         self._ledger = self._ledger[~self._ledger["id"].isin(ids)]
 
-    def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
-        # TODO: Refactor mirroring logic #25 issue
-        target_df = self.standardize_ledger(target)
-
-        if delete:
-            self._ledger = target_df
-        else:
-            self._ledger = self.standardize_ledger(
-                pd.concat([self._ledger, target_df]).drop_duplicates()
-            )
-
     # ----------------------------------------------------------------------
     # Currency
 
