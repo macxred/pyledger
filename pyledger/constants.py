@@ -6,7 +6,7 @@ from io import StringIO
 FX_ADJUSTMENT_SCHEMA_CSV = """
     column_name,        dtype,                mandatory
     date,               datetime64[ns],       True
-    adjust,             string[python],       True
+    account,            string[python],       True
     credit,             Int64,                True
     debit,              Int64,                True
     description,        string[python],       True
@@ -16,11 +16,11 @@ FX_ADJUSTMENT_SCHEMA = pd.read_csv(StringIO(FX_ADJUSTMENT_SCHEMA_CSV), skipiniti
 VAT_CODE_SCHEMA_CSV = """
     column_name,        dtype,                mandatory
     id,                 string[python],       True
-    description,        string[python],       True
-    is_inclusive,       bool,                 True
     account,            Int64,                True
     contra,             Int64,                False
     rate,               Float64,              True
+    is_inclusive,       bool,                 True
+    description,        string[python],       True
 """
 VAT_CODE_SCHEMA = pd.read_csv(StringIO(VAT_CODE_SCHEMA_CSV), skipinitialspace=True)
 
