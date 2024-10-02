@@ -8,7 +8,7 @@
 
 - Double-entry accounting system.
 - Multiple currency and commodity support.
-- VAT calculations and reporting.
+- TAX calculations and reporting.
 - Customizable Data Storage, enabling users to either integrate with existing databases or utilize PyLedger's built-in storage mechanism based on text files.
 
 
@@ -46,7 +46,7 @@ The foundational element of the PyLedger library, the LedgerEngine class, specif
 **Stand-Alone implementations**
 
 1. **StandaloneLedger**\
-This class extends LedgerEngine to provide a self-sufficient ledger system independent of external accounting software. It implements specific business rules like VAT calculations and foreign exchange adjustments. Data storage is treated as an abstract concept, which allows for integration with any data storage solution, ensuring maximum flexibility.
+This class extends LedgerEngine to provide a self-sufficient ledger system independent of external accounting software. It implements specific business rules like TAX calculations and revaluations. Data storage is treated as an abstract concept, which allows for integration with any data storage solution, ensuring maximum flexibility.
 
 1. **MemoryLedger**\
 This class extends the StandaloneLedger to provide a fully featured but non-persistent ledger system. MemoryLedger stores accounting data as DataFrames directly in memory, without relying on external data storage solutions. It is particularly useful for demonstration and testing purposes where persistence is not required.
@@ -88,9 +88,9 @@ from pyledger import TestLedger
 # Instantiate a ledger engine pre-populated with hard-coded data
 ledger = TestLedger()
 
-# Get chart of accounts
-ledger.account_chart()
-##         currency vat_code                                               text
+# Get accounts
+ledger.accounts()
+##         currency tax_code                                        description
 ## account
 ## 1000         CHF      NaN                                       Cash on hand
 ## 1020         CHF      NaN                                     Cash at Bank A
@@ -103,27 +103,27 @@ ledger.account_chart()
 ledger.add_ledger_entry({
     'date': datetime.date.today(),
     'account': 1020,
-    'counter_account': 6000,
+    'contra': 6000,
     'currency': 'CHF',
-    'text': "First Test Transaction",
+    "description": "First Test Transaction",
     'amount': -100})
 ledger.add_ledger_entry({
     'date': datetime.date.today(),
     'account': 1020,
-    'counter_account': 4000,
+    'contra': 4000,
     'currency': 'CHF',
-    'text': "Second Test Transaction",
+    "description": "Second Test Transaction",
     'amount': 200})
 
 # Retrieve account balance
 ledger.account_balance(1020)
-## {'base_currency': 100.0, 'CHF': 100.0}
+## {'reporting_currency': 100.0, 'CHF': 100.0}
 
 # Retrieve an account's transaction history
 ledger.account_history(1020)
-##   id        date  account  counter_account currency  amount  balance  base_currency_amount  base_currency_balance vat_code                     text document
-## 0  1  2024-04-12     1020             6000      CHF  -100.0   -100.0                -100.0                 -100.0     <NA>   First Test Transaction     <NA>
-## 1  2  2024-04-12     1020             4000      CHF   200.0    100.0                 200.0                  100.0     <NA>  Second Test Transaction     <NA>
+##   id        date   account  contra currency  amount  balance  report_amount  reporting_currency_balance tax_code              description document
+## 0  1  2024-04-12     1020     6000      CHF  -100.0   -100.0         -100.0                      -100.0     <NA>   First Test Transaction     <NA>
+## 1  2  2024-04-12     1020     4000      CHF   200.0    100.0          200.0                       100.0     <NA>  Second Test Transaction     <NA>
 ```
 
 ## Testing Strategy

@@ -13,24 +13,24 @@ FX_ADJUSTMENT_SCHEMA_CSV = """
 """
 FX_ADJUSTMENT_SCHEMA = pd.read_csv(StringIO(FX_ADJUSTMENT_SCHEMA_CSV), skipinitialspace=True)
 
-VAT_CODE_SCHEMA_CSV = """
+TAX_CODE_SCHEMA_CSV = """
     column_name,        dtype,                mandatory
     id,                 string[python],       True
     account,            Int64,                True
-    contra,             Int64,                False
     rate,               Float64,              True
     is_inclusive,       bool,                 True
     description,        string[python],       True
+    contra,             Int64,                False
 """
-VAT_CODE_SCHEMA = pd.read_csv(StringIO(VAT_CODE_SCHEMA_CSV), skipinitialspace=True)
+TAX_CODE_SCHEMA = pd.read_csv(StringIO(TAX_CODE_SCHEMA_CSV), skipinitialspace=True)
 
 ACCOUNT_SCHEMA_CSV = """
     column_name,        dtype,                mandatory
-    group,              string[python],       False
     account,            Int64,                True
     currency,           string[python],       True
-    tax_code,           string[python],       False
     description,        string[python],       True
+    tax_code,           string[python],       False
+    group,              string[python],       False
 """
 ACCOUNT_SCHEMA = pd.read_csv(StringIO(ACCOUNT_SCHEMA_CSV), skipinitialspace=True)
 

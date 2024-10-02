@@ -11,8 +11,8 @@ from .standalone_ledger import StandaloneLedger
 from .constants import LEDGER_SCHEMA
 
 # TODO:
-# - Write functions standardize_prices, standardize_vat_codes,
-#   standardize_account_chart, standardize_fx_adjustments,
+# - Write functions standardize_prices, standardize_tax_codes,
+#   standardize_accounts, standardize_revaluations,
 #   standardize_settings analogues to LedgerEnging.standardize_ledger.
 #   Decide whether functions should be available at the parent class
 #   LedgerEnding or at the derived class TextLEdger.
@@ -46,19 +46,19 @@ class TextLedger(StandaloneLedger):
         accounts: str,
         ledger: str,
         prices: str = None,
-        vat_codes: str = None,
-        fx_adjustments: str = None,
+        tax_codes: str = None,
+        revaluations: str = None,
     ) -> None:
-        """Initialize the TextLedger with paths to settings, account chart,
-        ledger, prices, VAT codes, and FX adjustments files.
+        """Initialize the TextLedger with paths to settings, accounts,
+        ledger, prices, TAX codes, and revaluations files.
 
         Args:
             settings (str): Path to the JSON settings file.
             accounts (str): Path to the CSV accounts file.
             ledger (str): Path to the directory containing ledger CSV files.
             prices (str, optional): Path to the directory containing price CSV files.
-            vat_codes (str, optional): Path to the CSV VAT codes file.
-            fx_adjustments (str, optional): Path to the CSV FX adjustments file.
+            tax_codes (str, optional): Path to the CSV TAX codes file.
+            revaluations (str, optional): Path to the CSV revaluations file.
         """
         self._logger = logging.getLogger("ledger")
         super().__init__(
@@ -66,8 +66,8 @@ class TextLedger(StandaloneLedger):
             accounts=_read_csv_or_none(accounts),
             ledger=self.read_ledger(ledger),
             prices=self.read_prices(prices),
-            vat_codes=_read_csv_or_none(vat_codes),
-            fx_adjustments=_read_csv_or_none(fx_adjustments),
+            tax_codes=_read_csv_or_none(tax_codes),
+            revaluations=_read_csv_or_none(revaluations),
         )
 
     def read_prices(self, path: str = None) -> pd.DataFrame:
@@ -116,8 +116,8 @@ class TextLedger(StandaloneLedger):
 
         Returns:
             pd.DataFrame: Combined ledger data as a DataFrame with columns 'id',
-            'date', 'text', 'document', 'account', 'counter_account', 'currency',
-            'amount', 'base_currency_amount', 'vat_code'.
+            'date', "description", 'document', 'account', 'contra', 'currency',
+            'amount', 'report_amount', 'tax_code'.
         """
         directory = Path(path).expanduser()
         df_list = []
@@ -231,7 +231,7 @@ class TextLedger(StandaloneLedger):
         fixed_width_cols = [
             col
             for col in LEDGER_COLUMN_SEQUENCE
-            if (col in df.columns) and not (col in ["text", "document"])
+            if (col in df.columns) and not (col in ["description", "document"])
         ]
 
         if digits is not None:

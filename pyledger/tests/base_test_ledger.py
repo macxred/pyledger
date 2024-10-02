@@ -16,7 +16,7 @@ class BaseTestLedger(BaseTest):
 
     @pytest.fixture()
     def ledger_engine(self, ledger):
-        ledger.restore(accounts=self.ACCOUNTS, vat_codes=self.VAT_CODES)
+        ledger.restore(accounts=self.ACCOUNTS, tax_codes=self.TAX_CODES)
         return ledger
 
     @pytest.mark.parametrize("ledger_id", BaseTest.LEDGER_ENTRIES["id"].astype(str).unique())
@@ -68,10 +68,10 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
-    def test_accessor_mutators_single_transaction_without_VAT(self, ledger_engine):
-        # Test adding a ledger entry without VAT code
+    def test_accessor_mutators_single_transaction_without_TAX(self, ledger_engine):
+        # Test adding a ledger entry without TAX code
         target = self.LEDGER_ENTRIES.query("id == '4'").copy()
-        target["vat_code"] = None
+        target["tax_code"] = None
         id = ledger_engine.add_ledger_entry(target)
         remote = ledger_engine.ledger()
         created = remote.loc[remote["id"] == id]
@@ -82,7 +82,7 @@ class BaseTestLedger(BaseTest):
         initial_ledger = ledger_engine.ledger()
         target = self.LEDGER_ENTRIES.query("id == '1'").copy()
         target["id"] = id
-        target["vat_code"] = None
+        target["tax_code"] = None
         ledger_engine.modify_ledger_entry(target)
         remote = ledger_engine.ledger()
         updated = remote.loc[remote["id"] == id]
@@ -119,7 +119,7 @@ class BaseTestLedger(BaseTest):
         # Test replacing with an individual ledger entry
         target = self.LEDGER_ENTRIES.iloc[[0]].copy()
         target["id"] = id
-        target["vat_code"] = None
+        target["tax_code"] = None
         ledger_engine.modify_ledger_entry(target)
         remote = ledger_engine.ledger()
         updated = remote.loc[remote["id"] == id]
@@ -134,10 +134,10 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
-    def test_accessor_mutators_collective_transaction_without_vat(self, ledger_engine):
-        # Test adding a collective ledger entry without VAT code
+    def test_accessor_mutators_collective_transaction_without_tax(self, ledger_engine):
+        # Test adding a collective ledger entry without TAX code
         target = self.LEDGER_ENTRIES.query("id == '2'").copy()
-        target["vat_code"] = None
+        target["tax_code"] = None
         id = ledger_engine.add_ledger_entry(target)
         remote = ledger_engine.ledger()
         created = remote.loc[remote["id"] == id]
@@ -148,7 +148,7 @@ class BaseTestLedger(BaseTest):
         initial_ledger = ledger_engine.ledger()
         target = self.LEDGER_ENTRIES.query("id == '3'").copy()
         target["id"] = id
-        target["vat_code"] = None
+        target["tax_code"] = None
         ledger_engine.modify_ledger_entry(target)
         remote = ledger_engine.ledger()
         updated = remote.loc[remote["id"] == id]
@@ -194,7 +194,7 @@ class BaseTestLedger(BaseTest):
             ledger_engine.modify_ledger_entry(target)
 
     def test_mirror_ledger(self, ledger_engine):
-        ledger_engine.mirror_account_chart(self.ACCOUNTS, delete=False)
+        ledger_engine.mirror_accounts(self.ACCOUNTS, delete=False)
         # Mirror with one single and one collective transaction
         target = self.LEDGER_ENTRIES.query("id in [1, 2]")
         ledger_engine.mirror_ledger(target=target, delete=True)

@@ -23,28 +23,28 @@ class StandaloneLedger(LedgerEngine):
     Attributes:
         settings (dict): Accounting settings, such as beginning and end of the
             accounting period, rounding precision for currencies, etc.
-        accounts (pd.DataFrame): Account chart.
+        accounts (pd.DataFrame): Accounts.
         ledger (pd.DataFrame): General ledger data in original form entered
             into the accounting system, without automated enhancements such as
-            base currency amounts, FX adjustments, or VAT bookings.
+            reporting currency amounts, revaluations, or TAX bookings.
         serialized_ledger (pd.DataFrame): Ledger in completed form, after
-            automated enhancements, including base currency amounts,
-            FX adjustments or VAT bookings. Data is returned in long format,
+            automated enhancements, including reporting currency amounts,
+            revaluations or TAX bookings. Data is returned in long format,
             detailing accounts and counter-accounts in separate rows.
         prices (pd.DataFrame, optional): Prices data for foreign currencies,
             securities, commodities, inventory, etc.
-        vat_codes (pd.DataFrame, optional): VAT definitions.
-        fx_adjustments (pd.DataFrame, optional): Definitions for automated
-            calculation of FX adjustments.
+        tax_codes (pd.DataFrame, optional): TAX definitions.
+        revaluations (pd.DataFrame, optional): Definitions for automated
+            calculation of revaluations.
     """
 
     _settings = None
-    _account_chart = None
+    _accounts = None
     _ledger = None
     _serialized_ledger = None
     _prices = None
-    _vat_codes = None
-    _fx_adjustments = None
+    _tax_codes = None
+    _revaluations = None
 
     # ----------------------------------------------------------------------
     # Constructor
@@ -55,159 +55,159 @@ class StandaloneLedger(LedgerEngine):
         accounts: pd.DataFrame = None,
         ledger: pd.DataFrame = None,
         prices: pd.DataFrame = None,
-        vat_codes: pd.DataFrame = None,
-        fx_adjustments: pd.DataFrame = None,
+        tax_codes: pd.DataFrame = None,
+        revaluations: pd.DataFrame = None,
     ) -> None:
         """Initialize the StandaloneLedger with provided accounting data and settings.
 
         Args:
             settings (dict): Configuration settings for the ledger operations.
-            accounts (pd.DataFrame): Account chart.
+            accounts (pd.DataFrame): Accounts.
             ledger (pd.DataFrame, optional): General ledger data.
             prices (pd.DataFrame, optional): Prices data for various assets.
-            vat_codes (pd.DataFrame, optional): VAT definitions.
-            fx_adjustments (pd.DataFrame, optional): FX adjustment definitions.
+            tax_codes (pd.DataFrame, optional): TAX definitions.
+            revaluations (pd.DataFrame, optional): revaluations definitions.
         """
         super().__init__()
         self._settings = self.standardize_settings(settings)
-        self._account_chart = self.standardize_account_chart(accounts)
+        self._accounts = self.standardize_accounts(accounts)
         self._ledger = self.standardize_ledger_columns(ledger)
         self._prices = self.standardize_prices(prices)
-        self._vat_codes = self.standardize_vat_codes(vat_codes)
-        self._fx_adjustments = self.standardize_fx_adjustments(fx_adjustments)
+        self._tax_codes = self.standardize_tax_codes(tax_codes)
+        self._revaluations = self.standardize_revaluations(revaluations)
         self.validate_accounts()
 
-    def fx_adjustments(self) -> pd.DataFrame:
-        return self._fx_adjustments
+    def revaluations(self) -> pd.DataFrame:
+        return self._revaluations
 
     # ----------------------------------------------------------------------
-    # VAT Codes
+    # TAX Codes
 
-    def vat_codes(self) -> pd.DataFrame:
-        return self._vat_codes
+    def tax_codes(self) -> pd.DataFrame:
+        return self._tax_codes
 
-    def vat_rate(self, vat_code: str) -> float:
-        """Retrieve the VAT rate for a given VAT code.
-
-        Args:
-            vat_code (str): VAT code to look up.
-
-        Returns:
-            float: VAT rate associated with the specified code.
-
-        Raises:
-            KeyError: If the VAT code is not defined.
-        """
-        if vat_code not in self._vat_codes["id"].values:
-            raise KeyError(f"VAT code not defined: {vat_code}")
-        return self._vat_codes["rate"][vat_code]
-
-    def vat_accounts(self, vat_code: str) -> list[int]:
-        """Retrieve the accounts associated with a given VAT code.
+    def tax_code(self, tax_code: str) -> float:
+        """Retrieve the TAX rate for a given TAX code.
 
         Args:
-            vat_code (str): VAT code to look up.
+            tax_code (str): TAX code to look up.
 
         Returns:
-            list[int]: List of accounts associated with the specified VAT code.
+            float: TAX rate associated with the specified code.
 
         Raises:
-            KeyError: If the VAT code is not defined.
+            KeyError: If the TAX code is not defined.
         """
-        if vat_code not in self._vat_codes["id"].values:
-            raise KeyError(f"VAT code not defined: {vat_code}")
-        return self._vat_codes["accounts"][vat_code]
+        if tax_code not in self._tax_codes["id"].values:
+            raise KeyError(f"TAX code not defined: {tax_code}")
+        return self._tax_codes["rate"][tax_code]
 
-    def add_vat_code(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_vat_code is not implemented yet.")
+    def tax_accounts(self, tax_code: str) -> list[int]:
+        """Retrieve the accounts associated with a given TAX code.
 
-    def modify_vat_code(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_vat_code is not implemented yet.")
+        Args:
+            tax_code (str): TAX code to look up.
 
-    def delete_vat_codes(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_vat_codes is not implemented yet.")
+        Returns:
+            list[int]: List of accounts associated with the specified TAX code.
 
-    def vat_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create journal entries to book VAT according to vat_codes.
+        Raises:
+            KeyError: If the TAX code is not defined.
+        """
+        if tax_code not in self._tax_codes["id"].values:
+            raise KeyError(f"TAX code not defined: {tax_code}")
+        return self._tax_codes["accounts"][tax_code]
 
-        Iterates through the provided DataFrame and calculates VAT for entries
-        that have a non-null vat_code. It generates a new journal entry for
-        each VAT account.
+    def add_tax_code(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_tax_code is not implemented yet.")
+
+    def modify_tax_code(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_tax_code is not implemented yet.")
+
+    def delete_tax_codes(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_tax_codes is not implemented yet.")
+
+    def tax_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create journal entries to book TAX according to tax_codes.
+
+        Iterates through the provided DataFrame and calculates TAX for entries
+        that have a non-null tax_code. It generates a new journal entry for
+        each TAX account.
 
         Args:
             df (pd.DataFrame): A pandas DataFrame containing ledger entries.
 
         Returns:
-            pd.DataFrame: A new DataFrame with VAT journal entries.
-            Returns empty DataFrame with the correct structure if no VAT codes are present.
+            pd.DataFrame: A new DataFrame with TAX journal entries.
+            Returns empty DataFrame with the correct structure if no TAX codes are present.
         """
-        vat_definitions = self.vat_codes().set_index("id").to_dict("index")
-        vat_journal_entries = []
-        account_chart = self.account_chart()
-        for _, row in df.loc[df["vat_code"].notna()].iterrows():
-            vat = vat_definitions[row["vat_code"]]
-            account_vat_code = (
-                account_chart.loc[
-                    account_chart["account"] == row["account"], "vat_code"
+        tax_definitions = self.tax_codes().set_index("id").to_dict("index")
+        tax_journal_entries = []
+        accounts = self.accounts()
+        for _, row in df.loc[df["tax_code"].notna()].iterrows():
+            tax = tax_definitions[row["tax_code"]]
+            account_tax_code = (
+                accounts.loc[
+                    accounts["account"] == row["account"], "tax_code"
                 ].values[0] if pd.notna(row["account"]) else None
             )
-            counter_vat_code = (
-                account_chart.loc[
-                    account_chart["account"] == row["counter_account"], "vat_code"
-                ].values[0] if pd.notna(row["counter_account"]) else None
+            counter_tax_code = (
+                accounts.loc[
+                    accounts["account"] == row["contra"], "tax_code"
+                ].values[0] if pd.notna(row["contra"]) else None
             )
-            if pd.isna(account_vat_code) and pd.isna(counter_vat_code):
+            if pd.isna(account_tax_code) and pd.isna(counter_tax_code):
                 self._logger.warning(
-                    f"Skip vat code '{row['vat_code']}' for {row['id']}: Neither account nor "
-                    f"counter account have a vat_code."
+                    f"Skip tax code '{row['tax_code']}' for {row['id']}: Neither account nor "
+                    f"counter account have a tax_code."
                 )
-            elif pd.isna(account_vat_code) and pd.notna(counter_vat_code):
+            elif pd.isna(account_tax_code) and pd.notna(counter_tax_code):
                 multiplier = 1.0
-                account = (row["counter_account"] if vat["inclusive"] else row["account"])
-            elif pd.notna(account_vat_code) and pd.isna(counter_vat_code):
+                account = (row["contra"] if tax["is_inclusive"] else row["account"])
+            elif pd.notna(account_tax_code) and pd.isna(counter_tax_code):
                 multiplier = -1.0
-                account = (row["account"] if vat["inclusive"] else row["counter_account"])
+                account = (row["account"] if tax["is_inclusive"] else row["contra"])
             else:
                 self._logger.warning(
-                    f"Skip vat code '{row['vat_code']}' for {row['id']}: Both account and "
-                    f"counter accounts have vat_codes."
+                    f"Skip tax code '{row['tax_code']}' for {row['id']}: Both account and "
+                    f"counter accounts have tax_code."
                 )
 
-            # Calculate VAT amount
-            if vat["inclusive"]:
-                amount = row["amount"] * vat["rate"] / (1 + vat["rate"])
+            # Calculate TAX amount
+            if tax["is_inclusive"]:
+                amount = row["amount"] * tax["rate"] / (1 + tax["rate"])
             else:
-                amount = row["amount"] * vat["rate"]
+                amount = row["amount"] * tax["rate"]
             amount = amount * multiplier
             amount = self.round_to_precision(amount, row["currency"])
 
-            # Create a new journal entry for the VAT amount
+            # Create a new journal entry for the TAX amount
             if amount != 0:
-                base_entry = {
+                reporting_entry = {
                     "date": row["date"],
-                    "text": "VAT: " + row["text"],
+                    "description": "TAX: " + row["description"],
                     "account": account,
                     "document": row["document"],
                     "currency": row["currency"],
-                    "base_currency_amount": np.nan,
-                    "vat_code": row["vat_code"]
+                    "report_amount": np.nan,
+                    "tax_code": row["tax_code"]
                 }
-                if pd.notna(vat["account"]):
-                    vat_journal_entries.append(base_entry | {
-                        "id": f"{row['id']}:vat",
-                        "counter_account": vat["account"],
+                if pd.notna(tax["account"]):
+                    tax_journal_entries.append(reporting_entry | {
+                        "id": f"{row['id']}:tax",
+                        "contra": tax["account"],
                         "amount": amount
                     })
-                if pd.notna(vat["inverse_account"]):
-                    vat_journal_entries.append(base_entry | {
-                        "id": f"{row['id']}:vat",
-                        "counter_account": vat["inverse_account"],
+                if pd.notna(tax["contra"]):
+                    tax_journal_entries.append(reporting_entry | {
+                        "id": f"{row['id']}:tax",
+                        "contra": tax["contra"],
                         "amount": -1 * amount
                     })
 
         # Return a DataFrame
-        if len(vat_journal_entries) > 0:
-            result = pd.DataFrame(vat_journal_entries)
+        if len(tax_journal_entries) > 0:
+            result = pd.DataFrame(tax_journal_entries)
         else:
             # Empty DataFrame with identical structure
             result = pd.DataFrame(
@@ -216,13 +216,13 @@ class StandaloneLedger(LedgerEngine):
         return result
 
     # ----------------------------------------------------------------------
-    # Account chart
+    # Accounts
 
     def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
         return self._balance_from_serialized_ledger(account=account, date=date)
 
-    def account_chart(self) -> pd.DataFrame:
-        return self._account_chart
+    def accounts(self) -> pd.DataFrame:
+        return self._accounts
 
     def add_account(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_account is not implemented yet.")
@@ -234,29 +234,28 @@ class StandaloneLedger(LedgerEngine):
         raise NotImplementedError("delete_accounts is not implemented yet.")
 
     def validate_accounts(self) -> None:
-        """Validate coherence between account, VAT and FX adjustment definitions."""
-        # Ensure all vat code accounts are defined in account chart
-        vat_codes = set(self._vat_codes["id"])
-        missing = set(self._account_chart["vat_code"].dropna()) - vat_codes
+        """Validate coherence between account, TAX and revaluation definitions."""
+        # Ensure all tax code accounts are defined in accounts
+        tax_codes = set(self._tax_codes["id"])
+        missing = set(self._accounts["tax_code"].dropna()) - tax_codes
         if len(missing) > 0:
-            raise ValueError(f"Some VAT codes in account chart not defined: {missing}.")
+            raise ValueError(f"Some TAX codes in accounts not defined: {missing}.")
 
-        # Ensure all account vat_codes are defined in vat_codes
-        accounts = set(self._account_chart["account"])
-        missing = set(self._vat_codes["account"].dropna()) - accounts
+        # Ensure all account tax_codes are defined in tax_codes
+        accounts = set(self._accounts["account"])
+        missing = set(self._tax_codes["account"].dropna()) - accounts
         if len(missing) > 0:
             raise ValueError(
-                f"Some accounts in VAT code definitions are not defined in the account chart: "
+                f"Some accounts in TAX code definitions are not defined in the accounts: "
                 f"{missing}."
             )
 
-        # Ensure all credit and debit accounts in fx_adjustments are defined
-        # in account chart
-        df = self.fx_adjustments()
+        # Ensure all credit and debit accounts in revaluations are defined in accounts
+        df = self.revaluations()
         missing = (set(df["credit"]) | set(df["debit"])) - accounts
         if len(missing) > 0:
             raise ValueError(
-                f"Some accounts in FX adjustment definitions are not defined in the account chart: "
+                f"Some accounts in revaluation definitions are not defined in the accounts: "
                 f"{missing}."
             )
 
@@ -348,62 +347,63 @@ class StandaloneLedger(LedgerEngine):
                 new_amount.append(amount)
                 df.loc[range(df.shape[0]) == i, "amount"] = amount
 
-        # Add automated journal entries for VAT
-        vat = self.vat_journal_entries(df)
-        if vat.shape[0] > 0:
-            df = pd.concat([df, vat])
+        # Add automated journal entries for TAX
+        tax = self.tax_journal_entries(df)
+        if tax.shape[0] > 0:
+            df = pd.concat([df, tax])
 
-        # Insert missing base currency amounts
-        index = df["base_currency_amount"].isna()
-        df.loc[index, "base_currency_amount"] = self._base_currency_amount(
+        # Insert missing reporting currency amounts
+        index = df["report_amount"].isna()
+        df.loc[index, "report_amount"] = self._reporting_currency_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
         )
 
-        # FX adjustments
-        adjustment = self.fx_adjustments()
-        base_currency = self.base_currency
-        for row in adjustment.to_dict("records"):
+        # revaluations
+        revaluations = self.revaluations()
+        reporting_currency = self.reporting_currency
+        for row in revaluations.to_dict("records"):
             self._serialized_ledger = self.serialize_ledger(df)
             date = row["date"]
-            accounts = self.account_range(row["adjust"])
+            accounts = self.account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
-            adjustments = []
+            revaluations = []
             for account in accounts:
                 currency = self.account_currency(account)
-                if currency != base_currency:
+                if currency != reporting_currency:
                     balance = self.account_balance(account, date=date)
-                    fx_rate = self.price(currency, date=date, currency=base_currency)
-                    if fx_rate[0] != base_currency:
+                    fx_rate = self.price(currency, date=date, currency=reporting_currency)
+                    if fx_rate[0] != reporting_currency:
                         raise ValueError(
-                            f"FX rate currency mismatch: expected {base_currency}, got {fx_rate[0]}"
+                            f"FX rate currency mismatch: expected {reporting_currency}, got "
+                            f"{fx_rate[0]}"
                         )
                     target = balance[currency] * fx_rate[1]
-                    amount = target - balance["base_currency"]
-                    amount = self.round_to_precision(amount, ticker=base_currency, date=date)
-                    id = f"fx_adjustment:{date}:{account}"
-                    adjustments.append({
+                    amount = target - balance["reporting_currency"]
+                    amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
+                    id = f"revaluation:{date}:{account}"
+                    revaluations.append({
                         "id": id,
                         "date": date,
                         "account": account,
                         "currency": currency,
                         "amount": 0,
-                        "base_currency_amount": amount,
-                        "text": row["text"]
+                        "report_amount": amount,
+                        "description": row["description"]
                     })
-                    adjustments.append({
+                    revaluations.append({
                         "id": id,
                         "date": date,
                         "account": row["credit"] if amount > 0 else row["debit"],
-                        "currency": base_currency,
+                        "currency": reporting_currency,
                         "amount": -1 * amount,
-                        "base_currency_amount": -1 * amount,
-                        "text": row["text"]
+                        "report_amount": -1 * amount,
+                        "description": row["description"]
                     })
-            if len(adjustments) > 0:
-                adjustments = self.standardize_ledger_columns(pd.DataFrame(adjustments))
-                df = pd.concat([df, adjustments])
+            if len(revaluations) > 0:
+                revaluations = self.standardize_ledger_columns(pd.DataFrame(revaluations))
+                df = pd.concat([df, revaluations])
 
         # Serializes ledger with separate credit and debit entries.
         result = self.serialize_ledger(df)
@@ -430,37 +430,37 @@ class StandaloneLedger(LedgerEngine):
         rows = df["account"] == int(account)
         if date is not None:
             rows = rows & (df["date"] <= date)
-        cols = ["amount", "base_currency_amount", "currency"]
+        cols = ["amount", "report_amount", "currency"]
         if rows.sum() == 0:
-            result = {"base_currency": 0.0}
+            result = {"reporting_currency": 0.0}
             currency = self.account_currency(account)
             if currency is not None:
                 result[currency] = 0.0
         else:
             sub = df.loc[rows, cols]
-            base_amount = sub["base_currency_amount"].sum()
+            reporting_amount = sub["report_amount"].sum()
             amount = sub.groupby("currency").agg({"amount": "sum"})
             amount = {currency: amount for currency, amount in zip(amount.index, amount["amount"])}
-            result = {"base_currency": base_amount} | amount
+            result = {"reporting_currency": reporting_amount} | amount
         return result
 
     # ----------------------------------------------------------------------
     # Currency
 
     @property
-    def base_currency(self) -> str:
-        return self._settings["base_currency"]
+    def reporting_currency(self) -> str:
+        return self._settings["reporting_currency"]
 
-    def _base_currency_amount(
+    def _reporting_currency_amount(
         self, amount: list[float], currency: list[str], date: list[datetime.date]
     ) -> list[float]:
-        base_currency = self.base_currency
+        reporting_currency = self.reporting_currency
         if not (len(amount) == len(currency) == len(date)):
             raise ValueError("Vectors 'amount', 'currency', and 'date' must have the same length.")
         result = [
             self.round_to_precision(
-                a * self.price(t, date=d, currency=base_currency)[1],
-                base_currency, date=d)
+                a * self.price(t, date=d, currency=reporting_currency)[1],
+                reporting_currency, date=d)
             for a, t, d in zip(amount, currency, date)]
         return result
 
