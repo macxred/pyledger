@@ -1,4 +1,4 @@
-"""Definition of abstract base class for testing TAX code operations."""
+"""Definition of abstract base class for testing tax operations."""
 
 import pytest
 import pandas as pd
@@ -24,7 +24,7 @@ class BaseTestTaxCodes(BaseTest):
         initial_tax_codes = ledger.tax_codes()
         new_tax_code = {
             "code": "TestCode",
-            "description": "TAX 2%",
+            "description": "tax 2%",
             "account": 9990,
             "rate": 0.02,
             "is_inclusive": True,
@@ -41,11 +41,11 @@ class BaseTestTaxCodes(BaseTest):
         assert created_tax_codes["rate"].item() == new_tax_code["rate"]
         assert created_tax_codes["is_inclusive"].item() == new_tax_code["is_inclusive"]
 
-        # Test updating a TAX code with valid inputs.
+        # Test updating a tax code with valid inputs.
         initial_tax_codes = ledger.tax_codes()
         new_tax_code = {
             "code": "TestCode",
-            "description": "TAX 20%",
+            "description": "tax 20%",
             "account": 9990,
             "rate": 0.20,
             "is_inclusive": True,
@@ -65,7 +65,7 @@ class BaseTestTaxCodes(BaseTest):
         assert modified_tax_codes["rate"].item() == new_tax_code["rate"]
         assert modified_tax_codes["is_inclusive"].item() == new_tax_code["is_inclusive"]
 
-        # Test deleting an existent TAX code.
+        # Test deleting an existent tax code.
         ledger.delete_tax_codes(codes=["TestCode"])
         updated_tax_codes = ledger.tax_codes()
 
@@ -76,7 +76,7 @@ class BaseTestTaxCodes(BaseTest):
     ):
         new_tax_code = {
             "code": "TestCode",
-            "description": "TAX 2%",
+            "description": "tax 2%",
             "account": 9990,
             "rate": 0.02,
             "is_inclusive": True,
@@ -90,14 +90,14 @@ class BaseTestTaxCodes(BaseTest):
     ):
         with pytest.raises(error_class, match=error_message):
             ledger.modify_tax_code(
-                code="TestCode", description="TAX 20%", account=9990, rate=0.02, is_inclusive=True
+                code="TestCode", description="tax 20%", account=9990, rate=0.02, is_inclusive=True
             )
 
     def test_mirror(self, ledger):
         # Standardize TAX_CODES before testing
         standardized_df = ledger.standardize_tax_codes(self.TAX_CODES)
 
-        # Mirror test TAX codes onto server with delete=False
+        # Mirror test tax codes onto server with delete=False
         initial = standardized_df.copy()
         ledger.mirror_tax_codes(standardized_df, delete=False)
         mirrored_df = ledger.tax_codes()
@@ -105,7 +105,7 @@ class BaseTestTaxCodes(BaseTest):
         # Mirroring should not change initial df
         assert_frame_equal(initial, mirrored_df, ignore_row_order=True, check_like=True)
 
-        # Mirror target TAX codes onto server with delete=True
+        # Mirror target tax codes onto server with delete=True
         tax_codes = self.TAX_CODES[~self.TAX_CODES["id"].isin(["OutStd", "OutRed"])]
         ledger.mirror_tax_codes(tax_codes, delete=True)
         mirrored_df = ledger.tax_codes()
@@ -114,18 +114,18 @@ class BaseTestTaxCodes(BaseTest):
             expected, mirrored_df, ignore_row_order=True, check_like=True
         )
 
-        # Reshuffle target data randomly and modify one of the TAX rates
+        # Reshuffle target data randomly and modify one of the tax rates
         tax_codes_shuffled = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
         tax_codes_shuffled.loc[tax_codes_shuffled["id"] == "OutStdEx", "rate"] = 0.9
         tax_codes_shuffled = ledger.standardize_tax_codes(tax_codes_shuffled)
 
-        # Mirror target TAX codes onto server with updating
+        # Mirror target tax codes onto server with updating
         ledger.mirror_tax_codes(tax_codes_shuffled, delete=True)
         mirrored_df = ledger.tax_codes()
         assert_frame_equal(tax_codes_shuffled, mirrored_df, ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_tax_codes(self, ledger):
         ledger.restore(tax_codes=self.TAX_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS)
-        assert not ledger.tax_codes().empty, "TAX codes were not populated"
+        assert not ledger.tax_codes().empty, "Tax codes were not populated"
         ledger.mirror_tax_codes(ledger.standardize_tax_codes(None), delete=True)
-        assert ledger.tax_codes().empty, "Mirroring empty df should erase all TAX codes"
+        assert ledger.tax_codes().empty, "Mirroring empty df should erase all tax codes"

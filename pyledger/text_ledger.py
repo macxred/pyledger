@@ -50,14 +50,14 @@ class TextLedger(StandaloneLedger):
         revaluations: str = None,
     ) -> None:
         """Initialize the TextLedger with paths to settings, accounts,
-        ledger, prices, TAX codes, and revaluations files.
+        ledger, prices, tax codes, and revaluations files.
 
         Args:
             settings (str): Path to the JSON settings file.
             accounts (str): Path to the CSV accounts file.
             ledger (str): Path to the directory containing ledger CSV files.
             prices (str, optional): Path to the directory containing price CSV files.
-            tax_codes (str, optional): Path to the CSV TAX codes file.
+            tax_codes (str, optional): Path to the CSV tax codes file.
             revaluations (str, optional): Path to the CSV revaluations file.
         """
         self._logger = logging.getLogger("ledger")

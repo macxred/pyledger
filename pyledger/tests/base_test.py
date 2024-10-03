@@ -7,10 +7,10 @@ from io import StringIO
 
 TAX_CSV = """
     id,       account, rate,  is_inclusive, description
-    OutStd,   9990,    0.038, True,         TAX at the regular 7.7% rate on goods or services
-    OutRed,   9990,    0.025, True,         TAX at the reduced 2.5% rate on goods or services
+    OutStd,   9990,    0.038, True,         tax at the regular 7.7% rate on goods or services
+    OutRed,   9990,    0.025, True,         tax at the reduced 2.5% rate on goods or services
     OutAcc,   9990,    0.038, True,         XXXXX
-    OutStdEx, 9990,    0.077, False,        TAX at the regular 7.7% rate on goods or services
+    OutStdEx, 9990,    0.077, False,        tax at the regular 7.7% rate on goods or services
     InStd,    9992,    0.077, True,         Input Tax (Vorsteuer) at the regular 7.7% rate on
     InRed,    9992,    0.025, True,         Input Tax (Vorsteuer) at the reduced 2.5% rate on
     InAcc,    9992,    0.038, True,         YYYYY
@@ -26,7 +26,7 @@ ACCOUNT_CSV = """
     /Assets, 9993,      EUR,          , Transitory Account EUR
     /Assets, 9994,      USD,          , Transitory Account USD
     /Assets, 9995,      CHF,          , Transitory Account CHF
-    /Assets, 9999,      CHF,          , Test Account with TAX
+    /Assets, 9999,      CHF,          , Test Account with tax
 """
 
 # flake8: noqa: E501

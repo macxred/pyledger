@@ -8,7 +8,7 @@
 
 - Double-entry accounting system.
 - Multiple currency and commodity support.
-- TAX calculations and reporting.
+- Tax calculations and reporting.
 - Customizable Data Storage, enabling users to either integrate with existing databases or utilize PyLedger's built-in storage mechanism based on text files.
 
 
@@ -46,7 +46,7 @@ The foundational element of the PyLedger library, the LedgerEngine class, specif
 **Stand-Alone implementations**
 
 1. **StandaloneLedger**\
-This class extends LedgerEngine to provide a self-sufficient ledger system independent of external accounting software. It implements specific business rules like TAX calculations and revaluations. Data storage is treated as an abstract concept, which allows for integration with any data storage solution, ensuring maximum flexibility.
+This class extends LedgerEngine to provide a self-sufficient ledger system independent of external accounting software. It implements specific business rules like tax calculations and foreign exchange revaluations. Data storage is treated as an abstract concept, which allows for integration with any data storage solution, ensuring maximum flexibility.
 
 1. **MemoryLedger**\
 This class extends the StandaloneLedger to provide a fully featured but non-persistent ledger system. MemoryLedger stores accounting data as DataFrames directly in memory, without relying on external data storage solutions. It is particularly useful for demonstration and testing purposes where persistence is not required.
@@ -121,9 +121,9 @@ ledger.account_balance(1020)
 
 # Retrieve an account's transaction history
 ledger.account_history(1020)
-##   id        date   account  contra currency  amount  balance  report_amount  reporting_currency_balance tax_code              description document
-## 0  1  2024-04-12     1020     6000      CHF  -100.0   -100.0         -100.0                      -100.0     <NA>   First Test Transaction     <NA>
-## 1  2  2024-04-12     1020     4000      CHF   200.0    100.0          200.0                       100.0     <NA>  Second Test Transaction     <NA>
+##   id        date  account  contra  currency  amount  balance  report_amount  report_balance  tax_code              description  document
+## 0  1  2024-04-12     1020    6000       CHF  -100.0   -100.0         -100.0          -100.0      <NA>   First Test Transaction      <NA>
+## 1  2  2024-04-12     1020    4000       CHF   200.0    100.0          200.0           100.0      <NA>  Second Test Transaction      <NA>
 ```
 
 ## Testing Strategy

@@ -67,7 +67,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         ledger.clear()
         assert ledger.ledger().empty, "Ledger was not cleared"
-        assert ledger.tax_codes().empty, "TAX codes were not cleared"
+        assert ledger.tax_codes().empty, "Tax codes were not cleared"
         assert ledger.accounts().empty, "Accounts was not cleared"
         # TODO: Expand test logic to test price history, precision settings,
         # and revaluations when implemented

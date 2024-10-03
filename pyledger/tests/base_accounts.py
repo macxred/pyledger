@@ -86,7 +86,7 @@ class BaseTestAccounts(BaseTest):
         new_account = {
             "account": 1145,
             "currency": "USD",
-            "description": "test update account without TAX",
+            "description": "test update account without tax",
             "tax_code": None,
             "group": "/Assets",
         }

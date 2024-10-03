@@ -30,7 +30,7 @@ class MemoryLedger(StandaloneLedger):
         # TODO: Similarly initialise assets when concept implemented
 
     # ----------------------------------------------------------------------
-    # TAX Codes
+    # Tax Codes
 
     def tax_codes(self) -> pd.DataFrame:
         return self.standardize_tax_codes(self._tax_codes)
@@ -44,7 +44,7 @@ class MemoryLedger(StandaloneLedger):
         description: str = "",
     ) -> None:
         if (self._tax_codes["id"] == code).any():
-            raise ValueError(f"TAX code '{code}' already exists")
+            raise ValueError(f"Tax code '{code}' already exists")
 
         new_tax_code = self.standardize_tax_codes(pd.DataFrame({
             "id": [code],
@@ -64,7 +64,7 @@ class MemoryLedger(StandaloneLedger):
         description: str = "",
     ) -> None:
         if (self._tax_codes["id"] == code).sum() != 1:
-            raise ValueError(f"TAX code '{code}' not found or duplicated.")
+            raise ValueError(f"Tax code '{code}' not found or duplicated.")
 
         self._tax_codes.loc[
             self._tax_codes["id"] == code, ["rate", "account", "is_inclusive", "description"]
@@ -77,7 +77,7 @@ class MemoryLedger(StandaloneLedger):
         if not allow_missing:
             missing = set(codes) - set(self._tax_codes["id"])
             if missing:
-                raise ValueError(f"TAX code(s) '{', '.join(missing)}' not found.")
+                raise ValueError(f"Tax code(s) '{', '.join(missing)}' not found.")
 
         self._tax_codes = self._tax_codes[~self._tax_codes["id"].isin(codes)]
 

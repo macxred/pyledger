@@ -16,24 +16,23 @@ class StandaloneLedger(LedgerEngine):
     """StandaloneLedger is a self-contained implementation of the LedgerEngine class,
     that provides an abstract interface for a double-entry accounting system.
     StandaloneLedger operates autonomously and does not connect to third-party
-    accounting software. It handles accounting data primarily in pandas DataFrames and
-    provides methods to enforce type consistency for these DataFrames. This class serves
-    as a base for any standalone ledger implementation with a specific data storage choice.
+    accounting software. It serves as a base for any standalone ledger implementation
+    with a specific data storage choice.
 
     Attributes:
         settings (dict): Accounting settings, such as beginning and end of the
             accounting period, rounding precision for currencies, etc.
-        accounts (pd.DataFrame): Accounts.
+        accounts (pd.DataFrame): Account chart.
         ledger (pd.DataFrame): General ledger data in original form entered
             into the accounting system, without automated enhancements such as
-            reporting currency amounts, revaluations, or TAX bookings.
+            reporting currency amounts, revaluations, or tax bookings.
         serialized_ledger (pd.DataFrame): Ledger in completed form, after
             automated enhancements, including reporting currency amounts,
-            revaluations or TAX bookings. Data is returned in long format,
+            revaluations or tax bookings. Data is returned in long format,
             detailing accounts and counter-accounts in separate rows.
         prices (pd.DataFrame, optional): Prices data for foreign currencies,
             securities, commodities, inventory, etc.
-        tax_codes (pd.DataFrame, optional): TAX definitions.
+        tax_codes (pd.DataFrame, optional): tax definitions.
         revaluations (pd.DataFrame, optional): Definitions for automated
             calculation of revaluations.
     """
@@ -62,11 +61,11 @@ class StandaloneLedger(LedgerEngine):
 
         Args:
             settings (dict): Configuration settings for the ledger operations.
-            accounts (pd.DataFrame): Accounts.
+            accounts (pd.DataFrame): Account chart.
             ledger (pd.DataFrame, optional): General ledger data.
             prices (pd.DataFrame, optional): Prices data for various assets.
-            tax_codes (pd.DataFrame, optional): TAX definitions.
-            revaluations (pd.DataFrame, optional): revaluations definitions.
+            tax_codes (pd.DataFrame, optional): tax definitions.
+            revaluations (pd.DataFrame, optional): foreign exchange or other revaluations.
         """
         super().__init__()
         self._settings = self.standardize_settings(settings)
@@ -81,42 +80,10 @@ class StandaloneLedger(LedgerEngine):
         return self._revaluations
 
     # ----------------------------------------------------------------------
-    # TAX Codes
+    # Tax Codes
 
     def tax_codes(self) -> pd.DataFrame:
         return self._tax_codes
-
-    def tax_code(self, tax_code: str) -> float:
-        """Retrieve the TAX rate for a given TAX code.
-
-        Args:
-            tax_code (str): TAX code to look up.
-
-        Returns:
-            float: TAX rate associated with the specified code.
-
-        Raises:
-            KeyError: If the TAX code is not defined.
-        """
-        if tax_code not in self._tax_codes["id"].values:
-            raise KeyError(f"TAX code not defined: {tax_code}")
-        return self._tax_codes["rate"][tax_code]
-
-    def tax_accounts(self, tax_code: str) -> list[int]:
-        """Retrieve the accounts associated with a given TAX code.
-
-        Args:
-            tax_code (str): TAX code to look up.
-
-        Returns:
-            list[int]: List of accounts associated with the specified TAX code.
-
-        Raises:
-            KeyError: If the TAX code is not defined.
-        """
-        if tax_code not in self._tax_codes["id"].values:
-            raise KeyError(f"TAX code not defined: {tax_code}")
-        return self._tax_codes["accounts"][tax_code]
 
     def add_tax_code(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_tax_code is not implemented yet.")
@@ -128,18 +95,18 @@ class StandaloneLedger(LedgerEngine):
         raise NotImplementedError("delete_tax_codes is not implemented yet.")
 
     def tax_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create journal entries to book TAX according to tax_codes.
+        """Create journal entries to book tax according to tax_codes.
 
-        Iterates through the provided DataFrame and calculates TAX for entries
+        Iterates through the provided DataFrame and calculates tax for entries
         that have a non-null tax_code. It generates a new journal entry for
-        each TAX account.
+        each tax account.
 
         Args:
             df (pd.DataFrame): A pandas DataFrame containing ledger entries.
 
         Returns:
-            pd.DataFrame: A new DataFrame with TAX journal entries.
-            Returns empty DataFrame with the correct structure if no TAX codes are present.
+            pd.DataFrame: A new DataFrame with tax journal entries.
+            Returns empty DataFrame with the correct structure if no tax codes are present.
         """
         tax_definitions = self.tax_codes().set_index("id").to_dict("index")
         tax_journal_entries = []
@@ -173,7 +140,7 @@ class StandaloneLedger(LedgerEngine):
                     f"counter accounts have tax_code."
                 )
 
-            # Calculate TAX amount
+            # Calculate tax amount
             if tax["is_inclusive"]:
                 amount = row["amount"] * tax["rate"] / (1 + tax["rate"])
             else:
@@ -181,7 +148,7 @@ class StandaloneLedger(LedgerEngine):
             amount = amount * multiplier
             amount = self.round_to_precision(amount, row["currency"])
 
-            # Create a new journal entry for the TAX amount
+            # Create a new journal entry for the tax amount
             if amount != 0:
                 reporting_entry = {
                     "date": row["date"],
@@ -234,19 +201,19 @@ class StandaloneLedger(LedgerEngine):
         raise NotImplementedError("delete_accounts is not implemented yet.")
 
     def validate_accounts(self) -> None:
-        """Validate coherence between account, TAX and revaluation definitions."""
+        """Validate coherence between account, tax and revaluation definitions."""
         # Ensure all tax code accounts are defined in accounts
         tax_codes = set(self._tax_codes["id"])
         missing = set(self._accounts["tax_code"].dropna()) - tax_codes
         if len(missing) > 0:
-            raise ValueError(f"Some TAX codes in accounts not defined: {missing}.")
+            raise ValueError(f"Some tax codes in accounts not defined: {missing}.")
 
         # Ensure all account tax_codes are defined in tax_codes
         accounts = set(self._accounts["account"])
         missing = set(self._tax_codes["account"].dropna()) - accounts
         if len(missing) > 0:
             raise ValueError(
-                f"Some accounts in TAX code definitions are not defined in the accounts: "
+                f"Some accounts in tax code definitions are not defined in the accounts: "
                 f"{missing}."
             )
 
@@ -347,7 +314,7 @@ class StandaloneLedger(LedgerEngine):
                 new_amount.append(amount)
                 df.loc[range(df.shape[0]) == i, "amount"] = amount
 
-        # Add automated journal entries for TAX
+        # Add automated journal entries for tax
         tax = self.tax_journal_entries(df)
         if tax.shape[0] > 0:
             df = pd.concat([df, tax])

@@ -69,8 +69,8 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
-    def test_accessor_mutators_single_transaction_without_TAX(self, ledger_engine):
-        # Test adding a ledger entry without TAX code
+    def test_accessor_mutators_single_transaction_without_tax(self, ledger_engine):
+        # Test adding a ledger entry without tax code
         target = self.LEDGER_ENTRIES.query("id == '4'").copy()
         target["tax_code"] = None
         id = ledger_engine.add_ledger_entry(target)
@@ -136,7 +136,7 @@ class BaseTestLedger(BaseTest):
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
     def test_accessor_mutators_collective_transaction_without_tax(self, ledger_engine):
-        # Test adding a collective ledger entry without TAX code
+        # Test adding a collective ledger entry without tax code
         target = self.LEDGER_ENTRIES.query("id == '2'").copy()
         target["tax_code"] = None
         id = ledger_engine.add_ledger_entry(target)

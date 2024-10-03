@@ -5,7 +5,8 @@
 **pyledger** is a Python package designed to standardize interaction with
 accounting systems and facilitate interoperability between different
 accounting software. It provides an abstract interface for a double accounting
-system with an accounts, foreign currencies, arbitrary assets and TAX management.
+system with an account chart, foreign currencies, arbitrary assets and vat or
+sales tax management.
 
 The package includes a stand-alone implementation of the interface that is
 storing data solely in text files and thereby lends itself to version tracking

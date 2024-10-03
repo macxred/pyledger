@@ -1,5 +1,5 @@
 """This module defines Abstract base class defining the core interface for
-managing a ledger system, including accounts, TAX management, and arbitrary
+managing a ledger system, including accounts, tax management, and arbitrary
 assets or currencies.
 """
 
@@ -30,7 +30,7 @@ from .time import parse_date_span
 
 class LedgerEngine(ABC):
     """Abstract base class defining the core interface for managing a ledger system,
-    including accounts, TAX management, and arbitrary assets or currencies.
+    including accounts, tax management, and arbitrary assets or currencies.
     """
 
     _logger = None
@@ -213,8 +213,8 @@ class LedgerEngine(ABC):
 
         Args:
             settings (dict | None): System settings. If `None`, settings remains unchanged.
-            tax_codes (pd.DataFrame | None): TAX codes of the restored ledger system.
-                If `None`, TAX codes remain unchanged.
+            tax_codes (pd.DataFrame | None): Tax codes of the restored ledger system.
+                If `None`, tax codes remain unchanged.
             accounts (pd.DataFrame | None): Accounts of the restored ledger system.
                 If `None`, accounts remain unchanged.
             ledger (pd.DataFrame | None): Ledger entries of the restored system.
@@ -282,14 +282,14 @@ class LedgerEngine(ABC):
         description: str = "",
     ) -> None:
         """
-        Update an existing TAX code.
+        Update an existing tax code.
 
         Args:
-            code (str): TAX code to update.
-            rate (float): TAX rate (from 0 to 1).
-            account (str): Account identifier for the TAX code.
-            is_inclusive (bool, optional): If True, TAX is 'NET' (default), else 'GROSS'.
-            description (str, optional): Description for the TAX code.
+            code (str): Tax code to update.
+            rate (float): Tax rate (from 0 to 1).
+            account (str): Account identifier for the tax code.
+            is_inclusive (bool, optional): If True, tax is 'NET' (default), else 'GROSS'.
+            description (str, optional): Description for the tax code.
         """
 
     @abstractmethod
@@ -297,36 +297,36 @@ class LedgerEngine(ABC):
         """Removes tax code definitions.
 
         Args:
-            codes (List[str]): TAX codes to be removed.
-            allow_missing (bool, optional): If True, no error is raised if the TAX code is not
+            codes (List[str]): Tax codes to be removed.
+            allow_missing (bool, optional): If True, no error is raised if the tax code is not
                                             found.
         """
 
     def mirror_tax_codes(self, target: pd.DataFrame, delete: bool = False):
-        """Aligns TAX codes with a desired target state.
+        """Aligns tax codes with a desired target state.
 
         Args:
-            target (pd.DataFrame): DataFrame with TAX codes in the pyledger.tax_codes format.
-            delete (bool, optional): If True, deletes existing TAX codes that are
+            target (pd.DataFrame): DataFrame with tax codes in the pyledger.tax_codes format.
+            delete (bool, optional): If True, deletes existing tax codes that are
                                      not present in the target data.
 
         Returns:
             dict: A dictionary containing statistics about the mirroring process:
-                - pre-existing (int): The number of TAX codes present before mirroring.
-                - targeted (int): The number of TAX codes in the target data.
-                - added (int): The number of TAX codes added by the mirroring method.
-                - deleted (int): The number of deleted TAX codes.
-                - updated (int): The number of TAX codes modified during mirroring.
+                - pre-existing (int): The number of tax codes present before mirroring.
+                - targeted (int): The number of tax codes in the target data.
+                - added (int): The number of tax codes added by the mirroring method.
+                - deleted (int): The number of deleted tax codes.
+                - updated (int): The number of tax codes modified during mirroring.
         """
         target_df = self.standardize_tax_codes(target)
         current_state = self.tax_codes()
 
-        # Delete superfluous TAX codes on remote
+        # Delete superfluous tax codes on remote
         if delete:
             to_delete = set(current_state["id"]).difference(set(target_df["id"]))
             self.delete_tax_codes(to_delete)
 
-        # Create new TAX codes on remote
+        # Create new tax codes on remote
         ids = set(target_df["id"]).difference(set(current_state["id"]))
         to_add = target_df.loc[target_df["id"].isin(ids)]
         for row in to_add.to_dict("records"):
@@ -338,7 +338,7 @@ class LedgerEngine(ABC):
                 is_inclusive=row["is_inclusive"],
             )
 
-        # Update modified TAX codes on remote
+        # Update modified tax codes on remote
         both = set(target_df["id"]).intersection(set(current_state["id"]))
         left = target_df.loc[target_df["id"].isin(both)]
         right = current_state.loc[current_state["id"].isin(both)]
@@ -371,12 +371,12 @@ class LedgerEngine(ABC):
         the required columns, correct data types, and logical consistency in the data.
 
         Args:
-            df (pd.DataFrame): The DataFrame representing the TAX codes.
+            df (pd.DataFrame): The DataFrame representing the tax codes.
             keep_extra_columns (bool): If True, columns that do not appear in the data frame
                                        schema are left in the resulting DataFrame.
 
         Returns:
-            pd.DataFrame: The standardized TAX codes DataFrame.
+            pd.DataFrame: The standardized tax codes DataFrame.
 
         Raises:
             ValueError: If required columns are missing, if data types are incorrect,
@@ -454,7 +454,7 @@ class LedgerEngine(ABC):
             account (int): Unique identifier for the account.
             description (str): Description of the account.
             currency (str): Currency of the account.
-            tax_code (bool, optional): Indicates if TAX is applicable. Defaults to False.
+            tax_code (bool, optional): Indicates if tax is applicable. Defaults to False.
         """
 
     @abstractmethod
@@ -481,7 +481,7 @@ class LedgerEngine(ABC):
         """Aligns the accounts with a desired target state.
 
         Args:
-            target (pd.DataFrame): DataFrame with an accounts in the pyledger format.
+            target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
             delete (bool, optional): If True, deletes existing accounts that are not
                                      present in the target data.
 
@@ -709,7 +709,7 @@ class LedgerEngine(ABC):
         df = ledger.loc[filter, :]
         df = df.sort_values("date")
         df["balance"] = df["amount"].cumsum()
-        df["reporting_currency_balance"] = df["report_amount"].cumsum()
+        df["report_balance"] = df["report_amount"].cumsum()
         cols = [col for col in LEDGER_SCHEMA["column"] if col in df.columns]
         if start is not None:
             df = df.loc[df["date"] >= start, :]
@@ -956,7 +956,7 @@ class LedgerEngine(ABC):
         Returns:
             pd.DataFrame: DataFrame with sanitized ledger entries.
         """
-        # Discard undefined TAX codes
+        # Discard undefined tax codes
         ledger["tax_code"] = ledger["tax_code"].str.strip()
         invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(self.tax_codes()["id"])
         if invalid.any():
@@ -965,7 +965,7 @@ class LedgerEngine(ABC):
             for id, codes in zip(df["id"].values, df["tax_code"]):
                 if len(codes) > 1:
                     self._logger.warning(
-                        f"Discard unknown TAX codes {', '.join([f'{x}' for x in codes])} at '{id}'."
+                        f"Discard unknown tax codes {', '.join([f'{x}' for x in codes])} at '{id}'."
                     )
                 else:
                     self._logger.warning(f"Discard unknown tax code '{codes[0]}' at '{id}'.")
@@ -1030,7 +1030,7 @@ class LedgerEngine(ABC):
             for id, description in zip(df.index, df["description"]):
                 self._logger.warning(f"Discard ledger entry '{id}': {description}.")
             ledger = ledger.loc[~ledger["id"].isin(df.index), :]
-        # # Add accounts TAX codes for 'account' and 'contra'
+        # # Add accounts tax codes for 'account' and 'contra'
         # accounts = self.accounts[['account', 'tax_code']]
         # df = df.merge(accounts, on='account', how='left',
         #               suffixes=('', '_account'))
@@ -1043,15 +1043,15 @@ class LedgerEngine(ABC):
         #           df['tax_code_counter_account'].notna())
         # if failed.any():
         #     warnings.warn(f"Found {failed.sum()} ledger entries where both "
-        #                   f"account and contra have TAX codes in the "
+        #                   f"account and contra have tax codes in the "
         #                   f"accounts: {df.index[failed]}.", UserWarning)
 
         # failed = (df['tax_code'].notna()
         #           & df['tax_code_account'].isna()
         #           & df['tax_code_counter_account'].isna())
         # if failed.any():
-        #     warnings.warn(f"Found {failed.sum()} ledger entries with TAX code "
-        #                   f"where neither account and contra have TAX "
+        #     warnings.warn(f"Found {failed.sum()} ledger entries with tax code "
+        #                   f"where neither account and contra have tax "
         #                   f"codes in the accounts: {df.index[failed]}.",
         #                   UserWarning)
 
@@ -1059,9 +1059,9 @@ class LedgerEngine(ABC):
         #           & (df['tax_code_account'].notna()
         #              | df['tax_code_counter_account'].notna()))
         # if failed.any():
-        #     warnings.warn(f"Found {failed.sum()} ledger entries without TAX "
+        #     warnings.warn(f"Found {failed.sum()} ledger entries without tax "
         #                   f"code where either account and contra "
-        #                   f"requires a TAX code: {df.index[failed]}.",
+        #                   f"requires a tax code: {df.index[failed]}.",
         #                   UserWarning)
 
         return ledger
