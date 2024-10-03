@@ -1089,7 +1089,7 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing from the ledger DataFrame.
         """
         # Enforce data frame schema
-        df = enforce_schema(df, LEDGER_SCHEMA)
+        df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True)
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
         if "id" not in df.columns or df["id"].isna().any():
@@ -1099,7 +1099,7 @@ class LedgerEngine(ABC):
         # Enforce column data types
         df["date"] = pd.to_datetime(df["date"]).dt.date
 
-        return df.sort_values("date")
+        return df.sort_values("id")
 
     def standardize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
         """Convert ledger entries to a canonical representation.

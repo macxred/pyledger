@@ -354,7 +354,7 @@ class StandaloneLedger(LedgerEngine):
 
         # Insert missing reporting currency amounts
         index = df["report_amount"].isna()
-        df.loc[index, "report_amount"] = self._reporting_currency_amount(
+        df.loc[index, "report_amount"] = self._report_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
@@ -451,7 +451,7 @@ class StandaloneLedger(LedgerEngine):
     def reporting_currency(self) -> str:
         return self._settings["reporting_currency"]
 
-    def _reporting_currency_amount(
+    def _report_amount(
         self, amount: list[float], currency: list[str], date: list[datetime.date]
     ) -> list[float]:
         reporting_currency = self.reporting_currency
