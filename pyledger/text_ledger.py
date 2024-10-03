@@ -133,7 +133,7 @@ class TextLedger(StandaloneLedger):
             result = pd.concat(df_list, ignore_index=True)
         else:
             # Empty DataFrame with identical structure
-            cols = LEDGER_SCHEMA["column_name"]
+            cols = LEDGER_SCHEMA["column"]
             result = self.standardize_ledger(pd.DataFrame(columns=cols))
 
         return result
@@ -195,8 +195,8 @@ class TextLedger(StandaloneLedger):
         Raises:
             ValueError: If required columns are missing.
         """
-        REQUIRED = LEDGER_SCHEMA[LEDGER_SCHEMA['mandatory']]['column_name']
-        LEDGER_COLUMN_SEQUENCE = LEDGER_SCHEMA["column_name"]
+        REQUIRED = LEDGER_SCHEMA[LEDGER_SCHEMA['mandatory']]['column']
+        LEDGER_COLUMN_SEQUENCE = LEDGER_SCHEMA["column"]
         missing = set(REQUIRED) - set(df.columns)
         if missing:
             raise ValueError(f"Missing required columns: {missing}")

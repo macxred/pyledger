@@ -710,7 +710,7 @@ class LedgerEngine(ABC):
         df = df.sort_values("date")
         df["balance"] = df["amount"].cumsum()
         df["reporting_currency_balance"] = df["report_amount"].cumsum()
-        cols = [col for col in LEDGER_SCHEMA["column_name"] if col in df.columns]
+        cols = [col for col in LEDGER_SCHEMA["column"] if col in df.columns]
         if start is not None:
             df = df.loc[df["date"] >= start, :]
         df = df.reset_index(drop=True)
@@ -1093,7 +1093,7 @@ class LedgerEngine(ABC):
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
         if "id" not in df.columns or df["id"].isna().any():
-            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column_name'] == 'id', 'dtype'].values[0]
+            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'id', 'dtype'].values[0]
             df["id"] = df["date"].notna().cumsum().astype(id_type)
 
         # Enforce column data types
@@ -1157,7 +1157,7 @@ class LedgerEngine(ABC):
             pd.DataFrame: Serialized DataFrame in long format.
         """
         # Create separate DataFrames for credit and debit accounts
-        credit = df[LEDGER_SCHEMA["column_name"]]
+        credit = df[LEDGER_SCHEMA["column"]]
         debit = credit.copy()
         debit["amount"] *= -1.0
         debit["report_amount"] *= -1.0
@@ -1168,7 +1168,7 @@ class LedgerEngine(ABC):
             credit.loc[credit["account"].notna()],
             debit.loc[debit["account"].notna()]
         ])
-        return result[LEDGER_SCHEMA["column_name"]]
+        return result[LEDGER_SCHEMA["column"]]
 
     def txn_to_str(self, df: pd.DataFrame) -> Dict[str, str]:
         """Create a consistent, unique representation of ledger transactions.
@@ -1357,7 +1357,7 @@ class LedgerEngine(ABC):
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
 
         # Check for missing values in required columns
-        schema = PRICE_SCHEMA.set_index("column_name")
+        schema = PRICE_SCHEMA.set_index("column")
         required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
         has_missing_value = [
             column for column in required.keys() if df[column].isnull().any()

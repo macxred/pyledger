@@ -211,7 +211,7 @@ class StandaloneLedger(LedgerEngine):
         else:
             # Empty DataFrame with identical structure
             result = pd.DataFrame(
-                columns=dict(zip(LEDGER_SCHEMA['column_name'], LEDGER_SCHEMA['dtype']))
+                columns=dict(zip(LEDGER_SCHEMA['column'], LEDGER_SCHEMA['dtype']))
             )
         return result
 

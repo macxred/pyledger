@@ -4,7 +4,7 @@ import pandas as pd
 from io import StringIO
 
 FX_ADJUSTMENT_SCHEMA_CSV = """
-    column_name,        dtype,                mandatory
+    column,        dtype,                mandatory
     date,               datetime64[ns],       True
     account,            string[python],       True
     credit,             Int64,                True
@@ -14,7 +14,7 @@ FX_ADJUSTMENT_SCHEMA_CSV = """
 FX_ADJUSTMENT_SCHEMA = pd.read_csv(StringIO(FX_ADJUSTMENT_SCHEMA_CSV), skipinitialspace=True)
 
 TAX_CODE_SCHEMA_CSV = """
-    column_name,        dtype,                mandatory
+    column,        dtype,                mandatory
     id,                 string[python],       True
     account,            Int64,                True
     rate,               Float64,              True
@@ -25,7 +25,7 @@ TAX_CODE_SCHEMA_CSV = """
 TAX_CODE_SCHEMA = pd.read_csv(StringIO(TAX_CODE_SCHEMA_CSV), skipinitialspace=True)
 
 ACCOUNT_SCHEMA_CSV = """
-    column_name,        dtype,                mandatory
+    column,        dtype,                mandatory
     account,            Int64,                True
     currency,           string[python],       True
     description,        string[python],       True
@@ -35,7 +35,7 @@ ACCOUNT_SCHEMA_CSV = """
 ACCOUNT_SCHEMA = pd.read_csv(StringIO(ACCOUNT_SCHEMA_CSV), skipinitialspace=True)
 
 PRICE_SCHEMA_CSV = """
-    column_name,        dtype,                mandatory
+    column,        dtype,                mandatory
     ticker,             string[python],       True
     date,               datetime64[ns],       True
     currency,           string[python],       True
@@ -44,7 +44,7 @@ PRICE_SCHEMA_CSV = """
 PRICE_SCHEMA = pd.read_csv(StringIO(PRICE_SCHEMA_CSV), skipinitialspace=True)
 
 LEDGER_SCHEMA_CSV = """
-    column_name,         dtype,                mandatory
+    column,         dtype,                mandatory
     id,                  string[python],       False
     date,                datetime64[ns],       True
     account,             Int64,                True
