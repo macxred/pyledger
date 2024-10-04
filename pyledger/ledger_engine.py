@@ -428,6 +428,11 @@ class LedgerEngine(ABC):
                         contains NaN values, or if data types are incorrect.
         """
         df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=keep_extra_columns)
+        # Ensure required values are present
+        if df["account"].isna().any():
+            # TODO: Drop entries with missing accounts with a warning, rather than raising an error
+            raise ValueError("Missing 'account' values in accounts.")
+
         return df
 
     def account_currency(self, account: int) -> str:
@@ -1313,6 +1318,16 @@ class LedgerEngine(ABC):
         """
         # Enforce data frame schema
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
+        # Check for missing values in required columns
+        has_missing_value = [
+            column
+            for column in PRICE_SCHEMA.query("mandatory")["column"]
+            if df[column].isna().any()
+        ]
+        if len(has_missing_value) > 0:
+            # TODO: drop entries with missing values with a warning, rather than raising an error
+            raise ValueError(f"Missing values in column {has_missing_value}.")
+
         return df
 
     @classmethod
