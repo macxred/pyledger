@@ -1022,39 +1022,6 @@ class LedgerEngine(ABC):
             for id, description in zip(df.index, df["description"]):
                 self._logger.warning(f"Discard ledger entry '{id}': {description}.")
             ledger = ledger.loc[~ledger["id"].isin(df.index), :]
-        # # Add accounts tax codes for 'account' and 'contra'
-        # accounts = self.accounts[['account', 'tax_code']]
-        # df = df.merge(accounts, on='account', how='left',
-        #               suffixes=('', '_account'))
-        # df = df.merge(accounts, left_on='account',
-        #               right_on='contra', how='left',
-        #               suffixes=('', '_counter_account'))
-
-        # # Check whether tax_codes match account definition
-        # failed = (df['tax_code_account'].notna() &
-        #           df['tax_code_counter_account'].notna())
-        # if failed.any():
-        #     warnings.warn(f"Found {failed.sum()} ledger entries where both "
-        #                   f"account and contra have tax codes in the "
-        #                   f"accounts: {df.index[failed]}.", UserWarning)
-
-        # failed = (df['tax_code'].notna()
-        #           & df['tax_code_account'].isna()
-        #           & df['tax_code_counter_account'].isna())
-        # if failed.any():
-        #     warnings.warn(f"Found {failed.sum()} ledger entries with tax code "
-        #                   f"where neither account and contra have tax "
-        #                   f"codes in the accounts: {df.index[failed]}.",
-        #                   UserWarning)
-
-        # failed = (df['tax_code'].isna()
-        #           & (df['tax_code_account'].notna()
-        #              | df['tax_code_counter_account'].notna()))
-        # if failed.any():
-        #     warnings.warn(f"Found {failed.sum()} ledger entries without tax "
-        #                   f"code where either account and contra "
-        #                   f"requires a tax code: {df.index[failed]}.",
-        #                   UserWarning)
 
         return ledger
 
