@@ -118,7 +118,7 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing or if data types are incorrect.
         """
         df = enforce_schema(df, FX_ADJUSTMENT_SCHEMA, keep_extra_columns=keep_extra_columns)
-        return df.sort_values("date")
+        return df
 
     # ----------------------------------------------------------------------
     # File Operations
@@ -391,7 +391,7 @@ class LedgerEngine(ABC):
             # TODO: Drop entries with missing account with a warning, rather than raising an error
             raise ValueError(f"Account must be defined for non-zero rate in tax_codes: {missing}.")
 
-        return df.sort_values("id")
+        return df
 
     # ----------------------------------------------------------------------
     # Accounts
@@ -427,15 +427,8 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing, or if 'account' column
                         contains NaN values, or if data types are incorrect.
         """
-        # Enforce data frame schema
         df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=keep_extra_columns)
-
-        # Ensure required values are present
-        if df["account"].isna().any():
-            # TODO: Drop entries with missing accounts with a warning, rather than raising an error
-            raise ValueError("Missing 'account' values in accounts.")
-
-        return df.sort_values("account")
+        return df
 
     def account_currency(self, account: int) -> str:
         accounts = self.accounts()
@@ -1097,8 +1090,7 @@ class LedgerEngine(ABC):
 
         # Enforce column data types
         df["date"] = pd.to_datetime(df["date"]).dt.date
-
-        return df.sort_values("id")
+        return df
 
     def standardize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
         """Convert ledger entries to a canonical representation.
@@ -1354,18 +1346,7 @@ class LedgerEngine(ABC):
         """
         # Enforce data frame schema
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
-
-        # Check for missing values in required columns
-        schema = PRICE_SCHEMA.set_index("column")
-        required = schema.loc[schema["mandatory"], 'dtype'].to_dict()
-        has_missing_value = [
-            column for column in required.keys() if df[column].isnull().any()
-        ]
-        if len(has_missing_value) > 0:
-            # TODO: drop entries with missing values with a warning, rather than raising an error
-            raise ValueError(f"Missing values in column {has_missing_value}.")
-
-        return df.sort_values("date")
+        return df
 
     @classmethod
     def standardize_prices(cls, df: pd.DataFrame) -> pd.DataFrame:
