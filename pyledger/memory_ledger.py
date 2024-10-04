@@ -33,7 +33,7 @@ class MemoryLedger(StandaloneLedger):
     # Tax Codes
 
     def tax_codes(self) -> pd.DataFrame:
-        return self.standardize_tax_codes(self._tax_codes)
+        return self.standardize_tax_codes(self._tax_codes.copy())
 
     def add_tax_code(
         self,
@@ -85,7 +85,7 @@ class MemoryLedger(StandaloneLedger):
     # Accounts
 
     def accounts(self) -> pd.DataFrame:
-        return self.standardize_accounts(self._accounts)
+        return self.standardize_accounts(self._accounts.copy())
 
     def add_account(
         self,
@@ -138,7 +138,7 @@ class MemoryLedger(StandaloneLedger):
     # Ledger
 
     def ledger(self) -> pd.DataFrame:
-        return self.standardize_ledger(self._ledger)
+        return self.standardize_ledger(self._ledger.copy())
 
     def add_ledger_entry(self, entry: pd.DataFrame) -> int:
         entry = self.standardize_ledger(entry)
