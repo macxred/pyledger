@@ -1,11 +1,11 @@
-"""Test suite for account chart operations."""
+"""Test suite for accounts operations."""
 
 import pytest
 from .base_accounts import BaseTestAccounts
 from pyledger import MemoryLedger
 
 
-class TestVatCodes(BaseTestAccounts):
+class TestTaxCodes(BaseTestAccounts):
 
     @pytest.fixture
     def ledger(self):

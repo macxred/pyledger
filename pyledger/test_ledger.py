@@ -1,6 +1,6 @@
 """This module defines the TestLedger class, an extension of StandaloneLedger,
 designed for demos, experimentation, and testing purposes with hard-coded settings,
-account charts, and VAT codes.
+accounts, and tax codes.
 """
 
 from io import StringIO
@@ -11,7 +11,7 @@ from .standalone_ledger import StandaloneLedger
 
 class TestLedger(StandaloneLedger):
     """Implementation of the StandaloneLedger class that is initiated with
-    hard-coded settings, account chart, and VAT codes. Its purpose is to
+    hard-coded settings, accounts, and tax codes. Its purpose is to
     facilitate demos, experimentation, and testing.
 
     Usage example:
@@ -21,7 +21,7 @@ class TestLedger(StandaloneLedger):
     """
 
     SETTINGS = {
-        "base_currency": "CHF",
+        "reporting_currency": "CHF",
         "precision": {
             "CAD": 0.01,
             "CHF": 0.01,
@@ -33,7 +33,7 @@ class TestLedger(StandaloneLedger):
     }
 
     SWISS_SME_ACCOUNT_CHART = """
-        account, currency, vat_code, text
+        account, currency, tax_code, description
         1000,         CHF,         , Cash on hand
         1020,         CHF,         , Cash at Bank A
         1030,         CHF,         , Cash at Bank B
@@ -86,31 +86,31 @@ class TestLedger(StandaloneLedger):
 
     # flake8: noqa: E501
 
-    SWISS_VAT = """
-        id, date, account, inverse_account, rate, inclusive, text
-        Exempt,   2001-01-01,     ,     , 0.0,    True, Exempt from VAT
-        OutStd,   2001-01-01, 2200,     , 0.077,  True, VAT at the regular 7.7% rate on goods or services sold
-        OutRed,   2001-01-01, 2200,     , 0.025,  True, VAT at the reduced 2.5% rate on goods or services sold
-        OutAcc,   2001-01-01, 2200,     , 0.037,  True, VAT at the 2.5% accommodation rate on goods or services sold
-        OutStdEx, 2001-01-01, 2200,     , 0.077, False, VAT at the regular 7.7% rate on goods or services sold
-        InStd,    2001-01-01, 1170,     , 0.077,  True, Input Tax (Vorsteuer) at the regular 7.7% rate on purchased goods or services
-        InRed,    2001-01-01, 1170,     , 0.025,  True, Input Tax (Vorsteuer) at the reduced 2.5% rate on purchased goods or services
-        InAcc,    2001-01-01, 1170,     , 0.037,  True, Input Tax (Vorsteuer) at the 3.7% accommodation rate on purchased goods or services
-        AcqStd,   2001-01-01, 1170, 2200, 0.077, False, Acquisition tax (Bezugsteuer): VAT on services purchased abroad for which no VAT has been levied yet.
+    SWISS_TAX = """
+        id,       date,       account, contra, rate,  is_inclusive, description
+        Exempt,   2001-01-01,        ,      ,  0.0,           True, Exempt from tax
+        OutStd,   2001-01-01,    2200,      ,  0.077,         True, Tax at the regular 7.7% rate on goods or services sold
+        OutRed,   2001-01-01,    2200,      ,  0.025,         True, Tax at the reduced 2.5% rate on goods or services sold
+        OutAcc,   2001-01-01,    2200,      ,  0.037,         True, Tax at the 2.5% accommodation rate on goods or services sold
+        OutStdEx, 2001-01-01,    2200,      ,  0.077,        False, Tax at the regular 7.7% rate on goods or services sold
+        InStd,    2001-01-01,    1170,      ,  0.077,         True, Input Tax (Vorsteuer) at the regular 7.7% rate on purchased goods or services
+        InRed,    2001-01-01,    1170,      ,  0.025,         True, Input Tax (Vorsteuer) at the reduced 2.5% rate on purchased goods or services
+        InAcc,    2001-01-01,    1170,      ,  0.037,         True, Input Tax (Vorsteuer) at the 3.7% accommodation rate on purchased goods or services
+        AcqStd,   2001-01-01,    1170,  2200,  0.077,        False, Acquisition tax (Bezugsteuer): tax on services purchased abroad for which no tax has been levied yet.
     """
 
     # flake8: enable
 
     def __init__(self) -> None:
-        """Initialize the TestLedger with hard-coded settings, account chart and VAT codes."""
+        """Initialize the TestLedger with hard-coded settings, accounts and tax codes."""
         super().__init__(
             settings=self.SETTINGS,
             accounts=pd.read_csv(
                 StringIO(self.drop_commented_lines(self.SWISS_SME_ACCOUNT_CHART)),
                 skipinitialspace=True
             ),
-            vat_codes=pd.read_csv(
-                StringIO(self.drop_commented_lines(self.SWISS_VAT)),
+            tax_codes=pd.read_csv(
+                StringIO(self.drop_commented_lines(self.SWISS_TAX)),
                 skipinitialspace=True
             ),
         )

@@ -13,132 +13,132 @@ class MemoryLedger(StandaloneLedger):
     memory and is particularly useful for demonstration and testing purposes.
     """
 
-    _base_currency = None
+    _reporting_currency = None
     _precision = CURRENCY_PRECISION
 
-    def __init__(self, base_currency: str = "USD") -> None:
+    def __init__(self, reporting_currency: str = "USD") -> None:
         """Initialize the MemoryLedger and sets the reporting currency.
 
         Args:
-            base_currency (str): The reporting currency. Defaults to "USD".
+            reporting_currency (str): The reporting currency. Defaults to "USD".
         """
-        self._base_currency = base_currency
+        self._reporting_currency = reporting_currency
         self._ledger = self.standardize_ledger(None)
         self._prices = self.standardize_prices(None)
-        self._vat_codes = self.standardize_vat_codes(None)
-        self._account_chart = self.standardize_account_chart(None)
+        self._tax_codes = self.standardize_tax_codes(None)
+        self._accounts = self.standardize_accounts(None)
         # TODO: Similarly initialise assets when concept implemented
 
     # ----------------------------------------------------------------------
-    # VAT Codes
+    # Tax Codes
 
-    def vat_codes(self) -> pd.DataFrame:
-        return self.standardize_vat_codes(self._vat_codes)
+    def tax_codes(self) -> pd.DataFrame:
+        return self.standardize_tax_codes(self._tax_codes.copy())
 
-    def add_vat_code(
+    def add_tax_code(
         self,
-        code: str,
+        id: str,
         rate: float,
         account: str,
-        inclusive: bool = True,
-        text: str = "",
+        is_inclusive: bool = True,
+        description: str = "",
     ) -> None:
-        if (self._vat_codes["id"] == code).any():
-            raise ValueError(f"VAT code '{code}' already exists")
+        if (self._tax_codes["id"] == id).any():
+            raise ValueError(f"Tax code '{id}' already exists")
 
-        new_vat_code = self.standardize_vat_codes(pd.DataFrame({
-            "id": [code],
-            "text": [text],
+        new_tax_code = self.standardize_tax_codes(pd.DataFrame({
+            "id": [id],
+            "description": [description],
             "account": [account],
             "rate": [rate],
-            "inclusive": [inclusive],
+            "is_inclusive": [is_inclusive],
         }))
-        self._vat_codes = pd.concat([self._vat_codes, new_vat_code])
+        self._tax_codes = pd.concat([self._tax_codes, new_tax_code])
 
-    def modify_vat_code(
+    def modify_tax_code(
         self,
-        code: str,
+        id: str,
         rate: float,
         account: str,
-        inclusive: bool = True,
-        text: str = "",
+        is_inclusive: bool = True,
+        description: str = "",
     ) -> None:
-        if (self._vat_codes["id"] == code).sum() != 1:
-            raise ValueError(f"VAT code '{code}' not found or duplicated.")
+        if (self._tax_codes["id"] == id).sum() != 1:
+            raise ValueError(f"Tax code '{id}' not found or duplicated.")
 
-        self._vat_codes.loc[
-            self._vat_codes["id"] == code, ["rate", "account", "inclusive", "text"]
-        ] = [rate, account, inclusive, text]
-        self._vat_codes = self.standardize_vat_codes(self._vat_codes)
+        self._tax_codes.loc[
+            self._tax_codes["id"] == id, ["rate", "account", "is_inclusive", "description"]
+        ] = [rate, account, is_inclusive, description]
+        self._tax_codes = self.standardize_tax_codes(self._tax_codes)
 
-    def delete_vat_codes(
+    def delete_tax_codes(
         self, codes: List[str] = [], allow_missing: bool = False
     ) -> None:
         if not allow_missing:
-            missing = set(codes) - set(self._vat_codes["id"])
+            missing = set(codes) - set(self._tax_codes["id"])
             if missing:
-                raise ValueError(f"VAT code(s) '{', '.join(missing)}' not found.")
+                raise ValueError(f"Tax code(s) '{', '.join(missing)}' not found.")
 
-        self._vat_codes = self._vat_codes[~self._vat_codes["id"].isin(codes)]
+        self._tax_codes = self._tax_codes[~self._tax_codes["id"].isin(codes)]
 
     # ----------------------------------------------------------------------
     # Accounts
 
-    def account_chart(self) -> pd.DataFrame:
-        return self.standardize_account_chart(self._account_chart)
+    def accounts(self) -> pd.DataFrame:
+        return self.standardize_accounts(self._accounts.copy())
 
     def add_account(
         self,
         account: int,
         currency: str,
-        text: str,
+        description: str,
         group: str,
-        vat_code: str = None,
+        tax_code: str = None,
     ) -> None:
-        if (self._account_chart["account"] == account).any():
+        if (self._accounts["account"] == account).any():
             raise ValueError(f"Account '{account}' already exists")
 
-        new_account = self.standardize_account_chart(pd.DataFrame({
+        new_account = self.standardize_accounts(pd.DataFrame({
             "account": [account],
             "currency": [currency],
-            "text": [text],
-            "vat_code": [vat_code],
+            "description": [description],
+            "tax_code": [tax_code],
             "group": [group],
         }))
-        self._account_chart = pd.concat([self._account_chart, new_account])
+        self._accounts = pd.concat([self._accounts, new_account])
 
     def modify_account(
         self,
         account: int,
         currency: str,
-        text: str,
+        description: str,
         group: str,
-        vat_code: str = None,
+        tax_code: str = None,
     ) -> None:
-        if (self._account_chart["account"] == account).sum() != 1:
+        if (self._accounts["account"] == account).sum() != 1:
             raise ValueError(f"Account '{account}' not found or duplicated.")
 
-        self._account_chart.loc[
-            self._account_chart["account"] == account,
-            ["currency", "text", "vat_code", "group"]
-        ] = [currency, text, vat_code, group]
-        self._account_chart = self.standardize_account_chart(self._account_chart)
+        self._accounts.loc[
+            self._accounts["account"] == account,
+            ["currency", "description", "tax_code", "group"]
+        ] = [currency, description, tax_code, group]
+        self._accounts = self.standardize_accounts(self._accounts)
 
     def delete_accounts(
         self, accounts: List[int] = [], allow_missing: bool = False
     ) -> None:
         if not allow_missing:
-            missing = set(accounts) - set(self._account_chart["account"])
+            missing = set(accounts) - set(self._accounts["account"])
             if missing:
                 raise KeyError(f"Account(s) '{', '.join(missing)}' not found.")
 
-        self._account_chart = self._account_chart[~self._account_chart["account"].isin(accounts)]
+        self._accounts = self._accounts[~self._accounts["account"].isin(accounts)]
 
     # ----------------------------------------------------------------------
     # Ledger
 
     def ledger(self) -> pd.DataFrame:
-        return self.standardize_ledger(self._ledger)
+        return self.standardize_ledger(self._ledger.copy())
 
     def add_ledger_entry(self, entry: pd.DataFrame) -> int:
         entry = self.standardize_ledger(entry)
@@ -176,24 +176,13 @@ class MemoryLedger(StandaloneLedger):
 
         self._ledger = self._ledger[~self._ledger["id"].isin(ids)]
 
-    def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
-        # TODO: Refactor mirroring logic #25 issue
-        target_df = self.standardize_ledger(target)
-
-        if delete:
-            self._ledger = target_df
-        else:
-            self._ledger = self.standardize_ledger(
-                pd.concat([self._ledger, target_df]).drop_duplicates()
-            )
-
     # ----------------------------------------------------------------------
     # Currency
 
     @property
-    def base_currency(self):
-        return self._base_currency
+    def reporting_currency(self):
+        return self._reporting_currency
 
-    @base_currency.setter
-    def base_currency(self, currency):
-        self._base_currency = currency
+    @reporting_currency.setter
+    def reporting_currency(self, currency):
+        self._reporting_currency = currency

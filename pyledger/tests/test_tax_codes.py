@@ -1,11 +1,11 @@
-"""Test suite for VAT code operations"""
+"""Test suite for tax code operations"""
 
 import pytest
-from .base_vat_codes import BaseTestVatCode
+from .base_tax_codes import BaseTestTaxCodes
 from pyledger import MemoryLedger
 
 
-class TestVatCodes(BaseTestVatCode):
+class TestTaxCodes(BaseTestTaxCodes):
 
     @pytest.fixture
     def ledger(self):
