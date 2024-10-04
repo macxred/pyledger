@@ -37,17 +37,17 @@ class MemoryLedger(StandaloneLedger):
 
     def add_tax_code(
         self,
-        code: str,
+        id: str,
         rate: float,
         account: str,
         is_inclusive: bool = True,
         description: str = "",
     ) -> None:
-        if (self._tax_codes["id"] == code).any():
-            raise ValueError(f"Tax code '{code}' already exists")
+        if (self._tax_codes["id"] == id).any():
+            raise ValueError(f"Tax code '{id}' already exists")
 
         new_tax_code = self.standardize_tax_codes(pd.DataFrame({
-            "id": [code],
+            "id": [id],
             "description": [description],
             "account": [account],
             "rate": [rate],
@@ -57,17 +57,17 @@ class MemoryLedger(StandaloneLedger):
 
     def modify_tax_code(
         self,
-        code: str,
+        id: str,
         rate: float,
         account: str,
         is_inclusive: bool = True,
         description: str = "",
     ) -> None:
-        if (self._tax_codes["id"] == code).sum() != 1:
-            raise ValueError(f"Tax code '{code}' not found or duplicated.")
+        if (self._tax_codes["id"] == id).sum() != 1:
+            raise ValueError(f"Tax code '{id}' not found or duplicated.")
 
         self._tax_codes.loc[
-            self._tax_codes["id"] == code, ["rate", "account", "is_inclusive", "description"]
+            self._tax_codes["id"] == id, ["rate", "account", "is_inclusive", "description"]
         ] = [rate, account, is_inclusive, description]
         self._tax_codes = self.standardize_tax_codes(self._tax_codes)
 

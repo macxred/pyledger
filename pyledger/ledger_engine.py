@@ -256,7 +256,7 @@ class LedgerEngine(ABC):
     @abstractmethod
     def add_tax_code(
         self,
-        code: str,
+        id: str,
         rate: float,
         account: str,
         is_inclusive: bool = True,
@@ -264,7 +264,7 @@ class LedgerEngine(ABC):
         """Append a tax code to the list of available tax_codes.
 
         Args:
-            code (str): Identifier for the tax definition.
+            id (str): Identifier for the tax definition.
             rate (float): The tax code to apply.
             account (str): Account to which the tax code is applicable.
             is_inclusive (bool, optional): Specifies whether the tax amount is included in the
@@ -274,7 +274,7 @@ class LedgerEngine(ABC):
     @abstractmethod
     def modify_tax_code(
         self,
-        code: str,
+        id: str,
         rate: float,
         account: str,
         is_inclusive: bool = True,
@@ -284,7 +284,7 @@ class LedgerEngine(ABC):
         Update an existing tax code.
 
         Args:
-            code (str): Tax code to update.
+            id (str): Tax code to update.
             rate (float): Tax rate (from 0 to 1).
             account (str): Account identifier for the tax code.
             is_inclusive (bool, optional): If True, tax is 'NET' (default), else 'GROSS'.
@@ -330,7 +330,7 @@ class LedgerEngine(ABC):
         to_add = target_df.loc[target_df["id"].isin(ids)]
         for row in to_add.to_dict("records"):
             self.add_tax_code(
-                code=row["id"],
+                id=row["id"],
                 description=row["description"],
                 account=row["account"],
                 rate=row["rate"],
@@ -345,7 +345,7 @@ class LedgerEngine(ABC):
         to_update = merged[merged["_merge"] == "left_only"]
         for row in to_update.to_dict("records"):
             self.modify_tax_code(
-                code=row["id"],
+                id=row["id"],
                 description=row["description"],
                 account=row["account"],
                 rate=row["rate"],

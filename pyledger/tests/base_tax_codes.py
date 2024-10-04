@@ -23,7 +23,7 @@ class BaseTestTaxCodes(BaseTest):
         # Test adding a valid tax_code
         initial_tax_codes = ledger.tax_codes()
         new_tax_code = {
-            "code": "TestCode",
+            "id": "TestCode",
             "description": "tax 2%",
             "account": 9990,
             "rate": 0.02,
@@ -35,7 +35,7 @@ class BaseTestTaxCodes(BaseTest):
         created_tax_codes = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
         assert len(created_tax_codes) == 1, "Expected exactly one row to be added"
-        assert created_tax_codes["id"].item() == new_tax_code["code"]
+        assert created_tax_codes["id"].item() == new_tax_code["id"]
         assert created_tax_codes["description"].item() == new_tax_code["description"]
         assert created_tax_codes["account"].item() == new_tax_code["account"]
         assert created_tax_codes["rate"].item() == new_tax_code["rate"]
@@ -44,7 +44,7 @@ class BaseTestTaxCodes(BaseTest):
         # Test updating a tax code with valid inputs.
         initial_tax_codes = ledger.tax_codes()
         new_tax_code = {
-            "code": "TestCode",
+            "id": "TestCode",
             "description": "tax 20%",
             "account": 9990,
             "rate": 0.20,
@@ -59,7 +59,7 @@ class BaseTestTaxCodes(BaseTest):
             "Expected tax codes to have same length before and after modification"
         )
         assert len(modified_tax_codes) == 1, "Expected exactly one updated row"
-        assert modified_tax_codes["id"].item() == new_tax_code["code"]
+        assert modified_tax_codes["id"].item() == new_tax_code["id"]
         assert modified_tax_codes["description"].item() == new_tax_code["description"]
         assert modified_tax_codes["account"].item() == new_tax_code["account"]
         assert modified_tax_codes["rate"].item() == new_tax_code["rate"]
@@ -75,7 +75,7 @@ class BaseTestTaxCodes(BaseTest):
         self, ledger, error_class=ValueError, error_message="already exists"
     ):
         new_tax_code = {
-            "code": "TestCode",
+            "id": "TestCode",
             "description": "tax 2%",
             "account": 9990,
             "rate": 0.02,
@@ -90,7 +90,7 @@ class BaseTestTaxCodes(BaseTest):
     ):
         with pytest.raises(error_class, match=error_message):
             ledger.modify_tax_code(
-                code="TestCode", description="tax 20%", account=9990, rate=0.02, is_inclusive=True
+                id="TestCode", description="tax 20%", account=9990, rate=0.02, is_inclusive=True
             )
 
     def test_mirror(self, ledger):
