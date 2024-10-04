@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from .constants import LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
+from consistent_df import enforce_schema
 
 
 class StandaloneLedger(LedgerEngine):
@@ -171,15 +172,8 @@ class StandaloneLedger(LedgerEngine):
                         "contra": tax["contra"],
                         "amount": -1 * amount
                     })
+        result = enforce_schema(pd.DataFrame(tax_journal_entries), LEDGER_SCHEMA)
 
-        # Return a DataFrame
-        if len(tax_journal_entries) > 0:
-            result = pd.DataFrame(tax_journal_entries)
-        else:
-            # Empty DataFrame with identical structure
-            result = pd.DataFrame(
-                columns=dict(zip(LEDGER_SCHEMA['column'], LEDGER_SCHEMA['dtype']))
-            )
         return result
 
     # ----------------------------------------------------------------------
