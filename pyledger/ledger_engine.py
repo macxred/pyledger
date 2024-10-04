@@ -1,7 +1,4 @@
-"""This module defines Abstract base class defining the core interface for
-managing a ledger system, including accounts, tax management, and arbitrary
-assets or currencies.
-"""
+"""This module defines Abstract base class for a double entry accounting system."""
 
 from abc import ABC, abstractmethod
 import datetime
@@ -29,8 +26,10 @@ from .time import parse_date_span
 
 
 class LedgerEngine(ABC):
-    """Abstract base class defining the core interface for managing a ledger system,
-    including accounts, tax management, and arbitrary assets or currencies.
+    """
+    Abstract base class defining the core interface for managing a double entry
+    accounting system for multiple currencies and arbitrary assets, including
+    account chart, and vat or sales tax management.
     """
 
     _logger = None

@@ -118,20 +118,20 @@ class StandaloneLedger(LedgerEngine):
                     accounts["account"] == row["account"], "tax_code"
                 ].values[0] if pd.notna(row["account"]) else None
             )
-            counter_tax_code = (
+            contra_tax_code = (
                 accounts.loc[
                     accounts["account"] == row["contra"], "tax_code"
                 ].values[0] if pd.notna(row["contra"]) else None
             )
-            if pd.isna(account_tax_code) and pd.isna(counter_tax_code):
+            if pd.isna(account_tax_code) and pd.isna(contra_tax_code):
                 self._logger.warning(
                     f"Skip tax code '{row['tax_code']}' for {row['id']}: Neither account nor "
                     f"counter account have a tax_code."
                 )
-            elif pd.isna(account_tax_code) and pd.notna(counter_tax_code):
+            elif pd.isna(account_tax_code) and pd.notna(contra_tax_code):
                 multiplier = 1.0
                 account = (row["contra"] if tax["is_inclusive"] else row["account"])
-            elif pd.notna(account_tax_code) and pd.isna(counter_tax_code):
+            elif pd.notna(account_tax_code) and pd.isna(contra_tax_code):
                 multiplier = -1.0
                 account = (row["account"] if tax["is_inclusive"] else row["contra"])
             else:
@@ -150,7 +150,7 @@ class StandaloneLedger(LedgerEngine):
 
             # Create a new journal entry for the tax amount
             if amount != 0:
-                reporting_entry = {
+                base_entry = {
                     "date": row["date"],
                     "description": "TAX: " + row["description"],
                     "account": account,
@@ -160,13 +160,13 @@ class StandaloneLedger(LedgerEngine):
                     "tax_code": row["tax_code"]
                 }
                 if pd.notna(tax["account"]):
-                    tax_journal_entries.append(reporting_entry | {
+                    tax_journal_entries.append(base_entry | {
                         "id": f"{row['id']}:tax",
                         "contra": tax["account"],
                         "amount": amount
                     })
                 if pd.notna(tax["contra"]):
-                    tax_journal_entries.append(reporting_entry | {
+                    tax_journal_entries.append(base_entry | {
                         "id": f"{row['id']}:tax",
                         "contra": tax["contra"],
                         "amount": -1 * amount
