@@ -26,7 +26,7 @@ TAX_CODE_SCHEMA = pd.read_csv(StringIO(TAX_CODE_SCHEMA_CSV), skipinitialspace=Tr
 
 ACCOUNT_SCHEMA_CSV = """
     column,             dtype,                mandatory
-    account,            Int64,                True
+    account,            int,                  True
     currency,           string[python],       True
     description,        string[python],       True
     tax_code,           string[python],       False
