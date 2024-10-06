@@ -81,7 +81,10 @@ def write_fixed_width_csv(
         col = df.iloc[:, i]
         col_str = pd.Series(np.where(col.isna(), na_rep, col.astype(str)))
         colname = df.columns[i]
-        max_length = max(col_str.dropna().apply(len).max(), len(colname))
+        if col_str.empty:
+            max_length = len(colname)
+        else:
+            max_length = max(col_str.dropna().apply(len).max(), len(colname))
 
         # Fixed width formatting
         if i < fixed_width_cols:
