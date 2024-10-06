@@ -12,7 +12,8 @@ from .constants import (
     REQUIRED_LEDGER_COLUMNS,
     OPTIONAL_LEDGER_COLUMNS,
     LEDGER_COLUMN_SEQUENCE,
-    LEDGER_COLUMN_SHORTCUTS
+    LEDGER_COLUMN_SHORTCUTS,
+    REQUIRED_PRICE_COLUMNS
 )
 
 # TODO:
@@ -108,7 +109,7 @@ class TextLedger(StandaloneLedger):
             result = pd.concat(df_list, ignore_index=True)
         else:
             # Empty DataFrame with identical structure
-            result = pd.DataFrame(columns=self.REQUIRED_PRICE_COLUMNS)
+            result = pd.DataFrame(columns=REQUIRED_PRICE_COLUMNS)
         return result
 
     def read_ledger(self, path: str) -> pd.DataFrame:
