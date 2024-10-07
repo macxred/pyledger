@@ -3,6 +3,7 @@
 import pandas as pd
 from abc import ABC
 from io import StringIO
+from pyledger.ledger_engine import LedgerEngine
 
 
 TAX_CSV = """
@@ -85,6 +86,6 @@ class BaseTest(ABC):
     SETTINGS = {"REPORTING_CURRENCY": "CHF"}
     TAX_CODES = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
     ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
-    LEDGER_ENTRIES = pd.read_csv(
+    LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(pd.read_csv(
         StringIO(STRIPPED_CSV), skipinitialspace=True, comment="#", skip_blank_lines=True
-    )
+    ))
