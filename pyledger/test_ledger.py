@@ -20,6 +20,8 @@ class TestLedger(StandaloneLedger):
         add_ledger_entry("")
     """
 
+    __test__ = False
+
     SETTINGS = {
         "reporting_currency": "CHF",
         "precision": {

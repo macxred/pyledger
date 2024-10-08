@@ -17,7 +17,6 @@ class BaseTestLedger(BaseTest):
     @pytest.fixture()
     def ledger_engine(self, ledger):
         ledger.restore(accounts=self.ACCOUNTS, tax_codes=self.TAX_CODES)
-        self.LEDGER_ENTRIES = ledger.standardize_ledger(self.LEDGER_ENTRIES)
         return ledger
 
     @pytest.mark.parametrize("ledger_id", BaseTest.LEDGER_ENTRIES["id"].astype(str).unique())
