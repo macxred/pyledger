@@ -155,6 +155,7 @@ class MemoryLedger(StandaloneLedger):
         return id
 
     def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
+        entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
             raise ValueError(
                 "Id needs to be unique and present in all rows of a collective booking."
