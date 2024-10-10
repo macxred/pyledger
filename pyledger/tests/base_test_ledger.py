@@ -196,7 +196,7 @@ class BaseTestLedger(BaseTest):
     def test_mirror_ledger(self, ledger_engine):
         ledger_engine.mirror_accounts(self.ACCOUNTS, delete=False)
         # Mirror with one single and one collective transaction
-        target = self.LEDGER_ENTRIES.query("id in [1, 2]")
+        target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
         ledger_engine.mirror_ledger(target=target, delete=True)
         expected = ledger_engine.standardize_ledger(target)
         mirrored = ledger_engine.ledger()
@@ -206,20 +206,21 @@ class BaseTestLedger(BaseTest):
         # Mirror with duplicate transactions and delete=False
         target = pd.concat(
             [
-                self.LEDGER_ENTRIES.query("id == 1"),
-                self.LEDGER_ENTRIES.query("id == 1").assign(id=5),
-                self.LEDGER_ENTRIES.query("id == 2").assign(id=6),
-                self.LEDGER_ENTRIES.query("id == 2"),
+                self.LEDGER_ENTRIES.query("id == '1'"),
+                self.LEDGER_ENTRIES.query("id == '1'").assign(id='5'),
+                self.LEDGER_ENTRIES.query("id == '2'").assign(id='6'),
+                self.LEDGER_ENTRIES.query("id == '2'"),
             ]
         )
         ledger_engine.mirror_ledger(target=target, delete=True)
         expected = ledger_engine.standardize_ledger(target)
         mirrored = ledger_engine.ledger()
+
         assert sorted(ledger_engine.txn_to_str(mirrored).values()) == \
                sorted(ledger_engine.txn_to_str(expected).values())
 
         # Mirror with complex transactions and delete=False
-        target = self.LEDGER_ENTRIES.query("id in [15, 16, 17, 18]")
+        target = self.LEDGER_ENTRIES.query("id in ['15', '16', '17', '18']")
         ledger_engine.mirror_ledger(target=target, delete=False)
         expected = ledger_engine.standardize_ledger(target)
         expected = ledger_engine.sanitize_ledger(expected)
@@ -229,14 +230,14 @@ class BaseTestLedger(BaseTest):
                sorted(ledger_engine.txn_to_str(expected).values())
 
         # Mirror existing transactions with delete=False has no impact
-        target = self.LEDGER_ENTRIES.query("id in [1, 2]")
+        target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
         ledger_engine.mirror_ledger(target=target, delete=False)
         mirrored = ledger_engine.ledger()
         assert sorted(ledger_engine.txn_to_str(mirrored).values()) == \
                sorted(ledger_engine.txn_to_str(expected).values())
 
         # Mirror with delete=True
-        target = self.LEDGER_ENTRIES.query("id in [1, 2]")
+        target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
         ledger_engine.mirror_ledger(target=target, delete=True)
         mirrored = ledger_engine.ledger()
         expected = ledger_engine.standardize_ledger(target)
