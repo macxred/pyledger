@@ -47,6 +47,12 @@ def test_standardize_ledger_columns():
         })
         ledger.standardize_ledger_columns(posting)
 
+def test_standardize_ledger_columns_ensure_date_type():
+    ledger = TestLedger()
+    df = ledger.standardize_ledger_columns(None)
+
+    # <M8[ns] is a correct format for pandas
+    assert df["date"].dtype == "<M8[ns]"
 
 def test_add_ledger_entry():
     """Test adding ledger entries."""
