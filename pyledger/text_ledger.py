@@ -7,9 +7,10 @@ import pandas as pd
 from typing import List
 from pathlib import Path
 from datetime import datetime
-from pyledger.constants import LEDGER_SCHEMA, FIXED_LEDGER_COLUMNS
 from pyledger.helpers import write_fixed_width_csv
 from pyledger.standalone_ledger import StandaloneLedger
+from pyledger.constants import LEDGER_SCHEMA, FIXED_LEDGER_COLUMNS
+
 
 class TextLedger(StandaloneLedger):
     """TextLedger class for reading and processing tax, accounts, ledger, etc.
@@ -17,11 +18,11 @@ class TextLedger(StandaloneLedger):
     """
 
     def __init__(
-            self,
-            root_path: Path = Path.cwd(),
-            cache_timeout: int = 300,
-            reporting_currency: str = "USD",
-        ):
+        self,
+        root_path: Path = Path.cwd(),
+        cache_timeout: int = 300,
+        reporting_currency: str = "USD",
+    ):
         """Initializes the TextLedgerClient with a root path for file storage.
         If no root path is provided, defaults to the current working directory.
         """
@@ -40,58 +41,52 @@ class TextLedger(StandaloneLedger):
         if self._ledger_cache is not None and not self._is_expired(self._ledger_cache_time):
             return self._ledger_cache
 
-        ledger_folder = self.root_path / 'ledger'
+        ledger = self.standardize_ledger(None)
+        ledger_folder = self.root_path / "ledger"
         ledger_folder.mkdir(parents=True, exist_ok=True)
-
-        dsf = []
-        ledger_files = list(ledger_folder.rglob('*.csv'))
+        ledger_files = list(ledger_folder.rglob("*.csv"))
         for file in ledger_files:
             try:
                 path = file.relative_to(self.root_path)
                 df = pd.read_csv(file, skipinitialspace=True)
-                df['file_path'] = str(path)
-                dsf.append(df)
+                df["file_path"] = str(path)
+                ledger = pd.concat([ledger, df], ignore_index=True)
             except Exception as e:
                 self._logger.warning(f"Skipping {path}: {e}")
 
-        if not len(dsf):
-            df = self.standardize_ledger(None)
-            df["file_path"] = "ledger/default.csv"
-            dsf.append(df)
+        if not ledger.empty:
+            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA["column"] == "id", "dtype"].values[0]
+            ledger["id"] = (
+                ledger["file_path"] + ":"
+                + ledger["date"].notna().cumsum().astype(id_type)
+            )
+            ledger.drop(columns="file_path", inplace=True)
 
-        df = pd.concat(dsf, ignore_index=True)
-        id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'id', 'dtype'].values[0]
-        df["id"] = df["file_path"] + ":" + df["date"].notna().cumsum().astype(id_type)
-        df.drop(columns="file_path", inplace=True)
-
-        LEDGER_COLUMN_SHORTCUTS = {
-            "cur": "currency",
-            "vat": "tax_code",
-            "target": "target_balance",
-            "base_amount": "report_amount",
-            "counter": "contra",
-        }
+        # TODO: remove this code block when old system will be migrated
         if short_names:
-            reverse_shortcuts = {
-                v: k for k, v in LEDGER_COLUMN_SHORTCUTS.items()
+            LEDGER_COLUMN_SHORTCUTS = {
+                "cur": "currency",
+                "vat": "tax_code",
+                "target": "target_balance",
+                "base_amount": "report_amount",
+                "counter": "contra",
             }
-            df = df.rename(columns=reverse_shortcuts)
+            ledger = ledger.rename(columns=LEDGER_COLUMN_SHORTCUTS)
 
-        df = self.standardize_ledger(df)
-        self._ledger_cache = df
+        ledger = self.standardize_ledger(ledger)
+        self._ledger_cache = ledger
         self._ledger_cache_time = datetime.now()
         return self._ledger_cache
 
-    def ledger_for_save(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Formats and validates the DataFrame for storage by extracting file paths,
-        standardizing columns, and ensuring data consistency.
+    def _ledger_for_save(self, df: pd.DataFrame) -> pd.DataFrame:
+        """This method Prepares the ledger DataFrame for saving by extracting the file
+        path from the "id" column and assigning it to a new "file_path" column.
 
         Args:
-            df (pd.DataFrame): The DataFrame to prepare.
+            df (pd.DataFrame): The ledger DataFrame to prepare.
 
         Returns:
-            pd.DataFrame: The formatted DataFrame ready for saving.
+            pd.DataFrame: The formatted ledger DataFrame ready for saving.
         """
         def extract_file_path(id_value: str) -> str:
             return id_value.split(":")[0] if ":" in str(id_value) else "ledger/default.csv"
@@ -101,62 +96,71 @@ class TextLedger(StandaloneLedger):
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
 
         if df.loc[~df.duplicated(subset="id"), "date"].isna().any():
-            raise ValueError("A valid 'date' is required in the first occurrence of every 'id'.")
+            raise ValueError(
+                "A valid 'date' is required in the first occurrence of every 'id'."
+            )
 
-        df = df.drop(columns=["id"])
+        df.drop(columns=["id"], inplace=True)
         return df
 
     def add_ledger_entry(self, entry: pd.DataFrame) -> str:
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
-            raise ValueError("Id needs to be unique and present in all rows of a collective booking.")
+            raise ValueError(
+                "Id needs to be unique and present in all rows of a collective booking."
+            )
 
         df = self.ledger()
         file_path = entry["id"].iat[0].split(":")
         file_path = "ledger/default.csv" if len(file_path) == 1 else file_path[0]
         df_same_file = df[df["id"].str.startswith(file_path)]
 
-        ledger = self.ledger_for_save(pd.concat([df_same_file, entry]))
+        ledger = self._ledger_for_save(pd.concat([df_same_file, entry]))
         self.save_ledger(ledger)
         self.invalidate_ledger_cache()
 
-        existing_ids = df_same_file["id"].str.split(":").str[1].astype(int)
-        created_id = existing_ids.max() + 1 if not existing_ids.empty else 1
-        return f"{file_path}:{created_id}"
+        isd = df_same_file["id"].str.split(":").str[1].astype(int)
+        id = isd.max() + 1 if not isd.empty else 1
+        return f"{file_path}:{id}"
 
     def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
-            raise ValueError("Id needs to be unique and present in all rows of a collective booking.")
+            raise ValueError(
+                "Id needs to be unique and present in all rows of a collective booking."
+            )
 
         df = self.ledger()
         file_path = entry["id"].iat[0].split(":")[0]
         df_same_file = df[df["id"].str.startswith(file_path)]
         if entry["id"].iat[0] not in df_same_file["id"].values:
-            raise ValueError(f"Ledger entry with id '{entry["id"].iat[0]}' not found.")
+            raise ValueError(
+                f"Ledger entry with id '{entry["id"].iat[0]}' not found."
+            )
 
         ledger = pd.concat([df_same_file[df_same_file["id"] != entry["id"].iat[0]], entry])
-        ledger = self.ledger_for_save(ledger)
+        ledger = self._ledger_for_save(ledger)
         self.save_ledger(ledger)
         self.invalidate_ledger_cache()
 
     def delete_ledger_entries(self, ids: List[str], allow_missing: bool = False) -> None:
-        ledger = self.ledger()
+        df = self.ledger()
         if not allow_missing:
-            missing_ids = set(ids) - set(ledger["id"])
+            missing_ids = set(ids) - set(df["id"])
             if missing_ids:
                 raise KeyError(f"Ledger entries with ids '{', '.join(missing_ids)}' not found.")
 
-        ledger = ledger[~ledger["id"].isin(ids)]
-        ledger = self.ledger_for_save(ledger)
-        self.save_ledger(ledger)
+        df = df[~df["id"].isin(ids)]
+        df = self._ledger_for_save(df)
+        self.save_ledger(df)
         self.invalidate_ledger_cache()
 
     def save_ledger(self, df: pd.DataFrame) -> None:
         """
         Saves the ledger DataFrame to the corresponding CSV files within the 'ledger' folder.
         Groups rows by 'file_path' and writes only the necessary files.
-        Deletes any existing empty files or directories that are no longer present in the sorted file paths.
+        Deletes any existing empty files or directories that are no longer present
+        in the sorted file paths.
 
         Args:
             df (pd.DataFrame): The DataFrame with a 'file_path' column.
@@ -164,32 +168,29 @@ class TextLedger(StandaloneLedger):
         ledger_folder = self.root_path / "ledger"
         ledger_folder.mkdir(parents=True, exist_ok=True)
         df["file_path"] = df["file_path"].fillna("ledger/default.csv")
-        grouped = df.groupby('file_path')
-        sorted_file_paths = sorted(grouped.groups.keys(), key=lambda p: Path(p).parts)
-        existing_files = list(ledger_folder.rglob('*.csv'))
-        existing_dirs = [d for d in ledger_folder.rglob('*') if d.is_dir()]
-        expected_files = {self.root_path / file_path for file_path in sorted_file_paths}
+        grouped = df.groupby("file_path")
+        sorted_file_paths = {self.root_path / file_path for file_path in grouped.groups.keys()}
 
-        # Delete files that are not present in sorted_file_paths
-        for file in existing_files:
-            if file not in expected_files:
+        # Delete files not present in sorted file paths
+        for file in ledger_folder.rglob("*.csv"):
+            if file not in sorted_file_paths:
                 file.unlink()
                 self._logger.info(f"Deleted file: {file}")
 
-        # Delete empty directories that are not needed
-        for directory in existing_dirs:
+        # Delete empty directories that are no longer needed
+        for directory in (d for d in ledger_folder.rglob("*") if d.is_dir()):
             if not any(directory.iterdir()):
                 directory.rmdir()
                 self._logger.info(f"Deleted empty directory: {directory}")
 
-        # Save the updated files
+        # Save grouped DataFrame entries to their respective file paths
         for file_path in sorted_file_paths:
-            group_df = grouped.get_group(file_path)
+            group_df = grouped.get_group(str(file_path.relative_to(self.root_path)))
             group_df.drop(columns="file_path", inplace=True)
-            full_path = self.root_path / file_path
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-            write_fixed_width_csv(group_df, full_path, n=len(FIXED_LEDGER_COLUMNS))
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            write_fixed_width_csv(group_df, file_path, n=len(FIXED_LEDGER_COLUMNS))
 
+        # Ensure the default file exists
         default_file = ledger_folder / "default.csv"
         if not default_file.exists():
             default_file.touch()
@@ -322,7 +323,6 @@ class TextLedger(StandaloneLedger):
     @reporting_currency.setter
     def reporting_currency(self, currency):
         self._reporting_currency = currency
-
 
     def _is_expired(self, cache_time: datetime) -> bool:
         """
