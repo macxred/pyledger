@@ -1061,7 +1061,9 @@ class LedgerEngine(ABC):
             df["id"] = df["date"].notna().cumsum().astype(id_type)
 
         # Enforce column data types
-        df["date"] = pd.to_datetime(df["date"]).dt.date
+        date_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'date', 'dtype'].values[0]
+        df["date"] = pd.to_datetime(df["date"]).dt.date.astype(date_type)
+
         return df
 
     def standardize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
