@@ -75,17 +75,14 @@ def write_fixed_width_csv(
         str: CSV output as a string if the path is None.
     """
     result = {}
-    fixed_width_cols = df.shape[1] - 1 if n is None else n
+    fixed_width_cols = min(n or (df.shape[1] - 1), df.shape[1])
 
-    for i in range(len(df.columns)):
-        col = df.iloc[:, i]
+    for i, colname in enumerate(df.columns):
+        col = df[colname]
         col_str = pd.Series(np.where(col.isna(), na_rep, col.astype(str)))
-        colname = df.columns[i]
-        max_length = max(col_str.dropna().apply(len).max(), len(colname))
-
-        # Fixed width formatting
+        max_length = max(col_str.str.len().max(), len(colname))
         if i < fixed_width_cols:
-            col_str = col_str.apply(lambda x, ml=max_length: x.rjust(ml))
+            col_str = col_str.str.rjust(max_length)
             colname = colname.rjust(max_length)
 
         # Separator for all but the first column
@@ -98,4 +95,4 @@ def write_fixed_width_csv(
     result = pd.DataFrame(result)
 
     # Write to CSV
-    return result.to_csv(*args, path, sep=sep[0], index=False, na_rep=na_rep, **kwargs)
+    return result.to_csv(path, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
