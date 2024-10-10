@@ -206,13 +206,13 @@ class BaseTestLedger(BaseTest):
         # Mirror with duplicate transactions and delete=False
         target = pd.concat(
             [
-                self.LEDGER_ENTRIES.query("id == '1'"),
+                self.LEDGER_ENTRIES.query("id == '1'").assign(id='4'),
                 self.LEDGER_ENTRIES.query("id == '1'").assign(id='5'),
                 self.LEDGER_ENTRIES.query("id == '2'").assign(id='6'),
-                self.LEDGER_ENTRIES.query("id == '2'"),
+                self.LEDGER_ENTRIES.query("id == '2'").assign(id='7'),
             ]
         )
-        ledger_engine.mirror_ledger(target=target, delete=True)
+        ledger_engine.mirror_ledger(target=target, delete=False)
         expected = ledger_engine.standardize_ledger(target)
         mirrored = ledger_engine.ledger()
 
