@@ -36,7 +36,7 @@ class TextLedger(StandaloneLedger):
         self._tax_codes = self.standardize_tax_codes(None)
         self._accounts = self.standardize_accounts(None)
 
-    def ledger(self) -> pd.DataFrame:
+    def ledger(self, short_names: bool = False) -> pd.DataFrame:
         if self._ledger_cache is not None and not self._is_expired(self._ledger_cache_time):
             return self._ledger_cache
 
@@ -63,8 +63,21 @@ class TextLedger(StandaloneLedger):
         id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'id', 'dtype'].values[0]
         df["id"] = df["file_path"] + ":" + df["date"].notna().cumsum().astype(id_type)
         df.drop(columns="file_path", inplace=True)
-        df = self.standardize_ledger(df)
 
+        LEDGER_COLUMN_SHORTCUTS = {
+            "cur": "currency",
+            "vat": "tax_code",
+            "target": "target_balance",
+            "base_amount": "report_amount",
+            "counter": "contra",
+        }
+        if short_names:
+            reverse_shortcuts = {
+                v: k for k, v in LEDGER_COLUMN_SHORTCUTS.items()
+            }
+            df = df.rename(columns=reverse_shortcuts)
+
+        df = self.standardize_ledger(df)
         self._ledger_cache = df
         self._ledger_cache_time = datetime.now()
         return self._ledger_cache
