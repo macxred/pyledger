@@ -1057,11 +1057,13 @@ class LedgerEngine(ABC):
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
         if "id" not in df.columns or df["id"].isna().any():
-            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'id', 'dtype'].values[0]
+            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'id', 'dtype'].item()
             df["id"] = df["date"].notna().cumsum().astype(id_type)
 
         # Enforce column data types
-        df["date"] = pd.to_datetime(df["date"]).dt.date
+        date_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'date', 'dtype'].item()
+        df["date"] = pd.to_datetime(df["date"]).dt.date.astype(date_type)
+
         return df
 
     def standardize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -1152,7 +1154,7 @@ class LedgerEngine(ABC):
             raise ValueError("Some collective transaction(s) have non-unique date.")
 
         result = {
-            str(id): f"{str(date)}\n{df_to_consistent_str(txn)}"
+            str(id): f"{str(date.strftime("%Y-%m-%d"))}\n{df_to_consistent_str(txn)}"
             for id, date, txn in zip(df["id"], df["date"], df["txn"])
         }
         return result
