@@ -51,7 +51,10 @@ class TextLedger(StandaloneLedger):
                 df = pd.read_csv(file, skipinitialspace=True)
                 if not df.empty:
                     df["file_path"] = str(path)
-                    ledger = pd.concat([ledger, df], ignore_index=True)
+                    if ledger.empty:
+                        ledger = df.copy()
+                    else:
+                        ledger = pd.concat([ledger, df], ignore_index=True)
             except Exception as e:
                 self._logger.warning(f"Skipping {path}: {e}")
 
