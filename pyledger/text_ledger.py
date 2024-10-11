@@ -65,17 +65,16 @@ class TextLedger(StandaloneLedger):
                 + ledger["date"].notna().cumsum().astype(id_type)
             )
             ledger.drop(columns="file_path", inplace=True)
-
-        # TODO: remove this code block when old system will be migrated
-        if short_names:
-            LEDGER_COLUMN_SHORTCUTS = {
-                "cur": "currency",
-                "vat": "tax_code",
-                "target": "target_balance",
-                "base_amount": "report_amount",
-                "counter": "contra",
-            }
-            ledger = ledger.rename(columns=LEDGER_COLUMN_SHORTCUTS)
+            # TODO: remove this code block when old system will be migrated
+            if short_names:
+                LEDGER_COLUMN_SHORTCUTS = {
+                    "cur": "currency",
+                    "vat": "tax_code",
+                    "target": "target_balance",
+                    "base_amount": "report_amount",
+                    "counter": "contra",
+                }
+                ledger = ledger.rename(columns=LEDGER_COLUMN_SHORTCUTS)
 
         ledger = self.standardize_ledger(ledger)
         self._ledger_cache = ledger
@@ -120,7 +119,7 @@ class TextLedger(StandaloneLedger):
         df_same_file = df[df["id"].str.startswith(file_path)]
 
         ledger = self._ledger_for_save(pd.concat([df_same_file, entry]))
-        self.save_ledger(ledger)
+        self.save_files(ledger, "ledger", len(FIXED_LEDGER_COLUMNS))
         self._invalidate_ledger_cache()
 
         isd = df_same_file["id"].str.split(":").str[1].astype(int)
@@ -144,7 +143,7 @@ class TextLedger(StandaloneLedger):
 
         ledger = pd.concat([df_same_file[df_same_file["id"] != entry["id"].iat[0]], entry])
         ledger = self._ledger_for_save(ledger)
-        self.save_ledger(ledger)
+        self.save_files(ledger, "ledger", len(FIXED_LEDGER_COLUMNS))
         self._invalidate_ledger_cache()
 
     def delete_ledger_entries(self, ids: List[str], allow_missing: bool = False) -> None:
@@ -156,33 +155,58 @@ class TextLedger(StandaloneLedger):
 
         df = df[~df["id"].isin(ids)]
         df = self._ledger_for_save(df)
-        self.save_ledger(df)
+        self.save_files(df, "ledger", len(FIXED_LEDGER_COLUMNS))
         self._invalidate_ledger_cache()
 
-    def save_ledger(self, df: pd.DataFrame) -> None:
-        """Saves the ledger DataFrame entries to CSV files within the 'ledger' folder.
+    def _invalidate_ledger_cache(self) -> None:
+        """
+        Invalidates the cached ledger data.
+        Resets the cache and cache timestamp to ensure the next access reads from disk.
+        """
+        self._ledger_cache = None
+        self._ledger_cache_time = None
+
+    # File operations
+    # ----------------------------------------------------------------------
+
+    def save_files(self, df: pd.DataFrame, folder: str, fixed_n: int = None) -> None:
+        """Saves the DataFrame entries to CSV files within the specified folder.
 
         Groups entries by their 'file_path' and updates only the necessary files.
-        Removes any files or directories that are no longer referenced in the DataFrame
-        and ensures the directory structure is maintained.
+        Removes any files or directories that are no longer referenced in the DataFrame,
+        ensuring the directory structure is maintained. If the 'file_path' column
+        is missing, a default path is assigned.
 
         Args:
-            df (pd.DataFrame): The DataFrame with a 'file_path' column.
+            df (pd.DataFrame): The DataFrame containing the data to be saved.
+            folder (str): The folder within the root path where files will be saved.
+            fixed_n (int, optional): Number of columns to apply fixed-width formatting.
         """
-        ledger_folder = self.root_path / "ledger"
-        ledger_folder.mkdir(parents=True, exist_ok=True)
-        df["file_path"] = df["file_path"].fillna("ledger/default.csv")
+
+        if fixed_n is None:
+            fixed_n = len(df.columns)
+        default_folder = self.root_path / folder
+        default_folder.mkdir(parents=True, exist_ok=True)
+        if "file_path" not in df.columns:
+            df["file_path"] = f"{folder}/default.csv"
+        else:
+            df["file_path"] = df["file_path"].fillna(f"{folder}/default.csv")
         grouped = df.groupby("file_path")
         sorted_file_paths = {self.root_path / file_path for file_path in grouped.groups.keys()}
 
         # Delete files not present in sorted file paths
-        for file in ledger_folder.rglob("*.csv"):
+        for file in default_folder.rglob("*.csv"):
             if file not in sorted_file_paths:
                 file.unlink()
                 self._logger.info(f"Deleted file: {file}")
 
-        # Delete empty directories that are no longer needed
-        for directory in (d for d in ledger_folder.rglob("*") if d.is_dir()):
+        # Delete empty directories
+        sorted_directories = sorted(
+            (d for d in default_folder.rglob("*") if d.is_dir()),
+            key=lambda x: len(x.parts),
+            reverse=True
+        )
+        for directory in sorted_directories:
             if not any(directory.iterdir()):
                 directory.rmdir()
                 self._logger.info(f"Deleted empty directory: {directory}")
@@ -192,21 +216,13 @@ class TextLedger(StandaloneLedger):
             group_df = grouped.get_group(str(file_path.relative_to(self.root_path)))
             group_df.drop(columns="file_path", inplace=True)
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            write_fixed_width_csv(group_df, file_path, n=len(FIXED_LEDGER_COLUMNS))
+            write_fixed_width_csv(group_df, file_path, n=fixed_n)
 
         # Ensure the default file exists
-        default_file = ledger_folder / "default.csv"
+        default_file = default_folder / "default.csv"
         if not default_file.exists():
             default_file.touch()
-            self._logger.info(f"Created default ledger file: {default_file}")
-
-    def _invalidate_ledger_cache(self) -> None:
-        """
-        Invalidates the cached ledger data.
-        Resets the cache and cache timestamp to ensure the next access reads from disk.
-        """
-        self._ledger_cache = None
-        self._ledger_cache_time = None
+            self._logger.info(f"Created default file: {default_file}")
 
     # TODO: This section was copied form MemoryLedger temporary
     # Need to define logic for TextLedger and replace following
