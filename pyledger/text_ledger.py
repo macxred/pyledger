@@ -2,14 +2,27 @@
 designed to read and process tax, accounts, ledger, etc. from text files.
 """
 
-import logging
 import pandas as pd
 from typing import List
 from pathlib import Path
 from datetime import datetime, timedelta
 from pyledger.helpers import write_fixed_width_csv
 from pyledger.standalone_ledger import StandaloneLedger
-from pyledger.constants import LEDGER_SCHEMA, FIXED_LEDGER_COLUMNS
+from pyledger.constants import LEDGER_SCHEMA
+
+
+# TODO: replace with json realization
+SETTINGS = {
+    "reporting_currency": "CHF",
+    "precision": {
+        "CAD": 0.01,
+        "CHF": 0.01,
+        "EUR": 0.01,
+        "GBP": 0.01,
+        "HKD": 0.01,
+        "USD": 0.01,
+    },
+}
 
 
 class TextLedger(StandaloneLedger):
@@ -26,16 +39,13 @@ class TextLedger(StandaloneLedger):
         """Initializes the TextLedgerClient with a root path for file storage.
         If no root path is provided, defaults to the current working directory.
         """
+        super().__init__(settings=SETTINGS)
         self.root_path = root_path
         self._reporting_currency = reporting_currency
         self._cache_timeout = cache_timeout
         self._ledger_cache = None
         self._ledger_cache_time = None
-        self._logger = logging.getLogger(__name__)
         self._ledger = self.ledger()
-        self._prices = self.standardize_prices(None)
-        self._tax_codes = self.standardize_tax_codes(None)
-        self._accounts = self.standardize_accounts(None)
 
     def ledger(self, short_names: bool = False) -> pd.DataFrame:
         if self._ledger_cache is not None and not self._is_expired(self._ledger_cache_time):
@@ -119,7 +129,10 @@ class TextLedger(StandaloneLedger):
         df_same_file = df[df["id"].str.startswith(file_path)]
 
         ledger = self._ledger_for_save(pd.concat([df_same_file, entry]))
-        self.save_files(ledger, "ledger", len(FIXED_LEDGER_COLUMNS))
+        fixed_n = sum(
+            col not in ["description", "document", "id"] for col in LEDGER_SCHEMA["column"]
+        )
+        self.save_files(ledger, "ledger", fixed_n)
         self._invalidate_ledger_cache()
 
         isd = df_same_file["id"].str.split(":").str[1].astype(int)
@@ -143,7 +156,10 @@ class TextLedger(StandaloneLedger):
 
         ledger = pd.concat([df_same_file[df_same_file["id"] != entry["id"].iat[0]], entry])
         ledger = self._ledger_for_save(ledger)
-        self.save_files(ledger, "ledger", len(FIXED_LEDGER_COLUMNS))
+        fixed_n = sum(
+            col not in ["description", "document", "id"] for col in LEDGER_SCHEMA["column"]
+        )
+        self.save_files(ledger, "ledger", fixed_n)
         self._invalidate_ledger_cache()
 
     def delete_ledger_entries(self, ids: List[str], allow_missing: bool = False) -> None:
@@ -155,7 +171,10 @@ class TextLedger(StandaloneLedger):
 
         df = df[~df["id"].isin(ids)]
         df = self._ledger_for_save(df)
-        self.save_files(df, "ledger", len(FIXED_LEDGER_COLUMNS))
+        fixed_n = sum(
+            col not in ["description", "document", "id"] for col in LEDGER_SCHEMA["column"]
+        )
+        self.save_files(df, "ledger", fixed_n)
         self._invalidate_ledger_cache()
 
     def _invalidate_ledger_cache(self) -> None:

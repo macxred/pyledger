@@ -1,7 +1,10 @@
+"""Test suit for write_fixed_width_csv() function"""
+
 import pandas as pd
 import numpy as np
-import os
 import tempfile
+from io import StringIO
+from pathlib import Path
 from pyledger.helpers import write_fixed_width_csv
 
 
@@ -82,21 +85,7 @@ def test_date_and_float_handling():
     assert output == expected_output, "Failed on various data types with dates"
 
 
-def test_fixed_width_columns_all():
-    df = pd.DataFrame({
-        'ShortCol': [1, 2, 3],
-        'LongerCol': ['a', 'bb', 'ccc'],
-        'FinalCol': [10, 20, 30]
-    })
-    output = write_fixed_width_csv(df, n=2)
-    expected_output = ('ShortCol, LongerCol, FinalCol\n'
-                       '       1,         a, 10\n'
-                       '       2,        bb, 20\n'
-                       '       3,       ccc, 30\n')
-    assert output == expected_output, "Failed when n applies to all columns except the last"
-
-
-def test_fixed_width_columns_partial():
+def test_fixed_width_columns_specified_number():
     df = pd.DataFrame({
         'ShortCol': [1, 2, 3],
         'LongerCol': ['a', 'bb', 'ccc'],
@@ -142,13 +131,55 @@ def test_custom_na_rep():
 def test_write_to_file():
     df = pd.DataFrame({'A': [1, 2, 3], 'B': ['x', 'y', 'z']})
     with tempfile.NamedTemporaryFile(delete=False, mode='w+') as tmpfile:
-        path = tmpfile.name
+        path = Path(tmpfile.name)
+
     try:
         write_fixed_width_csv(df, path=path)
-        assert os.path.exists(path), "File was not created"
-        with open(path, 'r') as f:
-            output_file = f.read()
+        assert path.exists(), "File was not created"
+
+        output_file = path.read_text()
         expected_file_output = 'A, B\n1, x\n2, y\n3, z\n'
         assert output_file == expected_file_output, "File content is incorrect"
     finally:
-        os.remove(path)
+        path.unlink()
+
+
+def test_machine_readability():
+    df = pd.DataFrame({
+        'IntCol': [1, 2, 3, 4, 5],
+        'FloatCol': [1.1, 2.2, 3.3, 4.4, 5.5],
+        'StrCol': ['foo', 'bar', 'baz', 'qux', 'quux'],
+        'BoolCol': [True, False, True, False, True]
+    })
+
+    output = write_fixed_width_csv(df)
+    df_read = pd.read_csv(StringIO(output), skipinitialspace=True)
+    pd.testing.assert_frame_equal(df, df_read, check_dtype=False)
+
+
+def test_machine_readability_fixed_width():
+    df = pd.DataFrame({
+        'ShortCol': [1, 2, 3, 4, 5],
+        'LongerCol': ['a', 'bb', 'ccc', 'dddd', 'eeeee'],
+        'FinalCol': [10, 20, 30, 40, 50],
+        'ExtraCol': ['extra1', 'extra2', 'extra3', 'extra4', 'extra5']
+    })
+
+    output = write_fixed_width_csv(df, n=3)
+    df_read = pd.read_csv(StringIO(output), skipinitialspace=True)
+    pd.testing.assert_frame_equal(df, df_read, check_dtype=False)
+
+
+def test_machine_readability_with_none():
+    df = pd.DataFrame({
+        'Col1': [1, None, 3, None, 5],
+        'Col2': ['a', 'b', None, 'd', None],
+        'Col3': [1.5, 2.5, None, 4.5, 5.5],
+        'Col4': [None, 'text', None, 'another', None]
+    })
+
+    df = df.astype(object).where(pd.notna(df), np.nan)
+    output = write_fixed_width_csv(df)
+    df_read = pd.read_csv(StringIO(output), skipinitialspace=True)
+    df_read = df_read.astype(object).where(pd.notna(df_read), np.nan)
+    pd.testing.assert_frame_equal(df, df_read, check_dtype=False)

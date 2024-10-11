@@ -75,7 +75,7 @@ def write_fixed_width_csv(
         str: CSV output as a string if the path is None.
     """
     result = {}
-    fixed_width_cols = min(n or (df.shape[1] - 1), df.shape[1])
+    fixed_width_cols = df.shape[1] - 1 if n is None else n
 
     for i, colname in enumerate(df.columns):
         col = df[colname]

@@ -58,10 +58,6 @@ LEDGER_SCHEMA_CSV = """
 """
 LEDGER_SCHEMA = pd.read_csv(StringIO(LEDGER_SCHEMA_CSV), skipinitialspace=True)
 
-FIXED_LEDGER_COLUMNS = [
-    col for col in LEDGER_SCHEMA["column"] if col not in ["description", "document", "id"]
-]
-
 CURRENCY_PRECISION = {
     "AUD": 0.01,
     "CAD": 0.01,
