@@ -8,7 +8,7 @@ import datetime
 import logging
 import math
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 from consistent_df import enforce_dtypes
 import re
 import numpy as np
@@ -129,19 +129,27 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # File Operations
 
-    def export_account_sheets(self, file: str, root: str = None) -> None:
-        """Export ledger as Excel file, with separate sheets containing
-        transactions for each account.
+    def export_account_sheets(self, file: str,
+                              period: str | Tuple[datetime.date, datetime.date] = None,
+                              root: str = None) -> None:
+        """Export Account History to Excel
+
+        Generate an Excel file with account sheets, where separate Excel sheets
+        contain the transaction history of each account.
 
         Args:
             file (str): The path where the Excel file will be saved.
+            period (str, optional): The period over which which the account balance is calculated.
+                                    Can be a string such as "2023", "2023-11", "2023-Q4" or a
+                                    tuple with start and end date.
+                                    None, the default, means that all available data is returned.
             root (str, optional): Root directory for document paths. If not None, valid document
                                   paths are formatted as hyperlinks to the file in the root folder.
                                   Defaults to None.
         """
         out = {}
         for account in self.account_chart().index.sort_values():
-            df = self._fetch_account_history(account)
+            df = self.account_history(account=account, period=period)
             out[str(account)] = df.drop(columns="account")
         excel.write_sheets(out, path=file)
 
