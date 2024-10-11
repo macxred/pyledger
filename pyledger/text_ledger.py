@@ -6,7 +6,7 @@ import logging
 import pandas as pd
 from typing import List
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from pyledger.helpers import write_fixed_width_csv
 from pyledger.standalone_ledger import StandaloneLedger
 from pyledger.constants import LEDGER_SCHEMA, FIXED_LEDGER_COLUMNS
@@ -117,7 +117,7 @@ class TextLedger(StandaloneLedger):
 
         ledger = self._ledger_for_save(pd.concat([df_same_file, entry]))
         self.save_ledger(ledger)
-        self.invalidate_ledger_cache()
+        self._invalidate_ledger_cache()
 
         isd = df_same_file["id"].str.split(":").str[1].astype(int)
         id = isd.max() + 1 if not isd.empty else 1
@@ -141,7 +141,7 @@ class TextLedger(StandaloneLedger):
         ledger = pd.concat([df_same_file[df_same_file["id"] != entry["id"].iat[0]], entry])
         ledger = self._ledger_for_save(ledger)
         self.save_ledger(ledger)
-        self.invalidate_ledger_cache()
+        self._invalidate_ledger_cache()
 
     def delete_ledger_entries(self, ids: List[str], allow_missing: bool = False) -> None:
         df = self.ledger()
@@ -153,14 +153,14 @@ class TextLedger(StandaloneLedger):
         df = df[~df["id"].isin(ids)]
         df = self._ledger_for_save(df)
         self.save_ledger(df)
-        self.invalidate_ledger_cache()
+        self._invalidate_ledger_cache()
 
     def save_ledger(self, df: pd.DataFrame) -> None:
-        """
-        Saves the ledger DataFrame to the corresponding CSV files within the 'ledger' folder.
-        Groups rows by 'file_path' and writes only the necessary files.
-        Deletes any existing empty files or directories that are no longer present
-        in the sorted file paths.
+        """Saves the ledger DataFrame entries to CSV files within the 'ledger' folder.
+
+        Groups entries by their 'file_path' and updates only the necessary files.
+        Removes any files or directories that are no longer referenced in the DataFrame
+        and ensures the directory structure is maintained.
 
         Args:
             df (pd.DataFrame): The DataFrame with a 'file_path' column.
@@ -196,7 +196,7 @@ class TextLedger(StandaloneLedger):
             default_file.touch()
             self._logger.info(f"Created default ledger file: {default_file}")
 
-    def invalidate_ledger_cache(self) -> None:
+    def _invalidate_ledger_cache(self) -> None:
         """
         Invalidates the cached ledger data.
         Resets the cache and cache timestamp to ensure the next access reads from disk.
@@ -324,14 +324,15 @@ class TextLedger(StandaloneLedger):
     def reporting_currency(self, currency):
         self._reporting_currency = currency
 
-    def _is_expired(self, cache_time: datetime) -> bool:
-        """
-        Checks if the cache has expired based on the timeout.
+    def _is_expired(self, cache_time: datetime | None) -> bool:
+        """Checks if the cache has expired based on the cache timeout.
 
         Args:
-            cache_time (datetime): The timestamp when the cache was last updated.
+            cache_time (datetime | None): The timestamp when the cache was last updated.
 
         Returns:
             bool: True if the cache is expired or cache_time is None, False otherwise.
         """
-        return (datetime.now() - cache_time).total_seconds() > self._cache_timeout
+        if cache_time is None:
+            return True
+        return (datetime.now() - cache_time) > timedelta(seconds=self._cache_timeout)
