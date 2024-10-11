@@ -3,6 +3,7 @@ writing fixed-width CSV files and checking if values can be represented as integ
 """
 
 from typing import Any
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -96,3 +97,51 @@ def write_fixed_width_csv(
 
     # Write to CSV
     return result.to_csv(path, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
+
+
+def save_files(df: pd.DataFrame, root: Path | str, n_fixed: int = None) -> None:
+    """
+    Save a DataFrame to multiple CSV files specified in the '__csv_path__' column.
+
+    Ensures that CSV files in a `root` folder contain the data in `df`.
+    1. Saves df to multiple CSV files specified by df["__csv_path__"].
+    2. Removes unneeded CSV files.
+    3. Deletes any empty directories.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing the data to be saved
+                            and a '__csv_path__' column.
+        root (Path | str): The root folder in which CSV files are stored.
+        n_fixed (int, optional): Number of columns from the left to write with fixed column width.
+    """
+    if n_fixed is None:
+        n_fixed = len(df.columns)
+
+    if "__csv_path__" not in df.columns:
+        raise ValueError("The DataFrame must contain a '__csv_path__' column.")
+
+    root = Path(root).expanduser()
+    root.mkdir(parents=True, exist_ok=True)
+    referenced_files = set(root / path for path in df["__csv_path__"].dropna().unique() if path)
+
+    # Delete unneeded files
+    current_files = set(root.rglob("*.csv"))
+    for file in current_files - referenced_files:
+        file.unlink()
+
+    # Save DataFrame entries to their respective file paths
+    for path, group in df.groupby("__csv_path__"):
+        if path:
+            full_path = root / path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            write_fixed_width_csv(group.drop(columns="__csv_path__"), full_path, n=n_fixed)
+
+    # Delete empty directories
+    sorted_directories = sorted(
+        (d for d in root.rglob("*") if d.is_dir()),
+        key=lambda x: len(x.parts),
+        reverse=True
+    )
+    for directory in sorted_directories:
+        if not any(directory.iterdir()):
+            directory.rmdir()
