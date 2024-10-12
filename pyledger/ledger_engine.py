@@ -1053,7 +1053,8 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing from the ledger DataFrame.
         """
         # Enforce data frame schema
-        df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True)
+        df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=False,
+                            keep_extra_columns=keep_extra_columns)
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
         if "id" not in df.columns or df["id"].isna().any():
