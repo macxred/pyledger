@@ -1105,7 +1105,7 @@ class LedgerEngine(ABC):
             if pd.StringDtype.is_dtype(df[col]):
                 df[col] = df[col].str.strip()
             elif pd.Float64Dtype.is_dtype(df[col]):
-                df[col] = np.where(df[col].notna() & (df[col] == 0), 0.0, df[col])
+                df.loc[df[col].notna() & (df[col] == 0), col] = 0.0
 
         return df
 

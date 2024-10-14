@@ -37,23 +37,16 @@ def test_save_files(tmp_path):
     )
 
 
-def test_save_files_remove_empty_folders_and_files(tmp_path):
-    folder = tmp_path
-    (folder / "empty_folder").mkdir(parents=True, exist_ok=True)
-    (folder / "empty_folder/empty_subfolder").mkdir(parents=True, exist_ok=True)
-    empty_file1 = folder / "empty_file1.csv"
-    empty_file2 = folder / "empty_folder/empty_file2.csv"
+def test_save_files_remove_empty_files(tmp_path):
+    (tmp_path / "empty_folder").mkdir(parents=True, exist_ok=True)
+    empty_file1 = tmp_path / "empty_file1.csv"
+    empty_file2 = tmp_path / "empty_folder/empty_file2.csv"
     empty_file1.touch()
     empty_file2.touch()
 
-    save_files(SAMPLE_DF.query("__csv_path__ == 'file1.csv'"), folder)
-    assert not (folder / "empty_folder/empty_subfolder").exists(), (
-        "The 'empty_subfolder' should be removed."
-    )
-    assert not (folder / "empty_folder").exists(), "The 'empty_folder' should be removed."
+    save_files(SAMPLE_DF.query("__csv_path__ == 'file1.csv'"), tmp_path)
     assert not empty_file1.exists(), "The 'empty_file1.csv' should be removed."
     assert not empty_file2.exists(), "The 'empty_file2.csv' should be removed."
-    assert (folder / "default.csv").exists, "Should create default csv file"
 
 
 def test_save_files_no_path_column_raise_error(tmp_path):

@@ -99,7 +99,7 @@ def write_fixed_width_csv(
     return result.to_csv(path, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
 
 
-def save_files(df: pd.DataFrame, root: Path | str, func = write_fixed_width_csv) -> None:
+def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv) -> None:
     """
     Save a DataFrame to multiple CSV files specified in the '__csv_path__' column.
 
