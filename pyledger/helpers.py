@@ -100,18 +100,20 @@ def write_fixed_width_csv(
 
 
 def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv) -> None:
-    """
-    Save a DataFrame to multiple CSV files specified in the '__csv_path__' column.
+    """Save a DataFrame to multiple CSV files specified in the '__csv_path__' column.
 
-    Ensures that CSV files in a `root` folder contain the data in `df`.
-    1. Saves df to multiple CSV files specified by df["__csv_path__"].
-    2. Removes unneeded CSV files.
+    Manages all CSV files in a given root directory:
+    - Saves DataFrame entries across multiple files based on paths in '__csv_path__' column.
+    - The actual formatting and writing of each file is handled by the provided function.
+    - Deletes any files that are no longer referenced.
 
     Args:
-        df (pd.DataFrame): The DataFrame containing the data to be saved
-                            and a '__csv_path__' column.
+        df (pd.DataFrame): DataFrame containing the data to save with a '__csv_path__' column.
         root (Path | str): The root folder in which CSV files are stored.
         func: Method with signature (df, file) to write the data frame df.
+
+    Raises:
+        ValueError: If the DataFrame does not contain a '__csv_path__' column.
     """
     if "__csv_path__" not in df.columns:
         raise ValueError("The DataFrame must contain a '__csv_path__' column.")

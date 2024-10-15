@@ -66,6 +66,21 @@ class TextLedger(StandaloneLedger):
         return self._ledger
 
     def read_ledger_files(self) -> pd.DataFrame:
+        """Read ledger entries from all CSV files in the ledger directory.
+
+        Find and process each CSV file in the directory separately:
+        - Prepend the file path relative to the root directory to the 'id' column with a : sign.
+        - Skip files that fail processing with a warning.
+
+        Concatenate the DataFrames from each file into a single ledger DataFrame.
+
+        Returns:
+            pd.DataFrame: A DataFrame following the LEDGER_SCHEMA.
+
+        Raises:
+            NotADirectoryError: If the provided ledger path is not a directory.
+        """
+
         ledger_folder = self.root_path / "ledger"
         if not ledger_folder.exists():
             return self.standardize_ledger(None)
@@ -92,31 +107,37 @@ class TextLedger(StandaloneLedger):
 
     @staticmethod
     def csv_path(id: pd.Series) -> pd.Series:
-        """Extract storrage path from ledger id"""
+        """Extract storage path from ledger id."""
         return id.str.replace(":[0-9]+$", "", regex=True)
 
-    def write_ledger_directory(self, df: pd.DataFrame) -> pd.DataFrame:
+    def write_ledger_directory(self, df: pd.DataFrame):
         """Save ledger entries to multiple fixed-width CSV files.
+
+        This method saves all ledger entries across multiple files in a root directory.
+        It ensures the same file structure using the write_ledger_file method to enforce
+        a standard, deterministic structure for a single ledger file.
 
         Args:
             df (pd.DataFrame): The ledger DataFrame to prepare.
-
-        Returns:
-            pd.DataFrame: The formatted ledger DataFrame ready for saving.
         """
         df = self.standardize_ledger(df)
         df["__csv_path__"] = self.csv_path(df["id"])
         save_files(df, root=self.root_path / "ledger", func=self.write_ledger_file)
         self._invalidate_ledger()
-        return df
 
     @classmethod
     def write_ledger_file(cls, df: pd.DataFrame, path: Path):
-        """Save ledger entries to a fixed-width CSV file.
+        """Save ledger entries to a canonical human-readable CSV file.
+
+        This method enforces a standard, deterministic structure for ledger file,
+        ensuring consistency across all saved files.
 
         Args:
             df (pd.DataFrame): Ledger entries to save.
             path (Path): The file path where the entries will be saved.
+
+        Returns:
+            pd.DataFrame: The formatted ledger DataFrame ready for saving.
         """
         df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
         df.sort_values("date")
@@ -185,10 +206,7 @@ class TextLedger(StandaloneLedger):
         self._invalidate_ledger()
 
     def _invalidate_ledger(self) -> None:
-        """
-        Invalidates the cached ledger data.
-        Resets the cache and cache timestamp to ensure the next access reads from disk.
-        """
+        """Invalidates the cached ledger data."""
         self._ledger = None
         self._ledger_time = None
 
