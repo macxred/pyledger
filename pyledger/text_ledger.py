@@ -140,7 +140,7 @@ class TextLedger(StandaloneLedger):
             pd.DataFrame: The formatted ledger DataFrame ready for saving.
         """
         df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
-        df.sort_values("date")
+        df.sort_values(by="date")
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
         df = df.drop(columns=["id"]).dropna(axis=1, how='all')
         n_fixed = LEDGER_SCHEMA["column"].head(-2).isin(df.columns).sum()

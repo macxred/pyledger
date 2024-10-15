@@ -10,6 +10,7 @@ from consistent_df import assert_frame_equal
 SAMPLE_CSV = """
     __csv_path__,              date,      account,  contra, currency,  amount
     file1.csv,                 2024-05-24,   9992,    9995,      CHF,  100.00
+    file1.csv,                 2024-05-24,   9992,    9995,      CHF,  200.00
     level1/file2.csv,          2024-05-24,   9992,    9995,      CHF,  100.00
     level1/level2/file3.csv,   2024-05-24,   9992,    9995,      CHF,  100.00
 """
@@ -52,3 +53,21 @@ def test_save_files_remove_empty_files(tmp_path):
 def test_save_files_no_path_column_raise_error(tmp_path):
     with pytest.raises(ValueError, match="The DataFrame must contain a '__csv_path__' column."):
         save_files(pd.DataFrame({}), tmp_path)
+
+
+def test_save_files_empty_dataframe_with_path_column(tmp_path):
+    empty_df = pd.DataFrame({"__csv_path__": []})
+    save_files(empty_df, tmp_path)
+    assert not any(tmp_path.rglob("*.csv")), "No files should be created."
+
+
+def test_save_files_overwrite(tmp_path):
+    df = SAMPLE_DF.query("__csv_path__ == 'file1.csv'").copy()
+    save_files(df, tmp_path)
+
+    # Change data and save again
+    df.loc[0, "amount"] = 200.00
+    save_files(df, tmp_path)
+
+    output = pd.read_csv(tmp_path / "file1.csv", skipinitialspace=True)
+    assert output["amount"].iloc[0] == 200.00, "File content should be overwritten"
