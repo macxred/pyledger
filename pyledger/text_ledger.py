@@ -138,26 +138,38 @@ class TextLedger(StandaloneLedger):
         save_files(df, root=self.root_path / "ledger", func=self.write_ledger_file)
         self._invalidate_ledger()
 
-    @classmethod
-    def write_ledger_file(cls, df: pd.DataFrame, path: Path):
-        """Save ledger entries to a canonical human-readable CSV file.
+    @staticmethod
+    def write_ledger_file(df: pd.DataFrame, path: Path) -> pd.DataFrame:
+        """Save ledger entries to a fixed-width CSV file.
 
-        This method enforces a standard, deterministic structure for ledger file,
-        ensuring consistency across all saved files.
+        This method stores ledger entries in a fixed-width CSV format, ideal
+        for version control systems like Git. Entries are padded with spaces
+        to maintain a consistent column width for improved readability.
+
+        The "id" column is not saved. For transactions spanning multiple rows
+        with the same id, the date is recorded only on the first row. Rows
+        without a date belong to the transaction that began in the preceding
+        row with a date.
 
         Args:
-            df (pd.DataFrame): Ledger entries to save.
-            path (Path): The file path where the entries will be saved.
+            df (pd.DataFrame): The ledger entries to save.
+            path (Path): File path relative to the <root>/ledger directory.
 
         Returns:
-            pd.DataFrame: The formatted ledger DataFrame ready for saving.
+            pd.DataFrame: The formatted DataFrame saved to the file.
         """
         df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
+
+        # Record date only on the first row of collective transactions
         df.sort_values(by="id", inplace=True)
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
-        optional = LEDGER_SCHEMA.loc[~LEDGER_SCHEMA["mandatory"], "column"].to_list()
-        to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
-        df = df.drop(columns=["id"] + to_drop)
+
+        # Drop columns that are all NA and not required by the schema
+        na_columns = df.columns[df.isna().all()]
+        mandatory_columns = LEDGER_SCHEMA["column"][LEDGER_SCHEMA["mandatory"]]
+        df = df.drop(columns=set(na_columns).difference(mandatory_columns) | {"id"})
+
+        # Write a CSV with fixed-width in all columns but the last two in the schema
         n_fixed = LEDGER_SCHEMA["column"].head(-2).isin(df.columns).sum()
         write_fixed_width_csv(df, path=path, n=n_fixed)
 
