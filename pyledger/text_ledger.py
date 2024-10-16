@@ -116,20 +116,18 @@ class TextLedger(StandaloneLedger):
         """Extract numeric id from ledger id."""
         return id.str.extract(r"(\d+)$")[0]
 
-    def write_ledger_directory(self, df: pd.DataFrame = None):
-        """Save ledger entries to multiple fixed-width CSV files.
+    def write_ledger_directory(self, df: pd.DataFrame | None = None):
+        """Save ledger entries to multiple CSV files in the ledger directory.
 
-        This method saves all ledger entries across multiple files in a root directory.
-        It ensures the same file structure using the write_ledger_file method to enforce
-        a standard, deterministic structure for a single ledger file.
-
-        If no DataFrame is provided, it defaults to the current ledger.
+        Saves ledger entries to several fixed-width CSV files, formatted by
+        `write_ledger_file`. The storage location within the `<root>/ledger`
+        directory is determined by the portion of the ID up to the last
+        colon (':').
 
         Args:
-            df (pd.DataFrame, optional): The ledger DataFrame to prepare. If None,
-                                         defaults to the current ledger.
+            df (pd.DataFrame, optional): The ledger DataFrame to save.
+                If not provided, defaults to the current ledger.
         """
-
         if df is None:
             df = self.ledger()
 

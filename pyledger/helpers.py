@@ -99,18 +99,19 @@ def write_fixed_width_csv(
     return result.to_csv(path, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
 
 
-def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv) -> None:
-    """Save a DataFrame to multiple CSV files specified in the '__csv_path__' column.
+def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv):
+    """Save DataFrame entries to multiple files within a root folder.
 
-    Manages all CSV files in a given root directory:
-    - Saves DataFrame entries across multiple files based on paths in '__csv_path__' column.
-    - The actual formatting and writing of each file is handled by the provided function.
-    - Deletes any files that are no longer referenced.
+    Saves a DataFrame to multiple files in the specified `root` folder, with
+    file paths within the root folder determined by the `__csv_path__` column.
+    Any existing files in the root directory that are not referenced in the
+    `__csv_path__` column are deleted.
 
     Args:
-        df (pd.DataFrame): DataFrame containing the data to save with a '__csv_path__' column.
-        root (Path | str): The root folder in which CSV files are stored.
-        func: Method with signature (df, file) to write the data frame df.
+        df (pd.DataFrame): DataFrame to save, with a `__csv_path__` column.
+        root (Path | str): Root directory where the files will be stored.
+        func (callable): Function to save each DataFrame group to a file.
+                         Defaults to `write_fixed_width_csv`.
 
     Raises:
         ValueError: If the DataFrame does not contain a '__csv_path__' column.
@@ -121,13 +122,13 @@ def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv) -
     root = Path(root).expanduser()
     root.mkdir(parents=True, exist_ok=True)
 
-    # Delete unneeded files
+    # Delete unreferenced files
     current_files = set(root.rglob("*.csv"))
     referenced_files = set(root / path for path in df["__csv_path__"].unique())
     for file in current_files - referenced_files:
         file.unlink()
 
-    # Save DataFrame entries to their respective file paths
+    # Save DataFrame entries to their respective files
     for path, group in df.groupby("__csv_path__"):
         full_path = root / path
         full_path.parent.mkdir(parents=True, exist_ok=True)
