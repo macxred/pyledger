@@ -201,7 +201,7 @@ class TextLedger(StandaloneLedger):
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
             raise ValueError("Ids need to be identical across a single ledger entry.")
-        id = entry["id"].unique()[0]
+        id = entry["id"].iloc[0]
 
         ledger = self.ledger()
         path = self.csv_path(pd.Series(id)).item()
@@ -221,7 +221,7 @@ class TextLedger(StandaloneLedger):
                 raise KeyError(f"Ledger entries with ids '{', '.join(missing_ids)}' not found.")
 
         df = ledger[~ledger["id"].isin(ids)]
-        paths_to_update = self.csv_path(ledger["id"]).unique()
+        paths_to_update = self.csv_path(pd.Series(ids)).unique()
         for path in paths_to_update:
             df_same_file = df[self.csv_path(df["id"]) == path]
             file_path = self.root_path / "ledger" / path
