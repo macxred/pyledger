@@ -1,6 +1,4 @@
-"""This module defines the TextLedger class, an extension of StandaloneLedger,
-designed to read and process tax, accounts, ledger, etc. from text files.
-"""
+"""This module defines TextLedger, extending StandaloneLedger to store data in text files."""
 
 import pandas as pd
 from typing import List
@@ -36,8 +34,15 @@ LEDGER_COLUMN_SHORTCUTS = {
 
 
 class TextLedger(StandaloneLedger):
-    """TextLedger class for reading and processing tax, accounts, ledger, etc.
-    from text files.
+    """
+    Stand-alone ledger system storing data in text files.
+
+    TextLedger stores accounting data in text files, ideal for version
+    control systems like Git. Tabular data, such as the account chart and
+    general ledger entries, is stored in a fixed-width CSV format, with
+    entries padded with spaces for consistent column widths to enhance
+    readability. Configuration settings, including the reporting currency,
+    are stored in JSON format.
     """
 
     def __init__(
