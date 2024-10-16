@@ -66,21 +66,16 @@ class TextLedger(StandaloneLedger):
         return self._ledger
 
     def read_ledger_files(self) -> pd.DataFrame:
-        """Read ledger entries from all CSV files in the ledger directory.
+        """Reads ledger entries from CSV files in the ledger directory.
 
-        Find and process each CSV file in the directory separately:
-        - Prepend the file path relative to the root directory to the 'id' column with a : sign.
-        - Skip files that fail processing with a warning.
-
-        Concatenate the DataFrames from each file into a single ledger DataFrame.
+        Iterates through all CSV files in the 'ledger' directory, reading each file
+        into a DataFrame and converting the data according to `LEDGER_SCHEMA`. Files
+        that cannot be processed are skipped with a warning. The data from all valid
+        files is then combined into a single DataFrame.
 
         Returns:
-            pd.DataFrame: A DataFrame following the LEDGER_SCHEMA.
-
-        Raises:
-            NotADirectoryError: If the provided ledger path is not a directory.
+            pd.DataFrame: The aggregated ledger data adhering to `LEDGER_SCHEMA`.
         """
-
         ledger_folder = self.root_path / "ledger"
         if not ledger_folder.exists():
             return self.standardize_ledger(None)
@@ -89,21 +84,24 @@ class TextLedger(StandaloneLedger):
 
         ledger = []
         for file in ledger_folder.rglob("*.csv"):
+            relative_path = str(file.relative_to(ledger_folder))
             try:
                 df = pd.read_csv(file, skipinitialspace=True)
-                # TODO: remove line once old systems are migrated
+                # TODO: Remove the following line once legacy systems are migrated.
                 df = df.rename(columns=LEDGER_COLUMN_SHORTCUTS)
                 df = self.standardize_ledger(df)
                 if not df.empty:
-                    df["id"] = str(file.relative_to(self.root_path / "ledger")) + ":" + df["id"]
+                    df["id"] = relative_path + ":" + df["id"]
                 ledger.append(df)
             except Exception as e:
-                self._logger.warning(f"Skipping {file} file: {e}")
+                self._logger.warning(f"Skipping {relative_path}: {e}")
+
         if ledger:
             result = pd.concat(ledger, ignore_index=True)
             result = enforce_schema(result, LEDGER_SCHEMA, sort_columns=True)
         else:
             result = None
+
         return self.standardize_ledger(result)
 
     @staticmethod
