@@ -117,8 +117,8 @@ class TextLedger(StandaloneLedger):
 
     @staticmethod
     def id_from_path(id: pd.Series) -> pd.Series:
-        """Extract numeric id from ledger id."""
-        return id.str.extract(r"(\d+)$")[0]
+        """Extract numeric portion of ledger id."""
+        return id.str.replace("^.*:", "", regex=True).astype(int)
 
     def write_ledger_directory(self, df: pd.DataFrame | None = None):
         """Save ledger entries to multiple CSV files in the ledger directory.
@@ -163,7 +163,7 @@ class TextLedger(StandaloneLedger):
         df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
 
         # Record date only on the first row of collective transactions
-        df.sort_values(by="id", inplace=True)
+        df = df.iloc[TextLedger.id_from_path(df["id"]).argsort()]
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
 
         # Drop columns that are all NA and not required by the schema
@@ -187,7 +187,7 @@ class TextLedger(StandaloneLedger):
         if df_same_file.empty:
             id = f"{path}:1"
         else:
-            ids_same_file = self.id_from_path(ledger["id"]).astype(int)
+            ids_same_file = self.id_from_path(ledger["id"])
             id = f"{path}:{max(ids_same_file) + 1}"
         df = pd.concat([df_same_file, entry.assign(id=id)])
         full_path = self.root_path / "ledger" / path
