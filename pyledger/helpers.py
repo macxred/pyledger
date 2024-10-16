@@ -129,7 +129,6 @@ def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv) -
 
     # Save DataFrame entries to their respective file paths
     for path, group in df.groupby("__csv_path__"):
-        if path:
-            full_path = root / path
-            full_path.parent.mkdir(parents=True, exist_ok=True)
-            func(group.drop(columns="__csv_path__"), full_path)
+        full_path = root / path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        func(group.drop(columns="__csv_path__"), full_path)

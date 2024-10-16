@@ -17,6 +17,8 @@ class TestLedger(BaseTestLedger):
         return TextLedger(tmp_path)
 
     def test_ledger_invalidation(self, ledger):
+        assert ledger._is_expired(ledger._ledger_time)
+        ledger.ledger()
         assert not ledger._is_expired(ledger._ledger_time)
         ledger._invalidate_ledger()
         assert ledger._is_expired(ledger._ledger_time)
@@ -45,14 +47,14 @@ class TestLedger(BaseTestLedger):
 
         # Verify if the ledger is read correctly
         result = ledger.standardize_ledger(result)
-        result["id"] = "ledger/test.csv:" + result["id"]
+        result["id"] = "test.csv:" + result["id"]
         assert_frame_equal(ledger.read_ledger_files(), result, check_like=True)
 
     def test_write_read_empty_ledger_file(self, ledger):
-        df = ledger.standardize_ledger(None)
         path = Path(ledger.root_path / "ledger/test.csv")
         path.parent.mkdir(parents=True, exist_ok=True)
-        ledger.write_ledger_file(df, path)
+        path.touch(exist_ok=True)
+
         with pytest.raises(pd.errors.EmptyDataError):
             pd.read_csv(path)
         assert ledger.read_ledger_files().empty, "Reading ledger files should return empty df"
@@ -77,7 +79,6 @@ class TestLedger(BaseTestLedger):
         assert_frame_equal(result, level_1, ignore_columns=["id"])
 
         # Verify if the ledger is read correctly
-        entries["id"] = "ledger/" + entries["id"]
         assert_frame_equal(ledger.ledger(), ledger.standardize_ledger(entries))
 
     def test_ledger_write_and_read_empty_ledger_directory(self, ledger):
@@ -90,6 +91,39 @@ class TestLedger(BaseTestLedger):
         )
         assert ledger.ledger().empty, "Reading ledger files should return empty df"
 
+    def test_ledger_write_ledger_directory_with_none(self, ledger):
+        df = self.LEDGER_ENTRIES.query("id == '1'").copy().drop(columns=["id"])
+        ledger.add_ledger_entry(df)
+        ledger.write_ledger_directory()
+
+        # Verify if the file content matches the expected format
+        result = pd.read_csv(ledger.root_path / "ledger/default.csv", skipinitialspace=True)
+        result = ledger.standardize_ledger(result)
+        assert_frame_equal(result, df, ignore_columns=["id"], check_like=True)
+
+        # Verify if the ledger is read correctly
+        df["id"] = "default.csv:" + df["id"]
+        assert_frame_equal(ledger.ledger(), ledger.standardize_ledger(df), check_like=True)
+
     def test_ledger_read_no_ledger_folder_return_empty_df(self, ledger):
         expected_ledger = ledger.standardize_ledger(None)
         assert_frame_equal(ledger.ledger(), expected_ledger)
+
+    def test_add_modify_ledger_does_not_change_entries_order(self, ledger):
+        ledger.add_ledger_entry(self.LEDGER_ENTRIES.query("id == '3'"))
+        ledger.add_ledger_entry(self.LEDGER_ENTRIES.query("id == '2'"))
+        ledger.add_ledger_entry(self.LEDGER_ENTRIES.query("id == '1'"))
+        expected = pd.concat([
+            self.LEDGER_ENTRIES.query("id == '1'"),
+            self.LEDGER_ENTRIES.query("id == '2'"),
+            self.LEDGER_ENTRIES.query("id == '3'"),
+        ], ignore_index=True)
+        expected = ledger.standardize_ledger(expected)
+        assert_frame_equal(ledger.ledger(), expected, ignore_columns=["id"])
+
+        df = self.LEDGER_ENTRIES.query("id == '1'").copy()
+        df = df.assign(id="default.csv:1", amount=99999)
+        ledger.modify_ledger_entry(df)
+        expected = expected[expected["id"] != '1']
+        expected = ledger.standardize_ledger(pd.concat([df, expected], ignore_index=True))
+        assert_frame_equal(ledger.ledger(), expected, ignore_columns=["id"])

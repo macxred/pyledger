@@ -54,7 +54,7 @@ class TextLedger(StandaloneLedger):
         self._reporting_currency = reporting_currency
         self._cache_timeout = cache_timeout
         self._ledger_time = None
-        self._ledger = self.ledger()
+        self._ledger = self.standardize_ledger(None)
         self._prices = self.standardize_prices(None)
         self._tax_codes = self.standardize_tax_codes(None)
         self._accounts = self.standardize_accounts(None)
@@ -93,16 +93,17 @@ class TextLedger(StandaloneLedger):
                 df = pd.read_csv(file, skipinitialspace=True)
                 # TODO: remove line once old systems are migrated
                 df = df.rename(columns=LEDGER_COLUMN_SHORTCUTS)
-                self.standardize_ledger(df)
+                df = self.standardize_ledger(df)
                 if not df.empty:
-                    df["id"] = str(file.relative_to(self.root_path)) + ":" + df["id"]
+                    df["id"] = str(file.relative_to(self.root_path / "ledger")) + ":" + df["id"]
                 ledger.append(df)
             except Exception as e:
                 self._logger.warning(f"Skipping {file} file: {e}")
-        result = None
         if ledger:
             result = pd.concat(ledger, ignore_index=True)
             result = enforce_schema(result, LEDGER_SCHEMA, sort_columns=True)
+        else:
+            result = None
         return self.standardize_ledger(result)
 
     @staticmethod
@@ -110,16 +111,28 @@ class TextLedger(StandaloneLedger):
         """Extract storage path from ledger id."""
         return id.str.replace(":[0-9]+$", "", regex=True)
 
-    def write_ledger_directory(self, df: pd.DataFrame):
+    @staticmethod
+    def id_from_path(id: pd.Series) -> pd.Series:
+        """Extract numeric id from ledger id."""
+        return id.str.extract(r"(\d+)$")[0]
+
+    def write_ledger_directory(self, df: pd.DataFrame = None):
         """Save ledger entries to multiple fixed-width CSV files.
 
         This method saves all ledger entries across multiple files in a root directory.
         It ensures the same file structure using the write_ledger_file method to enforce
         a standard, deterministic structure for a single ledger file.
 
+        If no DataFrame is provided, it defaults to the current ledger.
+
         Args:
-            df (pd.DataFrame): The ledger DataFrame to prepare.
+            df (pd.DataFrame, optional): The ledger DataFrame to prepare. If None,
+                                         defaults to the current ledger.
         """
+
+        if df is None:
+            df = self.ledger()
+
         df = self.standardize_ledger(df)
         df["__csv_path__"] = self.csv_path(df["id"])
         save_files(df, root=self.root_path / "ledger", func=self.write_ledger_file)
@@ -140,16 +153,17 @@ class TextLedger(StandaloneLedger):
             pd.DataFrame: The formatted ledger DataFrame ready for saving.
         """
         df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
-        df.sort_values(by="date")
+        df.sort_values(by="id", inplace=True)
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
-        df = df.drop(columns=["id"]).dropna(axis=1, how='all')
+        optional = LEDGER_SCHEMA.loc[~LEDGER_SCHEMA["mandatory"], "column"].to_list()
+        to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
+        df = df.drop(columns=["id"] + to_drop)
         n_fixed = LEDGER_SCHEMA["column"].head(-2).isin(df.columns).sum()
         write_fixed_width_csv(df, path=path, n=n_fixed)
 
         return df
 
     def add_ledger_entry(self, entry: pd.DataFrame, path: str = "default.csv") -> str:
-        path = f"ledger/{path}"
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
             raise ValueError(
@@ -161,18 +175,14 @@ class TextLedger(StandaloneLedger):
         while entry["id"].iloc[0] in df_same_file["id"].values:
             entry["id"] = f"new_{entry['id'].iloc[0]}"
         df = pd.concat([df_same_file, entry])
-        full_path = self.root_path / path
+        full_path = self.root_path / "ledger" / path
         Path(full_path).parent.mkdir(parents=True, exist_ok=True)
-        ledger = self.write_ledger_file(df, full_path)
+        self.write_ledger_file(df, full_path)
         self._invalidate_ledger()
 
         # Return the id of a newly created ledger entry
-        ledger = self.standardize_ledger(ledger)
-        ledger["id"] = path + ":" + ledger["id"]
-        id = ledger["id"][~ledger["id"].isin(df_same_file["id"])].unique()
-        if len(id) != 1:
-            raise ValueError(f"Unexpected number of new ledger ids: {id}")
-        return id[0]
+        ids = self.id_from_path(ledger["id"]).astype(int).to_list() + [0]
+        return f"{path}:{int(max(ids)) + 1}"
 
     def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
         entry = self.standardize_ledger(entry)
@@ -183,12 +193,12 @@ class TextLedger(StandaloneLedger):
 
         ledger = self.ledger()
         path = self.csv_path(entry["id"]).iloc[0]
-        df_same_file = ledger[ledger["id"].str.startswith(path)]
+        df_same_file = ledger[self.csv_path(ledger["id"]) == path]
         if entry["id"].iat[0] not in df_same_file["id"].values:
             raise ValueError(f"Ledger entry with id '{entry['id'].iat[0]}' not found.")
 
         df_same_file = pd.concat([df_same_file[df_same_file["id"] != entry["id"].iat[0]], entry])
-        ledger = self.write_ledger_file(df_same_file, self.root_path / path)
+        ledger = self.write_ledger_file(df_same_file, self.root_path / "ledger" / path)
         self._invalidate_ledger()
 
     def delete_ledger_entries(self, ids: List[str], allow_missing: bool = False) -> None:
@@ -199,10 +209,14 @@ class TextLedger(StandaloneLedger):
                 raise KeyError(f"Ledger entries with ids '{', '.join(missing_ids)}' not found.")
 
         df = ledger[~ledger["id"].isin(ids)]
-        paths_to_update = ledger["id"].str.split(":").str[0].unique()
+        paths_to_update = self.csv_path(ledger["id"]).unique()
         for path in paths_to_update:
-            df_same_file = df[df["id"].str.startswith(path)]
-            self.write_ledger_file(df_same_file, self.root_path / path)
+            df_same_file = df[self.csv_path(df["id"]) == path]
+            file_path = self.root_path / "ledger" / path
+            if df_same_file.empty:
+                file_path.unlink()
+            else:
+                self.write_ledger_file(df_same_file, file_path)
         self._invalidate_ledger()
 
     def _invalidate_ledger(self) -> None:
