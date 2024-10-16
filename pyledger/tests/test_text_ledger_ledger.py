@@ -114,16 +114,16 @@ class TestLedger(BaseTestLedger):
         ledger.add_ledger_entry(self.LEDGER_ENTRIES.query("id == '2'"))
         ledger.add_ledger_entry(self.LEDGER_ENTRIES.query("id == '1'"))
         expected = pd.concat([
-            self.LEDGER_ENTRIES.query("id == '1'"),
-            self.LEDGER_ENTRIES.query("id == '2'"),
             self.LEDGER_ENTRIES.query("id == '3'"),
+            self.LEDGER_ENTRIES.query("id == '2'"),
+            self.LEDGER_ENTRIES.query("id == '1'"),
         ], ignore_index=True)
         expected = ledger.standardize_ledger(expected)
         assert_frame_equal(ledger.ledger(), expected, ignore_columns=["id"])
 
         df = self.LEDGER_ENTRIES.query("id == '1'").copy()
-        df = df.assign(id="default.csv:1", amount=99999)
+        df = df.assign(id="default.csv:3", amount=99999)
         ledger.modify_ledger_entry(df)
         expected = expected[expected["id"] != '1']
-        expected = ledger.standardize_ledger(pd.concat([df, expected], ignore_index=True))
+        expected = ledger.standardize_ledger(pd.concat([expected, df], ignore_index=True))
         assert_frame_equal(ledger.ledger(), expected, ignore_columns=["id"])

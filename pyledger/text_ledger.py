@@ -49,6 +49,7 @@ class TextLedger(StandaloneLedger):
         self,
         root_path: Path = Path.cwd(),
         cache_timeout: int = 300,
+        # TODO: reporting_currency will be removed in a later realization
         reporting_currency: str = "USD",
     ):
         """Initializes the TextLedger with a root path for file storage.
@@ -179,38 +180,36 @@ class TextLedger(StandaloneLedger):
     def add_ledger_entry(self, entry: pd.DataFrame, path: str = "default.csv") -> str:
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
-            raise ValueError(
-                "Id needs to be unique and present in all rows of a collective booking."
-            )
+            raise ValueError("Ids need to be identical across a single ledger entry.")
 
         ledger = self.ledger()
         df_same_file = ledger[self.csv_path(ledger["id"]) == path]
-        while entry["id"].iloc[0] in df_same_file["id"].values:
-            entry["id"] = f"new_{entry['id'].iloc[0]}"
-        df = pd.concat([df_same_file, entry])
+        if df_same_file.empty:
+            id = f"{path}:1"
+        else:
+            ids_same_file = self.id_from_path(ledger["id"]).astype(int)
+            id = f"{path}:{max(ids_same_file) + 1}"
+        df = pd.concat([df_same_file, entry.assign(id=id)])
         full_path = self.root_path / "ledger" / path
         Path(full_path).parent.mkdir(parents=True, exist_ok=True)
         self.write_ledger_file(df, full_path)
         self._invalidate_ledger()
 
-        # Return the id of a newly created ledger entry
-        ids = self.id_from_path(ledger["id"]).astype(int).to_list() + [0]
-        return f"{path}:{int(max(ids)) + 1}"
+        return id
 
     def modify_ledger_entry(self, entry: pd.DataFrame) -> None:
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
-            raise ValueError(
-                "Id needs to be unique and present in all rows of a collective booking."
-            )
+            raise ValueError("Ids need to be identical across a single ledger entry.")
+        id = entry["id"].unique()[0]
 
         ledger = self.ledger()
-        path = self.csv_path(entry["id"]).iloc[0]
+        path = self.csv_path(pd.Series(id)).item()
         df_same_file = ledger[self.csv_path(ledger["id"]) == path]
-        if entry["id"].iat[0] not in df_same_file["id"].values:
-            raise ValueError(f"Ledger entry with id '{entry['id'].iat[0]}' not found.")
+        if id not in df_same_file["id"].values:
+            raise ValueError(f"Ledger entry with id '{id}' not found.")
 
-        df_same_file = pd.concat([df_same_file[df_same_file["id"] != entry["id"].iat[0]], entry])
+        df_same_file = pd.concat([df_same_file[df_same_file["id"] != id], entry])
         ledger = self.write_ledger_file(df_same_file, self.root_path / "ledger" / path)
         self._invalidate_ledger()
 
