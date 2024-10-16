@@ -45,6 +45,12 @@ class TextLedger(StandaloneLedger):
     are stored in JSON format.
     """
 
+    _ledger_time = None
+    _ledger = None
+    _prices = None
+    _tax_codes = None
+    _accounts = None
+
     def __init__(
         self,
         root_path: Path = Path.cwd(),
@@ -59,38 +65,45 @@ class TextLedger(StandaloneLedger):
         self.root_path = Path(root_path).expanduser()
         self._reporting_currency = reporting_currency
         self._cache_timeout = cache_timeout
-        self._ledger_time = None
-        self._ledger = self.standardize_ledger(None)
-        self._prices = self.standardize_prices(None)
-        self._tax_codes = self.standardize_tax_codes(None)
-        self._accounts = self.standardize_accounts(None)
 
     def ledger(self) -> pd.DataFrame:
         if self._is_expired(self._ledger_time):
-            self._ledger = self.read_ledger_files()
+            self._ledger = self.read_ledger_files(self.root_path / "ledger")
             self._ledger_time = datetime.now()
         return self._ledger
 
-    def read_ledger_files(self) -> pd.DataFrame:
-        """Reads ledger entries from CSV files in the ledger directory.
+    def read_ledger_files(self, root: Path | str) -> pd.DataFrame:
+        """Reads ledger entries from CSV files in the given root directory.
 
-        Iterates through all CSV files in the 'ledger' directory, reading each file
-        into a DataFrame and converting the data according to `LEDGER_SCHEMA`. Files
-        that cannot be processed are skipped with a warning. The data from all valid
-        files is then combined into a single DataFrame.
+        Iterates through all CSV files in the root directory, reading each file
+        into a DataFrame and converting the data to conform with LEDGER_SCHEMA.
+        Files that cannot be processed are skipped with a warning. The data
+        from all valid files is then combined into a single DataFrame.
+
+        IDs are not stored in ledger files but are constructed when reading
+        each file. The `id` is created by combining the relative path to the
+        root directory with the integer position of ledger entries, separated
+        by a colon: {path}:{position}. Ids are thus not persistent, and might
+        be different when files are read again, for example if a preceding
+        entry in a ledger file is deleted. Successive rows belonging to the
+        same transaction are identified by recording the date only on the first
+        row; rows without a date are considered part of the transaction that
+        began in the preceding row with a date.
+
+        Args:
+            root (Path | str): Root directory containing the ledger files.
 
         Returns:
-            pd.DataFrame: The aggregated ledger data adhering to `LEDGER_SCHEMA`.
+            pd.DataFrame: The aggregated ledger data conforming to LEDGER_SCHEMA.
         """
-        ledger_folder = self.root_path / "ledger"
-        if not ledger_folder.exists():
+        if not root.exists():
             return self.standardize_ledger(None)
-        if not ledger_folder.is_dir():
-            raise NotADirectoryError(f"Ledger root folder is not a directory: {ledger_folder}")
+        if not root.is_dir():
+            raise NotADirectoryError(f"Ledger root folder is not a directory: {root}")
 
         ledger = []
-        for file in ledger_folder.rglob("*.csv"):
-            relative_path = str(file.relative_to(ledger_folder))
+        for file in root.rglob("*.csv"):
+            relative_path = str(file.relative_to(root))
             try:
                 df = pd.read_csv(file, skipinitialspace=True)
                 # TODO: Remove the following line once legacy systems are migrated.
