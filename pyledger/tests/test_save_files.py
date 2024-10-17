@@ -1,4 +1,4 @@
-"""Test suite for save_files() method tests."""
+"""Test suite for save_files() method."""
 
 import pytest
 import pandas as pd

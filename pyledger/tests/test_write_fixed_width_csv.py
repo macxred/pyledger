@@ -1,4 +1,4 @@
-"""Test suit for write_fixed_width_csv() function"""
+"""Test suite for write_fixed_width_csv() method."""
 
 import pandas as pd
 import numpy as np
