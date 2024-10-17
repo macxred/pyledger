@@ -72,29 +72,28 @@ class TextLedger(StandaloneLedger):
             self._ledger_time = datetime.now()
         return self._ledger
 
-    def read_ledger_files(self, root: Path | str) -> pd.DataFrame:
+    def read_ledger_files(self, root: Path) -> pd.DataFrame:
         """Reads ledger entries from CSV files in the given root directory.
 
         Iterates through all CSV files in the root directory, reading each file
-        into a DataFrame and converting the data to conform with LEDGER_SCHEMA.
-        Files that cannot be processed are skipped with a warning. The data
+        into a DataFrame and ensuring the data conforms to `LEDGER_SCHEMA`.
+        Files that cannot be processed are skipped with a warning. The Data
         from all valid files is then combined into a single DataFrame.
 
-        IDs are not stored in ledger files but are constructed when reading
-        each file. The `id` is created by combining the relative path to the
-        root directory with the integer position of ledger entries, separated
-        by a colon: {path}:{position}. Ids are thus not persistent, and might
-        be different when files are read again, for example if a preceding
-        entry in a ledger file is deleted. Successive rows belonging to the
-        same transaction are identified by recording the date only on the first
-        row; rows without a date are considered part of the transaction that
-        began in the preceding row with a date.
+        IDs are not stored in ledger files but are dynamically generated when
+        reading each file. The `id` is constructed by combining the relative
+        path to the root directory with the row's position, separated by a
+        colon (`{path}:{position}`). These IDs are non-persistent and may
+        change if a file's entries are modified. Successive rows that belong to
+        the same transaction are identified by recording the date only on the
+        first row; subsequent rows without a date are considered part of the
+        same transaction.
 
         Args:
-            root (Path | str): Root directory containing the ledger files.
+            root (Path): Root directory containing the ledger files.
 
         Returns:
-            pd.DataFrame: The aggregated ledger data conforming to LEDGER_SCHEMA.
+            pd.DataFrame: The aggregated ledger data conforming to `LEDGER_SCHEMA`.
         """
         if not root.exists():
             return self.standardize_ledger(None)

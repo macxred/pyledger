@@ -48,7 +48,8 @@ class TestLedger(BaseTestLedger):
         # Verify if the ledger is read correctly
         result = ledger.standardize_ledger(result)
         result["id"] = "test.csv:" + result["id"]
-        assert_frame_equal(ledger.read_ledger_files(), result, check_like=True)
+        assert_frame_equal(ledger.read_ledger_files(ledger.root_path / "ledger"),
+                           result, check_like=True)
 
     def test_write_read_empty_ledger_file(self, ledger):
         path = Path(ledger.root_path / "ledger/test.csv")
@@ -57,7 +58,8 @@ class TestLedger(BaseTestLedger):
 
         with pytest.raises(pd.errors.EmptyDataError):
             pd.read_csv(path)
-        assert ledger.read_ledger_files().empty, "Reading ledger files should return empty df"
+        assert ledger.read_ledger_files(ledger.root_path / "ledger").empty, (
+            "Reading ledger files should return empty df")
 
     def test_ledger_write_and_read_ledger_directory(self, ledger):
         # Define ledger entries with different nesting level
