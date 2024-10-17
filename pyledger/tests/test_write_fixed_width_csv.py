@@ -134,7 +134,7 @@ def test_write_to_file():
         path = Path(tmpfile.name)
 
     try:
-        write_fixed_width_csv(df, path=path)
+        write_fixed_width_csv(df, file=path)
         assert path.exists(), "File was not created"
 
         output_file = path.read_text()

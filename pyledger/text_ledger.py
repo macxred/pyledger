@@ -153,7 +153,7 @@ class TextLedger(StandaloneLedger):
         self._invalidate_ledger()
 
     @staticmethod
-    def write_ledger_file(df: pd.DataFrame, path: Path) -> pd.DataFrame:
+    def write_ledger_file(df: pd.DataFrame, file: str) -> pd.DataFrame:
         """Save ledger entries to a fixed-width CSV file.
 
         This method stores ledger entries in a fixed-width CSV format, ideal
@@ -167,7 +167,7 @@ class TextLedger(StandaloneLedger):
 
         Args:
             df (pd.DataFrame): The ledger entries to save.
-            path (Path): File path relative to the <root>/ledger directory.
+            file (str): Path of the CSV file to write.
 
         Returns:
             pd.DataFrame: The formatted DataFrame saved to the file.
@@ -185,7 +185,7 @@ class TextLedger(StandaloneLedger):
 
         # Write a CSV with fixed-width in all columns but the last two in the schema
         n_fixed = LEDGER_SCHEMA["column"].head(-2).isin(df.columns).sum()
-        write_fixed_width_csv(df, path=path, n=n_fixed)
+        write_fixed_width_csv(df, file=file, n=n_fixed)
 
         return df
 

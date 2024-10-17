@@ -46,7 +46,7 @@ def represents_integer(x: Any) -> bool:
 
 def write_fixed_width_csv(
     df: pd.DataFrame,
-    path: str = None,
+    file: str = None,
     sep: str = ", ",
     na_rep: str = "",
     n: int = None,
@@ -62,7 +62,7 @@ def write_fixed_width_csv(
 
     Args:
         df (pandas.DataFrame): DataFrame to be written to CSV.
-        path (str): Name/path of the CSV file to write. If None, returns the CSV
+        file (str): Path of the CSV file to write. If None, returns the CSV
             output as a string.
         sep (str): Separator for the CSV file, default is ', '. In contrast to
             pd.to_csv, multi-char separators are supported.
@@ -73,7 +73,7 @@ def write_fixed_width_csv(
         **kwargs: Additional keyword arguments for pandas to_csv method.
 
     Returns:
-        str: CSV output as a string if the path is None.
+        str: CSV output as a string if `file` is None.
     """
     result = {}
     fixed_width_cols = df.shape[1] - 1 if n is None else n
@@ -96,7 +96,7 @@ def write_fixed_width_csv(
     result = pd.DataFrame(result)
 
     # Write to CSV
-    return result.to_csv(path, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
+    return result.to_csv(file, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
 
 
 def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv):
