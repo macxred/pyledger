@@ -37,12 +37,15 @@ class TextLedger(StandaloneLedger):
     """
     Stand-alone ledger system storing data in text files.
 
-    TextLedger stores accounting data in text files, ideal for version
-    control systems like Git. Tabular data, such as the account chart and
-    general ledger entries, is stored in a fixed-width CSV format, with
-    entries padded with spaces for consistent column widths to enhance
-    readability. Configuration settings, including the reporting currency,
-    are stored in JSON format.
+    TextLedger stores accounting data in text files, optimized for version
+    control systems like Git. To produce concise Git diffs, files follow a
+    strict format, and mutator functions are minimally invasive, modifying
+    only necessary files and preserving row order whenever possible.
+
+    To enhance readability, tabular data, such as the account chart and general
+    ledger entries, is stored in a fixed-width CSV format, with entries padded
+    with spaces for consistent column widths. Configuration settings, including
+    the reporting currency, are stored in YAML format.
     """
 
     _ledger_time = None
