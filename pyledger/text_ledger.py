@@ -175,7 +175,7 @@ class TextLedger(StandaloneLedger):
         df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
 
         # Record date only on the first row of collective transactions
-        df = df.iloc[TextLedger.id_from_path(df["id"]).argsort()]
+        df = df.iloc[TextLedger.id_from_path(df["id"]).argsort(kind="mergesort")]
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
 
         # Drop columns that are all NA and not required by the schema
