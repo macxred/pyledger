@@ -3,6 +3,7 @@ writing fixed-width CSV files and checking if values can be represented as integ
 """
 
 from typing import Any
+from pathlib import Path
 import numpy as np
 import pandas as pd
 
@@ -45,7 +46,7 @@ def represents_integer(x: Any) -> bool:
 
 def write_fixed_width_csv(
     df: pd.DataFrame,
-    path: str = None,
+    file: str = None,
     sep: str = ", ",
     na_rep: str = "",
     n: int = None,
@@ -61,7 +62,7 @@ def write_fixed_width_csv(
 
     Args:
         df (pandas.DataFrame): DataFrame to be written to CSV.
-        path (str): Name/path of the CSV file to write. If None, returns the CSV
+        file (str): Path of the CSV file to write. If None, returns the CSV
             output as a string.
         sep (str): Separator for the CSV file, default is ', '. In contrast to
             pd.to_csv, multi-char separators are supported.
@@ -72,20 +73,17 @@ def write_fixed_width_csv(
         **kwargs: Additional keyword arguments for pandas to_csv method.
 
     Returns:
-        str: CSV output as a string if the path is None.
+        str: CSV output as a string if `file` is None.
     """
     result = {}
     fixed_width_cols = df.shape[1] - 1 if n is None else n
 
-    for i in range(len(df.columns)):
-        col = df.iloc[:, i]
+    for i, colname in enumerate(df.columns):
+        col = df[colname]
         col_str = pd.Series(np.where(col.isna(), na_rep, col.astype(str)))
-        colname = df.columns[i]
-        max_length = max(col_str.dropna().apply(len).max(), len(colname))
-
-        # Fixed width formatting
+        max_length = max(col_str.str.len().max(), len(colname))
         if i < fixed_width_cols:
-            col_str = col_str.apply(lambda x, ml=max_length: x.rjust(ml))
+            col_str = col_str.str.rjust(max_length)
             colname = colname.rjust(max_length)
 
         # Separator for all but the first column
@@ -98,4 +96,40 @@ def write_fixed_width_csv(
     result = pd.DataFrame(result)
 
     # Write to CSV
-    return result.to_csv(*args, path, sep=sep[0], index=False, na_rep=na_rep, **kwargs)
+    return result.to_csv(file, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
+
+
+def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv):
+    """Save DataFrame entries to multiple files within a root folder.
+
+    Saves a DataFrame to multiple files in the specified `root` folder, with
+    file paths within the root folder determined by the `__csv_path__` column.
+    Any existing files in the root directory that are not referenced in the
+    `__csv_path__` column are deleted.
+
+    Args:
+        df (pd.DataFrame): DataFrame to save, with a `__csv_path__` column.
+        root (Path | str): Root directory where the files will be stored.
+        func (callable): Function to save each DataFrame group to a file.
+                         Defaults to `write_fixed_width_csv`.
+
+    Raises:
+        ValueError: If the DataFrame does not contain a '__csv_path__' column.
+    """
+    if "__csv_path__" not in df.columns:
+        raise ValueError("The DataFrame must contain a '__csv_path__' column.")
+
+    root = Path(root).expanduser()
+    root.mkdir(parents=True, exist_ok=True)
+
+    # Delete unreferenced files
+    current_files = set(root.rglob("*.csv"))
+    referenced_files = set(root / path for path in df["__csv_path__"].unique())
+    for file in current_files - referenced_files:
+        file.unlink()
+
+    # Save DataFrame entries to their respective files
+    for path, group in df.groupby("__csv_path__"):
+        full_path = root / path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        func(group.drop(columns="__csv_path__"), full_path)
