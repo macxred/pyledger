@@ -5,7 +5,7 @@ from typing import List
 from pathlib import Path
 from datetime import datetime, timedelta
 from pyledger.standalone_ledger import StandaloneLedger
-from pyledger.constants import LEDGER_SCHEMA
+from pyledger.constants import ACCOUNT_SCHEMA, LEDGER_SCHEMA, TAX_CODE_SCHEMA
 from pyledger.helpers import save_files, write_fixed_width_csv
 from consistent_df import enforce_schema
 
@@ -31,6 +31,15 @@ LEDGER_COLUMN_SHORTCUTS = {
     "base_amount": "report_amount",
     "counter": "contra",
 }
+TAX_CODE_COLUMN_SHORTCUTS = {
+    "text": "description",
+    "inclusive": "is_inclusive",
+    "inverse_account": "contra",
+}
+ACCOUNT_COLUMN_SHORTCUTS = {
+    "text": "description",
+    "vat_code": "tax_code",
+}
 
 
 class TextLedger(StandaloneLedger):
@@ -51,7 +60,9 @@ class TextLedger(StandaloneLedger):
     _ledger_time = None
     _ledger = None
     _prices = None
+    _tax_codes_time = None
     _tax_codes = None
+    _accounts_time = None
     _accounts = None
 
     def __init__(
@@ -251,13 +262,51 @@ class TextLedger(StandaloneLedger):
         self._ledger = None
         self._ledger_time = None
 
-    # TODO: This section was copied form MemoryLedger temporary
-    # Need to define logic for TextLedger and replace following
     # ----------------------------------------------------------------------
     # Tax codes
 
     def tax_codes(self) -> pd.DataFrame:
-        return self.standardize_tax_codes(self._tax_codes.copy())
+        if self._is_expired(self._tax_codes_time):
+            self._tax_codes = self.read_tax_codes()
+            self._tax_codes_time = datetime.now()
+        return self._tax_codes.copy()
+
+    def read_tax_codes(self) -> pd.DataFrame:
+        """Read tax codes from CSV file in the root directory.
+
+        Returns:
+            pd.DataFrame: A DataFrame following the TAX_CODE_SCHEMA.
+        """
+
+        try:
+            tax_codes = pd.read_csv(self.root_path / "tax_codes.csv", skipinitialspace=True)
+            # TODO: remove line once old systems are migrated
+            tax_codes.rename(columns=TAX_CODE_COLUMN_SHORTCUTS, inplace=True)
+            tax_codes = self.standardize_tax_codes(tax_codes)
+        except Exception as e:
+            tax_codes = self.standardize_tax_codes(None)
+            self._logger.warning(f"Skipping {self.root_path / "tax_codes.csv"} file: {e}")
+        return tax_codes.copy()
+
+    @classmethod
+    def write_tax_codes_file(cls, df: pd.DataFrame, path: Path):
+        """Save tax codes to a canonical human-readable CSV file.
+
+        Args:
+            df (pd.DataFrame): tax codes to save.
+            path (Path): The file path where tax codes will be saved.
+
+        Returns:
+            pd.DataFrame: Formatted tax codes DataFrame ready for saving.
+        """
+        df = enforce_schema(df, TAX_CODE_SCHEMA, sort_columns=True, keep_extra_columns=True)
+        optional = TAX_CODE_SCHEMA.loc[~TAX_CODE_SCHEMA["mandatory"], "column"].to_list()
+        to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
+        df.drop(columns=to_drop, inplace=True)
+        n_fixed = TAX_CODE_SCHEMA["column"].isin(df.columns).sum()
+        write_fixed_width_csv(df, file=path, n=n_fixed)
+
+        return df
 
     def add_tax_code(
         self,
@@ -267,7 +316,8 @@ class TextLedger(StandaloneLedger):
         is_inclusive: bool = True,
         description: str = "",
     ) -> None:
-        if (self._tax_codes["id"] == id).any():
+        tax_codes = self.tax_codes()
+        if (tax_codes["id"] == id).any():
             raise ValueError(f"Tax code '{id}' already exists")
 
         new_tax_code = self.standardize_tax_codes(pd.DataFrame({
@@ -277,7 +327,9 @@ class TextLedger(StandaloneLedger):
             "rate": [rate],
             "is_inclusive": [is_inclusive],
         }))
-        self._tax_codes = pd.concat([self._tax_codes, new_tax_code])
+        tax_codes = pd.concat([tax_codes, new_tax_code])
+        self.write_tax_codes_file(tax_codes, self.root_path / "tax_codes.csv")
+        self._invalidate_tax_codes()
 
     def modify_tax_code(
         self,
@@ -287,31 +339,76 @@ class TextLedger(StandaloneLedger):
         is_inclusive: bool = True,
         description: str = "",
     ) -> None:
-        if (self._tax_codes["id"] == id).sum() != 1:
+        tax_codes = self.tax_codes()
+        if (tax_codes["id"] == id).sum() != 1:
             raise ValueError(f"Tax code '{id}' not found or duplicated.")
 
-        self._tax_codes.loc[
-            self._tax_codes["id"] == id, ["rate", "account", "is_inclusive", "description"]
+        tax_codes.loc[
+            tax_codes["id"] == id, ["rate", "account", "is_inclusive", "description"]
         ] = [rate, account, is_inclusive, description]
-        self._tax_codes = self.standardize_tax_codes(self._tax_codes)
+        tax_codes = self.standardize_tax_codes(tax_codes)
+        self.write_tax_codes_file(tax_codes, self.root_path / "tax_codes.csv")
+        self._invalidate_tax_codes()
 
     def delete_tax_codes(
         self, codes: List[str] = [], allow_missing: bool = False
     ) -> None:
+        tax_codes = self.tax_codes()
         if not allow_missing:
-            missing = set(codes) - set(self._tax_codes["id"])
+            missing = set(codes) - set(tax_codes["id"])
             if missing:
                 raise ValueError(f"Tax code(s) '{', '.join(missing)}' not found.")
 
-        self._tax_codes = self._tax_codes[~self._tax_codes["id"].isin(codes)]
+        tax_codes = tax_codes[~tax_codes["id"].isin(codes)]
+        self.write_tax_codes_file(tax_codes, self.root_path / "tax_codes.csv")
+        self._invalidate_tax_codes()
 
-    # TODO: This section was copied form MemoryLedger temporary
-    # Need to define logic for TextLedger and replace following
+    def _invalidate_tax_codes(self) -> None:
+        """Invalidates the cached tax codes data."""
+        self._tax_codes = None
+        self._tax_codes_time = None
+
     # ----------------------------------------------------------------------
     # Accounts
 
     def accounts(self) -> pd.DataFrame:
-        return self.standardize_accounts(self._accounts.copy())
+        if self._is_expired(self._accounts_time):
+            self._accounts = self.read_accounts()
+            self._accounts_time = datetime.now()
+        return self._accounts.copy()
+
+    def read_accounts(self) -> pd.DataFrame:
+        """Read tax codes from CSV file in the root directory."""
+
+        try:
+            accounts = pd.read_csv(self.root_path / "accounts.csv", skipinitialspace=True)
+            # TODO: remove line once old systems are migrated
+            accounts.rename(columns=ACCOUNT_COLUMN_SHORTCUTS, inplace=True)
+            accounts = self.standardize_accounts(accounts)
+        except Exception as e:
+            accounts = self.standardize_accounts(None)
+            self._logger.warning(f"Skipping {self.root_path / "accounts.csv"} file: {e}")
+        return accounts.copy()
+
+    @classmethod
+    def write_accounts_file(cls, df: pd.DataFrame, path: Path):
+        """Save accounts to a canonical human-readable CSV file.
+
+        Args:
+            df (pd.DataFrame): accounts to save.
+            path (Path): The file path where the accounts will be saved.
+
+        Returns:
+            pd.DataFrame: Formatted accounts DataFrame ready for saving.
+        """
+        df = enforce_schema(df, ACCOUNT_SCHEMA, sort_columns=True, keep_extra_columns=True)
+        optional = ACCOUNT_SCHEMA.loc[~ACCOUNT_SCHEMA["mandatory"], "column"].to_list()
+        to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
+        df.drop(columns=to_drop, inplace=True)
+        n_fixed = ACCOUNT_SCHEMA["column"].isin(df.columns).sum()
+        write_fixed_width_csv(df, file=path, n=n_fixed)
+
+        return df
 
     def add_account(
         self,
@@ -321,7 +418,8 @@ class TextLedger(StandaloneLedger):
         group: str,
         tax_code: str = None,
     ) -> None:
-        if (self._accounts["account"] == account).any():
+        accounts = self.accounts()
+        if (accounts["account"] == account).any():
             raise ValueError(f"Account '{account}' already exists")
 
         new_account = self.standardize_accounts(pd.DataFrame({
@@ -331,7 +429,9 @@ class TextLedger(StandaloneLedger):
             "tax_code": [tax_code],
             "group": [group],
         }))
-        self._accounts = pd.concat([self._accounts, new_account])
+        accounts = pd.concat([self._accounts, new_account])
+        self.write_accounts_file(accounts, self.root_path / "accounts.csv")
+        self._invalidate_accounts()
 
     def modify_account(
         self,
@@ -341,24 +441,35 @@ class TextLedger(StandaloneLedger):
         group: str,
         tax_code: str = None,
     ) -> None:
-        if (self._accounts["account"] == account).sum() != 1:
+        accounts = self.accounts()
+        if (accounts["account"] == account).sum() != 1:
             raise ValueError(f"Account '{account}' not found or duplicated.")
 
-        self._accounts.loc[
-            self._accounts["account"] == account,
+        accounts.loc[
+            accounts["account"] == account,
             ["currency", "description", "tax_code", "group"]
         ] = [currency, description, tax_code, group]
-        self._accounts = self.standardize_accounts(self._accounts)
+        accounts = self.standardize_accounts(accounts)
+        self.write_accounts_file(accounts, self.root_path / "accounts.csv")
+        self._invalidate_accounts()
 
     def delete_accounts(
         self, accounts: List[int] = [], allow_missing: bool = False
     ) -> None:
+        df = self.accounts()
         if not allow_missing:
-            missing = set(accounts) - set(self._accounts["account"])
+            missing = set(accounts) - set(df["account"])
             if missing:
                 raise KeyError(f"Account(s) '{', '.join(missing)}' not found.")
 
-        self._accounts = self._accounts[~self._accounts["account"].isin(accounts)]
+        df = df[~df["account"].isin(accounts)]
+        self.write_accounts_file(df, self.root_path / "accounts.csv")
+        self._invalidate_accounts()
+
+    def _invalidate_accounts(self) -> None:
+        """Invalidates the cached accounts data."""
+        self._accounts = None
+        self._accounts_time = None
 
     # ----------------------------------------------------------------------
     # Currency

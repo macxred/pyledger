@@ -78,20 +78,21 @@ def write_fixed_width_csv(
     result = {}
     fixed_width_cols = df.shape[1] - 1 if n is None else n
 
-    for i, colname in enumerate(df.columns):
-        col = df[colname]
-        col_str = pd.Series(np.where(col.isna(), na_rep, col.astype(str)))
-        max_length = max(col_str.str.len().max(), len(colname))
-        if i < fixed_width_cols:
-            col_str = col_str.str.rjust(max_length)
-            colname = colname.rjust(max_length)
+    if not df.empty:
+        for i, colname in enumerate(df.columns):
+            col = df[colname]
+            col_str = pd.Series(np.where(col.isna(), na_rep, col.astype(str)))
+            max_length = max(col_str.str.len().max(), len(colname))
+            if i < fixed_width_cols:
+                col_str = col_str.str.rjust(max_length)
+                colname = colname.rjust(max_length)
 
-        # Separator for all but the first column
-        if i > 0:
-            col_str = sep[1:] + col_str
-            colname = sep[1:] + colname
+            # Separator for all but the first column
+            if i > 0:
+                col_str = sep[1:] + col_str
+                colname = sep[1:] + colname
 
-        result[colname] = col_str
+            result[colname] = col_str
 
     result = pd.DataFrame(result)
 
