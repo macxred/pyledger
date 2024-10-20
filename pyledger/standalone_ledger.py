@@ -69,7 +69,7 @@ class StandaloneLedger(LedgerEngine):
             revaluations (pd.DataFrame, optional): foreign exchange or other revaluations.
         """
         super().__init__()
-        self._settings = self.standardize_settings(settings)
+        self.settings = self.standardize_settings(settings)
         self._accounts = self.standardize_accounts(accounts)
         self._ledger = self.standardize_ledger_columns(ledger)
         self._prices = self.standardize_prices(prices)
@@ -79,6 +79,17 @@ class StandaloneLedger(LedgerEngine):
 
     def revaluations(self) -> pd.DataFrame:
         return self._revaluations
+
+    # ----------------------------------------------------------------------
+    # Settings
+
+    @property
+    def settings(self):
+        return self._settings
+
+    @settings.setter
+    def settings(self, settings):
+        self._settings = settings
 
     # ----------------------------------------------------------------------
     # Tax Codes
@@ -410,7 +421,7 @@ class StandaloneLedger(LedgerEngine):
 
     @property
     def reporting_currency(self) -> str:
-        return self._settings["reporting_currency"]
+        return self.settings["reporting_currency"]
 
     def _report_amount(
         self, amount: list[float], currency: list[str], date: list[datetime.date]
@@ -474,7 +485,7 @@ class StandaloneLedger(LedgerEngine):
         return (currency, prc.iloc[-1].item())
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
-        return self._settings["precision"][ticker]
+        return self.settings["precision"][ticker]
 
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")
