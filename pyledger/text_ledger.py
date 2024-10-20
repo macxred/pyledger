@@ -5,14 +5,19 @@ from typing import List
 from pathlib import Path
 from datetime import datetime, timedelta
 from pyledger.standalone_ledger import StandaloneLedger
-from pyledger.constants import LEDGER_SCHEMA
-from pyledger.helpers import save_files, write_fixed_width_csv
+from pyledger.constants import ACCOUNT_SCHEMA, LEDGER_SCHEMA, TAX_CODE_SCHEMA
+from pyledger.helpers import (
+    read_dict_from_yml,
+    save_files,
+    write_dict_to_yml,
+    write_fixed_width_csv,
+)
 from consistent_df import enforce_schema
 
 
 # TODO: replace with json realization
-SETTINGS = {
-    "reporting_currency": "CHF",
+DEFAULT_SETTINGS = {
+    "reporting_currency": "USD",
     "precision": {
         "CAD": 0.01,
         "CHF": 0.01,
@@ -53,21 +58,53 @@ class TextLedger(StandaloneLedger):
     _prices = None
     _tax_codes = None
     _accounts = None
+    _settings = None
+    _settings_time = None
 
     def __init__(
         self,
         root_path: Path = Path.cwd(),
         cache_timeout: int = 300,
-        # TODO: reporting_currency will be removed in a later realization
-        reporting_currency: str = "USD",
     ):
         """Initializes the TextLedger with a root path for file storage.
         If no root path is provided, defaults to the current working directory.
         """
-        super().__init__(settings=SETTINGS)
         self.root_path = Path(root_path).expanduser()
-        self._reporting_currency = reporting_currency
         self._cache_timeout = cache_timeout
+        super().__init__(settings=DEFAULT_SETTINGS)
+
+    # ----------------------------------------------------------------------
+    # Settings
+
+    @property
+    def settings(self):
+        if self._is_expired(self._settings_time):
+            self._settings = self.read_settings_file()
+            self._settings_time = datetime.now()
+        return self._settings.copy()
+
+    @settings.setter
+    def settings(self, settings):
+        write_dict_to_yml(self.standardize_settings(settings), self.root_path / "settings.yml")
+        self._invalidate_settings()
+
+    def read_settings_file(self) -> dict:
+        settings_file = Path(self.root_path / "settings.yml")
+        try:
+            result = self.standardize_settings(read_dict_from_yml(settings_file))
+        except Exception as e:
+            self._logger.warning(f"Error reading settings: {e}. \nUsing default settings")
+            result = self.standardize_settings(DEFAULT_SETTINGS)
+
+        return result
+
+    def _invalidate_settings(self):
+        """Invalidates the cached settings data."""
+        self._settings = None
+        self._settings_time = None
+
+    # ----------------------------------------------------------------------
+    # Tax codes
 
     def ledger(self) -> pd.DataFrame:
         if self._is_expired(self._ledger_time):
@@ -303,7 +340,18 @@ class TextLedger(StandaloneLedger):
             if missing:
                 raise ValueError(f"Tax code(s) '{', '.join(missing)}' not found.")
 
-        self._tax_codes = self._tax_codes[~self._tax_codes["id"].isin(codes)]
+        tax_codes = tax_codes[~tax_codes["id"].isin(codes)]
+        file_path = self.root_path / "tax_codes.csv"
+        if not tax_codes.empty:
+            self.write_tax_codes_file(tax_codes, file_path)
+        elif file_path.exists():
+            file_path.unlink()
+        self._invalidate_tax_codes()
+
+    def _invalidate_tax_codes(self) -> None:
+        """Invalidates the cached tax codes data."""
+        self._tax_codes = None
+        self._tax_codes_time = None
 
     # TODO: This section was copied form MemoryLedger temporary
     # Need to define logic for TextLedger and replace following
@@ -358,18 +406,29 @@ class TextLedger(StandaloneLedger):
             if missing:
                 raise KeyError(f"Account(s) '{', '.join(missing)}' not found.")
 
-        self._accounts = self._accounts[~self._accounts["account"].isin(accounts)]
+        df = df[~df["account"].isin(accounts)]
+        file_path = self.root_path / "accounts.csv"
+        if not df.empty:
+            self.write_accounts_file(df, file_path)
+        elif file_path.exists():
+            file_path.unlink()
+        self._invalidate_accounts()
+
+    def _invalidate_accounts(self) -> None:
+        """Invalidates the cached accounts data."""
+        self._accounts = None
+        self._accounts_time = None
 
     # ----------------------------------------------------------------------
     # Currency
 
     @property
     def reporting_currency(self):
-        return self._reporting_currency
+        return self.settings["reporting_currency"]
 
     @reporting_currency.setter
     def reporting_currency(self, currency):
-        self._reporting_currency = currency
+        self.settings["reporting_currency"] = currency
 
     def _is_expired(self, cache_time: datetime | None) -> bool:
         """Checks if the cache has expired based on the cache timeout.
