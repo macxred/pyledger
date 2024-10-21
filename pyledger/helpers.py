@@ -146,6 +146,7 @@ def write_dict_to_yml(data: dict, file: Path):
     with open(file, "w") as f:
         yaml.dump(data, f, default_flow_style=False)
 
+
 def read_dict_from_yml(file: Path) -> dict:
     """Load a dictionary from a .yml file.
 

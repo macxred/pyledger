@@ -310,44 +310,54 @@ class TextLedger(StandaloneLedger):
 
     def tax_codes(self) -> pd.DataFrame:
         if self._is_expired(self._tax_codes_time):
-            self._tax_codes = self.read_tax_codes()
+            self._tax_codes = self.read_tax_codes(self.root_path / "tax_codes.csv")
             self._tax_codes_time = datetime.now()
         return self._tax_codes.copy()
 
-    def read_tax_codes(self) -> pd.DataFrame:
-        """Read tax codes from CSV file in the root directory.
+    def read_tax_codes(self, file: Path) -> pd.DataFrame:
+        """Read and standardize tax codes from the specified CSV file.
+
+        This method reads tax codes from the specified file and applies
+        the standardization process. If an error occurs during reading or
+        standardization, an empty DataFrame with standardized schema is returned.
+
+        Args:
+            file (Path): The path to the CSV file containing tax codes.
 
         Returns:
-            pd.DataFrame: A DataFrame following the TAX_CODE_SCHEMA.
+            pd.DataFrame: A DataFrame formatted according to TAX_CODE_SCHEMA.
         """
-
         try:
-            tax_codes = pd.read_csv(self.root_path / "tax_codes.csv", skipinitialspace=True)
+            tax_codes = pd.read_csv(file, skipinitialspace=True)
             # TODO: remove line once old systems are migrated
             tax_codes.rename(columns=TAX_CODE_COLUMN_SHORTCUTS, inplace=True)
             tax_codes = self.standardize_tax_codes(tax_codes)
         except Exception as e:
             tax_codes = self.standardize_tax_codes(None)
-            self._logger.warning(f"Skipping {self.root_path / "tax_codes.csv"} file: {e}")
+            self._logger.warning(f"Error reading {file} file: {e}")
         return tax_codes.copy()
 
     @classmethod
-    def write_tax_codes_file(cls, df: pd.DataFrame, path: Path):
-        """Save tax codes to a canonical human-readable CSV file.
+    def write_tax_codes_file(cls, df: pd.DataFrame, file: Path):
+        """Save tax codes to a fixed-width CSV file.
+
+        This method stores tax codes in a fixed-width CSV format, ideal
+        for version control systems like Git. Tax codes are padded with spaces
+        to maintain a consistent column width for improved readability.
 
         Args:
-            df (pd.DataFrame): tax codes to save.
-            path (Path): The file path where tax codes will be saved.
+            df (pd.DataFrame): The tax codes to save.
+            file (str): Path of the CSV file to write.
 
         Returns:
-            pd.DataFrame: Formatted tax codes DataFrame ready for saving.
+            pd.DataFrame: The formatted DataFrame saved to the file.
         """
         df = enforce_schema(df, TAX_CODE_SCHEMA, sort_columns=True, keep_extra_columns=True)
         optional = TAX_CODE_SCHEMA.loc[~TAX_CODE_SCHEMA["mandatory"], "column"].to_list()
         to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
         df.drop(columns=to_drop, inplace=True)
         n_fixed = TAX_CODE_SCHEMA["column"].isin(df.columns).sum()
-        write_fixed_width_csv(df, file=path, n=n_fixed)
+        write_fixed_width_csv(df, file=file, n=n_fixed)
 
         return df
 
@@ -420,40 +430,55 @@ class TextLedger(StandaloneLedger):
 
     def accounts(self) -> pd.DataFrame:
         if self._is_expired(self._accounts_time):
-            self._accounts = self.read_accounts()
+            self._accounts = self.read_accounts(self.root_path / "accounts.csv")
             self._accounts_time = datetime.now()
         return self._accounts.copy()
 
-    def read_accounts(self) -> pd.DataFrame:
-        """Read tax codes from CSV file in the root directory."""
+    def read_accounts(self, file: Path) -> pd.DataFrame:
+        """Read and standardize accounts from the specified CSV file.
+
+        This method reads accounts from the specified file and applies
+        the standardization process. If an error occurs during reading or
+        standardization, an empty DataFrame with standardized schema is returned.
+
+        Args:
+            file (Path): The path to the CSV file containing accounts.
+
+        Returns:
+            pd.DataFrame: A DataFrame formatted according to ACCOUNTS_SCHEMA.
+        """
 
         try:
-            accounts = pd.read_csv(self.root_path / "accounts.csv", skipinitialspace=True)
+            accounts = pd.read_csv(file, skipinitialspace=True)
             # TODO: remove line once old systems are migrated
             accounts.rename(columns=ACCOUNT_COLUMN_SHORTCUTS, inplace=True)
             accounts = self.standardize_accounts(accounts)
         except Exception as e:
             accounts = self.standardize_accounts(None)
-            self._logger.warning(f"Skipping {self.root_path / "accounts.csv"} file: {e}")
+            self._logger.warning(f"Skipping {file} file: {e}")
         return accounts.copy()
 
     @classmethod
-    def write_accounts_file(cls, df: pd.DataFrame, path: Path):
-        """Save accounts to a canonical human-readable CSV file.
+    def write_accounts_file(cls, df: pd.DataFrame, file: Path):
+        """Save accounts to a fixed-width CSV file.
+
+        This method stores accounts in a fixed-width CSV format, ideal
+        for version control systems like Git. Accounts are padded with spaces
+        to maintain a consistent column width for improved readability.
 
         Args:
-            df (pd.DataFrame): accounts to save.
-            path (Path): The file path where the accounts will be saved.
+            df (pd.DataFrame): The tax codes to save.
+            file (str): Path of the CSV file to write.
 
         Returns:
-            pd.DataFrame: Formatted accounts DataFrame ready for saving.
+            pd.DataFrame: The formatted DataFrame saved to the file.
         """
         df = enforce_schema(df, ACCOUNT_SCHEMA, sort_columns=True, keep_extra_columns=True)
         optional = ACCOUNT_SCHEMA.loc[~ACCOUNT_SCHEMA["mandatory"], "column"].to_list()
         to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
         df.drop(columns=to_drop, inplace=True)
         n_fixed = ACCOUNT_SCHEMA["column"].isin(df.columns).sum()
-        write_fixed_width_csv(df, file=path, n=n_fixed)
+        write_fixed_width_csv(df, file=file, n=n_fixed)
 
         return df
 
@@ -476,7 +501,7 @@ class TextLedger(StandaloneLedger):
             "tax_code": [tax_code],
             "group": [group],
         }))
-        accounts = pd.concat([self._accounts, new_account])
+        accounts = pd.concat([self.accounts, new_account])
         self.write_accounts_file(accounts, self.root_path / "accounts.csv")
         self._invalidate_accounts()
 
