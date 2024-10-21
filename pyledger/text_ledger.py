@@ -556,7 +556,9 @@ class TextLedger(StandaloneLedger):
 
     @reporting_currency.setter
     def reporting_currency(self, currency):
-        self.settings["reporting_currency"] = currency
+        settings = self.settings
+        settings["reporting_currency"] = currency
+        self.settings = settings
 
     def _is_expired(self, cache_time: datetime | None) -> bool:
         """Checks if the cache has expired based on the cache timeout.
