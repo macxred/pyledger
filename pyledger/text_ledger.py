@@ -5,7 +5,7 @@ from typing import List
 from pathlib import Path
 from datetime import datetime, timedelta
 from pyledger.standalone_ledger import StandaloneLedger
-from pyledger.constants import ACCOUNT_SCHEMA, LEDGER_SCHEMA, TAX_CODE_SCHEMA
+from pyledger.constants import ACCOUNT_SCHEMA, DEFAULT_SETTINGS, LEDGER_SCHEMA, TAX_CODE_SCHEMA
 from pyledger.helpers import (
     read_dict_from_yml,
     save_files,
@@ -14,19 +14,6 @@ from pyledger.helpers import (
 )
 from consistent_df import enforce_schema
 
-
-# TODO: replace with json realization
-DEFAULT_SETTINGS = {
-    "reporting_currency": "USD",
-    "precision": {
-        "CAD": 0.01,
-        "CHF": 0.01,
-        "EUR": 0.01,
-        "GBP": 0.01,
-        "HKD": 0.01,
-        "USD": 0.01,
-    },
-}
 
 # TODO: remove once old systems are migrated
 LEDGER_COLUMN_SHORTCUTS = {
@@ -71,7 +58,7 @@ class TextLedger(StandaloneLedger):
         """
         self.root_path = Path(root_path).expanduser()
         self._cache_timeout = cache_timeout
-        super().__init__(settings=DEFAULT_SETTINGS)
+        super().__init__()
 
     # ----------------------------------------------------------------------
     # Settings
@@ -79,21 +66,40 @@ class TextLedger(StandaloneLedger):
     @property
     def settings(self):
         if self._is_expired(self._settings_time):
-            self._settings = self.read_settings_file()
+            self._settings = self.read_settings_file(self.root_path / "settings.yml")
             self._settings_time = datetime.now()
         return self._settings.copy()
 
     @settings.setter
-    def settings(self, settings):
+    def settings(self, settings: dict):
+        """Save system settings to a YAML file.
+
+        This method stores standardized system settings to `<root>/settings.yml` YAML file,
+        which is ideal for version control and human readability.
+
+        Args:
+            settings (dict): A dictionary containing the system settings to be saved.
+        """
         write_dict_to_yml(self.standardize_settings(settings), self.root_path / "settings.yml")
         self._invalidate_settings()
 
-    def read_settings_file(self) -> dict:
-        settings_file = Path(self.root_path / "settings.yml")
+    def read_settings_file(self, file: Path) -> dict:
+        """Read system settings from the specified file.
+
+        This method returns standardized system settings. If the specified settings file
+        does not exist or any error occurs while reading or standardizing,
+        DEFAULT_SETTINGS are returned, ensuring the system can continue running.
+
+        Args:
+            file (Path): The path to the settings file.
+
+        Returns:
+            dict: Standardized system settings.
+        """
         try:
-            result = self.standardize_settings(read_dict_from_yml(settings_file))
+            result = self.standardize_settings(read_dict_from_yml(file))
         except Exception as e:
-            self._logger.warning(f"Error reading settings: {e}. \nUsing default settings")
+            self._logger.warning(f"Error reading settings: {e}.")
             result = self.standardize_settings(DEFAULT_SETTINGS)
 
         return result
