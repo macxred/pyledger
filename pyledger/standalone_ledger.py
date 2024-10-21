@@ -8,7 +8,7 @@ import datetime
 from warnings import warn
 import numpy as np
 import pandas as pd
-from .constants import LEDGER_SCHEMA
+from .constants import DEFAULT_SETTINGS, LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -51,7 +51,7 @@ class StandaloneLedger(LedgerEngine):
 
     def __init__(
         self,
-        settings: dict = None,
+        settings: dict = DEFAULT_SETTINGS,
         accounts: pd.DataFrame = None,
         ledger: pd.DataFrame = None,
         prices: pd.DataFrame = None,
