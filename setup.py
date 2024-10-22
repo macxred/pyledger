@@ -10,6 +10,7 @@ setup(
         'xlsxwriter',
         'openpyxl',
         'pytest',
+        'pyyaml',
         'consistent_df @ https://github.com/macxred/consistent_df/tarball/main'
     ],
     description=('Python package to streamline implementation of or '
