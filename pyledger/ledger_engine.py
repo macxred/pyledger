@@ -14,6 +14,7 @@ import numpy as np
 import openpyxl
 import pandas as pd
 from .constants import (
+    ASSETS_SCHEMA,
     PRICE_SCHEMA,
     LEDGER_SCHEMA,
     ACCOUNT_SCHEMA,
@@ -1362,3 +1363,116 @@ class LedgerEngine(ABC):
                 result[ticker] = {}
             result[ticker][currency] = group
         return result
+
+    # ----------------------------------------------------------------------
+    # Assets
+
+    @classmethod
+    def standardize_assets(cls, df: pd.DataFrame,
+                                 keep_extra_columns: bool = False) -> pd.DataFrame:
+        """Validates and standardizes the 'assets' DataFrame to ensure it contains
+        the required columns and correct data types.
+
+        Args:
+            df (pd.DataFrame): The DataFrame representing the assets.
+            keep_extra_columns (bool): If True, columns that do not appear in the data frame
+                                       schema are left in the resulting DataFrame.
+        Returns:
+            pd.DataFrame: The standardized revaluations DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing or if data types are incorrect.
+        """
+        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
+        # Check for missing values in required columns
+        missing_values_columns = [
+            column
+            for column in ASSETS_SCHEMA.query("mandatory")["column"]
+            if df[column].isna().any()
+        ]
+
+        if missing_values_columns:
+            cls._logger.warning(
+                f"Drop rows with missing values in columns: {', '.join(missing_values_columns)}."
+            )
+            df = df.dropna(subset=missing_values_columns)
+
+        return df
+
+    @abstractmethod
+    def assets(self) -> pd.DataFrame:
+        """Retrieves all asset entries.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns `ticker` (str), `increment` (float),
+                          and `date` (datetime64[ns], optional).
+        """
+
+    @abstractmethod
+    def add_asset(
+        self,
+        ticker: str,
+        increment: float,
+        date: pd.Timestamp
+    ) -> None:
+        """Adds a new asset entry.
+
+        The unique identifier is a combination of `ticker` and `date`.
+
+        Args:
+            ticker (str): Identifier for the asset (e.g., stock ticker).
+            increment (float): Increment value representing the asset unit.
+            date (pd.Timestamp): Date of the asset entry.
+        """
+
+    @abstractmethod
+    def modify_asset(
+        self,
+        ticker: str,
+        increment: float,
+        date: pd.Timestamp
+    ) -> None:
+        """Updates an existing asset entry.
+
+        The unique identifier is a combination of `ticker` and `date`.
+
+        Args:
+            ticker (str): Identifier for the asset.
+            increment (float): Increment value for the asset.
+            date (pd.Timestamp): Date of the asset entry.
+        """
+
+    @abstractmethod
+    def delete_asset(
+        self,
+        ticker: str,
+        date: datetime.date,
+        allow_missing: bool = False
+    ) -> None:
+        """Removes asset entries.
+
+        The unique identifier is a combination of `ticker` and `date`.
+
+        Args:
+            ticker (List[str]): List of asset tickers to remove.
+            date (List[pd.Timestamp]): List of dates corresponding to the tickers to remove.
+            allow_missing (bool, optional): If True, no error is raised if an asset entry is
+                                            not found. Defaults to False.
+        """
+
+    def mirror_assets(self, target: pd.DataFrame, delete: bool = False):
+        """Aligns assets with a desired target state.
+
+        Args:
+            target (pd.DataFrame): DataFrame with assets in the ASSETS_SCHEMA format.
+            delete (bool, optional): If True, deletes existing assets that are
+                                     not present in the target data.
+
+        Returns:
+            dict: A dictionary containing statistics about the mirroring process:
+                - pre-existing (int): The number of assets present before mirroring.
+                - targeted (int): The number of assets in the target data.
+                - added (int): The number of assets added by the mirroring method.
+                - deleted (int): The number of deleted assets.
+                - updated (int): The number of assets modified during mirroring.
+        """
