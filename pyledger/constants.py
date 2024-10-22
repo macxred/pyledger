@@ -58,6 +58,15 @@ LEDGER_SCHEMA_CSV = """
 """
 LEDGER_SCHEMA = pd.read_csv(StringIO(LEDGER_SCHEMA_CSV), skipinitialspace=True)
 
+ASSETS_SCHEMA_CSV = """
+column,             dtype,                mandatory
+ticker,             string[python],       True
+increment,          Float64,              True
+date,               datetime64[ns],       False
+"""
+ASSETS_SCHEMA = pd.read_csv(StringIO(ASSETS_SCHEMA_CSV), skipinitialspace=True)
+
+
 CURRENCY_PRECISION = {
     "AUD": 0.01,
     "CAD": 0.01,
