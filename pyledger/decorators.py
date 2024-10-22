@@ -3,6 +3,7 @@
 from functools import cache, wraps
 from time import time
 
+
 def timed_cache(seconds: int):
     """Decorator to cache function results with a time-based expiration."""
     def wrapper(func):

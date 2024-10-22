@@ -3,7 +3,7 @@
 import pandas as pd
 from typing import List
 from pathlib import Path
-from datetime import datetime, timedelta
+from pyledger.decorators import timed_cache
 from pyledger.standalone_ledger import StandaloneLedger
 from pyledger.constants import ACCOUNT_SCHEMA, DEFAULT_SETTINGS, LEDGER_SCHEMA, TAX_CODE_SCHEMA
 from pyledger.helpers import (
@@ -49,37 +49,23 @@ class TextLedger(StandaloneLedger):
     the reporting currency, are stored in YAML format.
     """
 
-    _ledger_time = None
-    _ledger = None
-    _prices = None
-    _tax_codes_time = None
-    _tax_codes = None
-    _accounts_time = None
-    _accounts = None
-    _settings = None
-    _settings_time = None
-
     def __init__(
         self,
         root_path: Path = Path.cwd(),
-        cache_timeout: int = 300,
     ):
         """Initializes the TextLedger with a root path for file storage.
         If no root path is provided, defaults to the current working directory.
         """
         self.root_path = Path(root_path).expanduser()
-        self._cache_timeout = cache_timeout
         super().__init__()
 
     # ----------------------------------------------------------------------
     # Settings
 
     @property
+    @timed_cache(300)
     def settings(self):
-        if self._is_expired(self._settings_time):
-            self._settings = self.read_settings_file(self.root_path / "settings.yml")
-            self._settings_time = datetime.now()
-        return self._settings.copy()
+        return self.read_settings_file(self.root_path / "settings.yml").copy()
 
     @settings.setter
     def settings(self, settings: dict):
@@ -92,7 +78,7 @@ class TextLedger(StandaloneLedger):
             settings (dict): A dictionary containing the system settings to be saved.
         """
         write_dict_to_yml(self.standardize_settings(settings), self.root_path / "settings.yml")
-        self._invalidate_settings()
+        self.__class__.settings.fget.cache_clear()
 
     def read_settings_file(self, file: Path) -> dict:
         """Read system settings from the specified file.
@@ -115,19 +101,12 @@ class TextLedger(StandaloneLedger):
 
         return result
 
-    def _invalidate_settings(self):
-        """Invalidates the cached settings data."""
-        self._settings = None
-        self._settings_time = None
-
     # ----------------------------------------------------------------------
-    # Tax codes
+    # Ledger
 
+    @timed_cache(300)
     def ledger(self) -> pd.DataFrame:
-        if self._is_expired(self._ledger_time):
-            self._ledger = self.read_ledger_files(self.root_path / "ledger")
-            self._ledger_time = datetime.now()
-        return self._ledger
+        return self.read_ledger_files(self.root_path / "ledger")
 
     def read_ledger_files(self, root: Path) -> pd.DataFrame:
         """Reads ledger entries from CSV files in the given root directory.
@@ -207,7 +186,7 @@ class TextLedger(StandaloneLedger):
         df = self.standardize_ledger(df)
         df["__csv_path__"] = self.csv_path(df["id"])
         save_files(df, root=self.root_path / "ledger", func=self.write_ledger_file)
-        self._invalidate_ledger()
+        self.ledger.cache_clear()
 
     @staticmethod
     def write_ledger_file(df: pd.DataFrame, file: str) -> pd.DataFrame:
@@ -262,7 +241,7 @@ class TextLedger(StandaloneLedger):
         full_path = self.root_path / "ledger" / path
         Path(full_path).parent.mkdir(parents=True, exist_ok=True)
         self.write_ledger_file(df, full_path)
-        self._invalidate_ledger()
+        self.ledger.cache_clear()
 
         return id
 
@@ -280,7 +259,7 @@ class TextLedger(StandaloneLedger):
 
         df_same_file = pd.concat([df_same_file[df_same_file["id"] != id], entry])
         ledger = self.write_ledger_file(df_same_file, self.root_path / "ledger" / path)
-        self._invalidate_ledger()
+        self.ledger.cache_clear()
 
     def delete_ledger_entries(self, ids: List[str], allow_missing: bool = False) -> None:
         ledger = self.ledger()
@@ -298,21 +277,14 @@ class TextLedger(StandaloneLedger):
                 file_path.unlink()
             else:
                 self.write_ledger_file(df_same_file, file_path)
-        self._invalidate_ledger()
-
-    def _invalidate_ledger(self) -> None:
-        """Invalidates the cached ledger data."""
-        self._ledger = None
-        self._ledger_time = None
+        self.ledger.cache_clear()
 
     # ----------------------------------------------------------------------
     # Tax codes
 
+    @timed_cache(300)
     def tax_codes(self) -> pd.DataFrame:
-        if self._is_expired(self._tax_codes_time):
-            self._tax_codes = self.read_tax_codes(self.root_path / "tax_codes.csv")
-            self._tax_codes_time = datetime.now()
-        return self._tax_codes.copy()
+        return self.read_tax_codes(self.root_path / "tax_codes.csv")
 
     def read_tax_codes(self, file: Path) -> pd.DataFrame:
         """Read and standardize tax codes from the specified CSV file.
@@ -335,7 +307,7 @@ class TextLedger(StandaloneLedger):
         except Exception as e:
             tax_codes = self.standardize_tax_codes(None)
             self._logger.warning(f"Error reading {file} file: {e}")
-        return tax_codes.copy()
+        return tax_codes
 
     @classmethod
     def write_tax_codes_file(cls, df: pd.DataFrame, file: Path):
@@ -382,7 +354,7 @@ class TextLedger(StandaloneLedger):
         }))
         tax_codes = pd.concat([tax_codes, new_tax_code])
         self.write_tax_codes_file(tax_codes, self.root_path / "tax_codes.csv")
-        self._invalidate_tax_codes()
+        self.tax_codes.cache_clear()
 
     def modify_tax_code(
         self,
@@ -392,7 +364,7 @@ class TextLedger(StandaloneLedger):
         is_inclusive: bool = True,
         description: str = "",
     ) -> None:
-        tax_codes = self.tax_codes()
+        tax_codes = self.tax_codes().copy()
         if (tax_codes["id"] == id).sum() != 1:
             raise ValueError(f"Tax code '{id}' not found or duplicated.")
 
@@ -401,7 +373,7 @@ class TextLedger(StandaloneLedger):
         ] = [rate, account, is_inclusive, description]
         tax_codes = self.standardize_tax_codes(tax_codes)
         self.write_tax_codes_file(tax_codes, self.root_path / "tax_codes.csv")
-        self._invalidate_tax_codes()
+        self.tax_codes.cache_clear()
 
     def delete_tax_codes(
         self, codes: List[str] = [], allow_missing: bool = False
@@ -418,21 +390,14 @@ class TextLedger(StandaloneLedger):
             self.write_tax_codes_file(tax_codes, file_path)
         elif file_path.exists():
             file_path.unlink()
-        self._invalidate_tax_codes()
-
-    def _invalidate_tax_codes(self) -> None:
-        """Invalidates the cached tax codes data."""
-        self._tax_codes = None
-        self._tax_codes_time = None
+        self.tax_codes.cache_clear()
 
     # ----------------------------------------------------------------------
     # Accounts
 
+    @timed_cache(300)
     def accounts(self) -> pd.DataFrame:
-        if self._is_expired(self._accounts_time):
-            self._accounts = self.read_accounts(self.root_path / "accounts.csv")
-            self._accounts_time = datetime.now()
-        return self._accounts.copy()
+        return self.read_accounts(self.root_path / "accounts.csv")
 
     def read_accounts(self, file: Path) -> pd.DataFrame:
         """Read and standardize accounts from the specified CSV file.
@@ -456,7 +421,7 @@ class TextLedger(StandaloneLedger):
         except Exception as e:
             accounts = self.standardize_accounts(None)
             self._logger.warning(f"Skipping {file} file: {e}")
-        return accounts.copy()
+        return accounts
 
     @classmethod
     def write_accounts_file(cls, df: pd.DataFrame, file: Path):
@@ -501,9 +466,9 @@ class TextLedger(StandaloneLedger):
             "tax_code": [tax_code],
             "group": [group],
         }))
-        accounts = pd.concat([self.accounts, new_account])
+        accounts = pd.concat([accounts, new_account])
         self.write_accounts_file(accounts, self.root_path / "accounts.csv")
-        self._invalidate_accounts()
+        self.accounts.cache_clear()
 
     def modify_account(
         self,
@@ -513,7 +478,7 @@ class TextLedger(StandaloneLedger):
         group: str,
         tax_code: str = None,
     ) -> None:
-        accounts = self.accounts()
+        accounts = self.accounts().copy()
         if (accounts["account"] == account).sum() != 1:
             raise ValueError(f"Account '{account}' not found or duplicated.")
 
@@ -523,7 +488,7 @@ class TextLedger(StandaloneLedger):
         ] = [currency, description, tax_code, group]
         accounts = self.standardize_accounts(accounts)
         self.write_accounts_file(accounts, self.root_path / "accounts.csv")
-        self._invalidate_accounts()
+        self.accounts.cache_clear()
 
     def delete_accounts(
         self, accounts: List[int] = [], allow_missing: bool = False
@@ -540,12 +505,7 @@ class TextLedger(StandaloneLedger):
             self.write_accounts_file(df, file_path)
         elif file_path.exists():
             file_path.unlink()
-        self._invalidate_accounts()
-
-    def _invalidate_accounts(self) -> None:
-        """Invalidates the cached accounts data."""
-        self._accounts = None
-        self._accounts_time = None
+        self.accounts.cache_clear()
 
     # ----------------------------------------------------------------------
     # Currency
@@ -559,16 +519,3 @@ class TextLedger(StandaloneLedger):
         settings = self.settings
         settings["reporting_currency"] = currency
         self.settings = settings
-
-    def _is_expired(self, cache_time: datetime | None) -> bool:
-        """Checks if the cache has expired based on the cache timeout.
-
-        Args:
-            cache_time (datetime | None): The timestamp when the cache was last updated.
-
-        Returns:
-            bool: True if the cache is expired or cache_time is None, False otherwise.
-        """
-        if cache_time is None:
-            return True
-        return (datetime.now() - cache_time) > timedelta(seconds=self._cache_timeout)
