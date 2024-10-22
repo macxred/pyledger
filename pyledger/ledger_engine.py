@@ -1290,6 +1290,21 @@ class LedgerEngine(ABC):
         """
 
     @abstractmethod
+    def modify_price(
+        self, ticker: str, date: datetime.date, currency: str, price: float, overwrite: bool = False
+    ) -> None:
+        """Modifies a price within the price history.
+
+        Args:
+            ticker (str): Asset identifier.
+            date (datetime.date): Date on which the price is recorded.
+            currency (str): Currency in which the price is quoted.
+            price (float): Value of the asset as of the given date.
+            overwrite (bool, optional): Overwrite an existing price definition with the same ticker,
+                                        date, and currency if one exists. Defaults to False.
+        """
+
+    @abstractmethod
     def delete_price(self, ticker: str, date: datetime.date, currency: str = None) -> None:
         """Removes a price definition from the history.
 
