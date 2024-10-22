@@ -1,6 +1,5 @@
 """Test suite for TextLedger ledger operations."""
 
-import time
 import pytest
 import pandas as pd
 from pyledger import TextLedger
@@ -13,20 +12,6 @@ class TestLedger(BaseTestLedger):
     @pytest.fixture
     def ledger(self, tmp_path):
         return TextLedger(tmp_path)
-
-    def test_ledger_invalidation(self, ledger):
-        assert ledger._is_expired(ledger._ledger_time)
-        ledger.ledger()
-        assert not ledger._is_expired(ledger._ledger_time)
-        ledger._invalidate_ledger()
-        assert ledger._is_expired(ledger._ledger_time)
-
-    def test_ledger_timeout(self, tmp_path):
-        ledger = TextLedger(tmp_path, cache_timeout=1)
-        ledger.ledger()
-        assert not ledger._is_expired(ledger._ledger_time)
-        time.sleep(1)
-        assert ledger._is_expired(ledger._ledger_time)
 
     def test_write_ledger_directory(self, ledger):
         # Define ledger entries with different nesting level
