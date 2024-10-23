@@ -6,10 +6,10 @@ from io import StringIO
 REVALUATION_SCHEMA_CSV = """
     column,             dtype,                mandatory
     date,               datetime64[ns],       True
-    account,            string[python],       True
-    credit,             Int64,                True
+    account,            string,               True
+    credit,             int64,                True
     debit,              Int64,                False
-    description,        string[python],       True
+    description,        string,               True
     price,              Float64,              False
 """
 REVALUATION_SCHEMA = pd.read_csv(StringIO(REVALUATION_SCHEMA_CSV), skipinitialspace=True)
@@ -37,10 +37,10 @@ ACCOUNT_SCHEMA = pd.read_csv(StringIO(ACCOUNT_SCHEMA_CSV), skipinitialspace=True
 
 PRICE_SCHEMA_CSV = """
     column,             dtype,                mandatory
-    ticker,             string[python],       True
+    ticker,             string,               True
     date,               datetime64[ns],       True
-    currency,           string[python],       True
-    price,              Float64,              True
+    currency,           string,               True
+    price,              float64,              True
 """
 PRICE_SCHEMA = pd.read_csv(StringIO(PRICE_SCHEMA_CSV), skipinitialspace=True)
 
@@ -60,10 +60,10 @@ LEDGER_SCHEMA_CSV = """
 LEDGER_SCHEMA = pd.read_csv(StringIO(LEDGER_SCHEMA_CSV), skipinitialspace=True)
 
 ASSETS_SCHEMA_CSV = """
-column,             dtype,                mandatory
-ticker,             string[python],       True
-increment,          Float64,              True
-date,               datetime64[ns],       False
+    column,             dtype,                mandatory
+    ticker,             string,               True
+    increment,          float64,              True
+    date,               datetime64[ns],       False
 """
 ASSETS_SCHEMA = pd.read_csv(StringIO(ASSETS_SCHEMA_CSV), skipinitialspace=True)
 
