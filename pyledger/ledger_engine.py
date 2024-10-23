@@ -156,7 +156,6 @@ class LedgerEngine(ABC):
             price (float, optional): Price associated with the revaluation.
         """
 
-
     @abstractmethod
     def modify_revaluation(
         self,
@@ -1432,18 +1431,7 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing, if there are missing values
                         in required columns, or if data types are incorrect.
         """
-        # Enforce data frame schema
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
-        # Check for missing values in required columns
-        has_missing_value = [
-            column
-            for column in PRICE_SCHEMA.query("mandatory")["column"]
-            if df[column].isna().any()
-        ]
-        if len(has_missing_value) > 0:
-            # TODO: drop entries with missing values with a warning, rather than raising an error
-            raise ValueError(f"Missing values in column {has_missing_value}.")
-
         return df
 
     @classmethod
@@ -1465,8 +1453,11 @@ class LedgerEngine(ABC):
     # Assets
 
     @classmethod
-    def standardize_assets(cls, df: pd.DataFrame,
-                                 keep_extra_columns: bool = False) -> pd.DataFrame:
+    def standardize_assets(
+        cls,
+        df: pd.DataFrame,
+        keep_extra_columns: bool = False
+    ) -> pd.DataFrame:
         """Validates and standardizes the 'assets' DataFrame to ensure it contains
         the required columns and correct data types.
 
@@ -1481,19 +1472,6 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing or if data types are incorrect.
         """
         df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
-        # Check for missing values in required columns
-        missing_values_columns = [
-            column
-            for column in ASSETS_SCHEMA.query("mandatory")["column"]
-            if df[column].isna().any()
-        ]
-
-        if missing_values_columns:
-            cls._logger.warning(
-                f"Drop rows with missing values in columns: {', '.join(missing_values_columns)}."
-            )
-            df = df.dropna(subset=missing_values_columns)
-
         return df
 
     @abstractmethod
