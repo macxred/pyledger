@@ -3,15 +3,16 @@
 import pandas as pd
 from io import StringIO
 
-FX_ADJUSTMENT_SCHEMA_CSV = """
+REVALUATION_SCHEMA_CSV = """
     column,             dtype,                mandatory
     date,               datetime64[ns],       True
     account,            string[python],       True
     credit,             Int64,                True
-    debit,              Int64,                True
+    debit,              Int64,                False
     description,        string[python],       True
+    price,              Float64,              False
 """
-FX_ADJUSTMENT_SCHEMA = pd.read_csv(StringIO(FX_ADJUSTMENT_SCHEMA_CSV), skipinitialspace=True)
+REVALUATION_SCHEMA = pd.read_csv(StringIO(REVALUATION_SCHEMA_CSV), skipinitialspace=True)
 
 TAX_CODE_SCHEMA_CSV = """
     column,             dtype,                mandatory

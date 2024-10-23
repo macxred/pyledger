@@ -490,6 +490,9 @@ class StandaloneLedger(LedgerEngine):
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")
 
+    def modify_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_price is not implemented yet.")
+
     def delete_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_price is not implemented yet.")
 
@@ -498,3 +501,24 @@ class StandaloneLedger(LedgerEngine):
 
     def price_increment(self, *args, **kwargs) -> None:
         raise NotImplementedError("price_increment is not implemented yet.")
+
+    def assets(self, *args, **kwargs) -> None:
+        raise NotImplementedError("assets is not implemented yet.")
+
+    def add_asset(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_asset is not implemented yet.")
+
+    def modify_asset(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_asset is not implemented yet.")
+
+    def delete_asset(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_asset is not implemented yet.")
+
+    def add_revaluation(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_revaluation is not implemented yet.")
+
+    def modify_revaluation(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_revaluation is not implemented yet.")
+
+    def delete_revaluations(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_revaluations is not implemented yet.")

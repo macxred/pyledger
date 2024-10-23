@@ -19,7 +19,7 @@ from .constants import (
     LEDGER_SCHEMA,
     ACCOUNT_SCHEMA,
     TAX_CODE_SCHEMA,
-    FX_ADJUSTMENT_SCHEMA,
+    REVALUATION_SCHEMA,
 )
 from . import excel
 from .helpers import represents_integer
@@ -118,8 +118,105 @@ class LedgerEngine(ABC):
         Raises:
             ValueError: If required columns are missing or if data types are incorrect.
         """
-        df = enforce_schema(df, FX_ADJUSTMENT_SCHEMA, keep_extra_columns=keep_extra_columns)
+        df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=keep_extra_columns)
         return df
+
+    @abstractmethod
+    def revaluations(self) -> pd.DataFrame:
+        """Retrieves all revaluation entries.
+
+        Returns:
+            pd.DataFrame: DataFrame with columns `date` (datetime64[ns]), `account` (str),
+                          `credit` (Int64), `debit` (Int64, optional), `description` (str),
+                          and `price` (Float64, optional).
+        """
+
+    @abstractmethod
+    def add_revaluation(
+        self,
+        date: datetime.date,
+        account: str,
+        credit: int,
+        description: str,
+        debit: int = None,
+        price: float = None
+    ) -> None:
+        """Adds a new revaluation.
+
+        The unique identifier is a combination of `date` and `account`.
+        If `credit` is None, it will be assigned the same value as `debit`.
+
+        Args:
+            date (datetime.date): Date of the revaluation.
+            account (str): Account associated with the revaluation.
+            credit (int, optional): Credit amount for the revaluation.
+                                    If None, uses the value of `debit`.
+            debit (int, optional): Debit amount for the revaluation.
+            description (str): Description of the revaluation.
+            price (float, optional): Price associated with the revaluation.
+        """
+
+
+    @abstractmethod
+    def modify_revaluation(
+        self,
+        date: datetime.date,
+        account: str,
+        credit: int,
+        description: str,
+        debit: int = None,
+        price: float = None
+    ) -> None:
+        """Updates an existing revaluation.
+
+        The unique identifier is a combination of `date` and `account`.
+        If `credit` is None, it will be assigned the same value as `debit`.
+
+        Args:
+            date (datetime.date): Date of the revaluation.
+            account (str): Account associated with the revaluation.
+            credit (int, optional): Credit amount for the revaluation.
+                                    If None, uses the value of `debit`.
+            debit (int, optional): Debit amount for the revaluation.
+            description (str): Description of the revaluation.
+            price (float, optional): Price associated with the revaluation.
+        """
+
+    @abstractmethod
+    def delete_revaluations(
+        self,
+        accounts: List[str],
+        dates: List[datetime.date],
+        allow_missing: bool = False
+    ) -> None:
+        """Removes revaluations.
+
+        The unique identifier is a combination of `date` and `account`.
+
+        Args:
+            accounts (List[str]): List of accounts associated with the revaluations to remove.
+            dates (datetime.date): List of dates corresponding to the revaluations to remove.
+            allow_missing (bool, optional): If True, no error is raised if a revaluation entry is
+                                            not found. Defaults to False.
+        """
+
+    def mirror_revaluations(self, target: pd.DataFrame, delete: bool = False) -> dict:
+        """Aligns revaluations with a desired target state.
+
+        Args:
+            target (pd.DataFrame): DataFrame with revaluations in the same format as defined
+                                   by the schema.
+            delete (bool, optional): If True, deletes existing revaluations that are not
+                                     present in the target data.
+
+        Returns:
+            dict: A dictionary containing statistics about the mirroring process:
+                - pre-existing (int): The number of revaluations present before mirroring.
+                - targeted (int): The number of revaluations in the target data.
+                - added (int): The number of revaluations added by the mirroring method.
+                - deleted (int): The number of deleted revaluations.
+                - updated (int): The number of revaluations modified during mirroring.
+        """
 
     # ----------------------------------------------------------------------
     # File Operations
