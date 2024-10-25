@@ -268,6 +268,7 @@ class LedgerEngine(ABC):
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts().to_csv(index=False))
+            archive.writestr('assets.csv', self.assets().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
         """Restore ledger system from a ZIP archive.
@@ -293,9 +294,13 @@ class LedgerEngine(ABC):
             ledger = pd.read_csv(archive.open('ledger.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
-
+            assets = pd.read_csv(archive.open('assets.csv'))
             self.restore(
-                settings=settings, ledger=ledger, tax_codes=tax_codes, accounts=accounts
+                settings=settings,
+                ledger=ledger,
+                tax_codes=tax_codes,
+                accounts=accounts,
+                assets=assets
             )
 
     def restore(
@@ -304,6 +309,7 @@ class LedgerEngine(ABC):
         tax_codes: pd.DataFrame | None = None,
         accounts: pd.DataFrame | None = None,
         ledger: pd.DataFrame | None = None,
+        assets: pd.DataFrame | None = None,
     ):
         """Replaces the entire ledger system with data provided as arguments.
 
@@ -315,17 +321,20 @@ class LedgerEngine(ABC):
                 If `None`, accounts remain unchanged.
             ledger (pd.DataFrame | None): Ledger entries of the restored system.
                 If `None`, ledger remains unchanged.
+            assets (pd.DataFrame | None): Assets entries of the restored system.
+                If `None`, assets remains unchanged.
         """
         if settings is not None and "REPORTING_CURRENCY" in settings:
             self.reporting_currency = settings["REPORTING_CURRENCY"]
+        if assets is not None:
+            self.mirror_assets(assets, delete=True)
         if tax_codes is not None:
             self.mirror_tax_codes(tax_codes, delete=True)
         if accounts is not None:
             self.mirror_accounts(accounts, delete=True)
         if ledger is not None:
             self.mirror_ledger(ledger, delete=True)
-        # TODO: Implement price history, precision settings,
-        # and revaluation restoration logic
+        # TODO: Implement price history and revaluation restoration logic
 
     def clear(self):
         """Clear all data from the ledger system.
@@ -336,7 +345,8 @@ class LedgerEngine(ABC):
         self.mirror_ledger(None, delete=True)
         self.mirror_tax_codes(None, delete=True)
         self.mirror_accounts(None, delete=True)
-        # TODO: Implement price history, precision settings, and revaluation clearing logic
+        self.mirror_assets(None, delete=True)
+        # TODO: Implement price history and revaluation clearing logic
 
     # ----------------------------------------------------------------------
     # Tax rates
@@ -1474,6 +1484,30 @@ class LedgerEngine(ABC):
         df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
         return df
 
+    @classmethod
+    def sanitize_assets(
+        cls,
+        df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Sanitizes the 'assets' data to ensure it meets the requirements of the system.
+
+        This method adds an extra step to check and adjust the asset data so that it follows
+        the specific rules and restrictions of the system where the data will be used. Each
+        system may have unique requirements, such as mandatory fields, precision, or formats,
+        that go beyond the basic structure of the data.
+
+        This step ensures the data is both correct and usable within the system. By default,
+        the data is returned unchanged, but it can be customized to fit different systems' needs.
+
+        Args:
+            df (pd.DataFrame): The data representing the assets.
+
+        Returns:
+            pd.DataFrame: The adjusted data, ready for use in the system.
+        """
+
+        return df
+
     @abstractmethod
     def assets(self) -> pd.DataFrame:
         """Retrieves all asset entries.
@@ -1535,13 +1569,13 @@ class LedgerEngine(ABC):
                                             not found. Defaults to False.
         """
 
-    def mirror_assets(self, target: pd.DataFrame, delete: bool = False):
+    def mirror_assets(self, target: pd.DataFrame, delete: bool = False) -> dict:
         """Aligns assets with a desired target state.
 
         Args:
             target (pd.DataFrame): DataFrame with assets in the ASSETS_SCHEMA format.
-            delete (bool, optional): If True, deletes existing assets that are
-                                     not present in the target data.
+            delete (bool, optional): If True, deletes existing assets that are not present
+                                    in the target data.
 
         Returns:
             dict: A dictionary containing statistics about the mirroring process:
@@ -1551,3 +1585,43 @@ class LedgerEngine(ABC):
                 - deleted (int): The number of deleted assets.
                 - updated (int): The number of assets modified during mirroring.
         """
+        current_state = self.assets()
+        target = self.standardize_assets(target)
+        target = self.sanitize_assets(target)
+
+        # Perform an outer merge to identify differences
+        merged = current_state.merge(
+            target, on=["ticker", "date"], how="outer", suffixes=('_left', '_right'),
+            indicator=True
+        )
+
+        # Handle deletions
+        to_delete = []
+        if delete:
+            to_delete = merged[merged["_merge"] == "left_only"]
+            for _, row in to_delete.iterrows():
+                self.delete_asset(ticker=row["ticker"], date=row["date"])
+
+        # Handle additions
+        to_add = merged[merged["_merge"] == "right_only"]
+        for _, row in to_add.iterrows():
+            self.add_asset(
+                ticker=row["ticker"], increment=row["increment_right"], date=row["date"]
+            )
+
+        # Handle updates
+        to_update = merged[
+            (merged["_merge"] == "both") & (merged["increment_left"] != merged["increment_right"])
+        ]
+        for _, row in to_update.iterrows():
+            self.modify_asset(
+                ticker=row["ticker"], increment=row["increment_right"], date=row["date"]
+            )
+
+        return {
+            "pre-existing": len(current_state),
+            "targeted": len(target),
+            "added": len(to_add),
+            "deleted": len(to_delete) if delete else 0,
+            "updated": len(to_update)
+        }
