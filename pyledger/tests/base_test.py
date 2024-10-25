@@ -79,6 +79,20 @@ LEDGER_CSV = """
 
 # flake8: enable
 
+ASSETS_CSV = """
+    ticker, increment,  date
+       AUD,      0.01,
+       CAD,      0.01,
+       CHF,      0.01,
+       EUR,      0.01,
+       GBP,      0.01,
+       JPY,      1.00,
+       NZD,      0.01,
+       NOK,      0.01,
+       SEK,      0.01,
+       USD,      0.01,
+"""
+
 STRIPPED_CSV = "\n".join([line.strip() for line in LEDGER_CSV.split("\n")])
 
 
@@ -93,3 +107,6 @@ class BaseTest(ABC):
     LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(pd.read_csv(
         StringIO(STRIPPED_CSV), skipinitialspace=True, comment="#", skip_blank_lines=True
     ))
+    ASSETS = LedgerEngine.standardize_assets(
+        pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
+    )
