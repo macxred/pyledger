@@ -84,19 +84,6 @@ class LedgerEngine(ABC):
         ):
             raise ValueError("Missing/invalid 'reporting_currency' in settings.")
 
-        # Check for 'precision'
-        if "precision" not in settings or not isinstance(settings["precision"], dict):
-            raise ValueError("Missing/invalid 'precision'.")
-
-        # Validate contents of 'precision'
-        for key, value in settings["precision"].items():
-            if not isinstance(key, str) or not isinstance(value, (float, int)):
-                raise ValueError("Invalid types in 'precision'.")
-
-        settings["precision"]["reporting_currency"] = settings["precision"][
-            settings["reporting_currency"]
-        ]
-
         return settings
 
     # ----------------------------------------------------------------------

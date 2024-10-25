@@ -8,7 +8,7 @@ import datetime
 from warnings import warn
 import numpy as np
 import pandas as pd
-from .constants import DEFAULT_SETTINGS, LEDGER_SCHEMA
+from .constants import DEFAULT_ASSETS, DEFAULT_SETTINGS, LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -45,6 +45,7 @@ class StandaloneLedger(LedgerEngine):
     _prices = None
     _tax_codes = None
     _revaluations = None
+    _assets = None
 
     # ----------------------------------------------------------------------
     # Constructor
@@ -52,6 +53,7 @@ class StandaloneLedger(LedgerEngine):
     def __init__(
         self,
         settings: dict = DEFAULT_SETTINGS,
+        assets: pd.DataFrame = DEFAULT_ASSETS,
         accounts: pd.DataFrame = None,
         ledger: pd.DataFrame = None,
         prices: pd.DataFrame = None,
@@ -67,9 +69,11 @@ class StandaloneLedger(LedgerEngine):
             prices (pd.DataFrame, optional): Prices data for various assets.
             tax_codes (pd.DataFrame, optional): tax definitions.
             revaluations (pd.DataFrame, optional): foreign exchange or other revaluations.
+            assets (pd.DataFrame, optional): assets definitions.
         """
         super().__init__()
         self.settings = self.standardize_settings(settings)
+        self._assets = self.standardize_assets(assets)
         self._accounts = self.standardize_accounts(accounts)
         self._ledger = self.standardize_ledger_columns(ledger)
         self._prices = self.standardize_prices(prices)
@@ -485,7 +489,18 @@ class StandaloneLedger(LedgerEngine):
         return (currency, prc.iloc[-1].item())
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
-        return self.settings["precision"][ticker]
+        if ticker == "reporting_currency":
+            ticker = self.reporting_currency
+        date = pd.Timestamp(date) if date is not None else pd.NaT
+        mask = (
+            (self._assets["ticker"] == ticker)
+            & ((self._assets["date"] == date) | pd.isna(self._assets["date"]))
+        )
+
+        if not mask.any():
+            raise ValueError(f"Precision for ticker '{ticker}' and date '{date}' not found.")
+
+        return self._assets.loc[mask, "increment"].iloc[0]
 
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")

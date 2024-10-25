@@ -4,7 +4,6 @@ import datetime
 import pandas as pd
 from typing import List
 from .standalone_ledger import StandaloneLedger
-from .constants import CURRENCY_PRECISION
 
 
 class MemoryLedger(StandaloneLedger):
@@ -15,7 +14,6 @@ class MemoryLedger(StandaloneLedger):
     """
 
     _reporting_currency = None
-    _precision = CURRENCY_PRECISION
 
     def __init__(self, reporting_currency: str = "USD") -> None:
         """Initialize the MemoryLedger and sets the reporting currency.

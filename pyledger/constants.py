@@ -67,21 +67,19 @@ ASSETS_SCHEMA_CSV = """
 """
 ASSETS_SCHEMA = pd.read_csv(StringIO(ASSETS_SCHEMA_CSV), skipinitialspace=True)
 
+ASSETS_CSV = """
+    ticker, increment,  date
+       AUD,      0.01,
+       CAD,      0.01,
+       CHF,      0.01,
+       EUR,      0.01,
+       GBP,      0.01,
+       JPY,      1.00,
+       NZD,      0.01,
+       NOK,      0.01,
+       SEK,      0.01,
+       USD,      0.01,
+"""
+DEFAULT_ASSETS = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
 
-CURRENCY_PRECISION = {
-    "AUD": 0.01,
-    "CAD": 0.01,
-    "CHF": 0.01,
-    "EUR": 0.01,
-    "GBP": 0.01,
-    "JPY": 1.00,
-    "NZD": 0.01,
-    "NOK": 0.01,
-    "SEK": 0.01,
-    "USD": 0.01,
-}
-
-DEFAULT_SETTINGS = {
-    "reporting_currency": "USD",
-    "precision": CURRENCY_PRECISION
-}
+DEFAULT_SETTINGS = {"reporting_currency": "USD"}
