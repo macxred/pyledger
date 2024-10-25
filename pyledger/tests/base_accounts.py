@@ -18,7 +18,6 @@ class BaseTestAccounts(BaseTest):
         tax_codes = self.TAX_CODES[self.TAX_CODES["id"] == "Test"]
         accounts = self.ACCOUNTS[self.ACCOUNTS["account"] == 9999]
         ledger.restore(tax_codes=tax_codes, accounts=accounts, settings=self.SETTINGS)
-        initial_accounts = ledger.accounts()
         new_account = {
             "account": 1145,
             "currency": "CHF",
@@ -109,8 +108,8 @@ class BaseTestAccounts(BaseTest):
         ledger.delete_accounts(accounts=[1145])
         ledger.delete_accounts(accounts=[1146])
         updated_accounts = ledger.accounts()
-        assert 1145 not in initial_accounts["account"].values
-        assert 1146 not in initial_accounts["account"].values
+        assert 1145 not in updated_accounts["account"].values
+        assert 1146 not in updated_accounts["account"].values
 
     def test_add_already_existed_raise_error(
         self, ledger, error_class=ValueError, error_message="already exists"
