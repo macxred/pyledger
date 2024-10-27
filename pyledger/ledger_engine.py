@@ -1476,21 +1476,21 @@ class LedgerEngine(ABC):
         cls,
         df: pd.DataFrame
     ) -> pd.DataFrame:
-        """Sanitizes the 'assets' data to ensure it meets the requirements of the system.
+        """Sanitizes asset data to ensure compatibility with external systems.
 
-        This method adds an extra step to check and adjust the asset data so that it follows
-        the specific rules and restrictions of the system where the data will be used. Each
-        system may have unique requirements, such as mandatory fields, precision, or formats,
-        that go beyond the basic structure of the data.
+        This method ensures that asset data adheres to specific rules and constraints
+        required by integrating systems. External systems may impose additional requirements
+        beyond basic schema validation, such as stricter precision or custom formats.
 
-        This step ensures the data is both correct and usable within the system. By default,
-        the data is returned unchanged, but it can be customized to fit different systems' needs.
+        It provides a placeholder for applying these adjustments, preparing the data
+        for seamless integration with other platforms. By default, the data is returned unchanged,
+        but system-specific validation or transformations can be applied as needed.
 
         Args:
-            df (pd.DataFrame): The data representing the assets.
+            df (pd.DataFrame): The asset data to be sanitized.
 
         Returns:
-            pd.DataFrame: The adjusted data, ready for use in the system.
+            pd.DataFrame: The sanitized data, ready for use within external systems.
         """
 
         return df
