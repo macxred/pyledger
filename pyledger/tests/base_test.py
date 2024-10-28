@@ -73,7 +73,7 @@ LEDGER_CSV = """
     16, 2024-06-26,   9992,       ,      CHF,   90000.00,      90000.00,         ,   Convert 200k USD to EUR and CHF,
         # Foreign currency transaction exceeding precision for exchange rates in CashCtrl
     17, 2024-06-26,   9991,   9994,      USD,90000000.00,   81111111.11,         ,   Value 90 Mio USD @ 0.9012345679 with 10 digits precision,
-    18, 2024-06-26,       ,   9994,      USD, 9500000.00,     888888.88,         ,   Convert 9.5 Mio USD to CHF @ 0.830409356 with 9 digits precision,
+    18, 2024-06-26,       ,   9994,      USD, 9500000.00,    7888888.88,         ,   Convert 9.5 Mio USD to CHF @ 0.830409356 with 9 digits precision,
     18, 2024-06-26,   9992,       ,      CHF, 7888888.88,              ,         ,   Convert 9.5 Mio USD to CHF @ 0.830409356 with 9 digits precision,
 """
 
