@@ -1,16 +1,13 @@
-"""This module defines TextLedger, extending StandaloneLedger to store data in text files."""
+"""This module defines TextLedger, extending PersistentLedger to store data in text files."""
 
 import pandas as pd
 import yaml
 from typing import List
 from pathlib import Path
-from pyledger.decorators import timed_cache
-from pyledger.standalone_ledger import StandaloneLedger
-from pyledger.constants import ACCOUNT_SCHEMA, DEFAULT_SETTINGS, LEDGER_SCHEMA, TAX_CODE_SCHEMA
-from pyledger.helpers import (
-    save_files,
-    write_fixed_width_csv,
-)
+from datetime import datetime, timedelta
+from pyledger.persistent_ledger import PersistentLedger
+from pyledger.constants import LEDGER_SCHEMA
+from pyledger.helpers import save_files, write_fixed_width_csv
 from consistent_df import enforce_schema
 
 
@@ -33,9 +30,9 @@ ACCOUNT_COLUMN_SHORTCUTS = {
 }
 
 
-class TextLedger(StandaloneLedger):
+class TextLedger(PersistentLedger):
     """
-    Stand-alone ledger system storing data in text files.
+    Persistent ledger system storing data in text files.
 
     TextLedger stores accounting data in text files, optimized for version
     control systems like Git. To produce concise Git diffs, files follow a
@@ -55,8 +52,8 @@ class TextLedger(StandaloneLedger):
         """Initializes the TextLedger with a root path for file storage.
         If no root path is provided, defaults to the current working directory.
         """
-        self.root_path = Path(root_path).expanduser()
         super().__init__()
+        self.root_path = Path(root_path).expanduser()
 
     # ----------------------------------------------------------------------
     # Settings
