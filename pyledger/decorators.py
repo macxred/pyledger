@@ -1,4 +1,4 @@
-"""This module designed for storing decorators"""
+"""This module is designed for storing decorators."""
 
 from time import time
 from functools import wraps
