@@ -1,6 +1,5 @@
 """This module Defines PersistentLedger, which extends StandaloneLedger to manage
-persistent ledger data storages
-"""
+persistent ledger data storages"""
 
 from pyledger.standalone_ledger import StandaloneLedger
 
