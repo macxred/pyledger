@@ -16,25 +16,17 @@ class TestAccounts(BaseTestAccounts):
         """Test to ensure that mutator functions make minimal invasive changes to accounts file,
         preserving the original row order so that Git diffs show only the intended modifications.
         """
-        account_numbers = self.ACCOUNTS["account"].tolist()
-        for account in account_numbers:
-            target = self.ACCOUNTS.query(f"account == {account}").iloc[0].to_dict()
-            ledger.add_account(**target)
+        accounts = self.ACCOUNTS.sample(frac=1).reset_index(drop=True)
+        for account in accounts.to_dict('records'):
+            ledger.add_account(**account)
+        assert_frame_equal(ledger.accounts(), accounts, check_like=True)
 
-        expected = ledger.standardize_accounts(
-            self.ACCOUNTS[self.ACCOUNTS["account"].isin(account_numbers)]
-        )
+        rows = [0, 3, len(accounts) - 1]
+        for i in rows:
+            accounts.loc[i, "description"] = f"New description {i + 1}"
+            ledger.modify_account(**accounts.loc[i].to_dict())
+            assert_frame_equal(ledger.accounts(), accounts, check_like=True)
+
+        ledger.delete_accounts(accounts['account'].iloc[rows])
+        expected = accounts.drop(rows).reset_index(drop=True)
         assert_frame_equal(ledger.accounts(), expected, check_like=True)
-
-        expected.loc[expected["account"] == account_numbers[2], "description"] = "New description"
-        target = expected.query(f"account == {account_numbers[2]}").iloc[0].to_dict()
-        ledger.modify_account(**target)
-        expected.loc[expected["account"] == account_numbers[6], "description"] = "New description"
-        target = expected.query(f"account == {account_numbers[6]}").iloc[0].to_dict()
-        ledger.modify_account(**target)
-        assert_frame_equal(ledger.accounts(), expected, check_like=True)
-
-        to_delete = [account_numbers[2], account_numbers[6]]
-        expected = expected.query(f"account not in {to_delete}")
-        ledger.delete_accounts(to_delete)
-        assert_frame_equal(ledger.accounts(), expected, ignore_index=True, check_like=True)

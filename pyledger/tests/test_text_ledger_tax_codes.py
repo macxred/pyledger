@@ -16,25 +16,20 @@ class TestTaxCodes(BaseTestTaxCodes):
         """Test to ensure that mutator functions make minimal invasive changes to tax codes file,
         preserving the original row order so that Git diffs show only the intended modifications.
         """
-        tax_ids = self.TAX_CODES["id"].tolist()
-        for id in tax_ids:
-            target = self.TAX_CODES.query(f"id == '{id}'").iloc[0].to_dict()
-            target.pop("contra", None)
-            ledger.add_tax_code(**target)
-        expected = ledger.standardize_tax_codes(self.TAX_CODES[self.TAX_CODES["id"].isin(tax_ids)])
-        assert_frame_equal(ledger.tax_codes(), expected, check_like=True)
+        tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
+        for tax_code in tax_codes.to_dict('records'):
+            tax_code.pop("contra", None)
+            ledger.add_tax_code(**tax_code)
+        assert_frame_equal(ledger.tax_codes(), ledger.standardize_tax_codes(tax_codes), check_like=True)
 
-        expected.loc[expected["id"] == tax_ids[2], "description"] = "New description"
-        target = expected.query(f"id == '{tax_ids[2]}'").iloc[0].to_dict()
-        target.pop("contra", None)
-        ledger.modify_tax_code(**target)
-        expected.loc[expected["id"] == tax_ids[6], "description"] = "New description"
-        target = expected.query(f"id == '{tax_ids[6]}'").iloc[0].to_dict()
-        target.pop("contra", None)
-        ledger.modify_tax_code(**target)
-        assert_frame_equal(ledger.tax_codes(), expected, check_like=True)
+        rows = [0, 3, len(tax_codes) - 1]
+        for i in rows:
+            tax_codes.loc[i, "description"] = f"New description {i + 1}"
+            tax_code = tax_codes.loc[i].to_dict()
+            tax_code.pop("contra", None)
+            ledger.modify_tax_code(**tax_code)
+            assert_frame_equal(ledger.tax_codes(), tax_codes, check_like=True)
 
-        to_delete = [tax_ids[2], tax_ids[6]]
-        expected = expected.query(f"id not in {to_delete}")
-        ledger.delete_tax_codes(to_delete)
-        assert_frame_equal(ledger.tax_codes(), expected, ignore_index=True, check_like=True)
+        ledger.delete_tax_codes(tax_codes['id'].iloc[rows])
+        expected = tax_codes.drop(rows).reset_index(drop=True)
+        assert_frame_equal(ledger.tax_codes(), expected, check_like=True)
