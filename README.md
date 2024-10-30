@@ -52,9 +52,11 @@ This class extends LedgerEngine to provide a self-sufficient ledger system indep
 
 1. **MemoryLedger** extends `StandaloneLedger` to implement an in-memory ledger system. It stores and manages all data in memory using pandas DataFrames, providing fast access and manipulation of ledger data without the need for persistent storage. The class is particularly useful for demonstration and test purposes.
 
+1. **TextLedger**\
+An extension of StandaloneLedger, TextLedger specializes in file-based data storage using CSV files. This approach with data storage in text files allows to leverage git versioning to enhance data integrity and auditability, coupled with GitHub process management tools to facilitate collaboration. For more detailed usage and information, see the [TextLedger Documentation](docs/TextLedger.md).
+
 1. **PersistentLedger** classes extend `StandaloneLedger` to manage persistent storage of ledger data, ensuring that ledger data is not lost between application runs. `PersistentLedger` subclasses can integrate with different storage backends, such as files, databases, or other persistent storage solutions. The `PersistentLedger` class currently holds no methods or properties; it merely improves clarity of the class hierarchy.
 
-1. **TextLedger** specializes in file-based data storage using CSV files. This approach with data storage in text files allows to leverage git versioning to enhance data integrity and auditability, coupled with GitHub process management tools to facilitate collaboration.
 
 **Integration with External Software**
 
