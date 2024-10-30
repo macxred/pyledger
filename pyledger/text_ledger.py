@@ -62,16 +62,17 @@ class TextLedger(StandaloneLedger):
     # Settings
 
     @property
-    @timed_cache(300)
+    @timed_cache(15)
     def settings(self):
         return self.read_settings_file(self.root_path / "settings.yml").copy()
 
     @settings.setter
     def settings(self, settings: dict):
-        """Save system settings to a YAML file.
+        """Save settings to a YAML file.
 
-        This method stores standardized system settings to `<root>/settings.yml` YAML file,
-        which is ideal for version control and human readability.
+        This method stores accounting settings such as the reporting currency
+        to `<root>/settings.yml`. The YAML format is ideal for version control
+        and human readability.
 
         Args:
             settings (dict): A dictionary containing the system settings to be saved.
@@ -81,11 +82,12 @@ class TextLedger(StandaloneLedger):
         self.__class__.settings.fget.cache_clear()
 
     def read_settings_file(self, file: Path) -> dict:
-        """Read system settings from the specified file.
+        """Read settings from the specified file.
 
-        This method returns standardized system settings. If the specified settings file
-        does not exist or any error occurs while reading or standardizing,
-        DEFAULT_SETTINGS are returned, ensuring the system can continue running.
+        This method returns standardized accounting settings, including the reporting currency.
+        If the specified settings file does not exist, DEFAULT_SETTINGS are returned.
+        The system thus continues running even if the <root> directory is empty, which is useful
+        for testing and demonstration purposes.
 
         Args:
             file (Path): The path to the settings file.
@@ -93,11 +95,11 @@ class TextLedger(StandaloneLedger):
         Returns:
             dict: Standardized system settings.
         """
-        try:
+        if file.exists():
             with open(file, "r") as f:
                 result = yaml.safe_load(f)
-        except Exception as e:
-            self._logger.warning(f"Error reading settings: {e}.")
+        else:
+            self._logger.warning("Settings file missing, reverting to default settings.")
             result = self.standardize_settings(DEFAULT_SETTINGS)
 
         return result
@@ -105,7 +107,7 @@ class TextLedger(StandaloneLedger):
     # ----------------------------------------------------------------------
     # Ledger
 
-    @timed_cache(300)
+    @timed_cache(15)
     def ledger(self) -> pd.DataFrame:
         return self.read_ledger_files(self.root_path / "ledger")
 
@@ -283,16 +285,16 @@ class TextLedger(StandaloneLedger):
     # ----------------------------------------------------------------------
     # Tax codes
 
-    @timed_cache(300)
+    @timed_cache(15)
     def tax_codes(self) -> pd.DataFrame:
         return self.read_tax_codes(self.root_path / "tax_codes.csv")
 
     def read_tax_codes(self, file: Path) -> pd.DataFrame:
-        """Read and standardize tax codes from the specified CSV file.
+        """Read tax codes from the specified CSV file.
 
-        This method reads tax codes from the specified file and applies
-        the standardization process. If an error occurs during reading or
-        standardization, an empty DataFrame with standardized schema is returned.
+        This method reads tax codes from the specified file and enforces the standard
+        data format. If an error occurs during reading or standardization, an empty
+        DataFrame with standard TAX_CODE_SCHEMA is returned and a warning is logged.
 
         Args:
             file (Path): The path to the CSV file containing tax codes.
@@ -314,9 +316,9 @@ class TextLedger(StandaloneLedger):
     def write_tax_codes_file(cls, df: pd.DataFrame, file: Path):
         """Save tax codes to a fixed-width CSV file.
 
-        This method stores tax codes in a fixed-width CSV format, ideal
-        for version control systems like Git. Tax codes are padded with spaces
-        to maintain a consistent column width for improved readability.
+        This method stores tax codes in a fixed-width CSV format.
+        Values are padded with spaces to maintain consistent column width and improve readability.
+        Optional columns that contain only NA values are dropped for conciseness.
 
         Args:
             df (pd.DataFrame): The tax codes to save.
@@ -372,7 +374,6 @@ class TextLedger(StandaloneLedger):
         tax_codes.loc[
             tax_codes["id"] == id, ["rate", "account", "is_inclusive", "description"]
         ] = [rate, account, is_inclusive, description]
-        tax_codes = self.standardize_tax_codes(tax_codes)
         self.write_tax_codes_file(tax_codes, self.root_path / "tax_codes.csv")
         self.tax_codes.cache_clear()
 
@@ -396,16 +397,16 @@ class TextLedger(StandaloneLedger):
     # ----------------------------------------------------------------------
     # Accounts
 
-    @timed_cache(300)
+    @timed_cache(15)
     def accounts(self) -> pd.DataFrame:
         return self.read_accounts(self.root_path / "accounts.csv")
 
     def read_accounts(self, file: Path) -> pd.DataFrame:
-        """Read and standardize accounts from the specified CSV file.
+        """Read and accounts from the specified CSV file.
 
-        This method reads accounts from the specified file and applies
-        the standardization process. If an error occurs during reading or
-        standardization, an empty DataFrame with standardized schema is returned.
+        This method reads accounts from the specified file and enforces the standard
+        data format. If an error occurs during reading or standardization, an empty
+        DataFrame with standard ACCOUNT_SCHEMA is returned and a warning is logged.
 
         Args:
             file (Path): The path to the CSV file containing accounts.
@@ -428,9 +429,10 @@ class TextLedger(StandaloneLedger):
     def write_accounts_file(cls, df: pd.DataFrame, file: Path):
         """Save accounts to a fixed-width CSV file.
 
-        This method stores accounts in a fixed-width CSV format, ideal
-        for version control systems like Git. Accounts are padded with spaces
-        to maintain a consistent column width for improved readability.
+        This method stores accounts in a fixed-width CSV format.
+        Values are padded with spaces to maintain a consistent column width and
+        improve readability. Optional columns that contain only NA values
+        are dropped for conciseness.
 
         Args:
             df (pd.DataFrame): The tax codes to save.
@@ -517,6 +519,4 @@ class TextLedger(StandaloneLedger):
 
     @reporting_currency.setter
     def reporting_currency(self, currency):
-        settings = self.settings
-        settings["reporting_currency"] = currency
-        self.settings = settings
+        self.settings = self.settings | {"reporting_currency": currency}
