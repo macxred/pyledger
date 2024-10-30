@@ -134,27 +134,3 @@ def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv):
         full_path = root / path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         func(group.drop(columns="__csv_path__"), full_path)
-
-
-def write_dict_to_yml(data: dict, file: Path):
-    """Save a dictionary to a .yml file.
-
-    Args:
-        data (dict): The dictionary to be saved.
-        file (Path): The path to the .yml file where the dictionary will be saved.
-    """
-    with open(file, "w") as f:
-        yaml.dump(data, f, default_flow_style=False)
-
-
-def read_dict_from_yml(file: Path) -> dict:
-    """Load a dictionary from a .yml file.
-
-    Args:
-        file (Path): The path to the .yml file to be read.
-
-    Returns:
-        dict: The dictionary read from the .yml file.
-    """
-    with open(file, "r") as f:
-        return yaml.safe_load(f)

@@ -1,15 +1,14 @@
 """This module defines TextLedger, extending StandaloneLedger to store data in text files."""
 
 import pandas as pd
+import yaml
 from typing import List
 from pathlib import Path
 from pyledger.decorators import timed_cache
 from pyledger.standalone_ledger import StandaloneLedger
 from pyledger.constants import ACCOUNT_SCHEMA, DEFAULT_SETTINGS, LEDGER_SCHEMA, TAX_CODE_SCHEMA
 from pyledger.helpers import (
-    read_dict_from_yml,
     save_files,
-    write_dict_to_yml,
     write_fixed_width_csv,
 )
 from consistent_df import enforce_schema
@@ -77,7 +76,8 @@ class TextLedger(StandaloneLedger):
         Args:
             settings (dict): A dictionary containing the system settings to be saved.
         """
-        write_dict_to_yml(self.standardize_settings(settings), self.root_path / "settings.yml")
+        with open(self.root_path / "settings.yml", "w") as f:
+            yaml.dump(self.standardize_settings(settings), f, default_flow_style=False)
         self.__class__.settings.fget.cache_clear()
 
     def read_settings_file(self, file: Path) -> dict:
@@ -94,7 +94,8 @@ class TextLedger(StandaloneLedger):
             dict: Standardized system settings.
         """
         try:
-            result = self.standardize_settings(read_dict_from_yml(file))
+            with open(file, "r") as f:
+                result = yaml.safe_load(f)
         except Exception as e:
             self._logger.warning(f"Error reading settings: {e}.")
             result = self.standardize_settings(DEFAULT_SETTINGS)
