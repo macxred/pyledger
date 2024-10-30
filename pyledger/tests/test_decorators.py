@@ -1,4 +1,4 @@
-"""Test suite for timed_cache decorator"""
+"""Test suite for timed_cache decorator."""
 
 import time
 from pyledger.decorators import timed_cache
