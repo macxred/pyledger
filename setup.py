@@ -25,7 +25,6 @@ setup(
             "flake8-docstrings",
             "flake8-bugbear",
             "bandit",
-            "safety"
             "pytest-cov"
         ]
     }
