@@ -70,3 +70,8 @@ CURRENCY_PRECISION = {
     "SEK": 0.01,
     "USD": 0.01,
 }
+
+DEFAULT_SETTINGS = {
+    "reporting_currency": "USD",
+    "precision": CURRENCY_PRECISION
+}
