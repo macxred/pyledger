@@ -520,16 +520,16 @@ class TextLedger(StandaloneLedger):
     # ----------------------------------------------------------------------
     # Assets
 
-    @timed_cache(300)
+    @timed_cache(15)
     def assets(self) -> pd.DataFrame:
         return self.read_assets(self.root_path / "assets.csv")
 
     def read_assets(self, file: Path) -> pd.DataFrame:
-        """Read and standardize assets from the specified CSV file.
+        """Read assets from the specified CSV file.
 
-        This method reads assets from the specified file and applies
-        the standardization process. If an error occurs during reading or
-        standardization, an empty DataFrame with standardized schema is returned.
+        This method reads assets from the specified file and enforces the standard
+        data format. If an error occurs during reading or standardization,
+        an empty DataFrame with ASSETS_SCHEMA is returned and a warning is logged
 
         Args:
             file (Path): The path to the CSV file containing assets.
@@ -549,9 +549,9 @@ class TextLedger(StandaloneLedger):
     def write_assets_file(cls, df: pd.DataFrame, file: Path):
         """Save assets to a fixed-width CSV file.
 
-        This method stores assets in a fixed-width CSV format, ideal
-        for version control systems like Git. Assets are padded with spaces
-        to maintain a consistent column width for improved readability.
+        This method stores assets in a fixed-width CSV format.
+        Values are padded with spaces to maintain a consistent column and improve readability.
+        Optional columns that contain only NA values are dropped for conciseness.
 
         Args:
             df (pd.DataFrame): The assets to save.
@@ -591,7 +591,7 @@ class TextLedger(StandaloneLedger):
     def modify_asset(
         self, ticker: str, increment: float, date: datetime.date = None
     ) -> None:
-        assets = self.assets().copy()
+        assets = self.assets()
         date = pd.Timestamp(date) if date is not None else pd.NaT
         mask = (assets["ticker"] == ticker) & ((assets["date"] == date) | pd.isna(assets["date"]))
 
