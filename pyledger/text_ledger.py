@@ -481,7 +481,7 @@ class TextLedger(StandaloneLedger):
         group: str,
         tax_code: str = None,
     ) -> None:
-        accounts = self.accounts().copy()
+        accounts = self.accounts()
         if (accounts["account"] == account).sum() != 1:
             raise ValueError(f"Account '{account}' not found or duplicated.")
 

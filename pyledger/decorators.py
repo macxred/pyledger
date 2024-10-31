@@ -2,6 +2,7 @@
 
 from time import time
 from functools import wraps
+from copy import deepcopy
 
 
 def timed_cache(seconds: int):
@@ -28,12 +29,12 @@ def timed_cache(seconds: int):
             if key in cache:
                 result, timestamp = cache[key]
                 if current_time - timestamp < seconds:
-                    return result
+                    return deepcopy(result)
 
             # If not in cache or expired, call the function and cache the result
             result = func(*args, **kwargs)
             cache[key] = (result, current_time)
-            return result
+            return deepcopy(result)
 
         # Add a method to clear the cache manually
         def cache_clear():

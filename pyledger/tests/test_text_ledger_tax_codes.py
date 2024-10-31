@@ -18,6 +18,7 @@ class TestTaxCodes(BaseTestTaxCodes):
         """
         tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
         for tax_code in tax_codes.to_dict('records'):
+            # TODO: Remove this pop when interface for tax codes is updated
             tax_code.pop("contra", None)
             ledger.add_tax_code(**tax_code)
         assert_frame_equal(
@@ -28,6 +29,7 @@ class TestTaxCodes(BaseTestTaxCodes):
         for i in rows:
             tax_codes.loc[i, "description"] = f"New description {i + 1}"
             tax_code = tax_codes.loc[i].to_dict()
+            # TODO: Remove this pop when interface for tax codes is updated
             tax_code.pop("contra", None)
             ledger.modify_tax_code(**tax_code)
             assert_frame_equal(ledger.tax_codes(), tax_codes, check_like=True)
