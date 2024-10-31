@@ -491,16 +491,22 @@ class StandaloneLedger(LedgerEngine):
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         if ticker == "reporting_currency":
             ticker = self.reporting_currency
-        date = pd.Timestamp(date) if date is not None else pd.NaT
-        mask = (
-            (self._assets["ticker"] == ticker)
-            & ((self._assets["date"] == date) | pd.isna(self._assets["date"]))
-        )
 
-        if not mask.any():
+        date = pd.Timestamp(date) if date is not None else pd.Timestamp("today")
+        ticker_data = self._assets[self._assets["ticker"] == ticker]
+        if ticker_data.empty:
+            raise ValueError(f"Precision for ticker '{ticker}' not found.")
+
+        valid_dates = ticker_data.dropna(subset=["date"])
+        valid_dates = valid_dates[valid_dates["date"] <= date]
+
+        if not valid_dates.empty:
+            last_update = valid_dates.sort_values("date").iloc[-1]
+            return last_update["increment"]
+        elif ticker_data["date"].isna().any():
+            return ticker_data[ticker_data["date"].isna()]["increment"].iloc[0]
+        else:
             raise ValueError(f"Precision for ticker '{ticker}' and date '{date}' not found.")
-
-        return self._assets.loc[mask, "increment"].iloc[0]
 
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")

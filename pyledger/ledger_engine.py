@@ -113,9 +113,7 @@ class LedgerEngine(ABC):
         """Retrieves all revaluation entries.
 
         Returns:
-            pd.DataFrame: DataFrame with columns `date` (datetime64[ns]), `account` (str),
-                          `credit` (Int64), `debit` (Int64, optional), `description` (str),
-                          and `price` (Float64, optional).
+            pd.DataFrame with columns specified in REVALUATION_SCHEMA.
         """
 
     @abstractmethod
@@ -131,11 +129,11 @@ class LedgerEngine(ABC):
         """Adds a new revaluation.
 
         The unique identifier is a combination of `date` and `account`.
-        If `credit` is None, it will be assigned the same value as `debit`.
 
         Args:
             date (datetime.date): Date of the revaluation.
-            account (str): Account associated with the revaluation.
+            account (str): Account (e.g. "1020") or range of accounts
+                          (e.g. "1020:1099") to revalue.
             credit (int, optional): Credit amount for the revaluation.
                                     If None, uses the value of `debit`.
             debit (int, optional): Debit amount for the revaluation.
@@ -156,11 +154,11 @@ class LedgerEngine(ABC):
         """Updates an existing revaluation.
 
         The unique identifier is a combination of `date` and `account`.
-        If `credit` is None, it will be assigned the same value as `debit`.
 
         Args:
             date (datetime.date): Date of the revaluation.
-            account (str): Account associated with the revaluation.
+            account (str): Account (e.g. "1020") or range of accounts
+                          (e.g. "1020:1099") to revalue.
             credit (int, optional): Credit amount for the revaluation.
                                     If None, uses the value of `debit`.
             debit (int, optional): Debit amount for the revaluation.
@@ -171,17 +169,16 @@ class LedgerEngine(ABC):
     @abstractmethod
     def delete_revaluations(
         self,
-        accounts: List[str],
-        dates: List[datetime.date],
+        account: str,
+        date: datetime.date,
         allow_missing: bool = False
     ) -> None:
         """Removes revaluations.
 
         The unique identifier is a combination of `date` and `account`.
 
-        Args:
-            accounts (List[str]): List of accounts associated with the revaluations to remove.
-            dates (datetime.date): List of dates corresponding to the revaluations to remove.
+        Args: accounts (str): Account or account range of revaluations to remove.
+        date (datetime.date | None): The date of the revaluations to remove.
             allow_missing (bool, optional): If True, no error is raised if a revaluation entry is
                                             not found. Defaults to False.
         """
@@ -190,8 +187,7 @@ class LedgerEngine(ABC):
         """Aligns revaluations with a desired target state.
 
         Args:
-            target (pd.DataFrame): DataFrame with revaluations in the same format as defined
-                                   by the schema.
+            target (pd.DataFrame): DataFrame adhering to REVALUATION_SCHEMA.
             delete (bool, optional): If True, deletes existing revaluations that are not
                                      present in the target data.
 
@@ -1379,23 +1375,19 @@ class LedgerEngine(ABC):
             date (datetime.date): Date on which the price is recorded.
             currency (str): Currency in which the price is quoted.
             price (float): Value of the asset as of the given date.
-            overwrite (bool, optional): Overwrite an existing price definition with the same ticker,
-                                        date, and currency if one exists. Defaults to False.
         """
 
     @abstractmethod
     def modify_price(
         self, ticker: str, date: datetime.date, currency: str, price: float, overwrite: bool = False
     ) -> None:
-        """Modifies a price within the price history.
+        """Modifies an observation in the price history.
 
         Args:
             ticker (str): Asset identifier.
             date (datetime.date): Date on which the price is recorded.
             currency (str): Currency in which the price is quoted.
             price (float): Value of the asset as of the given date.
-            overwrite (bool, optional): Overwrite an existing price definition with the same ticker,
-                                        date, and currency if one exists. Defaults to False.
         """
 
     @abstractmethod
@@ -1500,8 +1492,7 @@ class LedgerEngine(ABC):
         """Retrieves all asset entries.
 
         Returns:
-            pd.DataFrame: DataFrame with columns `ticker` (str), `increment` (float),
-                          and `date` (datetime64[ns], optional).
+            pd.DataFrame with columns specified in ASSETS_SCHEMA.
         """
 
     @abstractmethod
@@ -1509,7 +1500,7 @@ class LedgerEngine(ABC):
         self,
         ticker: str,
         increment: float,
-        date: pd.Timestamp
+        date: pd.Timestamp = None
     ) -> None:
         """Adds a new asset entry.
 
@@ -1518,7 +1509,7 @@ class LedgerEngine(ABC):
         Args:
             ticker (str): Identifier for the asset (e.g., stock ticker).
             increment (float): Increment value representing the asset unit.
-            date (pd.Timestamp): Date of the asset entry.
+            date (pd.Timestamp, optional): Date of the asset entry.
         """
 
     @abstractmethod
@@ -1526,7 +1517,7 @@ class LedgerEngine(ABC):
         self,
         ticker: str,
         increment: float,
-        date: pd.Timestamp
+        date: pd.Timestamp = None
     ) -> None:
         """Updates an existing asset entry.
 
@@ -1535,14 +1526,14 @@ class LedgerEngine(ABC):
         Args:
             ticker (str): Identifier for the asset.
             increment (float): Increment value for the asset.
-            date (pd.Timestamp): Date of the asset entry.
+            date (pd.Timestamp, optional): Date of the asset entry.
         """
 
     @abstractmethod
     def delete_asset(
         self,
         ticker: str,
-        date: datetime.date,
+        date: pd.Timestamp = None,
         allow_missing: bool = False
     ) -> None:
         """Removes asset entries.
@@ -1550,8 +1541,8 @@ class LedgerEngine(ABC):
         The unique identifier is a combination of `ticker` and `date`.
 
         Args:
-            ticker (List[str]): List of asset tickers to remove.
-            date (List[pd.Timestamp]): List of dates corresponding to the tickers to remove.
+            ticker (str): Ticker to remove.
+            date (pd.Timestamp, optional): Date of the asset entry.
             allow_missing (bool, optional): If True, no error is raised if an asset entry is
                                             not found. Defaults to False.
         """

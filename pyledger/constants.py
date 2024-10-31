@@ -2,12 +2,13 @@
 
 import pandas as pd
 from io import StringIO
+from consistent_df import enforce_schema
 
 REVALUATION_SCHEMA_CSV = """
     column,             dtype,                mandatory
     date,               datetime64[ns],       True
     account,            string,               True
-    credit,             int64,                True
+    credit,             int,                  True
     debit,              Int64,                False
     description,        string,               True
     price,              Float64,              False
@@ -40,7 +41,7 @@ PRICE_SCHEMA_CSV = """
     ticker,             string,               True
     date,               datetime64[ns],       True
     currency,           string,               True
-    price,              float64,              True
+    price,              float,                True
 """
 PRICE_SCHEMA = pd.read_csv(StringIO(PRICE_SCHEMA_CSV), skipinitialspace=True)
 
@@ -62,13 +63,13 @@ LEDGER_SCHEMA = pd.read_csv(StringIO(LEDGER_SCHEMA_CSV), skipinitialspace=True)
 ASSETS_SCHEMA_CSV = """
     column,             dtype,                mandatory
     ticker,             string,               True
-    increment,          float64,              True
+    increment,          float,                True
     date,               datetime64[ns],       False
 """
 ASSETS_SCHEMA = pd.read_csv(StringIO(ASSETS_SCHEMA_CSV), skipinitialspace=True)
 
 ASSETS_CSV = """
-    ticker, increment,  date
+    ticker, increment,
        AUD,      0.01,
        CAD,      0.01,
        CHF,      0.01,
@@ -80,6 +81,9 @@ ASSETS_CSV = """
        SEK,      0.01,
        USD,      0.01,
 """
-DEFAULT_ASSETS = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
+
+DEFAULT_ASSETS = enforce_schema(
+    pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True), ASSETS_SCHEMA
+)
 
 DEFAULT_SETTINGS = {"reporting_currency": "USD"}
