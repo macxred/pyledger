@@ -15,82 +15,32 @@ class BaseTestAssets(BaseTest):
     def ledger(self):
         pass
 
-    def test_asset_mutators(self, ledger):
-        ledger.restore(assets=self.ASSETS, settings=self.SETTINGS)
-        # Add the first new asset with None as the date (NaT in DataFrame)
-        new_asset1 = {
-            "ticker": "BTC",
-            "increment": 0.001,
-            "date": None,
-        }
-        assets = ledger.assets()
-        ledger.add_asset(**new_asset1)
-        updated_assets = ledger.assets()
-        outer_join = pd.merge(assets, updated_assets, how="outer", indicator=True)
-        created_assets = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
+    def test_asset_accessor_mutators(self, ledger, ignore_row_order=False):
+        """Test to ensure that accessor mutator functions work as expected.
+        With `ignore_row_order=False`, we ensure minimal invasive changes, preserving
+        the original row order of the data so that Git diffs show only the intended modifications.
+        """
+        ledger.restore(settings=self.SETTINGS)
+        assets = self.ASSETS.sample(frac=1).reset_index(drop=True)
+        for asset in assets.to_dict('records'):
+            ledger.add_asset(**asset)
+        assert_frame_equal(
+            ledger.assets(), assets, check_like=True, ignore_row_order=ignore_row_order
+        )
 
-        assert len(created_assets) == 1, "Expected exactly one row to be added"
-        assert created_assets["ticker"].item() == new_asset1["ticker"]
-        assert created_assets["increment"].item() == new_asset1["increment"]
-        assert pd.isna(created_assets["date"].item()), "Expected the date to be None"
+        rows = [0, 3, len(assets) - 1]
+        for i in rows:
+            assets.loc[i, "increment"] = 0.001
+            ledger.modify_asset(**assets.loc[i].to_dict())
+            assert_frame_equal(
+                ledger.assets(), assets, check_like=True, ignore_row_order=ignore_row_order
+            )
 
-        # Add the second new asset with a specific date
-        new_asset2 = {
-            "ticker": "ETH",
-            "increment": 0.02,
-            "date": datetime.date(2023, 1, 12),
-        }
-        assets = ledger.assets()
-        ledger.add_asset(**new_asset2)
-        updated_assets = ledger.assets()
-        outer_join = pd.merge(assets, updated_assets, how="outer", indicator=True)
-        created_assets = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(created_assets) == 1, "Expected exactly one row to be added"
-        assert created_assets["ticker"].item() == new_asset2["ticker"]
-        assert created_assets["increment"].item() == new_asset2["increment"]
-        assert created_assets["date"].item() == pd.Timestamp(new_asset2["date"])
-
-        # Modify the first asset (with None as the date)
-        modified_asset1 = {
-            "ticker": "BTC",
-            "increment": 0.002,
-            "date": None,
-        }
-        assets = ledger.assets()
-        ledger.modify_asset(**modified_asset1)
-        updated_assets = ledger.assets()
-        outer_join = pd.merge(assets, updated_assets, how="outer", indicator=True)
-        modified_assets = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(modified_assets) == 1, "Expected exactly one updated row"
-        assert modified_assets["ticker"].item() == modified_asset1["ticker"]
-        assert modified_assets["increment"].item() == modified_asset1["increment"]
-        assert pd.isna(modified_assets["date"].item()), "Expected the date to still be None"
-
-        # Modify the second asset (with a specific date)
-        modified_asset2 = {
-            "ticker": "ETH",
-            "increment": 0.03,
-            "date": datetime.date(2023, 1, 12),
-        }
-        assets = ledger.assets()
-        ledger.modify_asset(**modified_asset2)
-        updated_assets = ledger.assets()
-        outer_join = pd.merge(assets, updated_assets, how="outer", indicator=True)
-        modified_assets = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(modified_assets) == 1, "Expected exactly one updated row"
-        assert modified_assets["ticker"].item() == modified_asset2["ticker"]
-        assert modified_assets["increment"].item() == modified_asset2["increment"]
-        assert modified_assets["date"].item() == pd.Timestamp(modified_asset2["date"])
-
-        # Delete both assets
-        ledger.delete_asset(ticker="BTC", date=None)
-        ledger.delete_asset(ticker="ETH", date=datetime.date(2023, 1, 12))
-        updated_assets = ledger.assets()
-        assert "BTC" not in updated_assets["ticker"].values
-        assert "ETH" not in updated_assets["ticker"].values
+        ledger.delete_asset(assets['ticker'].iloc[rows[0]], assets['date'].iloc[rows[0]])
+        assets = assets.drop(rows[0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.assets(), assets, check_like=True, ignore_row_order=ignore_row_order
+        )
 
     def test_add_existing_asset_raises_error(
         self, ledger, error_class=ValueError, error_message="already exists"

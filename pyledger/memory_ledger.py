@@ -229,4 +229,4 @@ class MemoryLedger(StandaloneLedger):
             if not allow_missing:
                 raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
         else:
-            self._assets = assets[~mask]
+            self._assets = assets[~mask].reset_index(drop=True)
