@@ -21,9 +21,7 @@ class TestTaxCodes(BaseTestTaxCodes):
             # TODO: Remove this pop when interface for tax codes is updated
             tax_code.pop("contra", None)
             ledger.add_tax_code(**tax_code)
-        assert_frame_equal(
-            ledger.tax_codes(), ledger.standardize_tax_codes(tax_codes), check_like=True
-        )
+        assert_frame_equal(ledger.tax_codes(), tax_codes, check_like=True)
 
         rows = [0, 3, len(tax_codes) - 1]
         for i in rows:

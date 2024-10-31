@@ -84,8 +84,12 @@ STRIPPED_CSV = "\n".join([line.strip() for line in LEDGER_CSV.split("\n")])
 
 class BaseTest(ABC):
     SETTINGS = {"REPORTING_CURRENCY": "CHF"}
-    TAX_CODES = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
-    ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    TAX_CODES = LedgerEngine.standardize_tax_codes(
+        pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    )
+    ACCOUNTS = LedgerEngine.standardize_accounts(
+        pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    )
     LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(pd.read_csv(
         StringIO(STRIPPED_CSV), skipinitialspace=True, comment="#", skip_blank_lines=True
     ))
