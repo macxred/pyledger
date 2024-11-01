@@ -1463,29 +1463,24 @@ class LedgerEngine(ABC):
         df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
         return df
 
-    @classmethod
-    def sanitize_assets(
-        cls,
-        df: pd.DataFrame
-    ) -> pd.DataFrame:
-        """Sanitizes asset data to ensure compatibility with external systems.
+    def prepare_assets_for_mirroring(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Aligns incoming asset data with the current system's constraints.
 
-        This method ensures that asset data adheres to specific rules and constraints
-        required by integrating systems. External systems may impose additional requirements
-        beyond basic schema validation, such as stricter precision or custom formats.
+        Invoked as the initial step in the mirroring process, this method prepares
+        asset data for integration into the current system. It adapts the incoming
+        data to specific storage requirements and aligns it with existing data, making
+        it easy to identify entries that need to be added, modified, or removed.
 
-        It provides a placeholder for applying these adjustments, preparing the data
-        for seamless integration with other platforms. By default, the data is returned unchanged,
-        but system-specific validation or transformations can be applied as needed.
+        By default, this method returns the data unchanged. Subclasses may override
+        it to apply class-specific adaptations as required.
 
         Args:
-            df (pd.DataFrame): The asset data to be sanitized.
+            df (pd.DataFrame): Incoming asset data.
 
         Returns:
-            pd.DataFrame: The sanitized data, ready for use within external systems.
+            pd.DataFrame: Adjusted data ready for synchronization with the current system.
         """
-
-        return df
+        return self.standardize_assets(df)
 
     @abstractmethod
     def assets(self) -> pd.DataFrame:
@@ -1564,8 +1559,7 @@ class LedgerEngine(ABC):
                 - updated (int): The number of assets modified during mirroring.
         """
         current_state = self.assets()
-        target = self.standardize_assets(target)
-        target = self.sanitize_assets(target)
+        target = self.prepare_assets_for_mirroring(target)
 
         # Perform an outer merge to identify differences
         merged = current_state.merge(
