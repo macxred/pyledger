@@ -4,16 +4,15 @@ import pandas as pd
 from io import StringIO
 from consistent_df import enforce_schema
 
-REVALUATION_SCHEMA_CSV = """
+FX_ADJUSTMENT_SCHEMA_CSV = """
     column,             dtype,                mandatory
     date,               datetime64[ns],       True
-    account,            string,               True
-    credit,             int,                  True
-    debit,              Int64,                False
-    description,        string,               True
-    price,              Float64,              False
+    account,            string[python],       True
+    credit,             Int64,                True
+    debit,              Int64,                True
+    description,        string[python],       True
 """
-REVALUATION_SCHEMA = pd.read_csv(StringIO(REVALUATION_SCHEMA_CSV), skipinitialspace=True)
+FX_ADJUSTMENT_SCHEMA = pd.read_csv(StringIO(FX_ADJUSTMENT_SCHEMA_CSV), skipinitialspace=True)
 
 TAX_CODE_SCHEMA_CSV = """
     column,             dtype,                mandatory

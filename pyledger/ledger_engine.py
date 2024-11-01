@@ -19,7 +19,7 @@ from .constants import (
     LEDGER_SCHEMA,
     ACCOUNT_SCHEMA,
     TAX_CODE_SCHEMA,
-    REVALUATION_SCHEMA,
+    FX_ADJUSTMENT_SCHEMA,
 )
 from . import excel
 from .helpers import represents_integer
@@ -105,101 +105,8 @@ class LedgerEngine(ABC):
         Raises:
             ValueError: If required columns are missing or if data types are incorrect.
         """
-        df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=keep_extra_columns)
+        df = enforce_schema(df, FX_ADJUSTMENT_SCHEMA, keep_extra_columns=keep_extra_columns)
         return df
-
-    @abstractmethod
-    def revaluations(self) -> pd.DataFrame:
-        """Retrieves all revaluation entries.
-
-        Returns:
-            pd.DataFrame with columns specified in REVALUATION_SCHEMA.
-        """
-
-    @abstractmethod
-    def add_revaluation(
-        self,
-        date: datetime.date,
-        account: str,
-        credit: int,
-        description: str,
-        debit: int = None,
-        price: float = None
-    ) -> None:
-        """Adds a new revaluation.
-
-        The unique identifier is a combination of `date` and `account`.
-
-        Args:
-            date (datetime.date): Date of the revaluation.
-            account (str): Account (e.g. "1020") or range of accounts
-                          (e.g. "1020:1099") to revalue.
-            credit (int, optional): Credit amount for the revaluation.
-                                    If None, uses the value of `debit`.
-            debit (int, optional): Debit amount for the revaluation.
-            description (str): Description of the revaluation.
-            price (float, optional): Price associated with the revaluation.
-        """
-
-    @abstractmethod
-    def modify_revaluation(
-        self,
-        date: datetime.date,
-        account: str,
-        credit: int,
-        description: str,
-        debit: int = None,
-        price: float = None
-    ) -> None:
-        """Updates an existing revaluation.
-
-        The unique identifier is a combination of `date` and `account`.
-
-        Args:
-            date (datetime.date): Date of the revaluation.
-            account (str): Account (e.g. "1020") or range of accounts
-                          (e.g. "1020:1099") to revalue.
-            credit (int, optional): Credit amount for the revaluation.
-                                    If None, uses the value of `debit`.
-            debit (int, optional): Debit amount for the revaluation.
-            description (str): Description of the revaluation.
-            price (float, optional): Price associated with the revaluation.
-        """
-
-    @abstractmethod
-    def delete_revaluations(
-        self,
-        account: str,
-        date: datetime.date | None,
-        allow_missing: bool = False
-    ) -> None:
-        """Removes revaluations.
-
-        The unique identifier is a combination of `date` and `account`.
-
-        Args:
-            accounts (str): Account or account range of revaluations to remove.
-            date (datetime.date | None): The date of the revaluations to remove.
-            allow_missing (bool, optional): If True, no error is raised if a revaluation entry is
-                                            not found. Defaults to False.
-        """
-
-    def mirror_revaluations(self, target: pd.DataFrame, delete: bool = False) -> dict:
-        """Aligns revaluations with a desired target state.
-
-        Args:
-            target (pd.DataFrame): DataFrame adhering to REVALUATION_SCHEMA.
-            delete (bool, optional): If True, deletes existing revaluations that are not
-                                     present in the target data.
-
-        Returns:
-            dict: A dictionary containing statistics about the mirroring process:
-                - pre-existing (int): The number of revaluations present before mirroring.
-                - targeted (int): The number of revaluations in the target data.
-                - added (int): The number of revaluations added by the mirroring method.
-                - deleted (int): The number of deleted revaluations.
-                - updated (int): The number of revaluations modified during mirroring.
-        """
 
     # ----------------------------------------------------------------------
     # File Operations
@@ -1421,7 +1328,18 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing, if there are missing values
                         in required columns, or if data types are incorrect.
         """
+        # Enforce data frame schema
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
+        # Check for missing values in required columns
+        has_missing_value = [
+            column
+            for column in PRICE_SCHEMA.query("mandatory")["column"]
+            if df[column].isna().any()
+        ]
+        if len(has_missing_value) > 0:
+            # TODO: drop entries with missing values with a warning, rather than raising an error
+            raise ValueError(f"Missing values in column {has_missing_value}.")
+
         return df
 
     @classmethod
