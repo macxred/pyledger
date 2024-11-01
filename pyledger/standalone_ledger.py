@@ -5,6 +5,7 @@ independently of third-party software.
 
 import collections
 import datetime
+from typing import Dict
 from warnings import warn
 import numpy as np
 import pandas as pd
@@ -495,7 +496,10 @@ class StandaloneLedger(LedgerEngine):
 
     @property
     @timed_cache(15)
-    def assets_as_dict_of_df(self):
+    def assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
+        """Store assets in a nested dict: Each assets[ticker] is a DataFrame with columns
+        'date' and 'increment', sorted by 'date' with NaT values first.
+        """
         result = {}
         for ticker, group in self.assets().groupby("ticker"):
             group = (group[["date", "increment"]]
