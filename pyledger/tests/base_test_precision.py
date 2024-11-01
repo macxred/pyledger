@@ -1,4 +1,4 @@
-"""Definition of abstract base class for testing precision()."""
+"""Abstract base class for testing precision()."""
 
 import pytest
 from abc import abstractmethod

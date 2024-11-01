@@ -525,14 +525,14 @@ class TextLedger(StandaloneLedger):
         return self.read_assets(self.root_path / "assets.csv")
 
     def read_assets(self, file: Path) -> pd.DataFrame:
-        """Read assets from the specified CSV file.
+        """Read assets from the a CSV file.
 
-        This method reads assets from the specified file and enforces the standard
-        data format. If an error occurs during reading or standardization,
-        an empty DataFrame with ASSETS_SCHEMA is returned and a warning is logged
+        Reads assets from a CSV file and enforce the standard data format.
+        If an error occurs during reading or standardization,
+        returns an empty DataFrame with `ASSETS_SCHEMA` and logs a warning.
 
         Args:
-            file (Path): The path to the CSV file containing assets.
+            file (Path): The path to the CSV file to read.
 
         Returns:
             pd.DataFrame: A DataFrame formatted according to ASSETS_SCHEMA.
@@ -547,18 +547,18 @@ class TextLedger(StandaloneLedger):
 
     @classmethod
     def write_assets_file(cls, df: pd.DataFrame, file: Path):
-        """Save assets to a fixed-width CSV file.
+        """Writes the assets DataFrame to a fixed-width CSV file.
 
-        This method stores assets in a fixed-width CSV format.
-        Values are padded with spaces to maintain a consistent column and improve readability.
-        Optional columns that contain only NA values are dropped for conciseness.
+        Drops optional columns that contain only NA values and writes the
+        assets DataFrame to a fixed-width CSV file. Entries are padded with
+        spaces for consistent column widths and improved readability.
 
         Args:
             df (pd.DataFrame): The assets to save.
-            file (Path): Path of the CSV file to write.
+            file (Path): Path to the CSV file to write.
 
         Returns:
-            pd.DataFrame: The formatted DataFrame saved to the file.
+            pd.DataFrame: The formatted DataFrame that was saved to the file.
         """
         df = enforce_schema(df, ASSETS_SCHEMA, sort_columns=True, keep_extra_columns=True)
         optional = ASSETS_SCHEMA.loc[~ASSETS_SCHEMA["mandatory"], "column"].to_list()

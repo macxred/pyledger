@@ -170,15 +170,16 @@ class LedgerEngine(ABC):
     def delete_revaluations(
         self,
         account: str,
-        date: datetime.date,
+        date: datetime.date | None,
         allow_missing: bool = False
     ) -> None:
         """Removes revaluations.
 
         The unique identifier is a combination of `date` and `account`.
 
-        Args: accounts (str): Account or account range of revaluations to remove.
-        date (datetime.date | None): The date of the revaluations to remove.
+        Args:
+            accounts (str): Account or account range of revaluations to remove.
+            date (datetime.date | None): The date of the revaluations to remove.
             allow_missing (bool, optional): If True, no error is raised if a revaluation entry is
                                             not found. Defaults to False.
         """
@@ -1444,21 +1445,22 @@ class LedgerEngine(ABC):
     @classmethod
     def standardize_assets(
         cls,
-        df: pd.DataFrame,
+        df: pd.DataFrame | None,
         keep_extra_columns: bool = False
     ) -> pd.DataFrame:
-        """Validates and standardizes the 'assets' DataFrame to ensure it contains
-        the required columns and correct data types.
+        """Standardize the 'assets' DataFrame to match `ASSETS_SCHEMA`.
 
         Args:
-            df (pd.DataFrame): The DataFrame representing the assets.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
+            df (pd.DataFrame | None): The DataFrame representing assets.
+                If None, returns an empty DataFrame with `ASSETS_SCHEMA`.
+            keep_extra_columns (bool, optional): If True, retain columns not
+                specified in `ASSETS_SCHEMA`. Defaults to False.
+
         Returns:
-            pd.DataFrame: The standardized revaluations DataFrame.
+            pd.DataFrame: The standardized assets DataFrame.
 
         Raises:
-            ValueError: If required columns are missing or if data types are incorrect.
+            ValueError: If required columns are missing or data types are incorrect.
         """
         df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
         return df
@@ -1476,16 +1478,21 @@ class LedgerEngine(ABC):
         self,
         ticker: str,
         increment: float,
-        date: pd.Timestamp = None
+        date: datetime.date = None
     ) -> None:
-        """Adds a new asset entry.
+        """Add a new asset entry.
 
-        The unique identifier is a combination of `ticker` and `date`.
+        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
 
         Args:
-            ticker (str): Identifier for the asset (e.g., stock ticker).
-            increment (float): Increment value representing the asset unit.
-            date (pd.Timestamp, optional): Date of the asset entry.
+            ticker (str): Identifier for the asset (e.g., currency code or stock ticker).
+            increment (float): The smallest price increment for the asset.
+            date (datetime.date, optional):
+                The effective date from which the `increment` applies. For this `ticker`,
+                the `increment` is valid from this `date` until the date of the next entry
+                with the same `ticker` and a later date. If `date` is None, the increment
+                is considered the initial value for this `ticker` and is valid until the
+                first dated entry for the same `ticker`
         """
 
     @abstractmethod
@@ -1495,14 +1502,19 @@ class LedgerEngine(ABC):
         increment: float,
         date: pd.Timestamp = None
     ) -> None:
-        """Updates an existing asset entry.
+        """Update an existing asset entry.
 
-        The unique identifier is a combination of `ticker` and `date`.
+        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
 
         Args:
-            ticker (str): Identifier for the asset.
-            increment (float): Increment value for the asset.
-            date (pd.Timestamp, optional): Date of the asset entry.
+            ticker (str): Identifier for the asset (e.g., currency code or stock ticker).
+            increment (float): The smallest price increment for the asset.
+            date (datetime.date, optional):
+                The effective date from which the `increment` applies. For this `ticker`,
+                the `increment` is valid from this `date` until the date of the next entry
+                with the same `ticker` and a later date. If `date` is None, the increment
+                is considered the initial value for this `ticker` and is valid until the
+                first dated entry for the same `ticker`
         """
 
     @abstractmethod
@@ -1512,44 +1524,47 @@ class LedgerEngine(ABC):
         date: pd.Timestamp = None,
         allow_missing: bool = False
     ) -> None:
-        """Removes asset entries.
+        """Remove an asset entry.
 
-        The unique identifier is a combination of `ticker` and `date`.
+        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
 
         Args:
-            ticker (str): Ticker to remove.
-            date (pd.Timestamp, optional): Date of the asset entry.
-            allow_missing (bool, optional): If True, no error is raised if an asset entry is
-                                            not found. Defaults to False.
+            ticker (str): Asset identifier for the entry to remove.
+            date (pd.Timestamp, optional): Date of the asset entry to remove.
+            allow_missing (bool, optional): If True, do not raise an error if the asset entry
+                                            is not found. Defaults to False.
         """
 
     def mirror_assets(self, target: pd.DataFrame, delete: bool = False) -> dict:
-        """Aligns assets with a desired target state.
+        """Align the system's assets with the target DataFrame.
+
+        Updates the system's assets to match the `target` DataFrame by adding new assets,
+        modifying existing ones, and optionally deleting assets not present in the target.
 
         Args:
-            target (pd.DataFrame): DataFrame with assets in the ASSETS_SCHEMA format.
+            target (pd.DataFrame): The target assets, formatted according to `ASSETS_SCHEMA`.
             delete (bool, optional): If True, deletes existing assets that are not present
-                                    in the target data.
+                                     in the target data.
 
         Returns:
-            dict: A dictionary containing statistics about the mirroring process:
-                - pre-existing (int): The number of assets present before mirroring.
-                - targeted (int): The number of assets in the target data.
-                - added (int): The number of assets added by the mirroring method.
-                - deleted (int): The number of deleted assets.
-                - updated (int): The number of assets modified during mirroring.
-        """
-        current_state = self.assets()
-        target = self.prepare_assets_for_mirroring(target)
+            dict: Summary statistics of the mirroring process:
+                - 'initial' (int): Number of assets before synchronization.
+                - 'target' (int): Number of assets in the target DataFrame.
+                - 'added' (int): Number of assets added.
+                - 'deleted' (int): Number of assets deleted.
+                - 'updated' (int): Number of assets updated.
 
-        # Perform an outer merge to identify differences
-        merged = current_state.merge(
-            target, on=["ticker", "date"], how="outer", suffixes=('_left', '_right'),
+        See Also:
+            prepare_assets_for_mirroring : Prepares the target data for synchronization.
+        """
+        current = self.assets()
+        incoming = self.prepare_assets_for_mirroring(target)
+        merged = current.merge(
+            incoming, on=["ticker", "date"], how="outer", suffixes=('_current', '_incoming'),
             indicator=True
         )
 
         # Handle deletions
-        to_delete = []
         if delete:
             to_delete = merged[merged["_merge"] == "left_only"]
             for _, row in to_delete.iterrows():
@@ -1559,41 +1574,42 @@ class LedgerEngine(ABC):
         to_add = merged[merged["_merge"] == "right_only"]
         for _, row in to_add.iterrows():
             self.add_asset(
-                ticker=row["ticker"], increment=row["increment_right"], date=row["date"]
+                ticker=row["ticker"], increment=row["increment_incoming"], date=row["date"]
             )
 
         # Handle updates
         to_update = merged[
-            (merged["_merge"] == "both") & (merged["increment_left"] != merged["increment_right"])
+            (merged["_merge"] == "both")
+            & (merged["increment_incoming"] != merged["increment_current"])
         ]
         for _, row in to_update.iterrows():
             self.modify_asset(
-                ticker=row["ticker"], increment=row["increment_right"], date=row["date"]
+                ticker=row["ticker"], increment=row["increment_incoming"], date=row["date"]
             )
 
         return {
-            "pre-existing": len(current_state),
-            "targeted": len(target),
+            "initial": len(current),
+            "target": len(incoming),
             "added": len(to_add),
             "deleted": len(to_delete) if delete else 0,
             "updated": len(to_update)
         }
 
     def prepare_assets_for_mirroring(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Aligns incoming asset data with the current system's constraints.
+        """Prepare incoming asset data for synchronization.
 
-        Invoked as the initial step in the mirroring process, this method prepares
-        asset data for integration into the current system. It adapts the incoming
-        data to specific storage requirements and aligns it with existing data, making
-        it easy to identify entries that need to be added, modified, or removed.
+        Invoked as the initial step in the mirroring process, this method
+        matches the incoming DataFrame with the current system's requirements
+        and aligns it with existing data, facilitating the identification
+        of entries that need to be added, modified, or removed.
 
-        By default, this method returns the data unchanged. Subclasses may override
-        it to apply class-specific adaptations as required.
+        By default, returns the data unchanged; subclasses may override this
+        method for custom preprocessing.
 
         Args:
             df (pd.DataFrame): Incoming asset data.
 
         Returns:
-            pd.DataFrame: Adjusted data ready for synchronization with the current system.
+            pd.DataFrame: Adjusted data ready for synchronization.
         """
         return self.standardize_assets(df)

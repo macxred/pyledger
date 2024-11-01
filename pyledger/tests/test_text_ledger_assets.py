@@ -1,4 +1,4 @@
-"""Test suite for assets operations."""
+"""Test suite for TextLedger assets operations."""
 
 import pytest
 from .base_test_assets import BaseTestAssets
