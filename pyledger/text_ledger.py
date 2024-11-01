@@ -574,7 +574,9 @@ class TextLedger(StandaloneLedger):
     ) -> None:
         assets = self.assets()
         date = pd.Timestamp(date) if date is not None else pd.NaT
-        mask = (assets["ticker"] == ticker) & ((assets["date"] == date) | pd.isna(assets["date"]))
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
 
         if mask.any():
             raise ValueError(f"Asset with ticker '{ticker}' already exists for the given date.")
@@ -593,7 +595,9 @@ class TextLedger(StandaloneLedger):
     ) -> None:
         assets = self.assets()
         date = pd.Timestamp(date) if date is not None else pd.NaT
-        mask = (assets["ticker"] == ticker) & ((assets["date"] == date) | pd.isna(assets["date"]))
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
 
         if not mask.any():
             raise ValueError(f"Asset with ticker '{ticker}' not found for the given date.")
@@ -608,7 +612,9 @@ class TextLedger(StandaloneLedger):
     ) -> None:
         assets = self.assets()
         date = pd.Timestamp(date) if date is not None else pd.NaT
-        mask = (assets["ticker"] == ticker) & ((assets["date"] == date) | pd.isna(assets["date"]))
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
 
         if not mask.any():
             if not allow_missing:

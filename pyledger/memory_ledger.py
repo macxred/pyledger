@@ -197,7 +197,9 @@ class MemoryLedger(StandaloneLedger):
     def add_asset(self, ticker: str, increment: float, date: datetime.date = None) -> pd.DataFrame:
         assets = self.assets()
         date = pd.Timestamp(date) if date is not None else pd.NaT
-        mask = (assets["ticker"] == ticker) & ((assets["date"] == date) | pd.isna(assets["date"]))
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
         if mask.any():
             raise ValueError("The asset with this unique combination already exists.")
 
@@ -211,7 +213,9 @@ class MemoryLedger(StandaloneLedger):
     def modify_asset(self, ticker: str, increment: float, date: datetime.date = None) -> None:
         assets = self.assets()
         date = pd.Timestamp(date) if date is not None else pd.NaT
-        mask = (assets["ticker"] == ticker) & ((assets["date"] == date) | pd.isna(assets["date"]))
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
         if not mask.any():
             raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
 
@@ -223,7 +227,9 @@ class MemoryLedger(StandaloneLedger):
     ) -> None:
         assets = self.assets()
         date = pd.Timestamp(date) if date is not None else pd.NaT
-        mask = (assets["ticker"] == ticker) & ((assets["date"] == date) | pd.isna(assets["date"]))
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
 
         if not mask.any():
             if not allow_missing:

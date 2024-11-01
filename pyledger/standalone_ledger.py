@@ -8,6 +8,8 @@ import datetime
 from warnings import warn
 import numpy as np
 import pandas as pd
+
+from pyledger.decorators import timed_cache
 from .constants import DEFAULT_ASSETS, DEFAULT_SETTINGS, LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
@@ -488,25 +490,42 @@ class StandaloneLedger(LedgerEngine):
 
         return (currency, prc.iloc[-1].item())
 
+    def assets(self) -> pd.DataFrame:
+        return self._assets.copy()
+
+    @property
+    @timed_cache(15)
+    def assets_as_dict_of_df(self):
+        result = {}
+        for ticker, group in self.assets().groupby("ticker"):
+            group = (group[["date", "increment"]]
+                     .sort_values("date", na_position="first")
+                     .reset_index(drop=True))
+            result[ticker] = group
+        return result
+
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         if ticker == "reporting_currency":
             ticker = self.reporting_currency
 
-        date = pd.Timestamp(date) if date is not None else pd.Timestamp("today")
-        ticker_data = self._assets[self._assets["ticker"] == ticker]
-        if ticker_data.empty:
-            raise ValueError(f"Precision for ticker '{ticker}' not found.")
+        if date is None:
+            date = datetime.date.today()
+        elif not isinstance(date, datetime.date):
+            date = pd.to_datetime(date).date()
 
-        valid_dates = ticker_data.dropna(subset=["date"])
-        valid_dates = valid_dates[valid_dates["date"] <= date]
+        increment = self.assets_as_dict_of_df.get(ticker)
+        if increment is None:
+            raise ValueError(f"No data available for ticker '{ticker}'.")
 
-        if not valid_dates.empty:
-            last_update = valid_dates.sort_values("date").iloc[-1]
-            return last_update["increment"]
-        elif ticker_data["date"].isna().any():
-            return ticker_data[ticker_data["date"].isna()]["increment"].iloc[0]
-        else:
-            raise ValueError(f"Precision for ticker '{ticker}' and date '{date}' not found.")
+        increments = increment.loc[
+            (increment["date"].isna())
+            | (increment["date"].dt.normalize() <= pd.Timestamp(date)), "increment"
+        ]
+
+        if increments.empty:
+            raise ValueError(f"No increments available for '{ticker}' on or before {date}.")
+
+        return increments.iloc[-1]
 
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")
@@ -522,9 +541,6 @@ class StandaloneLedger(LedgerEngine):
 
     def price_increment(self, *args, **kwargs) -> None:
         raise NotImplementedError("price_increment is not implemented yet.")
-
-    def assets(self, *args, **kwargs) -> None:
-        raise NotImplementedError("assets is not implemented yet.")
 
     def add_asset(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_asset is not implemented yet.")
