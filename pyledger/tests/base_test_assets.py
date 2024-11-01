@@ -16,10 +16,6 @@ class BaseTestAssets(BaseTest):
         pass
 
     def test_asset_accessor_mutators(self, ledger, ignore_row_order=False):
-        """Test to ensure that accessor mutator functions work as expected.
-        With `ignore_row_order=False`, we ensure minimal invasive changes, preserving
-        the original row order of the data so that Git diffs show only the intended modifications.
-        """
         ledger.restore(settings=self.SETTINGS)
         assets = self.ASSETS.sample(frac=1).reset_index(drop=True)
         for asset in assets.to_dict('records'):
@@ -69,27 +65,23 @@ class BaseTestAssets(BaseTest):
         )
 
     def test_mirror_assets(self, ledger):
-        initial_assets = ledger.assets()
-        assets = ledger.standardize_assets(self.ASSETS)
-        target_df = pd.concat([assets, initial_assets], ignore_index=True)
-        target_df = ledger.standardize_assets(target_df)
-        initial = target_df.copy()
-        ledger.mirror_assets(target_df, delete=False)
-        mirrored_df = ledger.assets()
-        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True)
-        # Mirroring should not change the initial df
-        assert_frame_equal(initial, target_df, ignore_row_order=True)
+        target = pd.concat([self.ASSETS, ledger.assets()], ignore_index=True)
+        original_target = target.copy()
+        ledger.mirror_assets(target, delete=False)
+        # Ensure the DataFrame passed as argument to mirror_assets() remains unchanged.
+        assert_frame_equal(target, original_target, ignore_row_order=True)
+        assert_frame_equal(
+            ledger.standardize_assets(target), ledger.assets(), ignore_row_order=True
+        )
 
-        target_df = target_df[~target_df["ticker"].isin(["USD", "JPY"])]
-        ledger.mirror_assets(target_df.copy(), delete=True)
-        mirrored_df = ledger.assets()
-        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True)
+        target = self.ASSETS.query("ticker not in ['USD', 'JPY']")
+        ledger.mirror_assets(target, delete=True)
+        assert_frame_equal(target, ledger.assets(), ignore_row_order=True)
 
-        target_df = target_df.sample(frac=1).reset_index(drop=True)
-        target_df.loc[target_df["ticker"] == "AUD", "increment"] = 0.02
-        ledger.mirror_assets(target_df.copy(), delete=True)
-        mirrored_df = ledger.assets()
-        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True)
+        target = target.sample(frac=1).reset_index(drop=True)
+        target.loc[target["ticker"] == "AUD", "increment"] = 0.02
+        ledger.mirror_assets(target, delete=True)
+        assert_frame_equal(target, ledger.assets(), ignore_row_order=True)
 
     def test_mirror_empty_assets(self, ledger):
         ledger.restore(assets=self.ASSETS, settings=self.SETTINGS)
