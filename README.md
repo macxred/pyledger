@@ -16,7 +16,6 @@
 
 PyLedger is designed with a flexible and extensible architecture. Its class hierarchy starts with an abstract base class at its core and extends to specialized implementations for varied use cases. This modularity ensures adaptability, promotes interoperability, and enhances usability across diverse environments.
 
-
 **Class Inheritance Diagram**
 
 ```
@@ -24,49 +23,50 @@ LedgerEngine (Abstract Base Class)
    |
    +-- StandaloneLedger (Abstract)
    |    |
+   |    |
+   |    +-- PersistentLedger
+   |    |    |
+   |    |    +-- TextLedger
+   |    |
    |    +-- MemoryLedger
-   |    |
-   |    +-- TextLedger
-   |    |
-   |    +-- TestLedger
+   |         |
+   |         +-- TestLedger
    |
+   +-- ExternalLedger
+       |
 · · · · · · · · · · · · · · · · · · · · (External Packages Below)
-   |
-   +-- ProffixLedger (Decommissioned)
-   |
-   +-- CashCtrlLedger (Upcoming)
+       |
+       +-- CashCtrlLedger
+       |
+       +-- ProffixLedger (Decommissioned)
 ```
 
 **Core Components**
 
-
 1. **LedgerEngine** (Abstract Base Class)\
-The foundational element of the PyLedger library, the LedgerEngine class, specifies abstract methods and properties for an accounting framework, including ledger operations, account management, and currency handling. It ensures all derived classes maintain a consistent framework and provides reporting features based on the abstract data model.
+The foundational element of the PyLedger library, the `LedgerEngine` class, specifies abstract methods and properties for an accounting framework, including ledger operations, account management, and currency handling. It ensures all derived classes maintain a consistent framework and provides reporting features based on the abstract data model.
 
-**Stand-Alone implementations**
+**Standalone Implementations**
 
 1. **StandaloneLedger**\
 This class extends LedgerEngine to provide a self-sufficient ledger system independent of external accounting software. It implements specific business rules like tax calculations and foreign exchange revaluations. Data storage is treated as an abstract concept, which allows for integration with any data storage solution, ensuring maximum flexibility.
 
-1. **MemoryLedger**\
-This class extends the StandaloneLedger to provide a fully featured but non-persistent ledger system. MemoryLedger stores accounting data as DataFrames directly in memory, without relying on external data storage solutions. It is particularly useful for demonstration and testing purposes where persistence is not required.
+1. **MemoryLedger** extends `StandaloneLedger` to implement an in-memory ledger system. It stores and manages all data in memory using pandas DataFrames, providing fast access and manipulation of ledger data without the need for persistent storage. The class is particularly useful for demonstration and test purposes.
 
-1. **TextLedger**\
-An extension of StandaloneLedger, TextLedger specializes in file-based data storage using CSV files. This approach with data storage in text files allows to leverage git versioning to enhance data integrity and auditability, coupled with GitHub process management tools to facilitate collaboration.
+1. **TestLedger** is designed for development and testing, it extends `MemoryLedger` with pre-populated data and settings. It simplifies the initial setup, allowing developers and testers to focus on functionality without the configuration overhead.
 
-1. **TestLedger**\
-Designed for development and testing, TestLedger extends StandaloneLedger with pre-populated, hard-coded data and settings. It simplifies the initial setup, allowing developers and testers to focus on functionality without the configuration overhead.
+1. **PersistentLedger** classes extend `StandaloneLedger` to manage persistent storage of ledger data, ensuring that ledger data is not lost between application runs. `PersistentLedger` subclasses can integrate with different storage backends, such as files, databases, or other persistent storage solutions. The `PersistentLedger` class currently holds no methods or properties; it merely improves clarity of the class hierarchy.
 
-**Integration with External Software** (Implemented in separate packages)
+1. **TextLedger** specializes in file-based data storage using CSV files. This approach with data storage in text files allows to leverage git versioning to enhance data integrity and auditability, coupled with GitHub process management tools to facilitate collaboration.
 
-1. **ProffixLedger** (Decommissioned)\
-Previously implemented to interface with Proffix ERP software through REST API requests, this class has been decommissioned but can serve as a template for possible future adaptations.
+**Integration with External Software**
 
-1. **CashCtrlLedger** (Upcoming)\
-The upcoming CashCtrlLedger will implement the abstract LedgerEngine class with the CashCtrl accounting software via REST API. Get and set methods of the abstract class are routed via REST API requests to the CashCtrl server.
+7. **ExternalLedger** classes delegate storage and all accounting operations to an external system or service. These classes connect to external systems, handle API communication and convert data between PyLedger and the external format. The `ExternalLedger` class currently holds no methods or properties; it merely improves clarity of the class hierarchy.
 
+1. **CashCtrlLedger** connects to the web-based CashCtrl accounting software. It implements accessor and mutator methods that use CashCtrl's REST API to manipulate and retrieve accounting data on a remote CashCtrl instance.
+
+1. **ProffixLedger** (Decommissioned) Previously implemented to interface with Proffix ERP software through REST API requests, this class has been decommissioned but can serve as a template for possible future adaptations.
 _(External software integrations are maintained in separate packages to avoid pulling in unnecessary dependencies into the primary PyLedger package.)_
-
 
 
 ## Installation
@@ -150,3 +150,10 @@ execute `python setup.py develop` in the repository root folder. This approach
 adds a symbolic link to your development directory in Python's search path,
 ensuring immediate access to the latest code version upon (re-)loading the
 package.
+
+## Other Projects
+
+Below projects handle accounting tasks, but have a different purpose and scope. They might be of interest to some users or provide inspiration:
+
+- John Wiegley's [ledger](https://ledger-cli.org) is a command-line, double-entry accounting system.
+- [Ledger.py](https://github.com/mafm/ledger.py) is a simpler implementation of this concept in Python.
