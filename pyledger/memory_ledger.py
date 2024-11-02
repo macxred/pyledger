@@ -21,6 +21,7 @@ class MemoryLedger(StandaloneLedger):
         Args:
             reporting_currency (str): The reporting currency. Defaults to "USD".
         """
+        super().__init__()
         self._reporting_currency = reporting_currency
         self._ledger = self.standardize_ledger(None)
         self._prices = self.standardize_prices(None)
