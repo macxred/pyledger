@@ -101,9 +101,33 @@ ASSETS_CSV = """
 """
 ASSETS = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
 
+PRICES_CSV = """
+          date, ticker,  price, currency
+    2023-12-29,    EUR, 1.1068, USD
+    2024-03-29,    EUR, 1.0794, USD
+    2024-06-28,    EUR, 1.0708, USD
+    2024-09-30,    EUR, 1.1170, USD
+    2023-12-29,    JPY, 0.0071, USD
+    2024-03-29,    JPY, 0.0066, USD
+    2024-06-28,    JPY, 0.0062, USD
+    2024-09-30,    JPY, 0.0070, USD
+"""
+PRICES = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
+
+REVALUATION_CSV = """
+    date,         account, debit, credit, description
+    2024-03-31, 1000:2999,  7050,   8050, FX revaluations
+    2024-06-30, 1000:2999,  7050,       , FX revaluations
+    2024-09-30, 1000:2999,  7050,       , FX revaluations
+    2024-12-31, 1000:2999,  7050,       , FX revaluations
+"""
+REVALUATION = pd.read_csv(StringIO(REVALUATION_CSV), skipinitialspace=True)
+
 class BaseTest(ABC):
     SETTINGS = {"REPORTING_CURRENCY": "USD"}
     TAX_CODES = LedgerEngine.standardize_tax_codes(TAX_CODES)
     ACCOUNTS = LedgerEngine.standardize_accounts(ACCOUNTS)
     LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(LEDGER)
     ASSETS = LedgerEngine.standardize_assets(ASSETS)
+    PRICES = LedgerEngine.standardize_price_df(PRICES)
+    REVALUATION = LedgerEngine.standardize_revaluations(REVALUATION)
