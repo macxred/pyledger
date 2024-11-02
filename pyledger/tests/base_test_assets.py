@@ -99,11 +99,11 @@ class BaseTestAssets(BaseTest):
         "ticker, date, expected",
         [
             # Default increment for reporting_currency (CHF); date=None uses today
-            ("reporting_currency", None, 1),
+            ("reporting_currency", None, 0.01),
             # Exact date match for AUD on 2023-01-01
             ("AUD", datetime.date(2023, 1, 1), 0.001),
-            # Default to today’s date for CHF
-            ("CHF", None, 1),
+            # Default to today’s date for EUR
+            ("TRY", None, 1),
             # Date before all CAD entries, uses NaT entry
             ("CAD", datetime.date(2020, 1, 1), 0.1),
             # Date after all AUD dates, uses latest increment
@@ -111,7 +111,7 @@ class BaseTestAssets(BaseTest):
             # Latest date on/before 2023-12-31 for AUD
             ("AUD", datetime.date(2023, 12, 31), 0.001),
             # NaT and valid dates for EUR, date before all valid dates
-            ("EUR", datetime.date(2023, 1, 1), 0.001),
+            ("CHF", datetime.date(2023, 1, 1), 0.001),
         ]
     )
     def test_precision(self, ledger_with_assets, ticker, date, expected):
