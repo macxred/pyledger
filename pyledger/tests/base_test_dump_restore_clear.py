@@ -21,7 +21,9 @@ class BaseTestDumpRestoreClear(BaseTest):
             ledger=self.LEDGER_ENTRIES,
             assets=self.ASSETS,
         )
-        assert ledger.reporting_currency == "CHF", "Base currency were not restored"
+        assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
+            "Reporting currency was not restored"
+        )
         tax_codes = ledger.standardize_tax_codes(self.TAX_CODES)
         assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, check_like=True)
         accounts = ledger.standardize_accounts(self.ACCOUNTS)
@@ -38,7 +40,7 @@ class BaseTestDumpRestoreClear(BaseTest):
 
     def test_dump_and_restore_zip(self, ledger, tmp_path):
         # Populate with test data
-        ledger.reporting_currency = "CHF"
+        ledger.reporting_currency = self.SETTINGS["REPORTING_CURRENCY"]
         ledger.mirror_accounts(self.ACCOUNTS)
         ledger.mirror_tax_codes(self.TAX_CODES)
         ledger.mirror_ledger(self.LEDGER_ENTRIES)
@@ -57,7 +59,9 @@ class BaseTestDumpRestoreClear(BaseTest):
 
         # Restore dumped state
         ledger.restore_from_zip(tmp_path / "ledger.zip")
-        assert ledger.reporting_currency == "CHF", "Base currency were not restored"
+        assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
+            "Reporting currency was not restored"
+        )
         assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(assets, ledger.assets(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(

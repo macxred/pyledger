@@ -19,16 +19,19 @@ class TestLedger(BaseTestLedger):
         file_1["id"] = "level1/level2/file1.csv:" + file_1["id"]
         ids = [str(id) for id in range(11, 15)]
         file_2 = self.LEDGER_ENTRIES.query(f"id in {ids}")
-        file_2["id"] = "file2.csv:" + (file_2["id"].astype(int) - 10).astype(str)
+        id = file_2["id"].astype(int)
+        file_2["id"] = "file2.csv:" + (id - min(id) + 1).astype(str)
 
         # Populate ledger directory and check that ledger() returns original data
         expected = pd.concat([file_1, file_2], ignore_index=True)
         ledger.write_ledger_directory(expected)
+        expected = ledger.standardize_ledger(expected)
         assert_frame_equal(expected, ledger.ledger(), ignore_row_order=True)
 
         # Populate ledger directory with a subset and check that superfluous file is deleted
         ledger.write_ledger_directory(file_1)
-        assert_frame_equal(file_1, ledger.ledger())
+        expected = ledger.standardize_ledger(file_1)
+        assert_frame_equal(expected, ledger.ledger())
         ledger_root = ledger.root_path / "ledger"
         assert not (ledger_root / "file2.csv").exists(), "'file2.csv' was not deleted."
 
@@ -54,10 +57,9 @@ class TestLedger(BaseTestLedger):
         """Test to ensure that mutator functions make minimal invasive changes to ledger files,
         preserving the original row order so that Git diffs show only the intended modifications.
         """
-        ledger_ids = [str(id) for id in range(1, 15)]
-        for id in ledger_ids:
+        for id in self.LEDGER_ENTRIES['id'].unique():
             ledger.add_ledger_entry(self.LEDGER_ENTRIES.query(f"id == '{id}'"))
-        expected = ledger.standardize_ledger(self.LEDGER_ENTRIES.query(f"id in {ledger_ids}"))
+        expected = ledger.standardize_ledger(self.LEDGER_ENTRIES)
         expected["id"] = "default.csv:" + expected["id"]
         assert_frame_equal(ledger.ledger(), expected)
 
