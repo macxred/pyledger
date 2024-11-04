@@ -322,6 +322,28 @@ class StandaloneLedger(LedgerEngine):
 
     @property
     @timed_cache(15)
+    def _prices_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
+        """Organizes price data by ticker and currency for quick access.
+
+        Returns:
+            Dict[str, Dict[str, pd.DataFrame]]: Maps each asset ticker to
+            a nested dictionary of DataFrames by currency, with its
+            `price` history sorted by `date` with `NaT` values first.
+        """
+        result = {}
+        for (ticker, currency), group in self.price_history().groupby(["ticker", "currency"]):
+            group = group[["date", "price"]].sort_values("date", na_position="first")
+            group = group.reset_index(drop=True)
+            if ticker not in result.keys():
+                result[ticker] = {}
+            result[ticker][currency] = group
+        return result
+
+    # ----------------------------------------------------------------------
+    # Assets
+
+    @property
+    @timed_cache(15)
     def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
         """Organize assets by ticker for quick access.
 
@@ -340,25 +362,6 @@ class StandaloneLedger(LedgerEngine):
             )
             for ticker, group in self.assets().groupby("ticker")
         }
-
-    @property
-    @timed_cache(15)
-    def _prices_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
-        """Organizes price data by ticker and currency for quick access.
-
-        Returns:
-            Dict[str, Dict[str, pd.DataFrame]]: Maps each asset ticker to
-            a nested dictionary of DataFrames by currency, with its
-            `price` history sorted by `date` with `NaT` values first.
-        """
-        result = {}
-        for (ticker, currency), group in self.price_history().groupby(["ticker", "currency"]):
-            group = group[["date", "price"]].sort_values("date", na_position="first")
-            group = group.reset_index(drop=True)
-            if ticker not in result.keys():
-                result[ticker] = {}
-            result[ticker][currency] = group
-        return result
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         if ticker == "reporting_currency":
