@@ -141,6 +141,9 @@ class MemoryLedger(StandaloneLedger):
     def ledger(self) -> pd.DataFrame:
         return self.standardize_ledger(self._ledger.copy())
 
+    def ledger_entry(self, *args, **kwargs) -> None:
+        raise NotImplementedError("ledger_entry is not implemented yet.")
+
     def add_ledger_entry(self, entry: pd.DataFrame) -> int:
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
@@ -234,3 +237,27 @@ class MemoryLedger(StandaloneLedger):
         else:
             if not allow_missing:
                 raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
+
+    # ----------------------------------------------------------------------
+    # Revaluations
+
+    def revaluations(self) -> pd.DataFrame:
+        return self._revaluations.copy()
+
+    # ----------------------------------------------------------------------
+    # Price
+
+    def add_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_price is not implemented yet.")
+
+    def modify_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_price is not implemented yet.")
+
+    def delete_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_price is not implemented yet.")
+
+    def price_history(self, *args, **kwargs) -> None:
+        raise NotImplementedError("price_history is not implemented yet.")
+
+    def price_increment(self, *args, **kwargs) -> None:
+        raise NotImplementedError("price_increment is not implemented yet.")

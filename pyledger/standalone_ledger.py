@@ -9,9 +9,8 @@ from typing import Dict
 from warnings import warn
 import numpy as np
 import pandas as pd
-
 from pyledger.decorators import timed_cache
-from .constants import DEFAULT_ASSETS, DEFAULT_SETTINGS, LEDGER_SCHEMA
+from .constants import LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -41,27 +40,14 @@ class StandaloneLedger(LedgerEngine):
             calculation of revaluations.
     """
 
-    _settings = None
-    _accounts = None
-    _ledger = None
     _serialized_ledger = None
     _prices = None
-    _tax_codes = None
-    _revaluations = None
-    _assets = None
 
     # ----------------------------------------------------------------------
     # Constructor
 
     def __init__(
         self,
-        settings: dict = DEFAULT_SETTINGS,
-        assets: pd.DataFrame = DEFAULT_ASSETS,
-        accounts: pd.DataFrame = None,
-        ledger: pd.DataFrame = None,
-        prices: pd.DataFrame = None,
-        tax_codes: pd.DataFrame = None,
-        revaluations: pd.DataFrame = None,
     ) -> None:
         """Initialize the StandaloneLedger with provided accounting data and settings.
 
@@ -75,43 +61,11 @@ class StandaloneLedger(LedgerEngine):
             assets (pd.DataFrame, optional): assets definitions.
         """
         super().__init__()
-        self.settings = self.standardize_settings(settings)
-        self._assets = self.standardize_assets(assets)
-        self._accounts = self.standardize_accounts(accounts)
-        self._ledger = self.standardize_ledger_columns(ledger)
-        self._prices = self.standardize_prices(prices)
-        self._tax_codes = self.standardize_tax_codes(tax_codes)
-        self._revaluations = self.standardize_revaluations(revaluations)
+        self._prices = self.standardize_prices(None)
         self.validate_accounts()
-
-    def revaluations(self) -> pd.DataFrame:
-        return self._revaluations
-
-    # ----------------------------------------------------------------------
-    # Settings
-
-    @property
-    def settings(self):
-        return self._settings
-
-    @settings.setter
-    def settings(self, settings):
-        self._settings = settings
 
     # ----------------------------------------------------------------------
     # Tax Codes
-
-    def tax_codes(self) -> pd.DataFrame:
-        return self._tax_codes
-
-    def add_tax_code(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_tax_code is not implemented yet.")
-
-    def modify_tax_code(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_tax_code is not implemented yet.")
-
-    def delete_tax_codes(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_tax_codes is not implemented yet.")
 
     def tax_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create journal entries to book tax according to tax_codes.
@@ -200,29 +154,17 @@ class StandaloneLedger(LedgerEngine):
     def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
         return self._balance_from_serialized_ledger(account=account, date=date)
 
-    def accounts(self) -> pd.DataFrame:
-        return self._accounts
-
-    def add_account(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_account is not implemented yet.")
-
-    def modify_account(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_account is not implemented yet.")
-
-    def delete_accounts(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_accounts is not implemented yet.")
-
     def validate_accounts(self) -> None:
         """Validate coherence between account, tax and revaluation definitions."""
         # Ensure all tax code accounts are defined in accounts
-        tax_codes = set(self._tax_codes["id"])
-        missing = set(self._accounts["tax_code"].dropna()) - tax_codes
+        tax_codes = set(self.tax_codes()["id"])
+        missing = set(self.accounts()["tax_code"].dropna()) - tax_codes
         if len(missing) > 0:
             raise ValueError(f"Some tax codes in accounts not defined: {missing}.")
 
         # Ensure all account tax_codes are defined in tax_codes
-        accounts = set(self._accounts["account"])
-        missing = set(self._tax_codes["account"].dropna()) - accounts
+        accounts = set(self.accounts()["account"])
+        missing = set(self.tax_codes()["account"].dropna()) - accounts
         if len(missing) > 0:
             raise ValueError(
                 f"Some accounts in tax code definitions are not defined in the accounts: "
@@ -241,55 +183,6 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Ledger
 
-    def ledger(self) -> pd.DataFrame:
-        """Retrieves a DataFrame with all ledger transactions.
-
-        Returns:
-            pd.DataFrame: Combined DataFrame with ledger data.
-        """
-        return self._ledger
-
-    def add_ledger_entry(self, data: dict) -> None:
-        """Add one or more entries to the general ledger."""
-        if isinstance(data, dict):
-            # Transform one dict value to a list to avoid an error in
-            # pd.DataFrame() when passing a dict of scalars:
-            # ValueError: If using all scalar values, you must pass an index.
-            first_key = next(iter(data))
-            if not isinstance(data[first_key], collections.abc.Sequence):
-                data[first_key] = [data[first_key]]
-        df = pd.DataFrame(data)
-        automated_id = "id" not in df.columns
-        df = self.standardize_ledger_columns(df)
-
-        # Ensure ID is not already in use
-        duplicate = set(df["id"]).intersection(self._ledger["id"])
-        if len(duplicate) > 0:
-            if automated_id:
-                # Replace ids by integers above the highest existing integer id
-                min_id = df["id"].astype(pd.Int64Dtype()).min(skipna=True)
-                max_id = self._ledger["id"].astype(pd.Int64Dtype()).max(skipna=True)
-                offset = max_id - min_id + 1
-                df["id"] = df["id"].astype(pd.Int64Dtype()) + offset
-                df["id"] = df["id"].astype(pd.StringDtype())
-            else:
-                if len(duplicate) == 0:
-                    message = f"Ledger id '{list(duplicate)[0]}' already used."
-                else:
-                    message = f"Ledger ids {duplicate} already used."
-                raise ValueError(message)
-
-        self._ledger = pd.concat([self._ledger, df], axis=0)
-
-    def delete_ledger_entries(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_ledger_entries is not implemented yet.")
-
-    def ledger_entry(self, *args, **kwargs) -> None:
-        raise NotImplementedError("ledger_entry is not implemented yet.")
-
-    def modify_ledger_entry(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_ledger_entry is not implemented yet.")
-
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with all ledger transactions in long format.
 
@@ -302,7 +195,7 @@ class StandaloneLedger(LedgerEngine):
 
     def complete_ledger(self) -> None:
         # Ledger definition
-        df = self.standardize_ledger(self._ledger)
+        df = self.standardize_ledger(self.ledger())
         df = self.sanitize_ledger(df)
         df = df.sort_values(["date", "id"])
 
@@ -426,10 +319,6 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Currency
 
-    @property
-    def reporting_currency(self) -> str:
-        return self.settings["reporting_currency"]
-
     def _report_amount(
         self, amount: list[float], currency: list[str], date: list[datetime.date]
     ) -> list[float]:
@@ -491,9 +380,6 @@ class StandaloneLedger(LedgerEngine):
 
         return (currency, prc.iloc[-1].item())
 
-    def assets(self) -> pd.DataFrame:
-        return self._assets.copy()
-
     @property
     @timed_cache(15)
     def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
@@ -532,36 +418,3 @@ class StandaloneLedger(LedgerEngine):
         if not mask.any():
             raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
         return increment.loc[mask[mask].index[-1], "increment"]
-
-    def add_price(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_price is not implemented yet.")
-
-    def modify_price(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_price is not implemented yet.")
-
-    def delete_price(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_price is not implemented yet.")
-
-    def price_history(self, *args, **kwargs) -> None:
-        raise NotImplementedError("price_history is not implemented yet.")
-
-    def price_increment(self, *args, **kwargs) -> None:
-        raise NotImplementedError("price_increment is not implemented yet.")
-
-    def add_asset(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_asset is not implemented yet.")
-
-    def modify_asset(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_asset is not implemented yet.")
-
-    def delete_asset(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_asset is not implemented yet.")
-
-    def add_revaluation(self, *args, **kwargs) -> None:
-        raise NotImplementedError("add_revaluation is not implemented yet.")
-
-    def modify_revaluation(self, *args, **kwargs) -> None:
-        raise NotImplementedError("modify_revaluation is not implemented yet.")
-
-    def delete_revaluations(self, *args, **kwargs) -> None:
-        raise NotImplementedError("delete_revaluations is not implemented yet.")

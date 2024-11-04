@@ -118,6 +118,9 @@ class TextLedger(StandaloneLedger):
     def ledger(self) -> pd.DataFrame:
         return self.read_ledger_files(self.root_path / "ledger")
 
+    def ledger_entry(self, *args, **kwargs) -> None:
+        raise NotImplementedError("ledger_entry is not implemented yet.")
+
     def read_ledger_files(self, root: Path) -> pd.DataFrame:
         """Reads ledger entries from CSV files in the given root directory.
 
@@ -630,3 +633,28 @@ class TextLedger(StandaloneLedger):
     @reporting_currency.setter
     def reporting_currency(self, currency):
         self.settings = self.settings | {"reporting_currency": currency}
+
+    # ----------------------------------------------------------------------
+    # Revaluations
+
+    def revaluations(self) -> pd.DataFrame:
+        # TODO: replace with actual implementation
+        return self.standardize_revaluations(None)
+
+    # ----------------------------------------------------------------------
+    # Price
+
+    def add_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_price is not implemented yet.")
+
+    def modify_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_price is not implemented yet.")
+
+    def delete_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_price is not implemented yet.")
+
+    def price_history(self, *args, **kwargs) -> None:
+        raise NotImplementedError("price_history is not implemented yet.")
+
+    def price_increment(self, *args, **kwargs) -> None:
+        raise NotImplementedError("price_increment is not implemented yet.")
