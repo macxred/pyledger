@@ -22,14 +22,11 @@ class StandaloneLedger(LedgerEngine):
     with a specific data storage choice.
     """
 
-    _serialized_ledger = None
-
     # ----------------------------------------------------------------------
     # Constructor
 
     def __init__(self) -> None:
         super().__init__()
-        self.validate_accounts()
 
     # ----------------------------------------------------------------------
     # Tax Codes
@@ -156,13 +153,11 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        if self._serialized_ledger is None:
-            self.complete_ledger()
-        return self._serialized_ledger
+        return self.complete_ledger(self.ledger())
 
-    def complete_ledger(self) -> None:
+    def complete_ledger(self, ledger=None) -> pd.DataFrame:
         # Ledger definition
-        df = self.standardize_ledger(self.ledger())
+        df = self.standardize_ledger(ledger)
         df = self.sanitize_ledger(df)
         df = df.sort_values(["date", "id"])
 
@@ -178,8 +173,8 @@ class StandaloneLedger(LedgerEngine):
                 date = df["date"].iloc[i]
                 account = df["account"].iloc[i]
                 currency = self.account_currency(account)
-                self._serialized_ledger = self.serialize_ledger(df.loc[df["date"] <= date, :])
-                balance = self.account_balance(account=account, date=date)
+                serialized_ledger = self.serialize_ledger(df.loc[df["date"] <= date, :])
+                balance = self.account_balance(account=account, date=date, ledger=serialized_ledger)
                 balance = balance[currency]
                 amount = df["target_balance"].iloc[i] - balance
                 amount = self.round_to_precision(amount, ticker=currency, date=date)
@@ -199,11 +194,11 @@ class StandaloneLedger(LedgerEngine):
             date=df.loc[index, "date"]
         )
 
-        # revaluations
+        # Revaluations
         revaluations = self.revaluations()
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            self._serialized_ledger = self.serialize_ledger(df)
+            serialized_ledger = self.serialize_ledger(df)
             date = row["date"]
             accounts = self.account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
@@ -246,7 +241,7 @@ class StandaloneLedger(LedgerEngine):
 
         # Serializes ledger with separate credit and debit entries.
         result = self.serialize_ledger(df)
-        self._serialized_ledger = self.standardize_ledger_columns(result)
+        return self.standardize_ledger_columns(result)
 
     # Hack: abstract functionality to compute balance from serialized ledger,
     # that is used in two different branches of the dependency tree
