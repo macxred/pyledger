@@ -111,32 +111,6 @@ class StandaloneLedger(LedgerEngine):
     def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
         return self._balance_from_serialized_ledger(account=account, date=date)
 
-    def validate_accounts(self) -> None:
-        """Validate coherence between account, tax and revaluation definitions."""
-        # Ensure all tax code accounts are defined in accounts
-        tax_codes = set(self.tax_codes()["id"])
-        missing = set(self.accounts()["tax_code"].dropna()) - tax_codes
-        if len(missing) > 0:
-            raise ValueError(f"Some tax codes in accounts not defined: {missing}.")
-
-        # Ensure all account tax_codes are defined in tax_codes
-        accounts = set(self.accounts()["account"])
-        missing = set(self.tax_codes()["account"].dropna()) - accounts
-        if len(missing) > 0:
-            raise ValueError(
-                f"Some accounts in tax code definitions are not defined in the accounts: "
-                f"{missing}."
-            )
-
-        # Ensure all credit and debit accounts in revaluations are defined in accounts
-        df = self.revaluations()
-        missing = (set(df["credit"]) | set(df["debit"])) - accounts
-        if len(missing) > 0:
-            raise ValueError(
-                f"Some accounts in revaluation definitions are not defined in the accounts: "
-                f"{missing}."
-            )
-
     # ----------------------------------------------------------------------
     # Ledger
 
