@@ -5,7 +5,6 @@ independently of third-party software.
 
 import datetime
 from typing import Dict
-from warnings import warn
 import numpy as np
 import pandas as pd
 from pyledger.decorators import timed_cache
@@ -161,26 +160,6 @@ class StandaloneLedger(LedgerEngine):
         df = self.sanitize_ledger(df)
         df = df.sort_values(["date", "id"])
 
-        # Calculate amount to match target balance
-        # TODO: drop target_balance
-        if "target_balance" in df.columns:
-            warn(
-                "`target_balance` is deprecated and will be removed. Specify an amount instead.",
-                DeprecationWarning
-            )
-            new_amount = []
-            for i in np.where(df["target_balance"].notna())[0]:
-                date = df["date"].iloc[i]
-                account = df["account"].iloc[i]
-                currency = self.account_currency(account)
-                serialized_ledger = self.serialize_ledger(df.loc[df["date"] <= date, :])
-                balance = self.account_balance(account=account, date=date, ledger=serialized_ledger)
-                balance = balance[currency]
-                amount = df["target_balance"].iloc[i] - balance
-                amount = self.round_to_precision(amount, ticker=currency, date=date)
-                new_amount.append(amount)
-                df.loc[range(df.shape[0]) == i, "amount"] = amount
-
         # Add automated journal entries for tax
         tax = self.tax_journal_entries(df)
         if tax.shape[0] > 0:
@@ -198,7 +177,6 @@ class StandaloneLedger(LedgerEngine):
         revaluations = self.revaluations()
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            serialized_ledger = self.serialize_ledger(df)
             date = row["date"]
             accounts = self.account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])

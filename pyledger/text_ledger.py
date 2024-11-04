@@ -25,7 +25,6 @@ from consistent_df import enforce_schema
 LEDGER_COLUMN_SHORTCUTS = {
     "cur": "currency",
     "vat": "tax_code",
-    "target": "target_balance",
     "base_amount": "report_amount",
     "counter": "contra",
 }
