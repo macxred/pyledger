@@ -637,9 +637,8 @@ class TextLedger(StandaloneLedger):
     # ----------------------------------------------------------------------
     # Revaluations
 
-    def revaluations(self) -> pd.DataFrame:
-        # TODO: replace with actual implementation
-        return self.standardize_revaluations(None)
+    def revaluations(self, *args, **kwargs) -> pd.DataFrame:
+        raise NotImplementedError("revaluations is not implemented yet.")
 
     # ----------------------------------------------------------------------
     # Price
