@@ -29,8 +29,7 @@ LedgerEngine (Abstract Base Class)
    |    |    +-- TextLedger
    |    |
    |    +-- MemoryLedger
-   |         |
-   |         +-- TestLedger
+   |
    |
    +-- ExternalLedger
        |
@@ -52,8 +51,6 @@ The foundational element of the PyLedger library, the `LedgerEngine` class, spec
 This class extends LedgerEngine to provide a self-sufficient ledger system independent of external accounting software. It implements specific business rules like tax calculations and foreign exchange revaluations. Data storage is treated as an abstract concept, which allows for integration with any data storage solution, ensuring maximum flexibility.
 
 1. **MemoryLedger** extends `StandaloneLedger` to implement an in-memory ledger system. It stores and manages all data in memory using pandas DataFrames, providing fast access and manipulation of ledger data without the need for persistent storage. The class is particularly useful for demonstration and test purposes.
-
-1. **TestLedger** is designed for development and testing, it extends `MemoryLedger` with pre-populated data and settings. It simplifies the initial setup, allowing developers and testers to focus on functionality without the configuration overhead.
 
 1. **PersistentLedger** classes extend `StandaloneLedger` to manage persistent storage of ledger data, ensuring that ledger data is not lost between application runs. `PersistentLedger` subclasses can integrate with different storage backends, such as files, databases, or other persistent storage solutions. The `PersistentLedger` class currently holds no methods or properties; it merely improves clarity of the class hierarchy.
 
