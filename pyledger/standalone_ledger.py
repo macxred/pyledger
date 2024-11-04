@@ -497,12 +497,14 @@ class StandaloneLedger(LedgerEngine):
     @property
     @timed_cache(15)
     def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
-        """Provides a dictionary of asset DataFrames grouped by ticker for efficient data access.
+        """Organize assets by ticker for quick access.
 
-        Each key represents a unique asset ticker, with an associated DataFrame containing
-        historical records of that asset's `increment` values over time, sorted in ascending
-        order by `date`, with `NaT` values appearing first. This structure allows quick access
-        to asset data by ticker, improving performance when looking up asset-specific information.
+        Splits assets by ticker for efficient lookup of increments by ticker
+        and date.
+
+        Returns:
+            Dict[str, pd.DataFrame]: Maps each asset ticker to a DataFrame of
+            its `increment` history, sorted by `date` with `NaT` values first.
         """
         return {
             ticker: (
