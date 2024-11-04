@@ -109,7 +109,8 @@ class StandaloneLedger(LedgerEngine):
     # Accounts
 
     def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
-        return self._balance_from_serialized_ledger(account=account, date=date)
+        return self._balance_from_serialized_ledger(self.serialized_ledger(),
+                                                    account=account, date=date)
 
     # ----------------------------------------------------------------------
     # Ledger
@@ -120,7 +121,7 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        return self.complete_ledger(self.ledger())
+        return self.serialize_ledger(self.complete_ledger(self.ledger()))
 
     def complete_ledger(self, ledger=None) -> pd.DataFrame:
         # Ledger definition
@@ -141,18 +142,25 @@ class StandaloneLedger(LedgerEngine):
             date=df.loc[index, "date"]
         )
 
-        # Revaluations
-        revaluations = self.revaluations()
+        # Add ledger entries for (currency or other) revaluations
+        revalue = self.revaluation_entries(ledger=df, revaluations=self.revaluations())
+        return pd.concat([df, revalue], ignore_index=True)
+
+    def revaluation_entries(self, ledger: pd.DataFrame, revaluations: pd.DataFrame) -> pd.DataFrame:
+        """Compute ledger entries for (currency or other) revaluations"""
+        revaluations = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
+            revalue = self.standardize_ledger_columns(pd.DataFrame(revaluations))
+            df = self.serialize_ledger(pd.concat([ledger, revalue]))
             date = row["date"]
             accounts = self.account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
-            revaluations = []
+
             for account in accounts:
                 currency = self.account_currency(account)
                 if currency != reporting_currency:
-                    balance = self.account_balance(account, date=date)
+                    balance = self._balance_from_serialized_ledger(df, account, date=date)
                     fx_rate = self.price(currency, date=date, currency=reporting_currency)
                     if fx_rate[0] != reporting_currency:
                         raise ValueError(
@@ -163,42 +171,36 @@ class StandaloneLedger(LedgerEngine):
                     amount = target - balance["reporting_currency"]
                     amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
                     id = f"revaluation:{date}:{account}"
-                    revaluations.append({
-                        "id": id,
-                        "date": date,
-                        "account": account,
-                        "currency": currency,
-                        "amount": 0,
-                        "report_amount": amount,
-                        "description": row["description"]
-                    })
-                    revaluations.append({
-                        "id": id,
-                        "date": date,
-                        "account": row["credit"] if amount > 0 else row["debit"],
-                        "currency": reporting_currency,
-                        "amount": -1 * amount,
-                        "report_amount": -1 * amount,
-                        "description": row["description"]
-                    })
-            if len(revaluations) > 0:
-                revaluations = self.standardize_ledger_columns(pd.DataFrame(revaluations))
-                df = pd.concat([df, revaluations])
+                    if amount != 0:
+                        revaluations.append({
+                            "id": id,
+                            "date": date,
+                            "account": account,
+                            "currency": currency,
+                            "amount": 0,
+                            "report_amount": amount,
+                            "description": row["description"]
+                        })
+                        revaluations.append({
+                            "id": id,
+                            "date": date,
+                            "account": row["credit"] if amount > 0 else row["debit"],
+                            "currency": reporting_currency,
+                            "amount": -1 * amount,
+                            "report_amount": -1 * amount,
+                            "description": row["description"]
+                        })
 
-        # Serializes ledger with separate credit and debit entries.
-        result = self.serialize_ledger(df)
-        return self.standardize_ledger_columns(result)
+        return self.standardize_ledger_columns(pd.DataFrame(revaluations))
 
-    # Hack: abstract functionality to compute balance from serialized ledger,
-    # that is used in two different branches of the dependency tree
-    # (TextLedger, CachedProffixLedger). Ideally these two classes would have
-    # a common ancestor that could accommodate below method.
-    def _balance_from_serialized_ledger(self, account: int, date: datetime.date = None) -> dict:
+    def _balance_from_serialized_ledger(self,
+                                        ledger: pd.DataFrame,
+                                        account: int,
+                                        date: datetime.date = None) -> dict:
         """Compute balance from serialized ledger.
 
-        This method is used in different branches of the dependency tree.
-
         Args:
+            ledger (DataFrame): General ledger in long format following LEDGER_SCHEMA.
             account (int): The account number.
             date (datetime.date, optional): The date up to which the balance is computed.
                                             Defaults to None.
@@ -206,10 +208,9 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             dict: Dictionary containing the balance of the account in various currencies.
         """
-        df = self.serialized_ledger()
-        rows = df["account"] == int(account)
+        rows = ledger["account"] == int(account)
         if date is not None:
-            rows = rows & (df["date"] <= pd.Timestamp(date))
+            rows = rows & (ledger["date"] <= pd.Timestamp(date))
         cols = ["amount", "report_amount", "currency"]
         if rows.sum() == 0:
             result = {"reporting_currency": 0.0}
@@ -217,7 +218,7 @@ class StandaloneLedger(LedgerEngine):
             if currency is not None:
                 result[currency] = 0.0
         else:
-            sub = df.loc[rows, cols]
+            sub = ledger.loc[rows, cols]
             reporting_amount = sub["report_amount"].sum()
             amount = sub.groupby("currency").agg({"amount": "sum"})
             amount = {currency: amount for currency, amount in zip(amount.index, amount["amount"])}
