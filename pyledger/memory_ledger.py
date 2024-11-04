@@ -24,7 +24,7 @@ class MemoryLedger(StandaloneLedger):
         super().__init__()
         self._reporting_currency = reporting_currency
         self._ledger = self.standardize_ledger(None)
-        self._prices = self.standardize_prices(None)
+        self._prices = self.standardize_price_df(None)
         self._tax_codes = self.standardize_tax_codes(None)
         self._accounts = self.standardize_accounts(None)
         self._assets = self.standardize_assets(None)

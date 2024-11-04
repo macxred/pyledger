@@ -41,7 +41,6 @@ class StandaloneLedger(LedgerEngine):
     """
 
     _serialized_ledger = None
-    _prices = None
 
     # ----------------------------------------------------------------------
     # Constructor
@@ -61,7 +60,6 @@ class StandaloneLedger(LedgerEngine):
             assets (pd.DataFrame, optional): assets definitions.
         """
         super().__init__()
-        self._prices = self.standardize_prices(None)
         self.validate_accounts()
 
     # ----------------------------------------------------------------------
@@ -362,17 +360,17 @@ class StandaloneLedger(LedgerEngine):
         elif not isinstance(date, datetime.date):
             date = pd.to_datetime(date).date()
 
-        if ticker not in self._prices:
+        if ticker not in self._prices_as_dict_of_df:
             raise ValueError(f"No price data available for '{ticker}'.")
 
         if currency is None:
             # Assuming the first currency is the default if none specified
-            currency = next(iter(self._prices[ticker]))
+            currency = next(iter(self._prices_as_dict_of_df[ticker]))
 
-        if currency not in self._prices[ticker]:
+        if currency not in self._prices_as_dict_of_df[ticker]:
             raise ValueError(f"No {currency} prices available for '{ticker}'.")
 
-        prc = self._prices[ticker][currency]
+        prc = self._prices_as_dict_of_df[ticker][currency]
         prc = prc.loc[prc["date"].dt.normalize() <= pd.Timestamp(date), "price"]
 
         if prc.empty:
@@ -400,6 +398,28 @@ class StandaloneLedger(LedgerEngine):
             )
             for ticker, group in self.assets().groupby("ticker")
         }
+
+    @property
+    @timed_cache(15)
+    def _prices_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
+        """Provides a nested dictionary of price DataFrames grouped by ticker and currency
+        for efficient data access.
+
+        Each first-level key represents a unique asset ticker, with an associated nested
+        dictionary where each key is a currency code. The corresponding value is a DataFrame
+        containing historical price records of that asset in the specified currency,
+        sorted in ascending order by `'date'` with `NaT` values appearing first.
+        This structure allows quick access to price data by ticker and currency,
+        improving performance when looking up specific price information.
+        """
+        result = {}
+        for (ticker, currency), group in self.price_history().groupby(["ticker", "currency"]):
+            group = group[["date", "price"]].sort_values("date", na_position="first")
+            group = group.reset_index(drop=True)
+            if ticker not in result.keys():
+                result[ticker] = {}
+            result[ticker][currency] = group
+        return result
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         if ticker == "reporting_currency":
