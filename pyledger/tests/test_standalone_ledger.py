@@ -192,10 +192,10 @@ def test_rounding_with_list_amount_and_scalar_ticker(ledger):
 
 
 def test_rounding_with_empty_ticker(ledger):
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError):
         ledger.round_to_precision([100.234], [""])
 
 
 def test_rounding_with_unknown_ticker(ledger):
-    with pytest.raises(KeyError):
+    with pytest.raises(ValueError):
         ledger.round_to_precision([100.234], ["XYZ"])

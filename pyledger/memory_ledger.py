@@ -1,9 +1,9 @@
 """This module implements the MemoryLedger class."""
 
+import datetime
 import pandas as pd
 from typing import List
 from .standalone_ledger import StandaloneLedger
-from .constants import CURRENCY_PRECISION
 
 
 class MemoryLedger(StandaloneLedger):
@@ -14,7 +14,6 @@ class MemoryLedger(StandaloneLedger):
     """
 
     _reporting_currency = None
-    _precision = CURRENCY_PRECISION
 
     def __init__(self, reporting_currency: str = "USD") -> None:
         """Initialize the MemoryLedger and sets the reporting currency.
@@ -27,6 +26,7 @@ class MemoryLedger(StandaloneLedger):
         self._prices = self.standardize_prices(None)
         self._tax_codes = self.standardize_tax_codes(None)
         self._accounts = self.standardize_accounts(None)
+        self._assets = self.standardize_assets(None)
         # TODO: Similarly initialise assets when concept implemented
 
     # ----------------------------------------------------------------------
@@ -187,3 +187,49 @@ class MemoryLedger(StandaloneLedger):
     @reporting_currency.setter
     def reporting_currency(self, currency):
         self._reporting_currency = currency
+
+    # ----------------------------------------------------------------------
+    # Assets
+
+    def assets(self) -> pd.DataFrame:
+        return self.standardize_assets(self._assets.copy())
+
+    def add_asset(self, ticker: str, increment: float, date: datetime.date = None) -> pd.DataFrame:
+        assets = self.assets()
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
+        if mask.any():
+            raise ValueError("The asset with this unique combination already exists.")
+
+        asset = self.standardize_assets(pd.DataFrame({
+            "ticker": [ticker],
+            "date": [date],
+            "increment": [increment]
+        }))
+        self._assets = pd.concat([assets, asset], ignore_index=True)
+
+    def modify_asset(self, ticker: str, increment: float, date: datetime.date = None) -> None:
+        assets = self.assets()
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
+        if not mask.any():
+            raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
+
+        assets.loc[mask, "increment"] = increment
+        self._assets = self.standardize_assets(assets)
+
+    def delete_asset(
+        self, ticker: str, date: datetime.date = None, allow_missing: bool = False
+    ) -> None:
+        assets = self.assets()
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
+
+        if mask.any():
+            self._assets = assets[~mask].reset_index(drop=True)
+        else:
+            if not allow_missing:
+                raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")

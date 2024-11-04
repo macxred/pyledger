@@ -5,10 +5,13 @@ independently of third-party software.
 
 import collections
 import datetime
+from typing import Dict
 from warnings import warn
 import numpy as np
 import pandas as pd
-from .constants import DEFAULT_SETTINGS, LEDGER_SCHEMA
+
+from pyledger.decorators import timed_cache
+from .constants import DEFAULT_ASSETS, DEFAULT_SETTINGS, LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -45,6 +48,7 @@ class StandaloneLedger(LedgerEngine):
     _prices = None
     _tax_codes = None
     _revaluations = None
+    _assets = None
 
     # ----------------------------------------------------------------------
     # Constructor
@@ -52,6 +56,7 @@ class StandaloneLedger(LedgerEngine):
     def __init__(
         self,
         settings: dict = DEFAULT_SETTINGS,
+        assets: pd.DataFrame = DEFAULT_ASSETS,
         accounts: pd.DataFrame = None,
         ledger: pd.DataFrame = None,
         prices: pd.DataFrame = None,
@@ -67,9 +72,11 @@ class StandaloneLedger(LedgerEngine):
             prices (pd.DataFrame, optional): Prices data for various assets.
             tax_codes (pd.DataFrame, optional): tax definitions.
             revaluations (pd.DataFrame, optional): foreign exchange or other revaluations.
+            assets (pd.DataFrame, optional): assets definitions.
         """
         super().__init__()
         self.settings = self.standardize_settings(settings)
+        self._assets = self.standardize_assets(assets)
         self._accounts = self.standardize_accounts(accounts)
         self._ledger = self.standardize_ledger_columns(ledger)
         self._prices = self.standardize_prices(prices)
@@ -484,11 +491,53 @@ class StandaloneLedger(LedgerEngine):
 
         return (currency, prc.iloc[-1].item())
 
+    def assets(self) -> pd.DataFrame:
+        return self._assets.copy()
+
+    @property
+    @timed_cache(15)
+    def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
+        """Organize assets by ticker for quick access.
+
+        Splits assets by ticker for efficient lookup of increments by ticker
+        and date.
+
+        Returns:
+            Dict[str, pd.DataFrame]: Maps each asset ticker to a DataFrame of
+            its `increment` history, sorted by `date` with `NaT` values first.
+        """
+        return {
+            ticker: (
+                group[["date", "increment"]]
+                .sort_values("date", na_position="first")
+                .reset_index(drop=True)
+            )
+            for ticker, group in self.assets().groupby("ticker")
+        }
+
     def precision(self, ticker: str, date: datetime.date = None) -> float:
-        return self.settings["precision"][ticker]
+        if ticker == "reporting_currency":
+            ticker = self.reporting_currency
+
+        if date is None:
+            date = datetime.date.today()
+        elif not isinstance(date, datetime.date):
+            date = pd.to_datetime(date).date()
+
+        increment = self._assets_as_dict_of_df.get(ticker)
+        if increment is None:
+            raise ValueError(f"No asset definition available for ticker '{ticker}'.")
+
+        mask = increment["date"].isna() | (increment["date"] <= pd.Timestamp(date))
+        if not mask.any():
+            raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
+        return increment.loc[mask[mask].index[-1], "increment"]
 
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")
+
+    def modify_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_price is not implemented yet.")
 
     def delete_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_price is not implemented yet.")
@@ -498,3 +547,21 @@ class StandaloneLedger(LedgerEngine):
 
     def price_increment(self, *args, **kwargs) -> None:
         raise NotImplementedError("price_increment is not implemented yet.")
+
+    def add_asset(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_asset is not implemented yet.")
+
+    def modify_asset(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_asset is not implemented yet.")
+
+    def delete_asset(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_asset is not implemented yet.")
+
+    def add_revaluation(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_revaluation is not implemented yet.")
+
+    def modify_revaluation(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_revaluation is not implemented yet.")
+
+    def delete_revaluations(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_revaluations is not implemented yet.")

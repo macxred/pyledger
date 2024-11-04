@@ -19,6 +19,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,
+            assets=self.ASSETS,
         )
         assert ledger.reporting_currency == "CHF", "Base currency were not restored"
         tax_codes = ledger.standardize_tax_codes(self.TAX_CODES)
@@ -26,6 +27,10 @@ class BaseTestDumpRestoreClear(BaseTest):
         accounts = ledger.standardize_accounts(self.ACCOUNTS)
         assert_frame_equal(
             accounts, ledger.accounts(), ignore_row_order=True, check_like=True
+        )
+        assets = ledger.standardize_assets(self.ASSETS)
+        assert_frame_equal(
+            assets, ledger.assets(), ignore_row_order=True
         )
         target = ledger.txn_to_str(self.LEDGER_ENTRIES).values()
         actual = ledger.txn_to_str(ledger.ledger()).values()
@@ -37,11 +42,13 @@ class BaseTestDumpRestoreClear(BaseTest):
         ledger.mirror_accounts(self.ACCOUNTS)
         ledger.mirror_tax_codes(self.TAX_CODES)
         ledger.mirror_ledger(self.LEDGER_ENTRIES)
+        ledger.mirror_assets(self.ASSETS)
 
         # Dumping current state
         accounts = ledger.accounts()
         tax_codes = ledger.tax_codes()
         ledger_entries = ledger.ledger()
+        assets = ledger.assets()
         ledger.dump_to_zip(tmp_path / "ledger.zip")
 
         # Remove or alter data
@@ -52,6 +59,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         ledger.restore_from_zip(tmp_path / "ledger.zip")
         assert ledger.reporting_currency == "CHF", "Base currency were not restored"
         assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, ignore_index=True)
+        assert_frame_equal(assets, ledger.assets(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(
             accounts, ledger.accounts(), ignore_row_order=True, ignore_index=True
         )
@@ -64,10 +72,11 @@ class BaseTestDumpRestoreClear(BaseTest):
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,
+            assets=self.ASSETS
         )
         ledger.clear()
         assert ledger.ledger().empty, "Ledger was not cleared"
         assert ledger.tax_codes().empty, "Tax codes were not cleared"
         assert ledger.accounts().empty, "Accounts was not cleared"
-        # TODO: Expand test logic to test price history, precision settings,
-        # and revaluations when implemented
+        assert ledger.assets().empty, "Assets was not cleared"
+        # TODO: Expand test logic to test price history and revaluations when implemented

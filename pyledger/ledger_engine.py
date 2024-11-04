@@ -14,6 +14,7 @@ import numpy as np
 import openpyxl
 import pandas as pd
 from .constants import (
+    ASSETS_SCHEMA,
     PRICE_SCHEMA,
     LEDGER_SCHEMA,
     ACCOUNT_SCHEMA,
@@ -82,19 +83,6 @@ class LedgerEngine(ABC):
             or not isinstance(settings["reporting_currency"], str)
         ):
             raise ValueError("Missing/invalid 'reporting_currency' in settings.")
-
-        # Check for 'precision'
-        if "precision" not in settings or not isinstance(settings["precision"], dict):
-            raise ValueError("Missing/invalid 'precision'.")
-
-        # Validate contents of 'precision'
-        for key, value in settings["precision"].items():
-            if not isinstance(key, str) or not isinstance(value, (float, int)):
-                raise ValueError("Invalid types in 'precision'.")
-
-        settings["precision"]["reporting_currency"] = settings["precision"][
-            settings["reporting_currency"]
-        ]
 
         return settings
 
@@ -171,6 +159,7 @@ class LedgerEngine(ABC):
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts().to_csv(index=False))
+            archive.writestr('assets.csv', self.assets().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
         """Restore ledger system from a ZIP archive.
@@ -196,9 +185,13 @@ class LedgerEngine(ABC):
             ledger = pd.read_csv(archive.open('ledger.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
-
+            assets = pd.read_csv(archive.open('assets.csv'))
             self.restore(
-                settings=settings, ledger=ledger, tax_codes=tax_codes, accounts=accounts
+                settings=settings,
+                ledger=ledger,
+                tax_codes=tax_codes,
+                accounts=accounts,
+                assets=assets
             )
 
     def restore(
@@ -207,6 +200,7 @@ class LedgerEngine(ABC):
         tax_codes: pd.DataFrame | None = None,
         accounts: pd.DataFrame | None = None,
         ledger: pd.DataFrame | None = None,
+        assets: pd.DataFrame | None = None,
     ):
         """Replaces the entire ledger system with data provided as arguments.
 
@@ -218,17 +212,20 @@ class LedgerEngine(ABC):
                 If `None`, accounts remain unchanged.
             ledger (pd.DataFrame | None): Ledger entries of the restored system.
                 If `None`, ledger remains unchanged.
+            assets (pd.DataFrame | None): Assets entries of the restored system.
+                If `None`, assets remains unchanged.
         """
         if settings is not None and "REPORTING_CURRENCY" in settings:
             self.reporting_currency = settings["REPORTING_CURRENCY"]
+        if assets is not None:
+            self.mirror_assets(assets, delete=True)
         if tax_codes is not None:
             self.mirror_tax_codes(tax_codes, delete=True)
         if accounts is not None:
             self.mirror_accounts(accounts, delete=True)
         if ledger is not None:
             self.mirror_ledger(ledger, delete=True)
-        # TODO: Implement price history, precision settings,
-        # and revaluation restoration logic
+        # TODO: Implement price history and revaluation restoration logic
 
     def clear(self):
         """Clear all data from the ledger system.
@@ -239,7 +236,8 @@ class LedgerEngine(ABC):
         self.mirror_ledger(None, delete=True)
         self.mirror_tax_codes(None, delete=True)
         self.mirror_accounts(None, delete=True)
-        # TODO: Implement price history, precision settings, and revaluation clearing logic
+        self.mirror_assets(None, delete=True)
+        # TODO: Implement price history and revaluation clearing logic
 
     # ----------------------------------------------------------------------
     # Tax rates
@@ -1285,8 +1283,19 @@ class LedgerEngine(ABC):
             date (datetime.date): Date on which the price is recorded.
             currency (str): Currency in which the price is quoted.
             price (float): Value of the asset as of the given date.
-            overwrite (bool, optional): Overwrite an existing price definition with the same ticker,
-                                        date, and currency if one exists. Defaults to False.
+        """
+
+    @abstractmethod
+    def modify_price(
+        self, ticker: str, date: datetime.date, currency: str, price: float, overwrite: bool = False
+    ) -> None:
+        """Modifies an observation in the price history.
+
+        Args:
+            ticker (str): Asset identifier.
+            date (datetime.date): Date on which the price is recorded.
+            currency (str): Currency in which the price is quoted.
+            price (float): Value of the asset as of the given date.
         """
 
     @abstractmethod
@@ -1347,3 +1356,180 @@ class LedgerEngine(ABC):
                 result[ticker] = {}
             result[ticker][currency] = group
         return result
+
+    # ----------------------------------------------------------------------
+    # Assets
+
+    @classmethod
+    def standardize_assets(
+        cls,
+        df: pd.DataFrame | None,
+        keep_extra_columns: bool = False
+    ) -> pd.DataFrame:
+        """Standardize the 'assets' DataFrame to match `ASSETS_SCHEMA`.
+
+        Args:
+            df (pd.DataFrame | None): The DataFrame representing assets.
+                If None, returns an empty DataFrame with `ASSETS_SCHEMA`.
+            keep_extra_columns (bool, optional): If True, retain columns not
+                specified in `ASSETS_SCHEMA`. Defaults to False.
+
+        Returns:
+            pd.DataFrame: The standardized assets DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing or data types are incorrect.
+        """
+        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
+        df["date"] = df["date"].dt.tz_localize(None).dt.floor('D')
+
+        return df
+
+    @abstractmethod
+    def assets(self) -> pd.DataFrame:
+        """Retrieves all asset entries.
+
+        Returns:
+            pd.DataFrame with columns specified in ASSETS_SCHEMA.
+        """
+
+    @abstractmethod
+    def add_asset(
+        self,
+        ticker: str,
+        increment: float,
+        date: datetime.date = None
+    ) -> None:
+        """Add a new asset entry.
+
+        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
+
+        Args:
+            ticker (str): Identifier for the asset (e.g., currency code or stock ticker).
+            increment (float): The smallest price increment for the asset.
+            date (datetime.date, optional):
+                The effective date from which the `increment` applies. For this `ticker`,
+                the `increment` is valid from this `date` until the date of the next entry
+                with the same `ticker` and a later date. If `date` is None, the increment
+                is considered the initial value for this `ticker` and is valid until the
+                first dated entry for the same `ticker`
+        """
+
+    @abstractmethod
+    def modify_asset(
+        self,
+        ticker: str,
+        increment: float,
+        date: pd.Timestamp = None
+    ) -> None:
+        """Update an existing asset entry.
+
+        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
+
+        Args:
+            ticker (str): Identifier for the asset (e.g., currency code or stock ticker).
+            increment (float): The smallest price increment for the asset.
+            date (datetime.date, optional):
+                The effective date from which the `increment` applies. For this `ticker`,
+                the `increment` is valid from this `date` until the date of the next entry
+                with the same `ticker` and a later date. If `date` is None, the increment
+                is considered the initial value for this `ticker` and is valid until the
+                first dated entry for the same `ticker`
+        """
+
+    @abstractmethod
+    def delete_asset(
+        self,
+        ticker: str,
+        date: pd.Timestamp = None,
+        allow_missing: bool = False
+    ) -> None:
+        """Remove an asset entry.
+
+        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
+
+        Args:
+            ticker (str): Asset identifier for the entry to remove.
+            date (pd.Timestamp, optional): Date of the asset entry to remove.
+            allow_missing (bool, optional): If True, do not raise an error if the asset entry
+                                            is not found. Defaults to False.
+        """
+
+    def mirror_assets(self, target: pd.DataFrame, delete: bool = False) -> dict:
+        """Align the system's assets with the target DataFrame.
+
+        Updates the system's assets to match the `target` DataFrame by adding new assets,
+        modifying existing ones, and optionally deleting assets not present in the target.
+
+        Args:
+            target (pd.DataFrame): The target assets, formatted according to `ASSETS_SCHEMA`.
+            delete (bool, optional): If True, deletes existing assets that are not present
+                                     in the target data.
+
+        Returns:
+            dict: Summary statistics of the mirroring process:
+                - 'initial' (int): Number of assets before synchronization.
+                - 'target' (int): Number of assets in the target DataFrame.
+                - 'added' (int): Number of assets added.
+                - 'deleted' (int): Number of assets deleted.
+                - 'updated' (int): Number of assets updated.
+
+        See Also:
+            prepare_assets_for_mirroring : Prepares the target data for synchronization.
+        """
+        current = self.assets()
+        incoming = self.prepare_assets_for_mirroring(target)
+        merged = current.merge(
+            incoming, on=["ticker", "date"], how="outer", suffixes=('_current', '_incoming'),
+            indicator=True
+        )
+
+        # Handle deletions
+        if delete:
+            to_delete = merged[merged["_merge"] == "left_only"]
+            for _, row in to_delete.iterrows():
+                self.delete_asset(ticker=row["ticker"], date=row["date"])
+
+        # Handle additions
+        to_add = merged[merged["_merge"] == "right_only"]
+        for _, row in to_add.iterrows():
+            self.add_asset(
+                ticker=row["ticker"], increment=row["increment_incoming"], date=row["date"]
+            )
+
+        # Handle updates
+        to_update = merged[
+            (merged["_merge"] == "both")
+            & (merged["increment_incoming"] != merged["increment_current"])
+        ]
+        for _, row in to_update.iterrows():
+            self.modify_asset(
+                ticker=row["ticker"], increment=row["increment_incoming"], date=row["date"]
+            )
+
+        return {
+            "initial": len(current),
+            "target": len(incoming),
+            "added": len(to_add),
+            "deleted": len(to_delete) if delete else 0,
+            "updated": len(to_update)
+        }
+
+    def prepare_assets_for_mirroring(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Prepare incoming asset data for synchronization.
+
+        Invoked as the initial step in the mirroring process, this method
+        matches the incoming DataFrame with the current system's requirements
+        and aligns it with existing data, facilitating the identification
+        of entries that need to be added, modified, or removed.
+
+        By default, returns the data unchanged; subclasses may override this
+        method for custom preprocessing.
+
+        Args:
+            df (pd.DataFrame): Incoming asset data.
+
+        Returns:
+            pd.DataFrame: Adjusted data ready for synchronization.
+        """
+        return self.standardize_assets(df)

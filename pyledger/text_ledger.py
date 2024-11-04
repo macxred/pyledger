@@ -1,12 +1,19 @@
 """This module defines TextLedger, extending StandaloneLedger to store data in text files."""
 
+import datetime
 import pandas as pd
 import yaml
 from typing import List
 from pathlib import Path
 from pyledger.decorators import timed_cache
 from pyledger.standalone_ledger import StandaloneLedger
-from pyledger.constants import ACCOUNT_SCHEMA, DEFAULT_SETTINGS, LEDGER_SCHEMA, TAX_CODE_SCHEMA
+from pyledger.constants import (
+    ACCOUNT_SCHEMA,
+    ASSETS_SCHEMA,
+    DEFAULT_SETTINGS,
+    LEDGER_SCHEMA,
+    TAX_CODE_SCHEMA
+)
 from pyledger.helpers import (
     save_files,
     write_fixed_width_csv,
@@ -509,6 +516,109 @@ class TextLedger(StandaloneLedger):
         elif file_path.exists():
             file_path.unlink()
         self.accounts.cache_clear()
+
+    # ----------------------------------------------------------------------
+    # Assets
+
+    @timed_cache(15)
+    def assets(self) -> pd.DataFrame:
+        return self.read_assets(self.root_path / "assets.csv")
+
+    def read_assets(self, file: Path) -> pd.DataFrame:
+        """Read assets from the a CSV file.
+
+        Reads assets from a CSV file and enforce the standard data format.
+        If an error occurs during reading or standardization,
+        returns an empty DataFrame with `ASSETS_SCHEMA` and logs a warning.
+
+        Args:
+            file (Path): The path to the CSV file to read.
+
+        Returns:
+            pd.DataFrame: A DataFrame formatted according to ASSETS_SCHEMA.
+        """
+        try:
+            assets = pd.read_csv(file, skipinitialspace=True)
+            assets = self.standardize_assets(assets)
+        except Exception as e:
+            assets = self.standardize_assets(None)
+            self._logger.warning(f"Skipping {file} file: {e}")
+        return assets
+
+    @classmethod
+    def write_assets_file(cls, df: pd.DataFrame, file: Path):
+        """Writes the assets DataFrame to a fixed-width CSV file.
+
+        Drops optional columns that contain only NA values and writes the
+        assets DataFrame to a fixed-width CSV file. Entries are padded with
+        spaces for consistent column widths and improved readability.
+
+        Args:
+            df (pd.DataFrame): The assets to save.
+            file (Path): Path to the CSV file to write.
+
+        Returns:
+            pd.DataFrame: The formatted DataFrame that was saved to the file.
+        """
+        df = enforce_schema(df, ASSETS_SCHEMA, sort_columns=True, keep_extra_columns=True)
+        optional = ASSETS_SCHEMA.loc[~ASSETS_SCHEMA["mandatory"], "column"].to_list()
+        to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
+        df.drop(columns=to_drop, inplace=True)
+        n_fixed = ASSETS_SCHEMA["column"].isin(df.columns).sum()
+        write_fixed_width_csv(df, file=file, n=n_fixed)
+
+        return df
+
+    def add_asset(self, ticker: str, increment: float, date: datetime.date = None) -> pd.DataFrame:
+        assets = self.assets()
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
+        if mask.any():
+            raise ValueError("The asset with this unique combination already exists.")
+
+        asset = self.standardize_assets(pd.DataFrame({
+            "ticker": [ticker],
+            "date": [date],
+            "increment": [increment]
+        }))
+        assets = pd.concat([assets, asset])
+        self.write_assets_file(assets, self.root_path / "assets.csv")
+        self.assets.cache_clear()
+
+    def modify_asset(self, ticker: str, increment: float, date: datetime.date = None) -> None:
+        assets = self.assets()
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
+        if not mask.any():
+            raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
+
+        assets.loc[mask, "increment"] = increment
+        assets = self.standardize_assets(assets)
+        self.write_assets_file(assets, self.root_path / "assets.csv")
+        self.assets.cache_clear()
+
+    def delete_asset(
+        self, ticker: str, date: datetime.date = None, allow_missing: bool = False
+    ) -> None:
+        assets = self.assets()
+        mask = (assets["ticker"] == ticker) & (
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
+        )
+
+        if mask.any():
+            assets = assets[~mask].reset_index(drop=True)
+        else:
+            if not allow_missing:
+                raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
+
+        file_path = self.root_path / "assets.csv"
+        if not assets.empty:
+            self.write_assets_file(assets, file_path)
+        elif file_path.exists():
+            file_path.unlink()
+        self.assets.cache_clear()
 
     # ----------------------------------------------------------------------
     # Currency
