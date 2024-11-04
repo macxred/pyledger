@@ -366,15 +366,12 @@ class StandaloneLedger(LedgerEngine):
     @property
     @timed_cache(15)
     def _prices_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
-        """Provides a nested dictionary of price DataFrames grouped by ticker and currency
-        for efficient data access.
+        """Organizes price data by ticker and currency for quick access.
 
-        Each first-level key represents a unique asset ticker, with an associated nested
-        dictionary where each key is a currency code. The corresponding value is a DataFrame
-        containing historical price records of that asset in the specified currency,
-        sorted in ascending order by `'date'` with `NaT` values appearing first.
-        This structure allows quick access to price data by ticker and currency,
-        improving performance when looking up specific price information.
+        Returns:
+            Dict[str, Dict[str, pd.DataFrame]]: Maps each asset ticker to
+            a nested dictionary of DataFrames by currency, with its
+            `price` history sorted by `date` with `NaT` values first.
         """
         result = {}
         for (ticker, currency), group in self.price_history().groupby(["ticker", "currency"]):
