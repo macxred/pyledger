@@ -22,12 +22,6 @@ class StandaloneLedger(LedgerEngine):
     """
 
     # ----------------------------------------------------------------------
-    # Constructor
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    # ----------------------------------------------------------------------
     # Tax Codes
 
     def tax_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
