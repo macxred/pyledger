@@ -24,7 +24,7 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Tax Codes
 
-    def tax_journal_entries(self, df: pd.DataFrame) -> pd.DataFrame:
+    def tax_entries(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create journal entries to book tax according to tax_codes.
 
         Iterates through the provided DataFrame and calculates tax for entries
@@ -129,10 +129,8 @@ class StandaloneLedger(LedgerEngine):
         df = self.sanitize_ledger(df)
         df = df.sort_values(["date", "id"])
 
-        # Add automated journal entries for tax
-        tax = self.tax_journal_entries(df)
-        if tax.shape[0] > 0:
-            df = pd.concat([df, tax])
+        # Add ledger entries for tax
+        df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
         # Insert missing reporting currency amounts
         index = df["report_amount"].isna()
