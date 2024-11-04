@@ -528,7 +528,7 @@ class StandaloneLedger(LedgerEngine):
         if increment is None:
             raise ValueError(f"No asset definition available for ticker '{ticker}'.")
 
-        mask = increment["date"].isna() | (increment["date"].dt.normalize() <= pd.Timestamp(date))
+        mask = increment["date"].isna() | (increment["date"] <= pd.Timestamp(date))
         if not mask.any():
             raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
         return increment.loc[mask[mask].index[-1], "increment"]
