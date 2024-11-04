@@ -3,7 +3,6 @@ LedgerEngine abstract base class, designed for managing double-entry accounting 
 independently of third-party software.
 """
 
-import collections
 import datetime
 from typing import Dict
 from warnings import warn
@@ -21,23 +20,6 @@ class StandaloneLedger(LedgerEngine):
     StandaloneLedger operates autonomously and does not connect to third-party
     accounting software. It serves as a base for any standalone ledger implementation
     with a specific data storage choice.
-
-    Attributes:
-        settings (dict): Accounting settings, such as beginning and end of the
-            accounting period, rounding precision for currencies, etc.
-        accounts (pd.DataFrame): Account chart.
-        ledger (pd.DataFrame): General ledger data in original form entered
-            into the accounting system, without automated enhancements such as
-            reporting currency amounts, revaluations, or tax bookings.
-        serialized_ledger (pd.DataFrame): Ledger in completed form, after
-            automated enhancements, including reporting currency amounts,
-            revaluations or tax bookings. Data is returned in long format,
-            detailing accounts and counter-accounts in separate rows.
-        prices (pd.DataFrame, optional): Prices data for foreign currencies,
-            securities, commodities, inventory, etc.
-        tax_codes (pd.DataFrame, optional): tax definitions.
-        revaluations (pd.DataFrame, optional): Definitions for automated
-            calculation of revaluations.
     """
 
     _serialized_ledger = None
@@ -45,20 +27,7 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Constructor
 
-    def __init__(
-        self,
-    ) -> None:
-        """Initialize the StandaloneLedger with provided accounting data and settings.
-
-        Args:
-            settings (dict): Configuration settings for the ledger operations.
-            accounts (pd.DataFrame): Account chart.
-            ledger (pd.DataFrame, optional): General ledger data.
-            prices (pd.DataFrame, optional): Prices data for various assets.
-            tax_codes (pd.DataFrame, optional): tax definitions.
-            revaluations (pd.DataFrame, optional): foreign exchange or other revaluations.
-            assets (pd.DataFrame, optional): assets definitions.
-        """
+    def __init__(self) -> None:
         super().__init__()
         self.validate_accounts()
 
