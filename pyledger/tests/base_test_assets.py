@@ -65,6 +65,7 @@ class BaseTestAssets(BaseTest):
         )
 
     def test_mirror_assets(self, ledger):
+        ledger.restore(settings=self.SETTINGS)
         target = pd.concat([self.ASSETS, ledger.assets()], ignore_index=True)
         original_target = target.copy()
         ledger.mirror_assets(target, delete=False)
@@ -88,3 +89,43 @@ class BaseTestAssets(BaseTest):
         assert not ledger.assets().empty
         ledger.mirror_assets(ledger.standardize_assets(None), delete=True)
         assert ledger.assets().empty
+
+    @pytest.fixture()
+    def ledger_with_assets(self, ledger):
+        ledger.restore(settings=self.SETTINGS, assets=self.ASSETS)
+        return ledger
+
+    @pytest.mark.parametrize(
+        "ticker, date, expected",
+        [
+            # Default increment for reporting_currency (CHF); date=None uses today
+            ("reporting_currency", None, 1),
+            # Exact date match for AUD on 2023-01-01
+            ("AUD", datetime.date(2023, 1, 1), 0.001),
+            # Default to today’s date for CHF
+            ("CHF", None, 1),
+            # Date before all CAD entries, uses NaT entry
+            ("CAD", datetime.date(2020, 1, 1), 0.1),
+            # Date after all AUD dates, uses latest increment
+            ("AUD", datetime.date(2222, 1, 1), 0.01),
+            # Latest date on/before 2023-12-31 for AUD
+            ("AUD", datetime.date(2023, 12, 31), 0.001),
+            # NaT and valid dates for EUR, date before all valid dates
+            ("EUR", datetime.date(2023, 1, 1), 0.001),
+        ]
+    )
+    def test_precision(self, ledger_with_assets, ticker, date, expected):
+        assert ledger_with_assets.precision(ticker, date) == expected
+
+    @pytest.mark.parametrize(
+        "ticker, date, expected_exception, match",
+        [
+            ("XYZ", None, ValueError, "No asset definition available for ticker 'XYZ'"),
+            ("GBP", datetime.date(2022, 1, 1), ValueError, "No asset definition available"),
+        ]
+    )
+    def test_precision_exceptions(
+        self, ledger_with_assets, ticker, date, expected_exception, match
+    ):
+        with pytest.raises(expected_exception, match=match):
+            ledger_with_assets.precision(ticker, date)

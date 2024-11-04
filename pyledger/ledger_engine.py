@@ -1381,6 +1381,8 @@ class LedgerEngine(ABC):
             ValueError: If required columns are missing or data types are incorrect.
         """
         df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
+        df["date"] = df["date"].dt.tz_localize(None).dt.floor('D')
+
         return df
 
     @abstractmethod

@@ -569,38 +569,30 @@ class TextLedger(StandaloneLedger):
 
         return df
 
-    def add_asset(
-        self, ticker: str, increment: float, date: datetime.date = None
-    ) -> None:
+    def add_asset(self, ticker: str, increment: float, date: datetime.date = None) -> pd.DataFrame:
         assets = self.assets()
-        date = pd.Timestamp(date) if date is not None else pd.NaT
         mask = (assets["ticker"] == ticker) & (
-            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
         )
-
         if mask.any():
-            raise ValueError(f"Asset with ticker '{ticker}' already exists for the given date.")
+            raise ValueError("The asset with this unique combination already exists.")
 
-        new_asset = self.standardize_assets(pd.DataFrame({
+        asset = self.standardize_assets(pd.DataFrame({
             "ticker": [ticker],
-            "increment": [increment],
             "date": [date],
+            "increment": [increment]
         }))
-        assets = pd.concat([assets, new_asset])
+        assets = pd.concat([assets, asset])
         self.write_assets_file(assets, self.root_path / "assets.csv")
         self.assets.cache_clear()
 
-    def modify_asset(
-        self, ticker: str, increment: float, date: datetime.date = None
-    ) -> None:
+    def modify_asset(self, ticker: str, increment: float, date: datetime.date = None) -> None:
         assets = self.assets()
-        date = pd.Timestamp(date) if date is not None else pd.NaT
         mask = (assets["ticker"] == ticker) & (
-            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
         )
-
         if not mask.any():
-            raise ValueError(f"Asset with ticker '{ticker}' not found for the given date.")
+            raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
 
         assets.loc[mask, "increment"] = increment
         assets = self.standardize_assets(assets)
@@ -611,16 +603,15 @@ class TextLedger(StandaloneLedger):
         self, ticker: str, date: datetime.date = None, allow_missing: bool = False
     ) -> None:
         assets = self.assets()
-        date = pd.Timestamp(date) if date is not None else pd.NaT
         mask = (assets["ticker"] == ticker) & (
-            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
         )
 
-        if not mask.any():
+        if mask.any():
+            assets = assets[~mask].reset_index(drop=True)
+        else:
             if not allow_missing:
                 raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
-        else:
-            assets = assets[~mask]
 
         file_path = self.root_path / "assets.csv"
         if not assets.empty:

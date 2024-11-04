@@ -196,9 +196,8 @@ class MemoryLedger(StandaloneLedger):
 
     def add_asset(self, ticker: str, increment: float, date: datetime.date = None) -> pd.DataFrame:
         assets = self.assets()
-        date = pd.Timestamp(date) if date is not None else pd.NaT
         mask = (assets["ticker"] == ticker) & (
-            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
         )
         if mask.any():
             raise ValueError("The asset with this unique combination already exists.")
@@ -212,9 +211,8 @@ class MemoryLedger(StandaloneLedger):
 
     def modify_asset(self, ticker: str, increment: float, date: datetime.date = None) -> None:
         assets = self.assets()
-        date = pd.Timestamp(date) if date is not None else pd.NaT
         mask = (assets["ticker"] == ticker) & (
-            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
         )
         if not mask.any():
             raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
@@ -226,13 +224,12 @@ class MemoryLedger(StandaloneLedger):
         self, ticker: str, date: datetime.date = None, allow_missing: bool = False
     ) -> None:
         assets = self.assets()
-        date = pd.Timestamp(date) if date is not None else pd.NaT
         mask = (assets["ticker"] == ticker) & (
-            (assets["date"] == date) | (pd.isna(assets["date"]) & pd.isna(date))
+            (assets["date"] == pd.Timestamp(date)) | (pd.isna(assets["date"]) & pd.isna(date))
         )
 
-        if not mask.any():
+        if mask.any():
+            self._assets = assets[~mask].reset_index(drop=True)
+        else:
             if not allow_missing:
                 raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
-        else:
-            self._assets = assets[~mask].reset_index(drop=True)

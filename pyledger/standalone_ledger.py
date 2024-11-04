@@ -496,17 +496,22 @@ class StandaloneLedger(LedgerEngine):
 
     @property
     @timed_cache(15)
-    def assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
-        """Store assets in a nested dict: Each assets[ticker] is a DataFrame with columns
-        'date' and 'increment', sorted by 'date' with NaT values first.
+    def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
+        """Provides a dictionary of asset DataFrames grouped by ticker for efficient data access.
+
+        Each key represents a unique asset ticker, with an associated DataFrame containing
+        historical records of that asset's `increment` values over time, sorted in ascending
+        order by `date`, with `NaT` values appearing first. This structure allows quick access
+        to asset data by ticker, improving performance when looking up asset-specific information.
         """
-        result = {}
-        for ticker, group in self.assets().groupby("ticker"):
-            group = (group[["date", "increment"]]
-                     .sort_values("date", na_position="first")
-                     .reset_index(drop=True))
-            result[ticker] = group
-        return result
+        return {
+            ticker: (
+                group[["date", "increment"]]
+                .sort_values("date", na_position="first")
+                .reset_index(drop=True)
+            )
+            for ticker, group in self.assets().groupby("ticker")
+        }
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         if ticker == "reporting_currency":
@@ -517,19 +522,14 @@ class StandaloneLedger(LedgerEngine):
         elif not isinstance(date, datetime.date):
             date = pd.to_datetime(date).date()
 
-        increment = self.assets_as_dict_of_df.get(ticker)
+        increment = self._assets_as_dict_of_df.get(ticker)
         if increment is None:
-            raise ValueError(f"No data available for ticker '{ticker}'.")
+            raise ValueError(f"No asset definition available for ticker '{ticker}'.")
 
-        increments = increment.loc[
-            (increment["date"].isna())
-            | (increment["date"].dt.normalize() <= pd.Timestamp(date)), "increment"
-        ]
-
-        if increments.empty:
-            raise ValueError(f"No increments available for '{ticker}' on or before {date}.")
-
-        return increments.iloc[-1]
+        mask = increment["date"].isna() | (increment["date"].dt.normalize() <= pd.Timestamp(date))
+        if not mask.any():
+            raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
+        return increment.loc[mask[mask].index[-1], "increment"]
 
     def add_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("add_price is not implemented yet.")
