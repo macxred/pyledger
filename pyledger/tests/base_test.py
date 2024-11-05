@@ -1,115 +1,109 @@
-"""Definition of abstract base class for testing"""
+"""Definition of abstract base class for testing."""
 
 import pandas as pd
 from abc import ABC
 from io import StringIO
-from pyledger.ledger_engine import LedgerEngine
+from pyledger import LedgerEngine
 
 
 TAX_CSV = """
-    id,       account, rate,  is_inclusive, description
-    OutStd,   9990,    0.038, True,         tax at the regular 7.7% rate on goods or services
-    OutRed,   9990,    0.025, True,         tax at the reduced 2.5% rate on goods or services
-    OutAcc,   9990,    0.038, True,         XXXXX
-    OutStdEx, 9990,    0.077, False,        tax at the regular 7.7% rate on goods or services
-    InStd,    9992,    0.077, True,         Input Tax (Vorsteuer) at the regular 7.7% rate on
-    InRed,    9992,    0.025, True,         Input Tax (Vorsteuer) at the reduced 2.5% rate on
-    InAcc,    9992,    0.038, True,         YYYYY
-    Test,     9999,    0.038, True,         AAAAA
+    id,      account, rate,  is_inclusive, description
+    EXEMPT,         , 0.00,          True, Exempt from VAT
+    OUT_STD,    2200, 0.20,          True, Output VAT at Standard Rate 20%
+    OUT_RED,    2200, 0.05,          True, Output VAT at Reduced Rate 5%
+    IN_STD,     1300, 0.20,          True, Input VAT at Standard Rate 20%
+    IN_RED,     1300, 0.05,          True, Input VAT at Reduced Rate 5%
 """
-
+TAX_CODES = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
 
 ACCOUNT_CSV = """
-    group, account, currency, tax_code, description
-    /Assets, 9990,      EUR,          , Test EUR Bank Account
-    /Assets, 9991,      USD,          , Test USD Bank Account
-    /Assets, 9992,      CHF,          , Test CHF Bank Account
-    /Assets, 9993,      EUR,          , Transitory Account EUR
-    /Assets, 9994,      USD,          , Transitory Account USD
-    /Assets, 9995,      CHF,          , Transitory Account CHF
-    /Assets, 9999,      CHF,          , Test Account with tax
+    group,                       account, currency, tax_code, description
+    Assets,                         1000,      USD,         , Cash in Bank USD
+    Assets,                         1005,      USD,         , Cash in other Bank USD
+    Assets,                         1010,      EUR,         , Cash in Bank EUR
+    Assets,                         1015,      EUR,         , Cash in other Bank EUR
+    Assets,                         1020,      JPY,         , Cash in Bank JPY
+    Assets,                         1300,      USD,         , VAT Recoverable (Input VAT)
+    Liabilities,                    2000,      USD,         , Accounts Payable USD
+    Liabilities,                    2010,      USD,         , Accounts Payable EUR
+    Liabilities,                    2200,      USD,         , VAT Payable (Output VAT)
+    Equity,                         3000,      USD,         , Owner's Equity
+    Revenue,                        4000,      USD,  OUT_STD, Sales Revenue
+    Expenses,                       5000,      USD,   IN_STD, Purchases
+    Expenses/Financial Expenses,    7050,      USD,         , Foreign Exchange Gain/Loss
+    Revenue/Financial Gain,         8050,      USD,         , Foreign Exchange Gain
 """
+ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
-
 LEDGER_CSV = """
-    id,     date,  account, contra, currency,     amount, report_amount, tax_code,   description,                      document
-    1,  2024-05-24,   9992,   9995,      CHF,     100.00,              ,   OutRed,   pytest single transaction 1,      /file1.txt
-    2,  2024-05-24,   9991,       ,      USD,    -100.00,        -88.88,   OutRed,   pytest collective txn 1 - line 1, /subdir/file2.txt
-    2,  2024-05-24,   9991,       ,      USD,       1.00,          0.89,   OutRed,   pytest collective txn 1 - line 1, /subdir/file2.txt
-    2,  2024-05-24,   9991,       ,      USD,      99.00,         87.99,   OutRed,   pytest collective txn 1 - line 1,
-    3,  2024-04-24,       ,   9990,      EUR,     200.00,        175.55,   OutRed,   pytest collective txn 2 - line 1, /document-col-alt.pdf
-    3,  2024-04-24,   9990,       ,      EUR,     200.00,        175.55,   OutRed,   pytest collective txn 2 - line 2, /document-col-alt.pdf
-    4,  2024-05-24,   9991,   9994,      USD,     300.00,        450.45,   OutRed,   pytest single transaction 2,      /document-alt.pdf
-    5,  2024-04-04,   9995,       ,      CHF, -125000.00,    -125000.00,         ,   Convert -125'000 CHF to USD @ 1.10511,
-    5,  2024-04-04,   9994,       ,      USD,  138138.75,     125000.00,         ,   Convert -125'000 CHF to USD @ 1.10511,
-    6,  2024-04-04,   9995,       ,      CHF, -250000.00,              ,         ,   Convert -250'000 CHF to USD @ 1.10511,
-    6,  2024-04-04,   9994,       ,      USD,  276277.50,     250000.00,         ,   Convert -250'000 CHF to USD @ 1.10511,
-        # Transaction raised RequestException: API call failed. Total debit (125,000.00) and total credit (125,000.00) must be equal.
-    7,  2024-01-16,       ,   9993,      EUR,  125000.00,     125362.50,         ,   Convert 125'000 EUR to CHF, /2024/banking/IB/2023-01.pdf
-    7,  2024-01-16,   9995,       ,      CHF,  125362.50,     125362.50,         ,   Convert 125'000 EUR to CHF, /2024/banking/IB/2023-01.pdf
-        # Transactions with negative amount
-    8,  2024-05-24,   9990,   9993,      EUR,     -10.00,         -9.00,         ,   Individual transaction with negative amount,
-        # Collective transaction with credit and debit account in single line item
-    9,  2024-05-24,   9992,   9995,      CHF,     100.00,              ,         ,   Collective transaction - leg with debit and credit account,
-    9,  2024-05-24,   9990,       ,      EUR,      20.00,         19.00,         ,   Collective transaction - leg with credit account,
-    9,  2024-05-24,       ,   9993,      EUR,      20.00,         19.00,         ,   Collective transaction - leg with debit account,
-        # Transactions with zero reporting currency
-    10, 2024-05-24,   9992,   9995,      CHF,       0.00,              ,         ,   Individual transaction with zero amount,
-    11, 2024-05-24,   9992,       ,      CHF,     100.00,              ,   OutRed,   Collective transaction with zero amount,
-    11, 2024-05-24,   9995,       ,      CHF,    -100.00,              ,         ,   Collective transaction with zero amount,
-    11, 2024-05-24,   9995,       ,      CHF,       0.00,              ,         ,   Collective transaction with zero amount,
-    12, 2024-03-02,       ,   9993,      EUR,  600000.00,     599580.00,         ,   Convert 600k EUR to CHF @ 0.9993,
-    12, 2024-03-02,   9995,       ,      CHF,  599580.00,     599580.00,         ,   Convert 600k EUR to CHF @ 0.9993,
-        # FX gain/loss: transactions in reporting currency with zero foreign currency amount
-    13, 2024-06-26,   9991,   9995,      CHF,     999.00,              ,         ,   Foreign currency adjustment
-    14, 2024-06-26,   9990,       ,      EUR,       0.00,          5.55,         ,   Foreign currency adjustment
-    14, 2024-06-26,       ,   9995,      CHF,       5.55,              ,         ,   Foreign currency adjustment
-        # Transactions with two non-reporting currencies
-    15, 2024-06-26,       ,   9991,      USD,  100000.00,      90000.00,         ,   Convert 100k USD to EUR @ 0.9375,
-    15, 2024-06-26,   9990,       ,      EUR,   93750.00,      90000.00,         ,   Convert 100k USD to EUR @ 0.9375,
-    16, 2024-06-26,       ,   9991,      USD,  200000.00,     180000.00,         ,   Convert 200k USD to EUR and CHF,
-    16, 2024-06-26,   9990,       ,      EUR,   93750.00,      90000.00,         ,   Convert 200k USD to EUR and CHF,
-    16, 2024-06-26,   9992,       ,      CHF,   90000.00,      90000.00,         ,   Convert 200k USD to EUR and CHF,
-        # Foreign currency transaction exceeding precision for exchange rates in CashCtrl
-    17, 2024-06-26,   9991,   9994,      USD,90000000.00,   81111111.11,         ,   Value 90 Mio USD @ 0.9012345679 with 10 digits precision,
-    18, 2024-06-26,       ,   9994,      USD, 9500000.00,    7888888.88,         ,   Convert 9.5 Mio USD to CHF @ 0.830409356 with 9 digits precision,
-    18, 2024-06-26,   9992,       ,      CHF, 7888888.88,              ,         ,   Convert 9.5 Mio USD to CHF @ 0.830409356 with 9 digits precision,
+    id,       date, account, contra, currency,      amount, report_amount, tax_code, description, document
+     1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,    1010,       ,      EUR,      120.00,        132.82,         , Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,    1020,       ,      JPY, 42000000.00,     298200.00,         , Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,        ,   3000,      USD,  1098332.82,              ,         , Opening balance, 2023/financials/balance_sheet.pdf
+     2, 2024-01-24,    1000,   4000,      USD,     1200.00,              ,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
+     3, 2024-04-12,        ,   1000,      USD,    21288.24,              ,         , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+     3,           ,    1010,   1000,      EUR,    20000.00,      21288.24,         , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+     4, 2024-05-25,    1010,   5000,      EUR,     -800.00,              ,   IN_STD, Purchase goods, 2024/payables/2024-05-25.pdf
+     5, 2024-05-05,    1000,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with tax, 2024/payables/2024-05-05.pdf
+     6, 2024-05-06,    1000,   5000,      USD,     -666.66,              ,   IN_RED, Purchase at reduced tax, 2024/payables/2024-05-06.pdf
+     7, 2024-05-07,    1000,       ,      USD,     -777.77,              ,   EXEMPT, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+     8, 2024-05-08,    1000,       ,      USD,     -888.88,              ,         , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+     8,           ,        ,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+     8,           ,        ,   5000,      USD,     -444.44,              ,   EXEMPT, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+     9, 2024-07-01,    1010,       ,      EUR,     1500.00,              ,         , Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,    4000,       ,      EUR,     1000.00,              ,  OUT_STD, Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,        ,   4000,      EUR,      500.00,              ,  OUT_RED, Sale at mixed VAT rate, /invoices/invoice_002.pdf
+    10, 2024-07-04,    1020,   1000,      JPY, 12345678.00,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+    10,           ,    1010,   1000,      EUR,    70791.78,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+    11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         , Payment from customer, 2024/banking/USD_2024-Q2.pdf
+    12, 2024-08-07,    1000,   2000,      USD,     -200.00,              ,         , Payment to supplier,
+    13, 2024-08-08,    2000,   1000,      USD,     1000.00,              ,         , Correction of previous entry,
+    14, 2024-08-08,    1010,   2010,      EUR,        0.00,              ,         , Zero amount transaction,
+    15, 2024-05-24,    1000,       ,      USD,      100.00,              ,  OUT_RED, Collective transaction with zero amount,
+    15,           ,    1000,       ,      USD,     -100.00,              ,  OUT_RED, Collective transaction with zero amount,
+    15,           ,    1000,       ,      USD,        0.00,              ,         , Collective transaction with zero amount,
+    16, 2024-05-24,    1000,   1005,      USD,      100.00,              ,         , Collective transaction - leg with debit and credit account,
+    16,           ,    1010,       ,      EUR,       20.00,         20.50,         , Collective transaction - leg with credit account,
+    16,           ,        ,   1015,      EUR,       20.00,         20.50,         , Collective transaction - leg with debit account,
+    17, 2024-09-09,    1010,   7050,      EUR,        0.00,         -5.55,         , Manual Foreign currency adjustment
+    18, 2024-09-10,    1020,       ,      JPY,        0.00,             0,         , Manual Foreign currency adjustment
+    18,           ,        ,   8050,      USD,        5.55,              ,         , Manual Foreign currency adjustment
+    19, 2024-12-01,    1000,   3000,      EUR, 10000000.00,              ,         , Capital Increase,
+    20, 2024-12-02,    1010,   2010,      EUR, 90000000.00,   91111111.10,         , Value 90 Mio USD @1.0123456789 (10 decimal places),
+    21, 2024-12-03,    2010,   1010,      EUR, 90000000.00,   91111111.10,         , Revert previous entry,
+    22, 2024-12-04,        ,   1000,      USD,  9500000.00,              ,         , Convert 9.5 Mio USD to EUR @1.050409356 (9 decimal places),
+    23, 2024-12-04,    1010,       ,      EUR,  9978888.88,    9500000.00,         , Convert 9.5 Mio USD to EUR @1.050409356 (9 decimal places),
+    24, 2024-12-05,        ,   1000,      USD,   200000.00,              ,         , Convert USD to EUR and JPY,
+    24,           ,    1010,       ,      EUR,    97750.00,     100000.00,         , Convert USD to EUR and JPY,
+    24,           ,    1020,       ,      CHF, 14285714.29,     100000.00,         , Convert USD to EUR and JPY,
 """
-
+LEDGER = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 # flake8: enable
 
 ASSETS_CSV = """
-    ticker, increment,  date
+    ticker,  increment, date
        AUD,      0.001, 2023-01-01
-       AUD,      0.01,  2024-01-02
-       CAD,      0.1,
-       CAD,      0.01,  2023-06-02
-       CHF,      1,     2022-01-03
-       EUR,      0.001,
-       EUR,      0.1,   2024-05-04
-       GBP,      0.01,  2023-07-05
-       JPY,      1,
+       AUD,       0.01, 2024-01-02
+       CAD,        0.1,
+       CAD,       0.01, 2023-06-02
+       TRY,          1, 2022-01-03
+       CHF,      0.001,
+       CHF,        0.1, 2024-05-04
+       EUR,       0.01,
+       GBP,       0.01, 2023-07-05
+       JPY,          1,
        NZD,      0.001, 2023-03-06
-       NOK,      0.1,
-       SEK,      0.01,  2023-08-07
-       USD,      0.001,
+       NOK,        0.1,
+       SEK,       0.01, 2023-08-07
+       USD,       0.01,
 """
-
-STRIPPED_CSV = "\n".join([line.strip() for line in LEDGER_CSV.split("\n")])
-
+ASSETS = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
 
 class BaseTest(ABC):
-    SETTINGS = {"REPORTING_CURRENCY": "CHF"}
-    TAX_CODES = LedgerEngine.standardize_tax_codes(
-        pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
-    )
-    ACCOUNTS = LedgerEngine.standardize_accounts(
-        pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
-    )
-    LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(pd.read_csv(
-        StringIO(STRIPPED_CSV), skipinitialspace=True, comment="#", skip_blank_lines=True
-    ))
-    ASSETS = LedgerEngine.standardize_assets(
-        pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
-    )
+    SETTINGS = {"REPORTING_CURRENCY": "USD"}
+    TAX_CODES = LedgerEngine.standardize_tax_codes(TAX_CODES)
+    ACCOUNTS = LedgerEngine.standardize_accounts(ACCOUNTS)
+    LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(LEDGER)
+    ASSETS = LedgerEngine.standardize_assets(ASSETS)

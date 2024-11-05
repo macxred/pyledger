@@ -957,7 +957,7 @@ class LedgerEngine(ABC):
         if invalid.any():
             df = ledger.loc[invalid, ["id", "tax_code"]]
             df = df.groupby("id").agg({"tax_code": lambda x: x.unique()})
-            for id, codes in zip(df["id"].values, df["tax_code"]):
+            for id, codes in df.iterrows():
                 if len(codes) > 1:
                     self._logger.warning(
                         f"Discard unknown tax codes {', '.join([f'{x}' for x in codes])} at '{id}'."
