@@ -1,5 +1,6 @@
 """Definition of abstract base class for testing."""
 
+import json
 import pandas as pd
 from abc import ABC
 from io import StringIO
@@ -123,6 +124,20 @@ REVALUATION_CSV = """
 """
 REVALUATION = pd.read_csv(StringIO(REVALUATION_CSV), skipinitialspace=True)
 
+EXPECTED_BALANCE_CSV = """
+    date,         account, balance
+    2023-12-31, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0}"
+    2024-01-01, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0}"
+    2024-01-01,      1000, "{reporting_currency: 800000.00, USD: 800000.0}"
+    2024-01-01,      1010, "{reporting_currency:    132.82, EUR:    120.0}"
+    2024-01-01,      1020, "{reporting_currency: 298200.00, JPY: 298200.0}"
+"""
+EXPECTED_BALANCE = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), skipinitialspace=True)
+EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
+                               .str.replace(r'(\w+):', r'"\1":', regex=True)
+                               .apply(json.loads))
+
+
 class BaseTest(ABC):
     SETTINGS = {"REPORTING_CURRENCY": "USD"}
     TAX_CODES = LedgerEngine.standardize_tax_codes(TAX_CODES)
@@ -131,3 +146,4 @@ class BaseTest(ABC):
     ASSETS = LedgerEngine.standardize_assets(ASSETS)
     PRICES = LedgerEngine.standardize_price_df(PRICES)
     REVALUATION = LedgerEngine.standardize_revaluations(REVALUATION)
+    EXPECTED_BALANCE = EXPECTED_BALANCE
