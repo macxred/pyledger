@@ -37,7 +37,7 @@ ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
 LEDGER_CSV = """
-    id,      date, account, contra, currency,      amount, report_amount, tax_code, description, document
+    id,       date, account, contra, currency,      amount, report_amount, tax_code, description, document
      1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Opening balance, 2023/financials/balance_sheet.pdf
      1,           ,    1010,       ,      EUR,      120.00,        132.82,         , Opening balance, 2023/financials/balance_sheet.pdf
      1,           ,    1020,       ,      JPY, 42000000.00,     298200.00,         , Opening balance, 2023/financials/balance_sheet.pdf
@@ -83,21 +83,21 @@ LEDGER = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 # flake8: enable
 
 ASSETS_CSV = """
-    ticker, increment,  date
+    ticker,  increment, date
        AUD,      0.001, 2023-01-01
-       AUD,      0.01,  2024-01-02
-       CAD,      0.1,
-       CAD,      0.01,  2023-06-02
-       TRY,      1,     2022-01-03
+       AUD,       0.01, 2024-01-02
+       CAD,        0.1,
+       CAD,       0.01, 2023-06-02
+       TRY,          1, 2022-01-03
        CHF,      0.001,
-       CHF,      0.1,   2024-05-04
-       EUR,      0.01,
-       GBP,      0.01,  2023-07-05
-       JPY,      1,
+       CHF,        0.1, 2024-05-04
+       EUR,       0.01,
+       GBP,       0.01, 2023-07-05
+       JPY,          1,
        NZD,      0.001, 2023-03-06
-       NOK,      0.1,
-       SEK,      0.01,  2023-08-07
-       USD,      0.01,
+       NOK,        0.1,
+       SEK,       0.01, 2023-08-07
+       USD,       0.01,
 """
 ASSETS = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
 
