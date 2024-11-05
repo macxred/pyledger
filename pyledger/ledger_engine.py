@@ -1090,6 +1090,7 @@ class LedgerEngine(ABC):
         # Fill missing (NA) dates
         df["date"] = df.groupby("id")["date"].ffill()
         df["date"] = df.groupby("id")["date"].bfill()
+        df["date"] = df["date"].dt.tz_localize(None).dt.floor('D')
 
         # Drop redundant report_amount for transactions in reporting currency
         set_na = (

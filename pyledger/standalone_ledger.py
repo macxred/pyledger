@@ -408,7 +408,7 @@ class StandaloneLedger(LedgerEngine):
         df = self.serialized_ledger()
         rows = df["account"] == int(account)
         if date is not None:
-            rows = rows & (df["date"] <= date)
+            rows = rows & (df["date"] <= pd.Timestamp(date))
         cols = ["amount", "report_amount", "currency"]
         if rows.sum() == 0:
             result = {"reporting_currency": 0.0}
