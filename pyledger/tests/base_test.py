@@ -115,23 +115,32 @@ PRICES_CSV = """
 """
 PRICES = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
 
-REVALUATION_CSV = """
+REVALUATIONS_CSV = """
     date,         account, debit, credit, description
     2024-03-31, 1000:2999,  7050,   8050, FX revaluations
     2024-06-30, 1000:2999,  7050,       , FX revaluations
     2024-09-30, 1000:2999,  7050,       , FX revaluations
     2024-12-31, 1000:2999,  7050,       , FX revaluations
 """
-REVALUATION = pd.read_csv(StringIO(REVALUATION_CSV), skipinitialspace=True)
+REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
     date,         account, balance
     2023-12-31, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0}"
     2024-01-01, 1000:9999, "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0}"
-    2024-01-01,      1000, "{reporting_currency: 800000.00, USD:   800000.00}"
-    2024-01-01,      1010, "{reporting_currency:    132.82, EUR:      120.00}"
-    2024-01-01,      1020, "{reporting_currency: 298200.00, JPY: 42000000.00}"
+    2024-01-01, 1000:1999, "{reporting_currency: 1098332.82, USD:   800000.00, EUR: 120.0, JPY: 42000000.0}"
+    2024-01-01,      1000, "{reporting_currency:  800000.00, USD:   800000.00}"
+    2024-01-01,      1010, "{reporting_currency:     132.82, EUR:      120.00}"
+    2024-01-01,      1020, "{reporting_currency:  298200.00, JPY: 42000000.00}"
+    2024-01-23,      1000, "{reporting_currency:  800000.00, USD:   800000.00}"
+    2024-01-23,      2200, "{reporting_currency:       0.00, USD:        0.00}"
+    2024-01-24,      1000, "{reporting_currency:  801200.00, USD:   801200.00}"
+    2024-01-24,      2200, "{reporting_currency:    -200.00, USD:     -200.00}"
+    2024-03-30, 1000:1999, "{reporting_currency: 1099532.82, USD:   801200.00, EUR: 120.0, JPY: 42000000.0}"
+    2024-03-31, 1000:1999, "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0}"
+    2024-03-31,      7050, "{reporting_currency:   21003.29, USD:    21003.29}"
+    2024-03-31,      8050, "{reporting_currency:       0.00, USD:        0.00}"
 """
 EXPECTED_BALANCE = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), skipinitialspace=True)
 EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
@@ -146,5 +155,5 @@ class BaseTest(ABC):
     LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(LEDGER)
     ASSETS = LedgerEngine.standardize_assets(ASSETS)
     PRICES = LedgerEngine.standardize_price_df(PRICES)
-    REVALUATION = LedgerEngine.standardize_revaluations(REVALUATION)
+    REVALUATIONS = LedgerEngine.standardize_revaluations(REVALUATIONS)
     EXPECTED_BALANCE = EXPECTED_BALANCE

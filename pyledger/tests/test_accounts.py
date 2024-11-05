@@ -18,10 +18,11 @@ class TestAccounts(BaseTestAccounts):
     def test_account_balance(self, ledger):
         ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS, tax_codes=self.TAX_CODES,
                        ledger=self.LEDGER_ENTRIES, assets=self.ASSETS)
-        # HACK: Add prices DataFrame directly to MemoryLedger.
-        #       Replace by ledger.restore(prices=self.PRICES) once accessors
-        #       and mutators for prices are implemented.
+        # HACK: Add prices and revaluations DataFrames directly to MemoryLedger.
+        #       Replace by ledger.restore(prices=self.PRICES, revaluations=self.REVALUATIONS)
+        #       once accessors and mutators for prices are implemented.
         ledger._prices = ledger.standardize_prices(self.PRICES)
+        ledger._revaluations = ledger.standardize_revaluations(self.REVALUATIONS)
         for _, row in self.EXPECTED_BALANCE.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
             account = row['account']
