@@ -621,11 +621,13 @@ class LedgerEngine(ABC):
                 for currency in (at_start | at_end).keys()
             }
 
-        result = {
-            ticker: self.round_to_precision(value, ticker=ticker, date=date)
-            for ticker, value in result.items()
-        }
-
+        # Type consistent return value Dict[str, float]
+        def _standardize_currency(ticker: str, x: float) -> float:
+            result = float(self.round_to_precision(x, ticker=ticker, date=date))
+            if result == -0.0:
+                result = 0.0
+            return result
+        result = {k: _standardize_currency(k, v) for k, v in result.items()}
         return result
 
     def account_history(

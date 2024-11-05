@@ -124,19 +124,20 @@ REVALUATION_CSV = """
 """
 REVALUATION = pd.read_csv(StringIO(REVALUATION_CSV), skipinitialspace=True)
 
+# flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
     date,         account, balance
     2023-12-31, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0}"
-    2024-01-01, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0}"
-    2024-01-01,      1000, "{reporting_currency: 800000.00, USD: 800000.0}"
-    2024-01-01,      1010, "{reporting_currency:    132.82, EUR:    120.0}"
-    2024-01-01,      1020, "{reporting_currency: 298200.00, JPY: 298200.0}"
+    2024-01-01, 1000:9999, "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0}"
+    2024-01-01,      1000, "{reporting_currency: 800000.00, USD:   800000.00}"
+    2024-01-01,      1010, "{reporting_currency:    132.82, EUR:      120.00}"
+    2024-01-01,      1020, "{reporting_currency: 298200.00, JPY: 42000000.00}"
 """
 EXPECTED_BALANCE = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), skipinitialspace=True)
 EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
                                .str.replace(r'(\w+):', r'"\1":', regex=True)
                                .apply(json.loads))
-
+# flake8: enable
 
 class BaseTest(ABC):
     SETTINGS = {"REPORTING_CURRENCY": "USD"}
