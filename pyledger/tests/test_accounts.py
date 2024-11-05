@@ -24,8 +24,9 @@ class TestAccounts(BaseTestAccounts):
         ledger._prices = ledger.standardize_prices(self.PRICES)
         for _, row in self.EXPECTED_BALANCE.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
+            account = row['account']
             expected = row['balance']
             actual = ledger.account_balance(date=date, account=row['account'])
             assert expected == actual, (
-                f"Account balance for {row['account']} on {date} of {actual} differs from {expected}."
+                f"Account balance for {account} on {date} of {actual} differs from {expected}."
             )

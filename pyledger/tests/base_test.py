@@ -49,7 +49,7 @@ LEDGER_CSV = """
      4, 2024-05-25,    1010,   5000,      EUR,     -800.00,              ,   IN_STD, Purchase goods, 2024/payables/2024-05-25.pdf
      5, 2024-05-05,    1000,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with tax, 2024/payables/2024-05-05.pdf
      6, 2024-05-06,    1000,   5000,      USD,     -666.66,              ,   IN_RED, Purchase at reduced tax, 2024/payables/2024-05-06.pdf
-     7, 2024-05-07,    1000,       ,      USD,     -777.77,              ,   EXEMPT, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+     7, 2024-05-07,    1000,   5000,      USD,     -777.77,              ,   EXEMPT, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
      8, 2024-05-08,    1000,       ,      USD,     -888.88,              ,         , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
      8,           ,        ,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
      8,           ,        ,   5000,      USD,     -444.44,              ,   EXEMPT, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
@@ -62,8 +62,8 @@ LEDGER_CSV = """
     12, 2024-08-07,    1000,   2000,      USD,     -200.00,              ,         , Payment to supplier,
     13, 2024-08-08,    2000,   1000,      USD,     1000.00,              ,         , Correction of previous entry,
     14, 2024-08-08,    1010,   2010,      EUR,        0.00,              ,         , Zero amount transaction,
-    15, 2024-05-24,    1000,       ,      USD,      100.00,              ,  OUT_RED, Collective transaction with zero amount,
-    15,           ,    1000,       ,      USD,     -100.00,              ,  OUT_RED, Collective transaction with zero amount,
+    15, 2024-05-24,    1000,       ,      USD,      100.00,              ,         , Collective transaction with zero amount,
+    15,           ,    1000,       ,      USD,     -100.00,              ,         , Collective transaction with zero amount,
     15,           ,    1000,       ,      USD,        0.00,              ,         , Collective transaction with zero amount,
     16, 2024-05-24,    1000,   1005,      USD,      100.00,              ,         , Collective transaction - leg with debit and credit account,
     16,           ,    1010,       ,      EUR,       20.00,         20.50,         , Collective transaction - leg with credit account,
