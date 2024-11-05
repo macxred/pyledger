@@ -5,7 +5,7 @@ from .base_accounts import BaseTestAccounts
 from pyledger import MemoryLedger
 
 
-class TestTaxCodes(BaseTestAccounts):
+class TestAccounts(BaseTestAccounts):
 
     @pytest.fixture
     def ledger(self):
