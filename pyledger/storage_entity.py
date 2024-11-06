@@ -149,37 +149,25 @@ class TabularEntity(AccountingEntity):
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
         merged = current.merge(
             incoming, on=self._id_columns, how="outer",
-            suffixes=('_current', '_incoming'), indicator=True
+            suffixes=('_current', ''), indicator=True
         )
 
         # Handle deletions
         if delete:
-            to_delete = merged[merged["_merge"] == "left_only"]
-            for _, row in to_delete.iterrows():
-                to_delete = row[~row.index.str.endswith("_incoming")].to_frame().T
-                to_delete.columns = to_delete.columns.str.replace("_current", "", regex=False)
-                self.delete(to_delete)
+            to_delete = merged.loc[merged["_merge"] == "left_only", self._id_columns]
+            self.delete(to_delete)
 
         # Handle additions
-        to_add = merged[merged["_merge"] == "right_only"]
-        for _, row in to_add.iterrows():
-            add = row[~row.index.str.endswith("_current")].to_frame().T
-            add.columns = add.columns.str.replace("_incoming", "", regex=False)
-            self.add(add)
+        to_add = merged.loc[merged["_merge"] == "right_only", incoming.columns]
+        self.add(to_add)
 
         # Handle updates
-        non_id_cols = [col for col in self._schema['column'] if col not in self._id_columns]
-        non_id_current_cols = [col + '_current' for col in non_id_cols]
-        non_id_incoming_cols = [col + '_incoming' for col in non_id_cols]
+        current_cols = merged.columns[merged.columns.str.endswith("_current")]
+        incoming_cols = current_cols.str.replace("_current$", "", regex=True)
         both_rows = merged[merged['_merge'] == 'both']
-        df_current = both_rows[non_id_current_cols]
-        df_incoming = both_rows[non_id_incoming_cols]
-        diff = df_current.ne(df_incoming).any(axis=1)
-        to_update = both_rows[diff]
-        for _, row in to_update.iterrows():
-            modify = row[~row.index.str.endswith("_current")].to_frame().T
-            modify.columns = modify.columns.str.replace("_incoming", "", regex=False)
-            self.modify(modify)
+        diff = both_rows[current_cols].ne(both_rows[incoming_cols]).any(axis=1)
+        to_update = both_rows.loc[diff, incoming.columns]
+        self.modify(to_update)
 
         return {
             "initial": len(current),
