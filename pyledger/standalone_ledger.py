@@ -146,7 +146,7 @@ class StandaloneLedger(LedgerEngine):
 
     def revaluation_entries(self, ledger: pd.DataFrame, revaluations: pd.DataFrame) -> pd.DataFrame:
         """Compute ledger entries for (currency or other) revaluations"""
-        revaluations = []
+        revaluation = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
             revalue = self.standardize_ledger_columns(pd.DataFrame(revaluations))
@@ -170,7 +170,7 @@ class StandaloneLedger(LedgerEngine):
                     amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
                     id = f"revaluation:{date}:{account}"
                     if amount != 0:
-                        revaluations.append({
+                        revaluation.append({
                             "id": id,
                             "date": date,
                             "account": account,
@@ -179,7 +179,7 @@ class StandaloneLedger(LedgerEngine):
                             "report_amount": amount,
                             "description": row["description"]
                         })
-                        revaluations.append({
+                        revaluation.append({
                             "id": id,
                             "date": date,
                             "account": row["credit"] if amount > 0 else row["debit"],
@@ -189,7 +189,7 @@ class StandaloneLedger(LedgerEngine):
                             "description": row["description"]
                         })
 
-        return self.standardize_ledger_columns(pd.DataFrame(revaluations))
+        return self.standardize_ledger_columns(pd.DataFrame(revaluation))
 
     def _balance_from_serialized_ledger(self,
                                         ledger: pd.DataFrame,

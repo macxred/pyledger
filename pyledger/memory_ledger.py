@@ -240,8 +240,9 @@ class MemoryLedger(StandaloneLedger):
     # ----------------------------------------------------------------------
     # Revaluations
 
-    def revaluations(self, *args, **kwargs) -> pd.DataFrame:
-        raise NotImplementedError("revaluations is not implemented yet.")
+    # HACK: return just private variable for now to make the test work
+    def revaluations(self) -> pd.DataFrame:
+        return self._revaluations
 
     # ----------------------------------------------------------------------
     # Price
@@ -255,8 +256,9 @@ class MemoryLedger(StandaloneLedger):
     def delete_price(self, *args, **kwargs) -> None:
         raise NotImplementedError("delete_price is not implemented yet.")
 
-    def price_history(self, *args, **kwargs) -> None:
-        raise NotImplementedError("price_history is not implemented yet.")
+    # HACK: return just private variable for now to make the test work
+    def price_history(self) -> pd.DataFrame:
+        return self._prices
 
     def price_increment(self, *args, **kwargs) -> None:
         raise NotImplementedError("price_increment is not implemented yet.")
