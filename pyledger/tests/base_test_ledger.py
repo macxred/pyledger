@@ -194,7 +194,7 @@ class BaseTestLedger(BaseTest):
             ledger_engine.modify_ledger_entry(target)
 
     def test_mirror_ledger(self, ledger_engine):
-        ledger_engine.mirror_accounts(self.ACCOUNTS, delete=False)
+        ledger_engine.accounts.mirror(self.ACCOUNTS, delete=False)
         # Mirror with one single and one collective transaction
         target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
         ledger_engine.mirror_ledger(target=target, delete=True)

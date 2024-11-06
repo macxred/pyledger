@@ -40,7 +40,7 @@ class StandaloneLedger(LedgerEngine):
         """
         tax_definitions = self.tax_codes().set_index("id").to_dict("index")
         tax_journal_entries = []
-        accounts = self.accounts()
+        accounts = self.accounts.list()
         for _, row in df.loc[df["tax_code"].notna()].iterrows():
             tax = tax_definitions[row["tax_code"]]
             account_tax_code = (

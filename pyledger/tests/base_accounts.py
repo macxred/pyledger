@@ -25,9 +25,9 @@ class BaseTestAccounts(BaseTest):
             "tax_code": "Test",
             "group": "/Assets",
         }
-        accounts = ledger.accounts()
-        ledger.add_account(**new_account)
-        updated_accounts = ledger.accounts()
+        accounts = ledger.accounts.list()
+        ledger.accounts.add(**new_account)
+        updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -39,7 +39,7 @@ class BaseTestAccounts(BaseTest):
         assert created_accounts["tax_code"].item() == "Test"
         assert created_accounts["group"].item() == new_account["group"]
 
-        accounts = ledger.accounts()
+        accounts = ledger.accounts.list()
         new_account = {
             "account": 1146,
             "currency": "CHF",
@@ -47,8 +47,8 @@ class BaseTestAccounts(BaseTest):
             "tax_code": None,
             "group": "/Assets",
         }
-        ledger.add_account(**new_account)
-        updated_accounts = ledger.accounts()
+        ledger.accounts.add(**new_account)
+        updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -60,7 +60,7 @@ class BaseTestAccounts(BaseTest):
         assert pd.isna(created_accounts["tax_code"].item())
         assert created_accounts["group"].item() == new_account["group"]
 
-        accounts = ledger.accounts()
+        accounts = ledger.accounts.list()
         new_account = {
             "account": 1146,
             "currency": "CHF",
@@ -68,8 +68,8 @@ class BaseTestAccounts(BaseTest):
             "tax_code": "Test",
             "group": "/Assets",
         }
-        ledger.modify_account(**new_account)
-        updated_accounts = ledger.accounts()
+        ledger.accounts.modify(**new_account)
+        updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         modified_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -81,7 +81,7 @@ class BaseTestAccounts(BaseTest):
         assert modified_accounts["tax_code"].item() == "Test"
         assert modified_accounts["group"].item() == new_account["group"]
 
-        accounts = ledger.accounts()
+        accounts = ledger.accounts.list()
         new_account = {
             "account": 1145,
             "currency": "USD",
@@ -89,8 +89,8 @@ class BaseTestAccounts(BaseTest):
             "tax_code": None,
             "group": "/Assets",
         }
-        ledger.modify_account(**new_account)
-        updated_accounts = ledger.accounts()
+        ledger.accounts.modify(**new_account)
+        updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
 
@@ -105,9 +105,9 @@ class BaseTestAccounts(BaseTest):
         assert pd.isna(created_accounts["tax_code"].item())
         assert created_accounts["group"].item() == new_account["group"]
 
-        ledger.delete_accounts(accounts=[1145])
-        ledger.delete_accounts(accounts=[1146])
-        updated_accounts = ledger.accounts()
+        ledger.accounts.delete(accounts=[1145])
+        ledger.accounts.delete(accounts=[1146])
+        updated_accounts = ledger.accounts.list()
         assert 1145 not in updated_accounts["account"].values
         assert 1146 not in updated_accounts["account"].values
 
@@ -121,15 +121,15 @@ class BaseTestAccounts(BaseTest):
             "tax_code": None,
             "group": "/Assets",
         }
-        ledger.add_account(**new_account)
+        ledger.accounts.add(**new_account)
         with pytest.raises(error_class, match=error_message):
-            ledger.add_account(**new_account)
+            ledger.accounts.add(**new_account)
 
     def test_modify_non_existed_raise_error(
         self, ledger, error_class=ValueError, error_message="not found or duplicated"
     ):
         with pytest.raises(error_class, match=error_message):
-            ledger.modify_account(
+            ledger.accounts.modify(
                 account=77777,
                 currency="EUR",
                 description="test account",
@@ -138,31 +138,31 @@ class BaseTestAccounts(BaseTest):
             )
 
     def test_mirror_accounts(self, ledger):
-        initial_accounts = ledger.accounts()
-        accounts = ledger.standardize_accounts(self.ACCOUNTS)
+        initial_accounts = ledger.accounts.list()
+        accounts = ledger.accounts.standardize(self.ACCOUNTS)
         target_df = pd.concat([accounts, initial_accounts], ignore_index=True)
-        target_df = ledger.standardize_accounts(target_df)
+        target_df = ledger.accounts.standardize(target_df)
         initial = target_df.copy()
-        ledger.mirror_accounts(target_df, delete=False)
-        mirrored_df = ledger.accounts()
+        ledger.accounts.mirror(target_df, delete=False)
+        mirrored_df = ledger.accounts.list()
         assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
         # Mirroring should not change the initial df
         assert_frame_equal(initial, target_df, ignore_row_order=True, check_like=True)
 
         target_df = target_df[~target_df["account"].isin([9995, 9996])]
-        ledger.mirror_accounts(target_df.copy(), delete=True)
-        mirrored_df = ledger.accounts()
+        ledger.accounts.mirror(target_df.copy(), delete=True)
+        mirrored_df = ledger.accounts.list()
         assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
 
         target_df = target_df.sample(frac=1).reset_index(drop=True)
         target_account = "2222"
         target_df.loc[target_df["account"] == target_account, "description"] = "Updated Text"
-        ledger.mirror_accounts(target_df.copy(), delete=True)
-        mirrored_df = ledger.accounts()
+        ledger.accounts.mirror(target_df.copy(), delete=True)
+        mirrored_df = ledger.accounts.list()
         assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_accounts(self, ledger):
         ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
-        assert not ledger.accounts().empty, "Accounts were not populated"
-        ledger.mirror_accounts(ledger.standardize_accounts(None), delete=True)
-        assert ledger.accounts().empty, "Mirroring empty df should erase all accounts"
+        assert not ledger.accounts.list().empty, "Accounts were not populated"
+        ledger.accounts.mirror(ledger.accounts.standardize(None), delete=True)
+        assert ledger.accounts.list().empty, "Mirroring empty df should erase all accounts"

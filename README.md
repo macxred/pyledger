@@ -86,7 +86,7 @@ from pyledger import TestLedger
 ledger = TestLedger()
 
 # Get accounts
-ledger.accounts()
+ledger.accounts.list()
 ##         currency tax_code                                        description
 ## account
 ## 1000         CHF      NaN                                       Cash on hand

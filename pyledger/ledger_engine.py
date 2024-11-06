@@ -115,7 +115,7 @@ class LedgerEngine(ABC):
                                   Defaults to None.
         """
         out = {}
-        for account in self.accounts().index.sort_values():
+        for account in self.accounts.list().index.sort_values():
             df = self._fetch_account_history(account)
             out[str(account)] = df.drop(columns="account")
         excel.write_sheets(out, path=file)
@@ -151,8 +151,8 @@ class LedgerEngine(ABC):
             archive.writestr('settings.json', json.dumps(settings))
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes().to_csv(index=False))
-            archive.writestr('accounts.csv', self.accounts().to_csv(index=False))
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
+            archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
         """Restore ledger system from a ZIP archive.
@@ -215,7 +215,7 @@ class LedgerEngine(ABC):
         if tax_codes is not None:
             self.mirror_tax_codes(tax_codes, delete=True)
         if accounts is not None:
-            self.mirror_accounts(accounts, delete=True)
+            self.accounts.mirror(accounts, delete=True)
         if ledger is not None:
             self.mirror_ledger(ledger, delete=True)
         # TODO: Implement price history and revaluation restoration logic
@@ -228,7 +228,7 @@ class LedgerEngine(ABC):
         """
         self.mirror_ledger(None, delete=True)
         self.mirror_tax_codes(None, delete=True)
-        self.mirror_accounts(None, delete=True)
+        self.accounts.mirror(None, delete=True)
         self.assets.mirror(None, delete=True)
         # TODO: Implement price history and revaluation clearing logic
 
@@ -394,7 +394,7 @@ class LedgerEngine(ABC):
         # Account balance per a single point in time
         if represents_integer(account):
             account = int(account)
-            if account not in self.accounts()[["account"]].values:
+            if account not in self.accounts.list()[["account"]].values:
                 raise ValueError(f"No account matching '{account}'.")
             out = self._fetch_account_history(account, start=start, end=end)
         elif (
@@ -464,7 +464,7 @@ class LedgerEngine(ABC):
         subtract = []
         if represents_integer(range):
             account = int(range)
-            if abs(account) in self.accounts()["account"].values:
+            if abs(account) in self.accounts.list()["account"].values:
                 if account >= 0:
                     add = [account]
                 else:
@@ -486,7 +486,7 @@ class LedgerEngine(ABC):
                     sequence = element.split(":")
                     first = int(sequence[0].strip())
                     last = int(sequence[1].strip())
-                    accounts = self.accounts()
+                    accounts = self.accounts.list()
                     in_range = (accounts["account"] >= first) & (accounts["account"] <= last)
                     accounts = list(accounts["account"][in_range])
                 elif re.match("[0-9]*", element.strip()):
@@ -710,7 +710,7 @@ class LedgerEngine(ABC):
             to_discard.append(df.reset_index()[["id", "description"]])
 
         # 2. Discard journal entries with undefined accounts
-        valid_accounts = self.accounts()["account"].values
+        valid_accounts = self.accounts.list()["account"].values
         invalid_accounts = []
         for col in ["account", "contra"]:
             invalid = ledger[col].notna() & ~ledger[col].isin(valid_accounts)
