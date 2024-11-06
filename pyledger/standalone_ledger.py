@@ -298,7 +298,7 @@ class StandaloneLedger(LedgerEngine):
             `price` history sorted by `date` with `NaT` values first.
         """
         result = {}
-        for (ticker, currency), group in self.price_history().groupby(["ticker", "currency"]):
+        for (ticker, currency), group in self.price_history.list().groupby(["ticker", "currency"]):
             group = group[["date", "price"]].sort_values("date", na_position="first")
             group = group.reset_index(drop=True)
             if ticker not in result.keys():
