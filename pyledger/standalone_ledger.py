@@ -327,7 +327,7 @@ class StandaloneLedger(LedgerEngine):
                 .sort_values("date", na_position="first")
                 .reset_index(drop=True)
             )
-            for ticker, group in self.assets().groupby("ticker")
+            for ticker, group in self.assets.list().groupby("ticker")
         }
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:

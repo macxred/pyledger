@@ -152,7 +152,7 @@ class LedgerEngine(ABC):
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts().to_csv(index=False))
-            archive.writestr('assets.csv', self.assets().to_csv(index=False))
+            archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
         """Restore ledger system from a ZIP archive.
@@ -211,7 +211,7 @@ class LedgerEngine(ABC):
         if settings is not None and "REPORTING_CURRENCY" in settings:
             self.reporting_currency = settings["REPORTING_CURRENCY"]
         if assets is not None:
-            self.mirror_assets(assets, delete=True)
+            self.assets.mirror(assets, delete=True)
         if tax_codes is not None:
             self.mirror_tax_codes(tax_codes, delete=True)
         if accounts is not None:
@@ -229,7 +229,7 @@ class LedgerEngine(ABC):
         self.mirror_ledger(None, delete=True)
         self.mirror_tax_codes(None, delete=True)
         self.mirror_accounts(None, delete=True)
-        self.mirror_assets(None, delete=True)
+        self.assets.mirror(None, delete=True)
         # TODO: Implement price history and revaluation clearing logic
 
     # ----------------------------------------------------------------------

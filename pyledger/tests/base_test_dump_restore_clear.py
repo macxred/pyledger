@@ -32,7 +32,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assets = ledger.standardize_assets(self.ASSETS)
         assert_frame_equal(
-            assets, ledger.assets(), ignore_row_order=True
+            assets, ledger.assets.list(), ignore_row_order=True
         )
         target = ledger.txn_to_str(self.LEDGER_ENTRIES).values()
         actual = ledger.txn_to_str(ledger.ledger()).values()
@@ -44,13 +44,13 @@ class BaseTestDumpRestoreClear(BaseTest):
         ledger.mirror_accounts(self.ACCOUNTS)
         ledger.mirror_tax_codes(self.TAX_CODES)
         ledger.mirror_ledger(self.LEDGER_ENTRIES)
-        ledger.mirror_assets(self.ASSETS)
+        ledger.assets.mirror(self.ASSETS)
 
         # Dumping current state
         accounts = ledger.accounts()
         tax_codes = ledger.tax_codes()
         ledger_entries = ledger.ledger()
-        assets = ledger.assets()
+        assets = ledger.assets.list()
         ledger.dump_to_zip(tmp_path / "ledger.zip")
 
         # Remove or alter data
@@ -63,7 +63,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             "Reporting currency was not restored"
         )
         assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, ignore_index=True)
-        assert_frame_equal(assets, ledger.assets(), ignore_row_order=True, ignore_index=True)
+        assert_frame_equal(assets, ledger.assets.list(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(
             accounts, ledger.accounts(), ignore_row_order=True, ignore_index=True
         )
@@ -82,5 +82,5 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert ledger.ledger().empty, "Ledger was not cleared"
         assert ledger.tax_codes().empty, "Tax codes were not cleared"
         assert ledger.accounts().empty, "Accounts was not cleared"
-        assert ledger.assets().empty, "Assets was not cleared"
+        assert ledger.assets.list().empty, "Assets was not cleared"
         # TODO: Expand test logic to test price history and revaluations when implemented
