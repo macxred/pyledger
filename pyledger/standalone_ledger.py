@@ -146,10 +146,10 @@ class StandaloneLedger(LedgerEngine):
 
     def revaluation_entries(self, ledger: pd.DataFrame, revaluations: pd.DataFrame) -> pd.DataFrame:
         """Compute ledger entries for (currency or other) revaluations"""
-        revaluation = []
+        result = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            revalue = self.standardize_ledger_columns(pd.DataFrame(revaluations))
+            revalue = self.standardize_ledger_columns(pd.DataFrame(result))
             df = self.serialize_ledger(pd.concat([ledger, revalue]))
             date = row["date"]
             accounts = self.account_range(row["account"])
@@ -170,7 +170,7 @@ class StandaloneLedger(LedgerEngine):
                     amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
                     id = f"revaluation:{date}:{account}"
                     if amount != 0:
-                        revaluation.append({
+                        result.append({
                             "id": id,
                             "date": date,
                             "account": account,
@@ -179,7 +179,7 @@ class StandaloneLedger(LedgerEngine):
                             "report_amount": amount,
                             "description": row["description"]
                         })
-                        revaluation.append({
+                        result.append({
                             "id": id,
                             "date": date,
                             "account": row["credit"] if amount > 0 else row["debit"],
@@ -189,7 +189,7 @@ class StandaloneLedger(LedgerEngine):
                             "description": row["description"]
                         })
 
-        return self.standardize_ledger_columns(pd.DataFrame(revaluation))
+        return self.standardize_ledger_columns(pd.DataFrame(result))
 
     def _balance_from_serialized_ledger(self,
                                         ledger: pd.DataFrame,
