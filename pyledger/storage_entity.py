@@ -193,10 +193,7 @@ class StandaloneTabularEntity(TabularEntity):
 
     def add(self, data: pd.DataFrame):
         current = self.list()
-        try:
-            incoming = self.standardize(pd.DataFrame(data))
-        except:
-            breakpoint()
+        incoming = self.standardize(pd.DataFrame(data))
         overlap = pd.merge(current, incoming, on=self._id_columns, how='inner')
         if not overlap.empty:
             raise ValueError("Unique identifiers already exist.")
