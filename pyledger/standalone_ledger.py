@@ -38,7 +38,7 @@ class StandaloneLedger(LedgerEngine):
             pd.DataFrame: A new DataFrame with tax journal entries.
             Returns empty DataFrame with the correct structure if no tax codes are present.
         """
-        tax_definitions = self.tax_codes().set_index("id").to_dict("index")
+        tax_definitions = self.tax_codes.list().set_index("id").to_dict("index")
         tax_journal_entries = []
         accounts = self.accounts.list()
         for _, row in df.loc[df["tax_code"].notna()].iterrows():

@@ -25,7 +25,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             "Reporting currency was not restored"
         )
         tax_codes = ledger.standardize_tax_codes(self.TAX_CODES)
-        assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, check_like=True)
+        assert_frame_equal(tax_codes, ledger.tax_codes.list(), ignore_row_order=True, check_like=True)
         accounts = ledger.standardize_accounts(self.ACCOUNTS)
         assert_frame_equal(
             accounts, ledger.accounts.list(), ignore_row_order=True, check_like=True
@@ -42,13 +42,13 @@ class BaseTestDumpRestoreClear(BaseTest):
         # Populate with test data
         ledger.reporting_currency = self.SETTINGS["REPORTING_CURRENCY"]
         ledger.accounts.mirror(self.ACCOUNTS)
-        ledger.mirror_tax_codes(self.TAX_CODES)
+        ledger.tax_codes.mirror(self.TAX_CODES)
         ledger.mirror_ledger(self.LEDGER_ENTRIES)
         ledger.assets.mirror(self.ASSETS)
 
         # Dumping current state
         accounts = ledger.accounts.list()
-        tax_codes = ledger.tax_codes()
+        tax_codes = ledger.tax_codes.list()
         ledger_entries = ledger.ledger()
         assets = ledger.assets.list()
         ledger.dump_to_zip(tmp_path / "ledger.zip")
@@ -62,7 +62,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
         )
-        assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, ignore_index=True)
+        assert_frame_equal(tax_codes, ledger.tax_codes.list(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(assets, ledger.assets.list(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(
             accounts, ledger.accounts.list(), ignore_row_order=True, ignore_index=True
@@ -80,7 +80,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         ledger.clear()
         assert ledger.ledger().empty, "Ledger was not cleared"
-        assert ledger.tax_codes().empty, "Tax codes were not cleared"
+        assert ledger.tax_codes.list().empty, "Tax codes were not cleared"
         assert ledger.assets.list().empty, "Assets was not cleared"
         assert ledger.accounts.list().empty, "Accounts was not cleared"
         # TODO: Expand test logic to test price history and revaluations when implemented

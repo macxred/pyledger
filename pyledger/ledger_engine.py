@@ -150,7 +150,7 @@ class LedgerEngine(ABC):
             settings["REPORTING_CURRENCY"] = self.reporting_currency
             archive.writestr('settings.json', json.dumps(settings))
             archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
-            archive.writestr('tax_codes.csv', self.tax_codes().to_csv(index=False))
+            archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
 
@@ -213,7 +213,7 @@ class LedgerEngine(ABC):
         if assets is not None:
             self.assets.mirror(assets, delete=True)
         if tax_codes is not None:
-            self.mirror_tax_codes(tax_codes, delete=True)
+            self.tax_codes.mirror(tax_codes, delete=True)
         if accounts is not None:
             self.accounts.mirror(accounts, delete=True)
         if ledger is not None:
@@ -227,7 +227,7 @@ class LedgerEngine(ABC):
         restoring the system to a pristine state.
         """
         self.mirror_ledger(None, delete=True)
-        self.mirror_tax_codes(None, delete=True)
+        self.tax_codes.mirror(None, delete=True)
         self.accounts.mirror(None, delete=True)
         self.assets.mirror(None, delete=True)
         # TODO: Implement price history and revaluation clearing logic
@@ -683,7 +683,7 @@ class LedgerEngine(ABC):
         """
         # Discard undefined tax codes
         ledger["tax_code"] = ledger["tax_code"].str.strip()
-        invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(self.tax_codes()["id"])
+        invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(self.tax_codes.list()["id"])
         if invalid.any():
             df = ledger.loc[invalid, ["id", "tax_code"]]
             df = df.groupby("id").agg({"tax_code": lambda x: x.unique()})
