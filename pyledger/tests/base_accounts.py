@@ -26,7 +26,7 @@ class BaseTestAccounts(BaseTest):
             "group": "/Assets",
         }
         accounts = ledger.accounts.list()
-        ledger.accounts.add(**new_account)
+        ledger.accounts.add([new_account])
         updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
@@ -47,7 +47,7 @@ class BaseTestAccounts(BaseTest):
             "tax_code": None,
             "group": "/Assets",
         }
-        ledger.accounts.add(**new_account)
+        ledger.accounts.add([new_account])
         updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
@@ -68,7 +68,7 @@ class BaseTestAccounts(BaseTest):
             "tax_code": "Test",
             "group": "/Assets",
         }
-        ledger.accounts.modify(**new_account)
+        ledger.accounts.modify([new_account])
         updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         modified_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
@@ -89,7 +89,7 @@ class BaseTestAccounts(BaseTest):
             "tax_code": None,
             "group": "/Assets",
         }
-        ledger.accounts.modify(**new_account)
+        ledger.accounts.modify([new_account])
         updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
         created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
@@ -105,14 +105,14 @@ class BaseTestAccounts(BaseTest):
         assert pd.isna(created_accounts["tax_code"].item())
         assert created_accounts["group"].item() == new_account["group"]
 
-        ledger.accounts.delete(accounts=[1145])
-        ledger.accounts.delete(accounts=[1146])
+        ledger.accounts.delete({"account": [1145]})
+        ledger.accounts.delete({"account": [1146]})
         updated_accounts = ledger.accounts.list()
         assert 1145 not in updated_accounts["account"].values
         assert 1146 not in updated_accounts["account"].values
 
     def test_add_already_existed_raise_error(
-        self, ledger, error_class=ValueError, error_message="already exists"
+        self, ledger, error_class=ValueError, error_message="already exist"
     ):
         new_account = {
             "account": 77777,
@@ -121,21 +121,21 @@ class BaseTestAccounts(BaseTest):
             "tax_code": None,
             "group": "/Assets",
         }
-        ledger.accounts.add(**new_account)
+        ledger.accounts.add([new_account])
         with pytest.raises(error_class, match=error_message):
-            ledger.accounts.add(**new_account)
+            ledger.accounts.add([new_account])
 
     def test_modify_non_existed_raise_error(
-        self, ledger, error_class=ValueError, error_message="not found or duplicated"
+        self, ledger, error_class=ValueError, error_message="Some elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
-            ledger.accounts.modify(
-                account=77777,
-                currency="EUR",
-                description="test account",
-                tax_code="Test",
-                group="/Assets",
-            )
+            ledger.accounts.modify([{
+                "account": 77777,
+                "currency": "CHF",
+                "description": "test account",
+                "tax_code": None,
+                "group": "/Assets",
+            }])
 
     def test_mirror_accounts(self, ledger):
         initial_accounts = ledger.accounts.list()
