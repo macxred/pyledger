@@ -1345,21 +1345,6 @@ class LedgerEngine(ABC):
 
         return df
 
-    @classmethod
-    def standardize_prices(cls, df: pd.DataFrame) -> pd.DataFrame:
-        """Store prices in nested dict: Each prices[ticker][currency] is a DataFrame with
-        columns 'date' and 'price' that is sorted by 'date'.
-        """
-        df = cls.standardize_price_df(df)
-        result = {}
-        for (ticker, currency), group in df.groupby(["ticker", "currency"]):
-            group = group[["date", "price"]].sort_values("date")
-            group = group.reset_index(drop=True)
-            if ticker not in result.keys():
-                result[ticker] = {}
-            result[ticker][currency] = group
-        return result
-
     # ----------------------------------------------------------------------
     # Assets
 

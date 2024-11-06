@@ -24,7 +24,6 @@ class MemoryLedger(StandaloneLedger):
         super().__init__()
         self._reporting_currency = reporting_currency
         self._ledger = self.standardize_ledger(None)
-        self._prices = self.standardize_prices(None)
         self._tax_codes = self.standardize_tax_codes(None)
         self._accounts = self.standardize_accounts(None)
         self._assets = self.standardize_assets(None)
@@ -141,6 +140,9 @@ class MemoryLedger(StandaloneLedger):
     def ledger(self) -> pd.DataFrame:
         return self.standardize_ledger(self._ledger.copy())
 
+    def ledger_entry(self, *args, **kwargs) -> None:
+        raise NotImplementedError("ledger_entry is not implemented yet.")
+
     def add_ledger_entry(self, entry: pd.DataFrame) -> int:
         entry = self.standardize_ledger(entry)
         if entry["id"].nunique() != 1:
@@ -234,3 +236,29 @@ class MemoryLedger(StandaloneLedger):
         else:
             if not allow_missing:
                 raise ValueError(f"Asset with ticker '{ticker}' and date '{date}' not found.")
+
+    # ----------------------------------------------------------------------
+    # Revaluations
+
+    # HACK: return just private variable for now to make the test work
+    def revaluations(self) -> pd.DataFrame:
+        return self._revaluations
+
+    # ----------------------------------------------------------------------
+    # Price
+
+    def add_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("add_price is not implemented yet.")
+
+    def modify_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("modify_price is not implemented yet.")
+
+    def delete_price(self, *args, **kwargs) -> None:
+        raise NotImplementedError("delete_price is not implemented yet.")
+
+    # HACK: return just private variable for now to make the test work
+    def price_history(self) -> pd.DataFrame:
+        return self._prices
+
+    def price_increment(self, *args, **kwargs) -> None:
+        raise NotImplementedError("price_increment is not implemented yet.")
