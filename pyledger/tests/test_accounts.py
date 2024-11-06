@@ -22,7 +22,6 @@ class TestAccounts(BaseTestAccounts):
         #       Replace by ledger.restore(prices=self.PRICES, revaluations=self.REVALUATIONS)
         #       once accessors and mutators for prices are implemented.
         ledger._prices = self.PRICES
-        ledger._prices = ledger._prices_as_dict_of_df
         ledger._revaluations = ledger.standardize_revaluations(self.REVALUATIONS)
         for _, row in self.EXPECTED_BALANCE.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
