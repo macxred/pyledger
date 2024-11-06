@@ -50,6 +50,10 @@ class LedgerEngine(ABC):
         return self._assets
 
     @property
+    def ledger(self) -> TabularEntity:
+        return self._ledger
+
+    @property
     def revaluations(self) -> TabularEntity:
         return self._revaluations
 
@@ -515,18 +519,6 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Ledger
 
-    @abstractmethod
-    def ledger(self) -> pd.DataFrame:
-        """Retrieves a DataFrame representing all ledger transactions.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `id` (str), `date` (datetime),
-            `document` (str), `amounts` (DataFrame). `amounts` is a nested
-            pd.DataFrame with columns `account` (int), `contra`
-            (int or None), `currency` (str), `amount` (float),
-            `report_amount` (float or None), and `tax_code` (str).
-        """
-
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with a long representation of all ledger transactions.
 
@@ -540,140 +532,7 @@ class LedgerEngine(ABC):
                          `amount` (float), `report_amount` (float or None),
                          `tax_code` (str), and `document` (str).
         """
-        return self.serialize_ledger(self.ledger())
-
-    @abstractmethod
-    def ledger_entry(self, id: str) -> dict:
-        """Retrieves a specific ledger entry by its ID.
-
-        Args:
-            id (str): The unique identifier for the ledger entry.
-
-        Returns:
-            dict: A dictionary representing the ledger entry.
-        """
-
-    @abstractmethod
-    def add_ledger_entry(
-        self, date: datetime.date, document: str, amounts: pd.DataFrame
-    ) -> None:
-        """Adds a new posting to the ledger.
-
-        Args:
-            date (datetime.date): Date of the transaction.
-            document (str): Reference to the associated document.
-            amounts (pd.DataFrame): DataFrame detailing transaction amounts.
-            Columns include: `account` (int), `contra` (int, optional),
-            `currency` (str), `amount` (float), `report_amount` (float, optional),
-            `tax_code` (str, optional).
-        """
-
-    @abstractmethod
-    def modify_ledger_entry(self, id: str, new_data: dict) -> None:
-        """Modifies an existing ledger entry.
-
-        Args:
-            id (str): Unique identifier of the ledger entry to be modified.
-            new_data (dict): Fields to be overwritten in the ledger entry.
-                             Keys typically include `date` (datetime.date),
-                             `document` (str), or `amounts` (pd.DataFrame).
-        """
-
-    @abstractmethod
-    def delete_ledger_entries(self, ids: List[str] = []) -> None:
-        """Deletes a ledger entry by its ID.
-
-        Args:
-            ids (List[str]): The ids of the ledger entries to be deleted.
-        """
-
-    def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
-        """Aligns ledger entries with a desired target state.
-
-        Args:
-            target (pd.DataFrame): DataFrame with ledger entries in pyledger format.
-            delete (bool, optional): If True, deletes existing ledger that are not
-                                     present in the target data.
-
-        Returns:
-            dict: A dictionary containing statistics about the mirroring process:
-                - pre-existing (int): The number of transactions present before mirroring.
-                - targeted (int): The number of transactions in the target data.
-                - added (int): The number of new transactions that were added.
-                - deleted (int): The number of deleted transactions.
-        """
-        # Standardize data frame schema, discard incoherent entries with a warning
-        target = self.standardize_ledger(target)
-        target = self.sanitize_ledger(target)
-
-        # Nest to create one row per transaction, add unique string identifier
-        def process_ledger(df: pd.DataFrame) -> pd.DataFrame:
-            df = nest(
-                df,
-                columns=[col for col in df.columns if col not in ["id", "date"]],
-                key="txn",
-            )
-            df["txn_str"] = [
-                f"{str(date)},{df_to_consistent_str(txn)}"
-                for date, txn in zip(df["date"], df["txn"])
-            ]
-            return df
-
-        remote = process_ledger(self.ledger())
-        target = process_ledger(target)
-        if target["id"].duplicated().any():
-            # We expect nesting to combine all rows with the same
-            raise ValueError("Non-unique dates in `target` transactions.")
-
-        # Count occurrences of each unique transaction in target and remote,
-        # find number of additions and deletions for each unique transaction
-        count = pd.DataFrame({
-            "remote": remote["txn_str"].value_counts(),
-            "target": target["txn_str"].value_counts(),
-        })
-        count = count.fillna(0).reset_index(names="txn_str")
-        count["n_add"] = (count["target"] - count["remote"]).clip(lower=0).astype(int)
-        count["n_delete"] = (count["remote"] - count["target"]).clip(lower=0).astype(int)
-
-        # Delete unneeded transactions on remote
-        if delete and any(count["n_delete"] > 0):
-            ids = [
-                id
-                for txn_str, n in zip(count["txn_str"], count["n_delete"])
-                if n > 0
-                for id in remote.loc[remote["txn_str"] == txn_str, "id"]
-                .tail(n=n)
-                .values
-            ]
-            self.delete_ledger_entries(ids)
-
-        # Add missing transactions to remote
-        for txn_str, n in zip(count["txn_str"], count["n_add"]):
-            if n > 0:
-                txn = unnest(
-                    target.loc[target["txn_str"] == txn_str, :].head(1), "txn"
-                )
-                txn.drop(columns="txn_str", inplace=True)
-                if txn["id"].dropna().nunique() > 0:
-                    id = txn["id"].dropna().unique()[0]
-                else:
-                    id = txn["description"].iat[0]
-                for _ in range(n):
-                    try:
-                        self.add_ledger_entry(txn)
-                    except Exception as e:
-                        raise Exception(
-                            f"Error while adding ledger entry {id}: {e}"
-                        ) from e
-
-        # return number of elements found, targeted, changed:
-        stats = {
-            "pre-existing": int(count["remote"].sum()),
-            "targeted": int(count["target"].sum()),
-            "added": count["n_add"].sum(),
-            "deleted": count["n_delete"].sum() if delete else 0,
-        }
-        return stats
+        return self.serialize_ledger(self.ledger.list())
 
     def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
         """Discards inconsistent ledger entries and inconsistent tax codes.
@@ -762,86 +621,6 @@ class LedgerEngine(ABC):
             ledger = ledger.loc[~ledger["id"].isin(df.index), :]
 
         return ledger
-
-    @staticmethod
-    def standardize_ledger_columns(df: pd.DataFrame = None,
-                                   keep_extra_columns: bool = True) -> pd.DataFrame:
-        """Standardizes and enforces type consistency for the ledger DataFrame.
-
-        Ensures that the required columns are present in the ledger DataFrame,
-        adds any missing optional columns with None values, and enforces
-        specific data types for each column.
-
-        Args:
-            ledger (pd.DataFrame, optional): A data frame with ledger transactions
-                                             Defaults to None.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
-
-        Returns:
-            pd.DataFrame: A standardized DataFrame with both the required and
-            optional columns with enforced data types.
-
-        Raises:
-            ValueError: If required columns are missing from the ledger DataFrame.
-        """
-        # Enforce data frame schema
-        df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=False,
-                            keep_extra_columns=keep_extra_columns)
-
-        # Add id column if missing: Entries without a date share id of the last entry with a date
-        if "id" not in df.columns or df["id"].isna().any():
-            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'id', 'dtype'].item()
-            df["id"] = df["date"].notna().cumsum().astype(id_type)
-
-        # Enforce column data types
-        date_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'date', 'dtype'].item()
-        df["date"] = pd.to_datetime(df["date"]).dt.date.astype(date_type)
-
-        return df
-
-    def standardize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Convert ledger entries to a canonical representation.
-
-        This method converts ledger entries into a standardized format. It
-        ensures uniformity where transactions can be defined in various
-        equivalent ways, allowing for easy identification of equivalent
-        entries.
-
-        Args:
-            df (pd.DataFrame): A data frame with ledger transactions.
-
-        Returns:
-            pd.DataFrame: A DataFrame with ledger entries in canonical form.
-
-        Notes:
-            - The method removes redundant 'report_amount' values for
-            transactions in the reporting currency.
-            - It fills missing dates in collective transactions with dates from
-            other line items in the same collective transaction.
-        """
-        df = self.standardize_ledger_columns(df).copy()
-
-        # Fill missing (NA) dates
-        df["date"] = df.groupby("id")["date"].ffill()
-        df["date"] = df.groupby("id")["date"].bfill()
-        df["date"] = df["date"].dt.tz_localize(None).dt.floor('D')
-
-        # Drop redundant report_amount for transactions in reporting currency
-        set_na = (
-            (df["currency"] == self.reporting_currency)
-            & (df["report_amount"].isna() | (df["report_amount"] == df["amount"]))
-        )
-        df.loc[set_na, "report_amount"] = pd.NA
-
-        # Remove leading and trailing spaces in strings, convert -0.0 to 0.0
-        for col in df.columns:
-            if pd.StringDtype.is_dtype(df[col]):
-                df[col] = df[col].str.strip()
-            elif pd.Float64Dtype.is_dtype(df[col]):
-                df.loc[df[col].notna() & (df[col] == 0), col] = 0.0
-
-        return df
 
     def serialize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
         """Serializes the ledger into a long format.
