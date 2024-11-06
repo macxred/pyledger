@@ -10,6 +10,9 @@ class AccountingEntity(ABC):
     tax codes or configuration settings.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     @abstractmethod
     def standardize(self, data):
         pass
@@ -42,8 +45,8 @@ class TabularEntity(AccountingEntity):
     consistent pandas DataFrames in each entity's specific column schema.
     """
 
-    def __init__(self, schema, prepare_for_mirroring = lambda x: x):
-        super().__init__()
+    def __init__(self, schema, prepare_for_mirroring=lambda x: x, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._schema = schema
         self._id_columns = schema.query("id == True")["column"].to_list()
         self._prepare_for_mirroring = prepare_for_mirroring
@@ -184,8 +187,8 @@ class StandaloneTabularEntity(TabularEntity):
     relying on an external system.
     """
 
-    def __init__(self, schema, prepare_for_mirroring = lambda x: x):
-        super().__init__(schema, prepare_for_mirroring)
+    def __init__(self, schema, prepare_for_mirroring=lambda x: x, *args, **kwargs):
+        super().__init__(schema, prepare_for_mirroring, *args, **kwargs)
 
     @abstractmethod
     def _store(self, data: pd.DataFrame):
@@ -227,8 +230,8 @@ class StandaloneTabularEntity(TabularEntity):
 class DataFrameEntity(StandaloneTabularEntity):
     """Stores tabular accounting data as a DataFrame in memory."""
 
-    def __init__(self, schema, prepare_for_mirroring = lambda x: x):
-        super().__init__(schema, prepare_for_mirroring)
+    def __init__(self, schema, *args, **kwargs):
+        super().__init__(schema, *args, **kwargs)
         self._df = self.standardize(None)
 
     def list(self) -> pd.DataFrame:
