@@ -21,8 +21,8 @@ class TestAccounts(BaseTestAccounts):
         # HACK: Add prices and revaluations DataFrames directly to MemoryLedger.
         #       Replace by ledger.restore(prices=self.PRICES, revaluations=self.REVALUATIONS)
         #       once accessors and mutators for prices are implemented.
-        ledger._prices = self.PRICES
-        ledger._revaluations = ledger.standardize_revaluations(self.REVALUATIONS)
+        ledger._price_history.add(self.PRICES)
+        ledger._revaluations.add(self.REVALUATIONS)
         for _, row in self.EXPECTED_BALANCE.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
             account = row['account']
