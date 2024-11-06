@@ -41,18 +41,23 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Storage entities
 
+    @property
     def accounts(self) -> TabularEntity:
         return self._accounts
 
+    @property
     def assets(self) -> TabularEntity:
         return self._assets
 
+    @property
     def revaluations(self) -> TabularEntity:
         return self._revaluations
 
+    @property
     def tax_codes(self) -> TabularEntity:
         return self._tax_codes
 
+    @property
     def price_history(self) -> TabularEntity:
         return self._price_history
 

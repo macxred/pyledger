@@ -43,8 +43,9 @@ class TabularEntity(AccountingEntity):
     """
 
     def __init__(self, schema, prepare_for_mirroring = lambda x: x):
+        super().__init__()
         self._schema = schema
-        self._id_columns = schema.query("id == True")["column"]
+        self._id_columns = schema.query("id == True")["column"].to_list()
         self._prepare_for_mirroring = prepare_for_mirroring
 
     def standardize(self, data: pd.DataFrame | None, keep_extra_columns=False) -> pd.DataFrame:
@@ -147,22 +148,24 @@ class TabularEntity(AccountingEntity):
         current = self.list()
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
         merged = current.merge(
-            incoming, on=self._id_columns, how="outer", suffixes=('_current', '_incoming'),
-            indicator=True
+            incoming, on=self._id_columns, how="outer",
+            suffixes=('_current', '_incoming'), indicator=True
         )
 
         # Handle deletions
         if delete:
             to_delete = merged[merged["_merge"] == "left_only"]
             for _, row in to_delete.iterrows():
-                self.delete(ticker=row["ticker"], date=row["date"])
+                to_delete = row[~row.index.str.endswith("_incoming")].to_frame().T
+                to_delete.columns = to_delete.columns.str.replace("_current", "", regex=False)
+                self.delete(to_delete)
 
         # Handle additions
         to_add = merged[merged["_merge"] == "right_only"]
         for _, row in to_add.iterrows():
-            self.add(
-                ticker=row["ticker"], increment=row["increment_incoming"], date=row["date"]
-            )
+            add = row[~row.index.str.endswith("_current")].to_frame().T
+            add.columns = add.columns.str.replace("_incoming", "", regex=False)
+            self.add(add)
 
         # Handle updates
         non_id_cols = [col for col in self._schema['column'] if col not in self._id_columns]
@@ -174,8 +177,9 @@ class TabularEntity(AccountingEntity):
         diff = df_current.ne(df_incoming).any(axis=1)
         to_update = both_rows[diff]
         for _, row in to_update.iterrows():
-            # TODO: Only use '_incoming' columns, drop '_incoming' from names.
-            self.modify(**row)
+            modify = row[~row.index.str.endswith("_current")].to_frame().T
+            modify.columns = modify.columns.str.replace("_incoming", "", regex=False)
+            self.modify(modify)
 
         return {
             "initial": len(current),
@@ -192,52 +196,58 @@ class StandaloneTabularEntity(TabularEntity):
     relying on an external system.
     """
 
+    def __init__(self, schema, prepare_for_mirroring = lambda x: x):
+        super().__init__(schema, prepare_for_mirroring)
+
     @abstractmethod
     def _store(self, data: pd.DataFrame):
         """Update storage with an updated version of the DataFrame."""
 
     def add(self, data: pd.DataFrame):
         current = self.list()
-        incoming = self.standardize(pd.DataFrame(data))
-        overlap = pd.merge(current, incoming, on=self.id_columns, how='inner')
+        try:
+            incoming = self.standardize(pd.DataFrame(data))
+        except:
+            breakpoint()
+        overlap = pd.merge(current, incoming, on=self._id_columns, how='inner')
         if not overlap.empty:
             raise ValueError("Unique identifiers already exist.")
-        self._store(pd.concat([self.current, incoming], ignore_index=True))
+        self._store(pd.concat([current, incoming], ignore_index=True))
 
     def modify(self, data: pd.DataFrame):
         current = self.list()
         incoming = self.standardize(pd.DataFrame(data))
-        missing = pd.merge(incoming, self.current, on=self.id_columns, how='left', indicator=True)
-        if not missing.empty:
+        missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
+        if not missing[missing['_merge'] != 'both'].empty:
             raise ValueError("Some elements in 'data' are not present.")
         for _, row in incoming.iterrows():
-            mask = (current[self.id_columns] == incoming[incoming.id_columns].values).all(axis=1)
-            if current.columns != incoming.columns:
+            mask = (current[self._id_columns] == incoming[self._id_columns].values).all(axis=1)
+            if current.columns.to_list() != incoming.columns.to_list():
                 raise NotImplementedError(
                     "Modify with a differing set of columns is not implemented yet.")
-            self.current.loc[mask] = incoming
+            current.loc[mask] = incoming.values
         self._store(current)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
         current = self.list()
         incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
         if not allow_missing:
-            missing = pd.merge(incoming, current, on=self.id_columns, how='left', indicator=True)
-            if not missing.empty:
-               raise ValueError("Some ids are not present in the data.")
-        new = current.merge(id, on=self.id_columns, how='left', indicator=True)
+            missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
+            if not missing[missing['_merge'] != 'both'].empty:
+                raise ValueError("Some ids are not present in the data.")
+        new = current.merge(incoming, on=self._id_columns, how='left', indicator=True)
         new = new[new['_merge'] == 'left_only'].drop(columns=['_merge'])
         self._store(new)
 
 class DataFrameEntity(StandaloneTabularEntity):
     """Stores tabular accounting data as a DataFrame in memory."""
 
-    def __init__(self):
-        super.__init__(self)
+    def __init__(self, schema, prepare_for_mirroring = lambda x: x):
+        super().__init__(schema, prepare_for_mirroring)
         self._df = self.standardize(None)
 
     def list(self) -> pd.DataFrame:
-        self._df.copy()
+        return self._df.copy()
 
     def _store(self, data: pd.DataFrame):
         self._df = data.reset_index(drop=True)
