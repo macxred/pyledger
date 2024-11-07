@@ -33,4 +33,6 @@ from .tests import (
     BaseTestAccounts,
     BaseTestLedger,
     BaseTestDumpRestoreClear,
+    BaseTestAssets,
+    BaseTestPriceHistory,
 )
