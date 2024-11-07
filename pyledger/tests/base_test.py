@@ -151,10 +151,10 @@ EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
 class BaseTest(ABC):
     engine = MemoryLedger()
     SETTINGS = {"REPORTING_CURRENCY": "USD"}
-    TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
-    ACCOUNTS = engine.accounts.standardize(ACCOUNTS)
-    LEDGER_ENTRIES = engine.standardize_ledger_columns(LEDGER)
     ASSETS = engine.assets.standardize(ASSETS)
+    ACCOUNTS = engine.accounts.standardize(ACCOUNTS)
     PRICES = engine.price_history.standardize(PRICES)
+    LEDGER_ENTRIES = engine.ledger.standardize(LEDGER)
+    TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
     EXPECTED_BALANCE = EXPECTED_BALANCE

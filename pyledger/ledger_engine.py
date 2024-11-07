@@ -158,7 +158,7 @@ class LedgerEngine(ABC):
             settings = {}
             settings["REPORTING_CURRENCY"] = self.reporting_currency
             archive.writestr('settings.json', json.dumps(settings))
-            archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
+            archive.writestr('ledger.csv', self.ledger.list().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
@@ -226,7 +226,7 @@ class LedgerEngine(ABC):
         if accounts is not None:
             self.accounts.mirror(accounts, delete=True)
         if ledger is not None:
-            self.mirror_ledger(ledger, delete=True)
+            self.ledger.mirror(ledger, delete=True)
         # TODO: Implement price history and revaluation restoration logic
 
     def clear(self):
@@ -235,7 +235,7 @@ class LedgerEngine(ABC):
         This method removes all entries from the ledger, tax codes, accounts, etc.
         restoring the system to a pristine state.
         """
-        self.mirror_ledger(None, delete=True)
+        self.ledger.mirror(None, delete=True)
         self.tax_codes.mirror(None, delete=True)
         self.accounts.mirror(None, delete=True)
         self.assets.mirror(None, delete=True)
@@ -662,7 +662,7 @@ class LedgerEngine(ABC):
             Dict[str, str]: A dictionary where keys are ledger 'id's and values are
             unique string representations of the transactions.
         """
-        df = self.standardize_ledger(df)
+        df = self.ledger.standardize(df)
         df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
         if df['id'].duplicated().any():
             raise ValueError("Some collective transaction(s) have non-unique date.")

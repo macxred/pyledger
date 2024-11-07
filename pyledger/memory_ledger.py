@@ -1,8 +1,6 @@
 """This module implements the MemoryLedger class."""
 
-import datetime
 import pandas as pd
-from typing import List
 from .standalone_ledger import StandaloneLedger
 from .storage_entity import DataFrameEntity, LedgerDataFrameEntity
 from .constants import (
@@ -31,13 +29,13 @@ class MemoryLedger(StandaloneLedger):
         """
         super().__init__()
         self._reporting_currency = reporting_currency
-        self._accounts = DataFrameEntity(ACCOUNT_SCHEMA)
         self._assets = DataFrameEntity(ASSETS_SCHEMA)
-        self._ledger = LedgerDataFrameEntity(LEDGER_SCHEMA,
-                                             prepare_for_mirroring=self.sanitize_ledger)
+        self._accounts = DataFrameEntity(ACCOUNT_SCHEMA)
+        self._tax_codes = DataFrameEntity(TAX_CODE_SCHEMA)
         self._price_history = DataFrameEntity(PRICE_SCHEMA)
         self._revaluations = DataFrameEntity(FX_ADJUSTMENT_SCHEMA)
-        self._tax_codes = DataFrameEntity(TAX_CODE_SCHEMA)
+        self._ledger = LedgerDataFrameEntity(LEDGER_SCHEMA,
+                                             prepare_for_mirroring=self.sanitize_ledger)
 
     # ----------------------------------------------------------------------
     # Currency

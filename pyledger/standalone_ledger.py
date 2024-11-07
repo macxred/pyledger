@@ -121,11 +121,11 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        return self.serialize_ledger(self.complete_ledger(self.ledger()))
+        return self.serialize_ledger(self.complete_ledger(self.ledger.list()))
 
     def complete_ledger(self, ledger=None) -> pd.DataFrame:
         # Ledger definition
-        df = self.standardize_ledger(ledger)
+        df = self.ledger.standardize(ledger)
         df = self.sanitize_ledger(df)
         df = df.sort_values(["date", "id"])
 
@@ -149,7 +149,7 @@ class StandaloneLedger(LedgerEngine):
         result = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            revalue = self.standardize_ledger_columns(pd.DataFrame(result))
+            revalue = self.ledger.standardize(pd.DataFrame(result))
             df = self.serialize_ledger(pd.concat([ledger, revalue]))
             date = row["date"]
             accounts = self.account_range(row["account"])
@@ -189,7 +189,7 @@ class StandaloneLedger(LedgerEngine):
                             "description": row["description"]
                         })
 
-        return self.standardize_ledger_columns(pd.DataFrame(result))
+        return self.ledger.standardize(pd.DataFrame(result))
 
     def _balance_from_serialized_ledger(self,
                                         ledger: pd.DataFrame,

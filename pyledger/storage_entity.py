@@ -262,7 +262,7 @@ class TabularLedgerEntity(TabularEntity):
                     id = txn["description"].iat[0]
                 for _ in range(n):
                     try:
-                        self.add_ledger_entry(txn)
+                        self.add(txn)
                     except Exception as e:
                         raise Exception(
                             f"Error while adding ledger entry {id}: {e}"

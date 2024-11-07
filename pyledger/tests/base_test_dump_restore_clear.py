@@ -35,7 +35,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             assets, ledger.assets.list(), ignore_row_order=True
         )
         target = ledger.txn_to_str(self.LEDGER_ENTRIES).values()
-        actual = ledger.txn_to_str(ledger.ledger()).values()
+        actual = ledger.txn_to_str(ledger.ledger.list()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
 
     def test_dump_and_restore_zip(self, ledger, tmp_path):
@@ -43,13 +43,13 @@ class BaseTestDumpRestoreClear(BaseTest):
         ledger.reporting_currency = self.SETTINGS["REPORTING_CURRENCY"]
         ledger.accounts.mirror(self.ACCOUNTS)
         ledger.tax_codes.mirror(self.TAX_CODES)
-        ledger.mirror_ledger(self.LEDGER_ENTRIES)
+        ledger.ledger.mirror(self.LEDGER_ENTRIES)
         ledger.assets.mirror(self.ASSETS)
 
         # Dumping current state
         accounts = ledger.accounts.list()
         tax_codes = ledger.tax_codes.list()
-        ledger_entries = ledger.ledger()
+        ledger_entries = ledger.ledger.list()
         assets = ledger.assets.list()
         ledger.dump_to_zip(tmp_path / "ledger.zip")
 
@@ -68,7 +68,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             accounts, ledger.accounts.list(), ignore_row_order=True, ignore_index=True
         )
         assert sorted(ledger.txn_to_str(ledger_entries).values()) == \
-               sorted(ledger.txn_to_str(ledger.ledger()).values())
+               sorted(ledger.txn_to_str(ledger.ledger.list()).values())
 
     def test_clear(self, ledger):
         ledger.restore(
@@ -79,7 +79,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             assets=self.ASSETS
         )
         ledger.clear()
-        assert ledger.ledger().empty, "Ledger was not cleared"
+        assert ledger.ledger.list().empty, "Ledger was not cleared"
         assert ledger.tax_codes.list().empty, "Tax codes were not cleared"
         assert ledger.assets.list().empty, "Assets was not cleared"
         assert ledger.accounts.list().empty, "Accounts was not cleared"
