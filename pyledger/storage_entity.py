@@ -160,7 +160,8 @@ class TabularEntity(AccountingEntity):
 
         # Handle additions
         to_add = merged.loc[merged["_merge"] == "right_only", incoming.columns]
-        self.add(to_add)
+        if len(to_add):
+            self.add(to_add)
 
         # Handle updates
         current_cols = merged.columns[merged.columns.str.endswith("_current")]
@@ -298,6 +299,7 @@ class StandaloneTabularEntity(TabularEntity):
         if not overlap.empty:
             raise ValueError("Unique identifiers already exist.")
         self._store(pd.concat([current, incoming], ignore_index=True))
+        return incoming[self._id_columns].iloc[0].to_dict()
 
     def modify(self, data: pd.DataFrame):
         current = self.list()
@@ -346,4 +348,4 @@ class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
     def modify(self, data: pd.DataFrame):
         # DataFrameEntity.modify does not work for duplicate ids
         self.delete(data, allow_missing=False)
-        self.add(data, allow_missing=False)
+        self.add(data)
