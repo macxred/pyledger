@@ -16,7 +16,7 @@ class BaseTestTaxCodes(BaseTest):
 
     def test_accessors_mutators(self, ledger):
         # Ensure there is no 'TestCode' tax_code
-        ledger.tax_codes.delete(["TestCode"], allow_missing=True)
+        ledger.tax_codes.delete({"id": ["TestCode"]}, allow_missing=True)
         assert "TestCode" not in ledger.tax_codes.list()["id"].values
         ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
 
@@ -29,7 +29,7 @@ class BaseTestTaxCodes(BaseTest):
             "rate": 0.02,
             "is_inclusive": True,
         }
-        ledger.tax_codes.add(**new_tax_code)
+        ledger.tax_codes.add([new_tax_code])
         updated_tax_codes = ledger.tax_codes.list()
         outer_join = pd.merge(initial_tax_codes, updated_tax_codes, how="outer", indicator=True)
         created_tax_codes = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
@@ -50,7 +50,7 @@ class BaseTestTaxCodes(BaseTest):
             "rate": 0.20,
             "is_inclusive": True,
         }
-        ledger.tax_codes.modify(**new_tax_code)
+        ledger.tax_codes.modify([new_tax_code])
         updated_tax_codes = ledger.tax_codes.list()
         outer_join = pd.merge(initial_tax_codes, updated_tax_codes, how="outer", indicator=True)
         modified_tax_codes = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
@@ -66,13 +66,13 @@ class BaseTestTaxCodes(BaseTest):
         assert modified_tax_codes["is_inclusive"].item() == new_tax_code["is_inclusive"]
 
         # Test deleting an existent tax code.
-        ledger.tax_codes.delete(codes=["TestCode"])
+        ledger.tax_codes.delete({"id": ["TestCode"]})
         updated_tax_codes = ledger.tax_codes.list()
 
         assert "TestCode" not in updated_tax_codes["id"].values
 
     def test_create_already_existed_raise_error(
-        self, ledger, error_class=ValueError, error_message="already exists"
+        self, ledger, error_class=ValueError, error_message="Unique identifiers already exist."
     ):
         new_tax_code = {
             "id": "TestCode",
@@ -81,21 +81,22 @@ class BaseTestTaxCodes(BaseTest):
             "rate": 0.02,
             "is_inclusive": True,
         }
-        ledger.tax_codes.add(**new_tax_code)
+        ledger.tax_codes.add([new_tax_code])
         with pytest.raises(error_class, match=error_message):
-            ledger.tax_codes.add(**new_tax_code)
+            ledger.tax_codes.add([new_tax_code])
 
     def test_update_non_existent_raise_error(
-        self, ledger, error_class=ValueError, error_message="not found or duplicated"
+        self, ledger, error_class=ValueError, error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
-            ledger.tax_codes.modify(
-                id="TestCode", description="tax 20%", account=9990, rate=0.02, is_inclusive=True
-            )
+            ledger.tax_codes.modify([{
+                "id": "TestCode", "description": "tax 20%",
+                "account": 9990, "rate": 0.02, "is_inclusive": True
+            }])
 
     def test_mirror(self, ledger):
         # Standardize TAX_CODES before testing
-        standardized_df = ledger.standardize_tax_codes(self.TAX_CODES)
+        standardized_df = ledger.tax_codes.standardize(self.TAX_CODES)
 
         # Mirror test tax codes onto server with delete=False
         initial = standardized_df.copy()
@@ -109,7 +110,7 @@ class BaseTestTaxCodes(BaseTest):
         tax_codes = self.TAX_CODES[~self.TAX_CODES["id"].isin(["OutStd", "OutRed"])]
         ledger.tax_codes.mirror(tax_codes, delete=True)
         mirrored_df = ledger.tax_codes.list()
-        expected = ledger.standardize_tax_codes(tax_codes)
+        expected = ledger.tax_codes.standardize(tax_codes)
         assert_frame_equal(
             expected, mirrored_df, ignore_row_order=True, check_like=True
         )
@@ -117,7 +118,7 @@ class BaseTestTaxCodes(BaseTest):
         # Reshuffle target data randomly and modify one of the tax rates
         tax_codes_shuffled = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
         tax_codes_shuffled.loc[tax_codes_shuffled["id"] == "OutStdEx", "rate"] = 0.9
-        tax_codes_shuffled = ledger.standardize_tax_codes(tax_codes_shuffled)
+        tax_codes_shuffled = ledger.tax_codes.standardize(tax_codes_shuffled)
 
         # Mirror target tax codes onto server with updating
         ledger.tax_codes.mirror(tax_codes_shuffled, delete=True)
@@ -127,5 +128,5 @@ class BaseTestTaxCodes(BaseTest):
     def test_mirror_empty_tax_codes(self, ledger):
         ledger.restore(tax_codes=self.TAX_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS)
         assert not ledger.tax_codes.list().empty, "Tax codes were not populated"
-        ledger.tax_codes.mirror(ledger.standardize_tax_codes(None), delete=True)
+        ledger.tax_codes.mirror(ledger.tax_codes.standardize(None), delete=True)
         assert ledger.tax_codes.list().empty, "Mirroring empty df should erase all tax codes"
