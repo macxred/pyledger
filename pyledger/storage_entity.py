@@ -168,7 +168,8 @@ class TabularEntity(AccountingEntity):
         current_cols = merged.columns[merged.columns.str.endswith("_current")]
         incoming_cols = current_cols.str.replace("_current$", "", regex=True)
         both_rows = merged[merged['_merge'] == 'both']
-        diff = both_rows[current_cols].ne(both_rows[incoming_cols]).any(axis=1)
+        current_rows = both_rows[current_cols].rename(columns=lambda x: x.replace("_current", ""))
+        diff = current_rows.ne(both_rows[incoming_cols]).any(axis=1)
         to_update = both_rows.loc[diff, incoming.columns]
         self.modify(to_update)
 
