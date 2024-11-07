@@ -24,18 +24,13 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
         )
-        tax_codes = ledger.standardize_tax_codes(self.TAX_CODES)
         assert_frame_equal(
-            tax_codes, ledger.tax_codes.list(), ignore_row_order=True, check_like=True
+            self.TAX_CODES, ledger.tax_codes.list(), ignore_row_order=True, check_like=True
         )
-        accounts = ledger.standardize_accounts(self.ACCOUNTS)
         assert_frame_equal(
-            accounts, ledger.accounts.list(), ignore_row_order=True, check_like=True
+            self.ACCOUNTS, ledger.accounts.list(), ignore_row_order=True, check_like=True
         )
-        assets = ledger.standardize_assets(self.ASSETS)
-        assert_frame_equal(
-            assets, ledger.assets.list(), ignore_row_order=True
-        )
+        assert_frame_equal(self.ASSETS, ledger.assets.list(), ignore_row_order=True)
         target = ledger.txn_to_str(self.LEDGER_ENTRIES).values()
         actual = ledger.txn_to_str(ledger.ledger.list()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
