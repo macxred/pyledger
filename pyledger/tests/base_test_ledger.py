@@ -22,7 +22,7 @@ class BaseTestLedger(BaseTest):
     @pytest.mark.parametrize("ledger_id", BaseTest.LEDGER_ENTRIES["id"].astype(str).unique())
     def test_add_ledger_entry(self, ledger_engine, ledger_id):
         target = self.LEDGER_ENTRIES.query("id == @ledger_id")
-        id = ledger_engine.ledger.add(target)
+        id = ledger_engine.ledger.add(target)["id"]
         remote = ledger_engine.ledger.list()
         created = remote.loc[remote["id"] == id]
         expected = ledger_engine.ledger.standardize(target)
@@ -33,7 +33,7 @@ class BaseTestLedger(BaseTest):
     def test_accessor_mutators_single_transaction(self, ledger_engine):
         # Test adding a ledger entry
         target = self.LEDGER_ENTRIES.query("id == '1'")
-        id = ledger_engine.ledger.add(target)
+        id = ledger_engine.ledger.add(target)["id"]
         remote = ledger_engine.ledger.list()
         created = remote.loc[remote["id"] == id]
         expected = ledger_engine.ledger.standardize(target)
@@ -64,7 +64,7 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the created ledger entry
-        ledger_engine.ledger.delete([id])
+        ledger_engine.ledger.delete({"id": [id]})
         remote = ledger_engine.ledger.list()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
@@ -72,7 +72,7 @@ class BaseTestLedger(BaseTest):
         # Test adding a ledger entry without tax code
         target = self.LEDGER_ENTRIES.query("id == '4'").copy()
         target["tax_code"] = None
-        id = ledger_engine.ledger.add(target)
+        id = ledger_engine.ledger.add(target)["id"]
         remote = ledger_engine.ledger.list()
         created = remote.loc[remote["id"] == id]
         expected = ledger_engine.ledger.standardize(target)
@@ -93,14 +93,14 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
-        ledger_engine.ledger.delete([id])
+        ledger_engine.ledger.delete({"id": [id]})
         remote = ledger_engine.ledger.list()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
     def test_accessor_mutators_collective_transaction(self, ledger_engine):
         # Test adding a collective ledger entry
         target = self.LEDGER_ENTRIES.query("id == '2'")
-        id = ledger_engine.ledger.add(target)
+        id = ledger_engine.ledger.add(target)["id"]
         remote = ledger_engine.ledger.list()
         created = remote.loc[remote["id"] == id]
         expected = ledger_engine.ledger.standardize(target)
@@ -130,7 +130,7 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
-        ledger_engine.ledger.delete([id])
+        ledger_engine.ledger.delete({"id": [id]})
         remote = ledger_engine.ledger.list()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
@@ -138,7 +138,7 @@ class BaseTestLedger(BaseTest):
         # Test adding a collective ledger entry without tax code
         target = self.LEDGER_ENTRIES.query("id == '2'").copy()
         target["tax_code"] = None
-        id = ledger_engine.ledger.add(target)
+        id = ledger_engine.ledger.add(target)["id"]
         remote = ledger_engine.ledger.list()
         created = remote.loc[remote["id"] == id]
         expected = ledger_engine.ledger.standardize(target)
@@ -159,7 +159,7 @@ class BaseTestLedger(BaseTest):
         assert_frame_equal(updated, expected, ignore_row_order=True)
 
         # Test deleting the updated ledger entry
-        ledger_engine.ledger.delete([id])
+        ledger_engine.ledger.delete({"id": [id]})
         remote = ledger_engine.ledger.list()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
@@ -179,7 +179,7 @@ class BaseTestLedger(BaseTest):
             ledger_engine.ledger.add(target)
 
     def test_modify_non_existed_raises_error(
-        self, ledger_engine, error_class=ValueError, error_message="not found"
+        self, ledger_engine, error_class=ValueError, error_message="not present in the data."
     ):
         target = self.LEDGER_ENTRIES.query("id == '1'").copy()
         target["id"] = 999999
