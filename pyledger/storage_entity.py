@@ -306,11 +306,12 @@ class StandaloneTabularEntity(TabularEntity):
         if not missing[missing['_merge'] != 'both'].empty:
             raise ValueError("Some elements in 'data' are not present.")
         for _, row in incoming.iterrows():
-            mask = (current[self._id_columns] == incoming[self._id_columns].values).all(axis=1)
             if set(current.columns) != set(incoming.columns):
                 raise NotImplementedError(
                     "Modify with a differing set of columns is not implemented yet.")
             incoming = incoming[current.columns.to_list()]
+            mask = (current[self._id_columns].fillna("NA")
+                    == incoming[self._id_columns].fillna("NA").values).all(axis=1)
             current.loc[mask] = incoming.values
         self._store(current)
 
