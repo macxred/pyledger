@@ -162,6 +162,7 @@ class LedgerEngine(ABC):
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
+            archive.writestr('revaluations.csv', self.revaluations.list().to_csv(index=False))
             archive.writestr('price_history.csv', self.price_history.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
@@ -176,7 +177,7 @@ class LedgerEngine(ABC):
         """
         required_files = {
             'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'settings.json', 'assets.csv',
-            'price_history.csv'
+            'price_history.csv', 'revaluations.csv'
         }
 
         with zipfile.ZipFile(archive_path, 'r') as archive:
@@ -193,6 +194,7 @@ class LedgerEngine(ABC):
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
             assets = pd.read_csv(archive.open('assets.csv'))
             price_history = pd.read_csv(archive.open('price_history.csv'))
+            revaluations = pd.read_csv(archive.open('revaluations.csv'))
             self.restore(
                 settings=settings,
                 ledger=ledger,
@@ -200,6 +202,7 @@ class LedgerEngine(ABC):
                 accounts=accounts,
                 assets=assets,
                 price_history=price_history,
+                revaluations=revaluations
             )
 
     def restore(
@@ -210,6 +213,7 @@ class LedgerEngine(ABC):
         ledger: pd.DataFrame | None = None,
         assets: pd.DataFrame | None = None,
         price_history: pd.DataFrame | None = None,
+        revaluations: pd.DataFrame | None = None,
     ):
         """Replaces the entire ledger system with data provided as arguments.
 
@@ -223,6 +227,10 @@ class LedgerEngine(ABC):
                 If `None`, ledger remains unchanged.
             assets (pd.DataFrame | None): Assets entries of the restored system.
                 If `None`, assets remains unchanged.
+            price_history (pd.DataFrame | None): Price history of the restored system.
+                If `None`, price history remains unchanged.
+            revaluations (pd.DataFrame | None): Revaluations of the restored system.
+                If `None`, revaluations remains unchanged.
         """
         if settings is not None and "REPORTING_CURRENCY" in settings:
             self.reporting_currency = settings["REPORTING_CURRENCY"]
@@ -230,13 +238,14 @@ class LedgerEngine(ABC):
             self.assets.mirror(assets, delete=True)
         if price_history is not None:
             self.price_history.mirror(price_history, delete=True)
+        if revaluations is not None:
+            self.revaluations.mirror(revaluations, delete=True)
         if tax_codes is not None:
             self.tax_codes.mirror(tax_codes, delete=True)
         if accounts is not None:
             self.accounts.mirror(accounts, delete=True)
         if ledger is not None:
             self.ledger.mirror(ledger, delete=True)
-        # TODO: Implement revaluation restoration logic
 
     def clear(self):
         """Clear all data from the ledger system.
@@ -249,7 +258,7 @@ class LedgerEngine(ABC):
         self.accounts.mirror(None, delete=True)
         self.assets.mirror(None, delete=True)
         self.price_history.mirror(None, delete=True)
-        # TODO: Implement revaluation clearing logic
+        self.revaluations.mirror(None, delete=True)
 
     # ----------------------------------------------------------------------
     # Tax rates

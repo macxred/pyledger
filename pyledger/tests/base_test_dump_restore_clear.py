@@ -20,7 +20,8 @@ class BaseTestDumpRestoreClear(BaseTest):
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,
             assets=self.ASSETS,
-            price_history=self.PRICES
+            price_history=self.PRICES,
+            revaluations=self.REVALUATIONS,
         )
         assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
@@ -33,6 +34,9 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assert_frame_equal(
             self.PRICES, ledger.price_history.list(), ignore_row_order=True, check_like=True
+        )
+        assert_frame_equal(
+            self.REVALUATIONS, ledger.revaluations.list(), ignore_row_order=True, check_like=True
         )
         assert_frame_equal(self.ASSETS, ledger.assets.list(), ignore_row_order=True)
         target = ledger.txn_to_str(self.LEDGER_ENTRIES).values()
@@ -47,6 +51,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         ledger.ledger.mirror(self.LEDGER_ENTRIES)
         ledger.assets.mirror(self.ASSETS)
         ledger.price_history.mirror(self.PRICES)
+        ledger.revaluations.mirror(self.REVALUATIONS)
 
         # Dumping current state
         accounts = ledger.accounts.list()
@@ -54,6 +59,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         ledger_entries = ledger.ledger.list()
         assets = ledger.assets.list()
         price_history = ledger.price_history.list()
+        revaluations = ledger.revaluations.list()
         ledger.dump_to_zip(tmp_path / "ledger.zip")
 
         # Remove or alter data
@@ -68,6 +74,9 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert_frame_equal(assets, ledger.assets.list(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(
             price_history, ledger.price_history.list(), ignore_row_order=True, ignore_index=True
+        )
+        assert_frame_equal(
+            revaluations, ledger.revaluations.list(), ignore_row_order=True, ignore_index=True
         )
         assert_frame_equal(
             tax_codes, ledger.tax_codes.list(), ignore_row_order=True, ignore_index=True
@@ -85,7 +94,8 @@ class BaseTestDumpRestoreClear(BaseTest):
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,
             assets=self.ASSETS,
-            price_history=self.PRICES
+            price_history=self.PRICES,
+            revaluations=self.REVALUATIONS,
         )
         ledger.clear()
         assert ledger.ledger.list().empty, "Ledger was not cleared"
@@ -93,4 +103,4 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert ledger.assets.list().empty, "Assets was not cleared"
         assert ledger.accounts.list().empty, "Accounts was not cleared"
         assert ledger.price_history.list().empty, "Price history was not cleared"
-        # TODO: Expand test logic to test revaluations when implemented
+        assert ledger.revaluations.list().empty, "Revaluations was not cleared"
