@@ -171,7 +171,8 @@ class TabularEntity(AccountingEntity):
         current_rows = both_rows[current_cols].rename(columns=lambda x: x.replace("_current", ""))
         diff = current_rows.ne(both_rows[incoming_cols]).any(axis=1)
         to_update = both_rows.loc[diff, incoming.columns]
-        self.modify(to_update)
+        if len(to_update):
+            self.modify(to_update)
 
         return {
             "initial": len(current),
@@ -309,14 +310,15 @@ class StandaloneTabularEntity(TabularEntity):
         missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
         if not missing[missing['_merge'] != 'both'].empty:
             raise ValueError("Some elements in 'data' are not present.")
-        for _, row in incoming.iterrows():
-            if set(current.columns) != set(incoming.columns):
-                raise NotImplementedError(
-                    "Modify with a differing set of columns is not implemented yet.")
-            incoming = incoming[current.columns.to_list()]
-            mask = (current[self._id_columns].fillna("NA")
-                    == incoming[self._id_columns].fillna("NA").values).all(axis=1)
-            current.loc[mask] = incoming.values
+        if set(current.columns) != set(incoming.columns):
+            raise NotImplementedError(
+                "Modify with a differing set of columns is not implemented yet.")
+        merged = current.merge(
+            incoming, on=self._id_columns, how='left', suffixes=('', '_incoming'), indicator=True
+        )
+        mask = merged["_merge"] == "both"
+        for col in current.columns:
+            current.loc[mask, col] = incoming[col].values
         self._store(current)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
