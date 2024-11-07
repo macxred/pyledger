@@ -126,7 +126,7 @@ class BaseTestAccounts(BaseTest):
             ledger.accounts.add([new_account])
 
     def test_modify_non_existed_raise_error(
-        self, ledger, error_class=ValueError, error_message="Some elements in 'data' are not present"
+        self, ledger, error_class=ValueError, error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
             ledger.accounts.modify([{

@@ -25,7 +25,9 @@ class BaseTestDumpRestoreClear(BaseTest):
             "Reporting currency was not restored"
         )
         tax_codes = ledger.standardize_tax_codes(self.TAX_CODES)
-        assert_frame_equal(tax_codes, ledger.tax_codes.list(), ignore_row_order=True, check_like=True)
+        assert_frame_equal(
+            tax_codes, ledger.tax_codes.list(), ignore_row_order=True, check_like=True
+        )
         accounts = ledger.standardize_accounts(self.ACCOUNTS)
         assert_frame_equal(
             accounts, ledger.accounts.list(), ignore_row_order=True, check_like=True
@@ -62,8 +64,10 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
         )
-        assert_frame_equal(tax_codes, ledger.tax_codes.list(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(assets, ledger.assets.list(), ignore_row_order=True, ignore_index=True)
+        assert_frame_equal(
+            tax_codes, ledger.tax_codes.list(), ignore_row_order=True, ignore_index=True
+        )
         assert_frame_equal(
             accounts, ledger.accounts.list(), ignore_row_order=True, ignore_index=True
         )

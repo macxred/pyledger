@@ -8,7 +8,7 @@ import zipfile
 import json
 from pathlib import Path
 from typing import Dict, List
-from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
+from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
 import openpyxl
@@ -245,7 +245,7 @@ class LedgerEngine(ABC):
     # Tax rates
 
     @classmethod
-    def sanitize_tax_codes(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def sanitize_tax_codes(cls, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
         """Validates and standardizes the 'tax_codes' DataFrame to ensure it contains
         the required columns, correct data types, and logical consistency in the data.
 
@@ -514,7 +514,6 @@ class LedgerEngine(ABC):
         if (len(add) == 0) and (len(subtract) == 0):
             raise ValueError(f"No account matching '{range}'.")
         return {"add": add, "subtract": subtract}
-
 
     # ----------------------------------------------------------------------
     # Ledger

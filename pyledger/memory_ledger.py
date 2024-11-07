@@ -1,6 +1,5 @@
 """This module implements the MemoryLedger class."""
 
-import pandas as pd
 from .standalone_ledger import StandaloneLedger
 from .storage_entity import DataFrameEntity, LedgerDataFrameEntity
 from .constants import (
@@ -11,6 +10,7 @@ from .constants import (
     TAX_CODE_SCHEMA,
     FX_ADJUSTMENT_SCHEMA,
 )
+
 
 class MemoryLedger(StandaloneLedger):
     """

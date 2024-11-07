@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
 
+
 class AccountingEntity(ABC):
     """
     Abstract base class for accounting entities, such as general ledger, account chart,
@@ -183,9 +184,9 @@ class TabularLedgerEntity(TabularEntity):
     TabularEntity adapted to specific needs of ledger entries, with custom
     standardize and mirror methods.
     """
-        # # Standardize data frame schema, discard incoherent entries with a warning
-        #
-        # target = self.sanitize_ledger(target)
+    # # Standardize data frame schema, discard incoherent entries with a warning
+    #
+    # target = self.sanitize_ledger(target)
 
     def __init__(self, schema, *args, **kwargs):
         super().__init__(schema, *args, **kwargs)
@@ -276,6 +277,7 @@ class TabularLedgerEntity(TabularEntity):
             "updated": 0
         }
 
+
 class StandaloneTabularEntity(TabularEntity):
     """
     Abstract base class for local storage of tabular accounting data, without
@@ -322,6 +324,7 @@ class StandaloneTabularEntity(TabularEntity):
         new = new[new['_merge'] == 'left_only'].drop(columns=['_merge'])
         self._store(new)
 
+
 class DataFrameEntity(StandaloneTabularEntity):
     """Stores tabular accounting data as a DataFrame in memory."""
 
@@ -340,6 +343,5 @@ class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
 
     def modify(self, data: pd.DataFrame):
         # DataFrameEntity.modify does not work for duplicate ids
-        self.delete(data, allow_missing = False)
-        self.add(data, allow_missing = False)
-
+        self.delete(data, allow_missing=False)
+        self.add(data, allow_missing=False)
