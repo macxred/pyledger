@@ -8,7 +8,7 @@ from .constants import (
     LEDGER_SCHEMA,
     ACCOUNT_SCHEMA,
     TAX_CODE_SCHEMA,
-    FX_ADJUSTMENT_SCHEMA,
+    REVALUATION_SCHEMA,
 )
 
 
@@ -33,7 +33,7 @@ class MemoryLedger(StandaloneLedger):
         self._accounts = DataFrameEntity(ACCOUNT_SCHEMA)
         self._tax_codes = DataFrameEntity(TAX_CODE_SCHEMA)
         self._price_history = DataFrameEntity(PRICE_SCHEMA)
-        self._revaluations = DataFrameEntity(FX_ADJUSTMENT_SCHEMA)
+        self._revaluations = DataFrameEntity(REVALUATION_SCHEMA)
         self._ledger = LedgerDataFrameEntity(LEDGER_SCHEMA,
                                              prepare_for_mirroring=self.sanitize_ledger)
 
