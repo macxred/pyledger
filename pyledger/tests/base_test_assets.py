@@ -19,7 +19,7 @@ class BaseTestAssets(BaseTest):
         ledger.restore(settings=self.SETTINGS)
         assets = self.ASSETS.sample(frac=1).reset_index(drop=True)
         for asset in assets.to_dict('records'):
-            ledger.assets.add(**asset)
+            ledger.assets.add([asset])
         assert_frame_equal(
             ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -27,42 +27,44 @@ class BaseTestAssets(BaseTest):
         rows = [0, 3, len(assets) - 1]
         for i in rows:
             assets.loc[i, "increment"] = 0.001
-            ledger.assets.modify(**assets.loc[i].to_dict())
+            ledger.assets.modify([assets.loc[i]])
             assert_frame_equal(
                 ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
             )
 
-        ledger.delete_asset(assets['ticker'].iloc[rows[0]], assets['date'].iloc[rows[0]])
+        ledger.assets.delete([{
+            "ticker": assets['ticker'].iloc[rows[0]], "date": assets['date'].iloc[rows[0]]
+        }])
         assets = assets.drop(rows[0]).reset_index(drop=True)
         assert_frame_equal(
             ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
         )
 
     def test_add_existing_asset_raises_error(
-        self, ledger, error_class=ValueError, error_message="already exists"
+        self, ledger, error_class=ValueError, error_message="Unique identifiers already exist."
     ):
         new_asset = {"ticker": "AUD", "increment": 0.01, "date": datetime.date(2023, 1, 1)}
-        ledger.assets.add(**new_asset)
+        ledger.assets.add([new_asset])
         with pytest.raises(error_class, match=error_message):
-            ledger.assets.add(**new_asset)
+            ledger.assets.add([new_asset])
 
     def test_modify_nonexistent_asset_raises_error(
-        self, ledger, error_class=ValueError, error_message="not found"
+        self, ledger, error_class=ValueError, error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
-            ledger.assets.modify(
-                ticker="FAKE", increment=100.0, date=datetime.date(2023, 1, 1)
-            )
+            ledger.assets.modify([{
+                "ticker": "FAKE", "increment": 100.0, "date": datetime.date(2023, 1, 1)
+            }])
 
     def test_delete_asset_allow_missing(self, ledger):
         ledger.restore(assets=self.ASSETS, settings=self.SETTINGS)
-        with pytest.raises(ValueError, match="not found"):
-            ledger.delete_asset(
-                ticker="NON_EXISTENT", date=datetime.date(2023, 1, 1), allow_missing=False
-            )
-        ledger.delete_asset(
-            ticker="NON_EXISTENT", date=datetime.date(2023, 1, 1), allow_missing=True
-        )
+        with pytest.raises(ValueError, match="Some ids are not present in the data."):
+            ledger.assets.delete([{
+                "ticker": "FAKE", "increment": 100.0, "date": datetime.date(2023, 1, 1)
+            }], allow_missing=False)
+        ledger.assets.delete([{
+            "ticker": "FAKE", "increment": 100.0, "date": datetime.date(2023, 1, 1)
+        }], allow_missing=True)
 
     def test_mirror_assets(self, ledger):
         ledger.restore(settings=self.SETTINGS)
@@ -72,7 +74,7 @@ class BaseTestAssets(BaseTest):
         # Ensure the DataFrame passed as argument to mirror_assets() remains unchanged.
         assert_frame_equal(target, original_target, ignore_row_order=True)
         assert_frame_equal(
-            ledger.standardize_assets(target), ledger.assets.list(), ignore_row_order=True
+            ledger.assets.standardize(target), ledger.assets.list(), ignore_row_order=True
         )
 
         target = self.ASSETS.query("ticker not in ['USD', 'JPY']")
@@ -87,7 +89,7 @@ class BaseTestAssets(BaseTest):
     def test_mirror_empty_assets(self, ledger):
         ledger.restore(assets=self.ASSETS, settings=self.SETTINGS)
         assert not ledger.assets.list().empty
-        ledger.assets.mirror(ledger.standardize_assets(None), delete=True)
+        ledger.assets.mirror(ledger.assets.standardize(None), delete=True)
         assert ledger.assets.list().empty
 
     @pytest.fixture()
