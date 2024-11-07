@@ -35,4 +35,5 @@ from .tests import (
     BaseTestDumpRestoreClear,
     BaseTestAssets,
     BaseTestPriceHistory,
+    BaseTestRevaluations,
 )
