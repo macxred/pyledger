@@ -159,9 +159,10 @@ class LedgerEngine(ABC):
             settings["REPORTING_CURRENCY"] = self.reporting_currency
             archive.writestr('settings.json', json.dumps(settings))
             archive.writestr('ledger.csv', self.ledger.list().to_csv(index=False))
-            archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
+            archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
+            archive.writestr('price_history.csv', self.price_history.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
         """Restore ledger system from a ZIP archive.
@@ -173,7 +174,10 @@ class LedgerEngine(ABC):
         Args:
             archive_path (str): The file path of the ZIP archive to restore.
         """
-        required_files = {'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'settings.json'}
+        required_files = {
+            'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'settings.json', 'assets.csv',
+            'price_history.csv'
+        }
 
         with zipfile.ZipFile(archive_path, 'r') as archive:
             archive_files = set(archive.namelist())
@@ -188,12 +192,14 @@ class LedgerEngine(ABC):
             accounts = pd.read_csv(archive.open('accounts.csv'))
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
             assets = pd.read_csv(archive.open('assets.csv'))
+            price_history = pd.read_csv(archive.open('price_history.csv'))
             self.restore(
                 settings=settings,
                 ledger=ledger,
                 tax_codes=tax_codes,
                 accounts=accounts,
-                assets=assets
+                assets=assets,
+                price_history=price_history,
             )
 
     def restore(
@@ -203,6 +209,7 @@ class LedgerEngine(ABC):
         accounts: pd.DataFrame | None = None,
         ledger: pd.DataFrame | None = None,
         assets: pd.DataFrame | None = None,
+        price_history: pd.DataFrame | None = None,
     ):
         """Replaces the entire ledger system with data provided as arguments.
 
@@ -221,13 +228,15 @@ class LedgerEngine(ABC):
             self.reporting_currency = settings["REPORTING_CURRENCY"]
         if assets is not None:
             self.assets.mirror(assets, delete=True)
+        if price_history is not None:
+            self.price_history.mirror(price_history, delete=True)
         if tax_codes is not None:
             self.tax_codes.mirror(tax_codes, delete=True)
         if accounts is not None:
             self.accounts.mirror(accounts, delete=True)
         if ledger is not None:
             self.ledger.mirror(ledger, delete=True)
-        # TODO: Implement price history and revaluation restoration logic
+        # TODO: Implement revaluation restoration logic
 
     def clear(self):
         """Clear all data from the ledger system.
@@ -239,7 +248,8 @@ class LedgerEngine(ABC):
         self.tax_codes.mirror(None, delete=True)
         self.accounts.mirror(None, delete=True)
         self.assets.mirror(None, delete=True)
-        # TODO: Implement price history and revaluation clearing logic
+        self.price_history.mirror(None, delete=True)
+        # TODO: Implement revaluation clearing logic
 
     # ----------------------------------------------------------------------
     # Tax rates
