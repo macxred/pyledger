@@ -8,19 +8,16 @@ import zipfile
 import json
 from pathlib import Path
 from typing import Dict, List
-from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
+from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
 import openpyxl
 import pandas as pd
 from .constants import (
-    ASSETS_SCHEMA,
-    PRICE_SCHEMA,
     LEDGER_SCHEMA,
-    ACCOUNT_SCHEMA,
     TAX_CODE_SCHEMA,
-    FX_ADJUSTMENT_SCHEMA,
 )
+from .storage_entity import TabularEntity
 from . import excel
 from .helpers import represents_integer
 from .time import parse_date_span
@@ -40,6 +37,33 @@ class LedgerEngine(ABC):
 
     def __init__(self):
         self._logger = logging.getLogger("ledger")
+
+    # ----------------------------------------------------------------------
+    # Storage entities
+
+    @property
+    def accounts(self) -> TabularEntity:
+        return self._accounts
+
+    @property
+    def assets(self) -> TabularEntity:
+        return self._assets
+
+    @property
+    def ledger(self) -> TabularEntity:
+        return self._ledger
+
+    @property
+    def revaluations(self) -> TabularEntity:
+        return self._revaluations
+
+    @property
+    def tax_codes(self) -> TabularEntity:
+        return self._tax_codes
+
+    @property
+    def price_history(self) -> TabularEntity:
+        return self._price_history
 
     # ----------------------------------------------------------------------
     # Settings
@@ -87,28 +111,6 @@ class LedgerEngine(ABC):
         return settings
 
     # ----------------------------------------------------------------------
-    # Revaluation
-
-    @classmethod
-    def standardize_revaluations(cls, df: pd.DataFrame,
-                                 keep_extra_columns: bool = False) -> pd.DataFrame:
-        """Validates and standardizes the 'revaluations' DataFrame to ensure it contains
-        the required columns and correct data types.
-
-        Args:
-            df (pd.DataFrame): The DataFrame representing the revaluations.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
-        Returns:
-            pd.DataFrame: The standardized revaluations DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing or if data types are incorrect.
-        """
-        df = enforce_schema(df, FX_ADJUSTMENT_SCHEMA, keep_extra_columns=keep_extra_columns)
-        return df
-
-    # ----------------------------------------------------------------------
     # File Operations
 
     def export_account_sheets(self, file: str, root: str = None) -> None:
@@ -122,7 +124,7 @@ class LedgerEngine(ABC):
                                   Defaults to None.
         """
         out = {}
-        for account in self.accounts().index.sort_values():
+        for account in self.accounts.list().index.sort_values():
             df = self._fetch_account_history(account)
             out[str(account)] = df.drop(columns="account")
         excel.write_sheets(out, path=file)
@@ -156,10 +158,12 @@ class LedgerEngine(ABC):
             settings = {}
             settings["REPORTING_CURRENCY"] = self.reporting_currency
             archive.writestr('settings.json', json.dumps(settings))
-            archive.writestr('ledger.csv', self.ledger().to_csv(index=False))
-            archive.writestr('tax_codes.csv', self.tax_codes().to_csv(index=False))
-            archive.writestr('accounts.csv', self.accounts().to_csv(index=False))
-            archive.writestr('assets.csv', self.assets().to_csv(index=False))
+            archive.writestr('ledger.csv', self.ledger.list().to_csv(index=False))
+            archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
+            archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
+            archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
+            archive.writestr('revaluations.csv', self.revaluations.list().to_csv(index=False))
+            archive.writestr('price_history.csv', self.price_history.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
         """Restore ledger system from a ZIP archive.
@@ -171,7 +175,10 @@ class LedgerEngine(ABC):
         Args:
             archive_path (str): The file path of the ZIP archive to restore.
         """
-        required_files = {'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'settings.json'}
+        required_files = {
+            'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'settings.json', 'assets.csv',
+            'price_history.csv', 'revaluations.csv'
+        }
 
         with zipfile.ZipFile(archive_path, 'r') as archive:
             archive_files = set(archive.namelist())
@@ -186,12 +193,16 @@ class LedgerEngine(ABC):
             accounts = pd.read_csv(archive.open('accounts.csv'))
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
             assets = pd.read_csv(archive.open('assets.csv'))
+            price_history = pd.read_csv(archive.open('price_history.csv'))
+            revaluations = pd.read_csv(archive.open('revaluations.csv'))
             self.restore(
                 settings=settings,
                 ledger=ledger,
                 tax_codes=tax_codes,
                 accounts=accounts,
-                assets=assets
+                assets=assets,
+                price_history=price_history,
+                revaluations=revaluations
             )
 
     def restore(
@@ -201,6 +212,8 @@ class LedgerEngine(ABC):
         accounts: pd.DataFrame | None = None,
         ledger: pd.DataFrame | None = None,
         assets: pd.DataFrame | None = None,
+        price_history: pd.DataFrame | None = None,
+        revaluations: pd.DataFrame | None = None,
     ):
         """Replaces the entire ledger system with data provided as arguments.
 
@@ -214,18 +227,25 @@ class LedgerEngine(ABC):
                 If `None`, ledger remains unchanged.
             assets (pd.DataFrame | None): Assets entries of the restored system.
                 If `None`, assets remains unchanged.
+            price_history (pd.DataFrame | None): Price history of the restored system.
+                If `None`, price history remains unchanged.
+            revaluations (pd.DataFrame | None): Revaluations of the restored system.
+                If `None`, revaluations remains unchanged.
         """
         if settings is not None and "REPORTING_CURRENCY" in settings:
             self.reporting_currency = settings["REPORTING_CURRENCY"]
         if assets is not None:
-            self.mirror_assets(assets, delete=True)
+            self.assets.mirror(assets, delete=True)
+        if price_history is not None:
+            self.price_history.mirror(price_history, delete=True)
+        if revaluations is not None:
+            self.revaluations.mirror(revaluations, delete=True)
         if tax_codes is not None:
-            self.mirror_tax_codes(tax_codes, delete=True)
+            self.tax_codes.mirror(tax_codes, delete=True)
         if accounts is not None:
-            self.mirror_accounts(accounts, delete=True)
+            self.accounts.mirror(accounts, delete=True)
         if ledger is not None:
-            self.mirror_ledger(ledger, delete=True)
-        # TODO: Implement price history and revaluation restoration logic
+            self.ledger.mirror(ledger, delete=True)
 
     def clear(self):
         """Clear all data from the ledger system.
@@ -233,137 +253,18 @@ class LedgerEngine(ABC):
         This method removes all entries from the ledger, tax codes, accounts, etc.
         restoring the system to a pristine state.
         """
-        self.mirror_ledger(None, delete=True)
-        self.mirror_tax_codes(None, delete=True)
-        self.mirror_accounts(None, delete=True)
-        self.mirror_assets(None, delete=True)
-        # TODO: Implement price history and revaluation clearing logic
+        self.ledger.mirror(None, delete=True)
+        self.tax_codes.mirror(None, delete=True)
+        self.accounts.mirror(None, delete=True)
+        self.assets.mirror(None, delete=True)
+        self.price_history.mirror(None, delete=True)
+        self.revaluations.mirror(None, delete=True)
 
     # ----------------------------------------------------------------------
     # Tax rates
 
-    @abstractmethod
-    def tax_codes(self) -> pd.DataFrame:
-        """Retrieves all tax definitions.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `id` (str), `account` (int), `rate` (float),
-                          `is_inclusive` (bool), `description` (str).
-        """
-
-    @abstractmethod
-    def add_tax_code(
-        self,
-        id: str,
-        rate: float,
-        account: str,
-        is_inclusive: bool = True,
-    ) -> None:
-        """Append a tax code to the list of available tax_codes.
-
-        Args:
-            id (str): Identifier for the tax definition.
-            rate (float): The tax code to apply.
-            account (str): Account to which the tax code is applicable.
-            is_inclusive (bool, optional): Specifies whether the tax amount is included in the
-                                           transaction amount. Defaults to True.
-        """
-
-    @abstractmethod
-    def modify_tax_code(
-        self,
-        id: str,
-        rate: float,
-        account: str,
-        is_inclusive: bool = True,
-        description: str = "",
-    ) -> None:
-        """
-        Update an existing tax code.
-
-        Args:
-            id (str): Tax code to update.
-            rate (float): Tax rate (from 0 to 1).
-            account (str): Account identifier for the tax code.
-            is_inclusive (bool, optional): If True, tax is 'NET' (default), else 'GROSS'.
-            description (str, optional): Description for the tax code.
-        """
-
-    @abstractmethod
-    def delete_tax_codes(self, codes: List[str] = [], allow_missing: bool = False) -> None:
-        """Removes tax code definitions.
-
-        Args:
-            codes (List[str]): Tax codes to be removed.
-            allow_missing (bool, optional): If True, no error is raised if the tax code is not
-                                            found.
-        """
-
-    def mirror_tax_codes(self, target: pd.DataFrame, delete: bool = False):
-        """Aligns tax codes with a desired target state.
-
-        Args:
-            target (pd.DataFrame): DataFrame with tax codes in the pyledger.tax_codes format.
-            delete (bool, optional): If True, deletes existing tax codes that are
-                                     not present in the target data.
-
-        Returns:
-            dict: A dictionary containing statistics about the mirroring process:
-                - pre-existing (int): The number of tax codes present before mirroring.
-                - targeted (int): The number of tax codes in the target data.
-                - added (int): The number of tax codes added by the mirroring method.
-                - deleted (int): The number of deleted tax codes.
-                - updated (int): The number of tax codes modified during mirroring.
-        """
-        target_df = self.standardize_tax_codes(target)
-        current_state = self.tax_codes()
-
-        # Delete superfluous tax codes on remote
-        if delete:
-            to_delete = set(current_state["id"]).difference(set(target_df["id"]))
-            self.delete_tax_codes(to_delete)
-
-        # Create new tax codes on remote
-        ids = set(target_df["id"]).difference(set(current_state["id"]))
-        to_add = target_df.loc[target_df["id"].isin(ids)]
-        for row in to_add.to_dict("records"):
-            self.add_tax_code(
-                id=row["id"],
-                description=row["description"],
-                account=row["account"],
-                rate=row["rate"],
-                is_inclusive=row["is_inclusive"],
-            )
-
-        # Update modified tax codes on remote
-        both = set(target_df["id"]).intersection(set(current_state["id"]))
-        left = target_df.loc[target_df["id"].isin(both)]
-        right = current_state.loc[current_state["id"].isin(both)]
-        merged = pd.merge(left, right, how="outer", indicator=True)
-        to_update = merged[merged["_merge"] == "left_only"]
-        for row in to_update.to_dict("records"):
-            self.modify_tax_code(
-                id=row["id"],
-                description=row["description"],
-                account=row["account"],
-                rate=row["rate"],
-                is_inclusive=row["is_inclusive"],
-            )
-
-        # return number of elements found, targeted, changed:
-        stats = {
-            "pre-existing": len(current_state),
-            "targeted": len(target_df),
-            "added": len(to_add),
-            "deleted": len(to_delete) if delete else 0,
-            "updated": len(to_update),
-        }
-
-        return stats
-
     @classmethod
-    def standardize_tax_codes(cls, df: pd.DataFrame,
-                              keep_extra_columns: bool = False) -> pd.DataFrame:
+    def sanitize_tax_codes(cls, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
         """Validates and standardizes the 'tax_codes' DataFrame to ensure it contains
         the required columns, correct data types, and logical consistency in the data.
 
@@ -394,146 +295,11 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Accounts
 
-    @abstractmethod
-    def accounts(self) -> pd.DataFrame:
-        """Retrieves a data frame with all account definitions.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `account` (int), `description` (str),
-                          `currency` (str), `tax_code` (str or None). `None` implies
-                          tax code is never applicable. If set, tax code is sometimes applicable,
-                          and transactions on this account must explicitly state
-                          a `tax_code`. The value in the accounts serves as default
-                          for new transactions.
-        """
-
-    @classmethod
-    def standardize_accounts(cls, df: pd.DataFrame,
-                             keep_extra_columns: bool = True) -> pd.DataFrame:
-        """Validates and standardizes the 'accounts' DataFrame to ensure it contains
-        the required columns and correct data types.
-
-        Args:
-            df (pd.DataFrame): The DataFrame representing the accounts.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
-
-        Returns:
-            pd.DataFrame: The standardized accounts DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing, or if 'account' column
-                        contains NaN values, or if data types are incorrect.
-        """
-        df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=keep_extra_columns)
-        # Ensure required values are present
-        if df["account"].isna().any():
-            # TODO: Drop entries with missing accounts with a warning, rather than raising an error
-            raise ValueError("Missing 'account' values in accounts.")
-
-        return df
-
     def account_currency(self, account: int) -> str:
-        accounts = self.accounts()
+        accounts = self.accounts.list()
         if not int(account) in accounts["account"].values:
             raise ValueError(f"Account {account} is not defined.")
         return accounts.loc[accounts["account"] == account, "currency"].values[0]
-
-    @abstractmethod
-    def add_account(
-        self, account: int, description: str, currency: str, tax_code: bool = False
-    ) -> None:
-        """Appends an account to the accounts.
-
-        Args:
-            account (int): Unique identifier for the account.
-            description (str): Description of the account.
-            currency (str): Currency of the account.
-            tax_code (bool, optional): Indicates if tax is applicable. Defaults to False.
-        """
-
-    @abstractmethod
-    def modify_account(self, account: int, new_data: dict) -> None:
-        """Modifies an existing account definition.
-
-        Args:
-            account (int): Account to be modified.
-            new_data (dict): Fields to be overwritten. Keys typically include
-                             `description` (str), `currency` (str), or `tax_code` (str).
-        """
-
-    @abstractmethod
-    def delete_accounts(self, accounts: List[int] = [], allow_missing: bool = False) -> None:
-        """Removes an account from the account definitions.
-
-        Args:
-            accounts (List[int]): The numbers of the accounts to be deleted.
-            allow_missing (bool, optional): If True, no error is raised if the account is
-                                            not found.
-        """
-
-    def mirror_accounts(self, target: pd.DataFrame, delete: bool = False):
-        """Aligns the accounts with a desired target state.
-
-        Args:
-            target (pd.DataFrame): DataFrame with an account chart in the pyledger format.
-            delete (bool, optional): If True, deletes existing accounts that are not
-                                     present in the target data.
-
-        Returns:
-            dict: A dictionary containing statistics about the mirroring process:
-                - pre-existing (int): The number of accounts present before mirroring.
-                - targeted (int): The number of accounts in the target data.
-                - added (int): The number of accounts added by the mirroring method.
-                - deleted (int): The number of accounts codes.
-                - updated (int): The number of accounts modified during mirroring.
-        """
-        if target is not None:
-            target = target.copy()
-        target_df = self.standardize_accounts(target)
-        current_state = self.accounts()
-
-        # Delete superfluous accounts on remote
-        if delete:
-            to_delete = set(current_state["account"]).difference(set(target_df["account"]))
-            self.delete_accounts(to_delete)
-
-        # Create new accounts on remote
-        accounts = set(target_df["account"]).difference(set(current_state["account"]))
-        to_add = target_df.loc[target_df["account"].isin(accounts)]
-        for row in to_add.to_dict("records"):
-            self.add_account(
-                account=row["account"],
-                currency=row["currency"],
-                description=row["description"],
-                tax_code=row["tax_code"],
-                group=row["group"],
-            )
-
-        # Update modified accounts on remote
-        both = set(target_df["account"]).intersection(set(current_state["account"]))
-        left = target_df.loc[target_df["account"].isin(both)]
-        right = current_state.loc[current_state["account"].isin(both)]
-        merged = pd.merge(left, right, how="outer", indicator=True)
-        to_update = merged[merged["_merge"] == "left_only"]
-        for row in to_update.to_dict("records"):
-            self.modify_account(
-                account=row["account"],
-                currency=row["currency"],
-                description=row["description"],
-                tax_code=row["tax_code"],
-                group=row["group"],
-            )
-
-        # return number of elements found, targeted, changed:
-        stats = {
-            "pre-existing": len(current_state),
-            "targeted": len(target_df),
-            "added": len(to_add),
-            "deleted": len(to_delete) if delete else 0,
-            "updated": len(to_update),
-        }
-        return stats
 
     @abstractmethod
     def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
@@ -656,7 +422,7 @@ class LedgerEngine(ABC):
         # Account balance per a single point in time
         if represents_integer(account):
             account = int(account)
-            if account not in self.accounts()[["account"]].values:
+            if account not in self.accounts.list()[["account"]].values:
                 raise ValueError(f"No account matching '{account}'.")
             out = self._fetch_account_history(account, start=start, end=end)
         elif (
@@ -726,7 +492,7 @@ class LedgerEngine(ABC):
         subtract = []
         if represents_integer(range):
             account = int(range)
-            if abs(account) in self.accounts()["account"].values:
+            if abs(account) in self.accounts.list()["account"].values:
                 if account >= 0:
                     add = [account]
                 else:
@@ -748,7 +514,7 @@ class LedgerEngine(ABC):
                     sequence = element.split(":")
                     first = int(sequence[0].strip())
                     last = int(sequence[1].strip())
-                    accounts = self.accounts()
+                    accounts = self.accounts.list()
                     in_range = (accounts["account"] >= first) & (accounts["account"] <= last)
                     accounts = list(accounts["account"][in_range])
                 elif re.match("[0-9]*", element.strip()):
@@ -768,31 +534,8 @@ class LedgerEngine(ABC):
             raise ValueError(f"No account matching '{range}'.")
         return {"add": add, "subtract": subtract}
 
-    def sanitize_accounts(self, accounts: pd.DataFrame) -> pd.DataFrame:
-        """Discards inconsistent entries in the accounts.
-
-        Args:
-            accounts (pd.DataFrame): Accounts as a DataFrame.
-
-        Returns:
-            pd.DataFrame: DataFrame with sanitized accounts.
-        """
-        accounts = self.st  # noqa: F841
-
     # ----------------------------------------------------------------------
     # Ledger
-
-    @abstractmethod
-    def ledger(self) -> pd.DataFrame:
-        """Retrieves a DataFrame representing all ledger transactions.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `id` (str), `date` (datetime),
-            `document` (str), `amounts` (DataFrame). `amounts` is a nested
-            pd.DataFrame with columns `account` (int), `contra`
-            (int or None), `currency` (str), `amount` (float),
-            `report_amount` (float or None), and `tax_code` (str).
-        """
 
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with a long representation of all ledger transactions.
@@ -807,140 +550,7 @@ class LedgerEngine(ABC):
                          `amount` (float), `report_amount` (float or None),
                          `tax_code` (str), and `document` (str).
         """
-        return self.serialize_ledger(self.ledger())
-
-    @abstractmethod
-    def ledger_entry(self, id: str) -> dict:
-        """Retrieves a specific ledger entry by its ID.
-
-        Args:
-            id (str): The unique identifier for the ledger entry.
-
-        Returns:
-            dict: A dictionary representing the ledger entry.
-        """
-
-    @abstractmethod
-    def add_ledger_entry(
-        self, date: datetime.date, document: str, amounts: pd.DataFrame
-    ) -> None:
-        """Adds a new posting to the ledger.
-
-        Args:
-            date (datetime.date): Date of the transaction.
-            document (str): Reference to the associated document.
-            amounts (pd.DataFrame): DataFrame detailing transaction amounts.
-            Columns include: `account` (int), `contra` (int, optional),
-            `currency` (str), `amount` (float), `report_amount` (float, optional),
-            `tax_code` (str, optional).
-        """
-
-    @abstractmethod
-    def modify_ledger_entry(self, id: str, new_data: dict) -> None:
-        """Modifies an existing ledger entry.
-
-        Args:
-            id (str): Unique identifier of the ledger entry to be modified.
-            new_data (dict): Fields to be overwritten in the ledger entry.
-                             Keys typically include `date` (datetime.date),
-                             `document` (str), or `amounts` (pd.DataFrame).
-        """
-
-    @abstractmethod
-    def delete_ledger_entries(self, ids: List[str] = []) -> None:
-        """Deletes a ledger entry by its ID.
-
-        Args:
-            ids (List[str]): The ids of the ledger entries to be deleted.
-        """
-
-    def mirror_ledger(self, target: pd.DataFrame, delete: bool = False):
-        """Aligns ledger entries with a desired target state.
-
-        Args:
-            target (pd.DataFrame): DataFrame with ledger entries in pyledger format.
-            delete (bool, optional): If True, deletes existing ledger that are not
-                                     present in the target data.
-
-        Returns:
-            dict: A dictionary containing statistics about the mirroring process:
-                - pre-existing (int): The number of transactions present before mirroring.
-                - targeted (int): The number of transactions in the target data.
-                - added (int): The number of new transactions that were added.
-                - deleted (int): The number of deleted transactions.
-        """
-        # Standardize data frame schema, discard incoherent entries with a warning
-        target = self.standardize_ledger(target)
-        target = self.sanitize_ledger(target)
-
-        # Nest to create one row per transaction, add unique string identifier
-        def process_ledger(df: pd.DataFrame) -> pd.DataFrame:
-            df = nest(
-                df,
-                columns=[col for col in df.columns if col not in ["id", "date"]],
-                key="txn",
-            )
-            df["txn_str"] = [
-                f"{str(date)},{df_to_consistent_str(txn)}"
-                for date, txn in zip(df["date"], df["txn"])
-            ]
-            return df
-
-        remote = process_ledger(self.ledger())
-        target = process_ledger(target)
-        if target["id"].duplicated().any():
-            # We expect nesting to combine all rows with the same
-            raise ValueError("Non-unique dates in `target` transactions.")
-
-        # Count occurrences of each unique transaction in target and remote,
-        # find number of additions and deletions for each unique transaction
-        count = pd.DataFrame({
-            "remote": remote["txn_str"].value_counts(),
-            "target": target["txn_str"].value_counts(),
-        })
-        count = count.fillna(0).reset_index(names="txn_str")
-        count["n_add"] = (count["target"] - count["remote"]).clip(lower=0).astype(int)
-        count["n_delete"] = (count["remote"] - count["target"]).clip(lower=0).astype(int)
-
-        # Delete unneeded transactions on remote
-        if delete and any(count["n_delete"] > 0):
-            ids = [
-                id
-                for txn_str, n in zip(count["txn_str"], count["n_delete"])
-                if n > 0
-                for id in remote.loc[remote["txn_str"] == txn_str, "id"]
-                .tail(n=n)
-                .values
-            ]
-            self.delete_ledger_entries(ids)
-
-        # Add missing transactions to remote
-        for txn_str, n in zip(count["txn_str"], count["n_add"]):
-            if n > 0:
-                txn = unnest(
-                    target.loc[target["txn_str"] == txn_str, :].head(1), "txn"
-                )
-                txn.drop(columns="txn_str", inplace=True)
-                if txn["id"].dropna().nunique() > 0:
-                    id = txn["id"].dropna().unique()[0]
-                else:
-                    id = txn["description"].iat[0]
-                for _ in range(n):
-                    try:
-                        self.add_ledger_entry(txn)
-                    except Exception as e:
-                        raise Exception(
-                            f"Error while adding ledger entry {id}: {e}"
-                        ) from e
-
-        # return number of elements found, targeted, changed:
-        stats = {
-            "pre-existing": int(count["remote"].sum()),
-            "targeted": int(count["target"].sum()),
-            "added": count["n_add"].sum(),
-            "deleted": count["n_delete"].sum() if delete else 0,
-        }
-        return stats
+        return self.serialize_ledger(self.ledger.list())
 
     def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
         """Discards inconsistent ledger entries and inconsistent tax codes.
@@ -955,7 +565,7 @@ class LedgerEngine(ABC):
         """
         # Discard undefined tax codes
         ledger["tax_code"] = ledger["tax_code"].str.strip()
-        invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(self.tax_codes()["id"])
+        invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(self.tax_codes.list()["id"])
         if invalid.any():
             df = ledger.loc[invalid, ["id", "tax_code"]]
             df = df.groupby("id").agg({"tax_code": lambda x: x.unique()})
@@ -982,7 +592,7 @@ class LedgerEngine(ABC):
             to_discard.append(df.reset_index()[["id", "description"]])
 
         # 2. Discard journal entries with undefined accounts
-        valid_accounts = self.accounts()["account"].values
+        valid_accounts = self.accounts.list()["account"].values
         invalid_accounts = []
         for col in ["account", "contra"]:
             invalid = ledger[col].notna() & ~ledger[col].isin(valid_accounts)
@@ -1030,86 +640,6 @@ class LedgerEngine(ABC):
 
         return ledger
 
-    @staticmethod
-    def standardize_ledger_columns(df: pd.DataFrame = None,
-                                   keep_extra_columns: bool = True) -> pd.DataFrame:
-        """Standardizes and enforces type consistency for the ledger DataFrame.
-
-        Ensures that the required columns are present in the ledger DataFrame,
-        adds any missing optional columns with None values, and enforces
-        specific data types for each column.
-
-        Args:
-            ledger (pd.DataFrame, optional): A data frame with ledger transactions
-                                             Defaults to None.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
-
-        Returns:
-            pd.DataFrame: A standardized DataFrame with both the required and
-            optional columns with enforced data types.
-
-        Raises:
-            ValueError: If required columns are missing from the ledger DataFrame.
-        """
-        # Enforce data frame schema
-        df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=False,
-                            keep_extra_columns=keep_extra_columns)
-
-        # Add id column if missing: Entries without a date share id of the last entry with a date
-        if "id" not in df.columns or df["id"].isna().any():
-            id_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'id', 'dtype'].item()
-            df["id"] = df["date"].notna().cumsum().astype(id_type)
-
-        # Enforce column data types
-        date_type = LEDGER_SCHEMA.loc[LEDGER_SCHEMA['column'] == 'date', 'dtype'].item()
-        df["date"] = pd.to_datetime(df["date"]).dt.date.astype(date_type)
-
-        return df
-
-    def standardize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Convert ledger entries to a canonical representation.
-
-        This method converts ledger entries into a standardized format. It
-        ensures uniformity where transactions can be defined in various
-        equivalent ways, allowing for easy identification of equivalent
-        entries.
-
-        Args:
-            df (pd.DataFrame): A data frame with ledger transactions.
-
-        Returns:
-            pd.DataFrame: A DataFrame with ledger entries in canonical form.
-
-        Notes:
-            - The method removes redundant 'report_amount' values for
-            transactions in the reporting currency.
-            - It fills missing dates in collective transactions with dates from
-            other line items in the same collective transaction.
-        """
-        df = self.standardize_ledger_columns(df).copy()
-
-        # Fill missing (NA) dates
-        df["date"] = df.groupby("id")["date"].ffill()
-        df["date"] = df.groupby("id")["date"].bfill()
-        df["date"] = df["date"].dt.tz_localize(None).dt.floor('D')
-
-        # Drop redundant report_amount for transactions in reporting currency
-        set_na = (
-            (df["currency"] == self.reporting_currency)
-            & (df["report_amount"].isna() | (df["report_amount"] == df["amount"]))
-        )
-        df.loc[set_na, "report_amount"] = pd.NA
-
-        # Remove leading and trailing spaces in strings, convert -0.0 to 0.0
-        for col in df.columns:
-            if pd.StringDtype.is_dtype(df[col]):
-                df[col] = df[col].str.strip()
-            elif pd.Float64Dtype.is_dtype(df[col]):
-                df.loc[df[col].notna() & (df[col] == 0), col] = 0.0
-
-        return df
-
     def serialize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
         """Serializes the ledger into a long format.
 
@@ -1150,7 +680,7 @@ class LedgerEngine(ABC):
             Dict[str, str]: A dictionary where keys are ledger 'id's and values are
             unique string representations of the transactions.
         """
-        df = self.standardize_ledger(df)
+        df = self.ledger.standardize(df)
         df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
         if df['id'].duplicated().any():
             raise ValueError("Some collective transaction(s) have non-unique date.")
@@ -1242,20 +772,6 @@ class LedgerEngine(ABC):
         return result
 
     @abstractmethod
-    def price_history(self) -> pd.DataFrame:
-        """Retrieves a data frame with all price definitions.
-
-        Returns:
-            pd.DataFrame: DataFrame with columns `ticker` (str), `date` (datetime.date),
-                          `currency` (str), and `price` (float). Tickers can be arbitrarily
-                          chosen and can represent anything, including foreign currencies,
-                          securities, commodities, or inventory. Price observations are uniquely
-                          defined by a date/ticker/currency triple. Prices can be defined in
-                          any other currency and are applied up to the subsequent price
-                          definition for the same ticker/currency pair.
-        """
-
-    @abstractmethod
     def price(
         self, ticker: str, date: datetime.date, currency: str = None
     ) -> tuple[str, float]:
@@ -1274,250 +790,3 @@ class LedgerEngine(ABC):
                    of the price, and 'price' is a float representing the asset's price as
                    of the specified date.
         """
-
-    @abstractmethod
-    def add_price(
-        self, ticker: str, date: datetime.date, currency: str, price: float, overwrite: bool = False
-    ) -> None:
-        """Appends a price to the price history.
-
-        Args:
-            ticker (str): Asset identifier.
-            date (datetime.date): Date on which the price is recorded.
-            currency (str): Currency in which the price is quoted.
-            price (float): Value of the asset as of the given date.
-        """
-
-    @abstractmethod
-    def modify_price(
-        self, ticker: str, date: datetime.date, currency: str, price: float, overwrite: bool = False
-    ) -> None:
-        """Modifies an observation in the price history.
-
-        Args:
-            ticker (str): Asset identifier.
-            date (datetime.date): Date on which the price is recorded.
-            currency (str): Currency in which the price is quoted.
-            price (float): Value of the asset as of the given date.
-        """
-
-    @abstractmethod
-    def delete_price(self, ticker: str, date: datetime.date, currency: str = None) -> None:
-        """Removes a price definition from the history.
-
-        Args:
-            ticker (str): Asset identifier.
-            date (datetime.date): Date on which the price is recorded.
-            currency (str, optional): Currency in which the price is quoted. `None` indicates that
-                                      price definitions for this ticker in all currencies
-                                      should be removed.
-        """
-
-    @classmethod
-    def standardize_price_df(cls, df: pd.DataFrame,
-                             keep_extra_columns: bool = True) -> pd.DataFrame:
-        """Validates and standardizes the 'prices' DataFrame to ensure it contains
-        the required columns, correct data types, and no missing values in key fields.
-
-        Args:
-            df (pd.DataFrame): The DataFrame representing the prices.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
-
-        Returns:
-            pd.DataFrame: The standardized prices DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing, if there are missing values
-                        in required columns, or if data types are incorrect.
-        """
-        # Enforce data frame schema
-        df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
-        # Check for missing values in required columns
-        has_missing_value = [
-            column
-            for column in PRICE_SCHEMA.query("mandatory")["column"]
-            if df[column].isna().any()
-        ]
-        if len(has_missing_value) > 0:
-            # TODO: drop entries with missing values with a warning, rather than raising an error
-            raise ValueError(f"Missing values in column {has_missing_value}.")
-
-        return df
-
-    # ----------------------------------------------------------------------
-    # Assets
-
-    @classmethod
-    def standardize_assets(
-        cls,
-        df: pd.DataFrame | None,
-        keep_extra_columns: bool = False
-    ) -> pd.DataFrame:
-        """Standardize the 'assets' DataFrame to match `ASSETS_SCHEMA`.
-
-        Args:
-            df (pd.DataFrame | None): The DataFrame representing assets.
-                If None, returns an empty DataFrame with `ASSETS_SCHEMA`.
-            keep_extra_columns (bool, optional): If True, retain columns not
-                specified in `ASSETS_SCHEMA`. Defaults to False.
-
-        Returns:
-            pd.DataFrame: The standardized assets DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing or data types are incorrect.
-        """
-        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
-        df["date"] = df["date"].dt.tz_localize(None).dt.floor('D')
-
-        return df
-
-    @abstractmethod
-    def assets(self) -> pd.DataFrame:
-        """Retrieves all asset entries.
-
-        Returns:
-            pd.DataFrame with columns specified in ASSETS_SCHEMA.
-        """
-
-    @abstractmethod
-    def add_asset(
-        self,
-        ticker: str,
-        increment: float,
-        date: datetime.date = None
-    ) -> None:
-        """Add a new asset entry.
-
-        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
-
-        Args:
-            ticker (str): Identifier for the asset (e.g., currency code or stock ticker).
-            increment (float): The smallest price increment for the asset.
-            date (datetime.date, optional):
-                The effective date from which the `increment` applies. For this `ticker`,
-                the `increment` is valid from this `date` until the date of the next entry
-                with the same `ticker` and a later date. If `date` is None, the increment
-                is considered the initial value for this `ticker` and is valid until the
-                first dated entry for the same `ticker`
-        """
-
-    @abstractmethod
-    def modify_asset(
-        self,
-        ticker: str,
-        increment: float,
-        date: pd.Timestamp = None
-    ) -> None:
-        """Update an existing asset entry.
-
-        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
-
-        Args:
-            ticker (str): Identifier for the asset (e.g., currency code or stock ticker).
-            increment (float): The smallest price increment for the asset.
-            date (datetime.date, optional):
-                The effective date from which the `increment` applies. For this `ticker`,
-                the `increment` is valid from this `date` until the date of the next entry
-                with the same `ticker` and a later date. If `date` is None, the increment
-                is considered the initial value for this `ticker` and is valid until the
-                first dated entry for the same `ticker`
-        """
-
-    @abstractmethod
-    def delete_asset(
-        self,
-        ticker: str,
-        date: pd.Timestamp = None,
-        allow_missing: bool = False
-    ) -> None:
-        """Remove an asset entry.
-
-        Each asset entry is uniquely identified by the combination of `ticker` and `date`.
-
-        Args:
-            ticker (str): Asset identifier for the entry to remove.
-            date (pd.Timestamp, optional): Date of the asset entry to remove.
-            allow_missing (bool, optional): If True, do not raise an error if the asset entry
-                                            is not found. Defaults to False.
-        """
-
-    def mirror_assets(self, target: pd.DataFrame, delete: bool = False) -> dict:
-        """Align the system's assets with the target DataFrame.
-
-        Updates the system's assets to match the `target` DataFrame by adding new assets,
-        modifying existing ones, and optionally deleting assets not present in the target.
-
-        Args:
-            target (pd.DataFrame): The target assets, formatted according to `ASSETS_SCHEMA`.
-            delete (bool, optional): If True, deletes existing assets that are not present
-                                     in the target data.
-
-        Returns:
-            dict: Summary statistics of the mirroring process:
-                - 'initial' (int): Number of assets before synchronization.
-                - 'target' (int): Number of assets in the target DataFrame.
-                - 'added' (int): Number of assets added.
-                - 'deleted' (int): Number of assets deleted.
-                - 'updated' (int): Number of assets updated.
-
-        See Also:
-            prepare_assets_for_mirroring : Prepares the target data for synchronization.
-        """
-        current = self.assets()
-        incoming = self.prepare_assets_for_mirroring(target)
-        merged = current.merge(
-            incoming, on=["ticker", "date"], how="outer", suffixes=('_current', '_incoming'),
-            indicator=True
-        )
-
-        # Handle deletions
-        if delete:
-            to_delete = merged[merged["_merge"] == "left_only"]
-            for _, row in to_delete.iterrows():
-                self.delete_asset(ticker=row["ticker"], date=row["date"])
-
-        # Handle additions
-        to_add = merged[merged["_merge"] == "right_only"]
-        for _, row in to_add.iterrows():
-            self.add_asset(
-                ticker=row["ticker"], increment=row["increment_incoming"], date=row["date"]
-            )
-
-        # Handle updates
-        to_update = merged[
-            (merged["_merge"] == "both")
-            & (merged["increment_incoming"] != merged["increment_current"])
-        ]
-        for _, row in to_update.iterrows():
-            self.modify_asset(
-                ticker=row["ticker"], increment=row["increment_incoming"], date=row["date"]
-            )
-
-        return {
-            "initial": len(current),
-            "target": len(incoming),
-            "added": len(to_add),
-            "deleted": len(to_delete) if delete else 0,
-            "updated": len(to_update)
-        }
-
-    def prepare_assets_for_mirroring(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Prepare incoming asset data for synchronization.
-
-        Invoked as the initial step in the mirroring process, this method
-        matches the incoming DataFrame with the current system's requirements
-        and aligns it with existing data, facilitating the identification
-        of entries that need to be added, modified, or removed.
-
-        By default, returns the data unchanged; subclasses may override this
-        method for custom preprocessing.
-
-        Args:
-            df (pd.DataFrame): Incoming asset data.
-
-        Returns:
-            pd.DataFrame: Adjusted data ready for synchronization.
-        """
-        return self.standardize_assets(df)

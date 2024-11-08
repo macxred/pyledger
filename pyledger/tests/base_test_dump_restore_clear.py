@@ -20,37 +20,46 @@ class BaseTestDumpRestoreClear(BaseTest):
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,
             assets=self.ASSETS,
+            price_history=self.PRICES,
+            revaluations=self.REVALUATIONS,
         )
         assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
         )
-        tax_codes = ledger.standardize_tax_codes(self.TAX_CODES)
-        assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, check_like=True)
-        accounts = ledger.standardize_accounts(self.ACCOUNTS)
         assert_frame_equal(
-            accounts, ledger.accounts(), ignore_row_order=True, check_like=True
+            self.TAX_CODES, ledger.tax_codes.list(), ignore_row_order=True, check_like=True
         )
-        assets = ledger.standardize_assets(self.ASSETS)
         assert_frame_equal(
-            assets, ledger.assets(), ignore_row_order=True
+            self.ACCOUNTS, ledger.accounts.list(), ignore_row_order=True, check_like=True
         )
+        assert_frame_equal(
+            self.PRICES, ledger.price_history.list(), ignore_row_order=True, check_like=True
+        )
+        assert_frame_equal(
+            self.REVALUATIONS, ledger.revaluations.list(), ignore_row_order=True, check_like=True
+        )
+        assert_frame_equal(self.ASSETS, ledger.assets.list(), ignore_row_order=True)
         target = ledger.txn_to_str(self.LEDGER_ENTRIES).values()
-        actual = ledger.txn_to_str(ledger.ledger()).values()
+        actual = ledger.txn_to_str(ledger.ledger.list()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
 
     def test_dump_and_restore_zip(self, ledger, tmp_path):
         # Populate with test data
         ledger.reporting_currency = self.SETTINGS["REPORTING_CURRENCY"]
-        ledger.mirror_accounts(self.ACCOUNTS)
-        ledger.mirror_tax_codes(self.TAX_CODES)
-        ledger.mirror_ledger(self.LEDGER_ENTRIES)
-        ledger.mirror_assets(self.ASSETS)
+        ledger.accounts.mirror(self.ACCOUNTS)
+        ledger.tax_codes.mirror(self.TAX_CODES)
+        ledger.ledger.mirror(self.LEDGER_ENTRIES)
+        ledger.assets.mirror(self.ASSETS)
+        ledger.price_history.mirror(self.PRICES)
+        ledger.revaluations.mirror(self.REVALUATIONS)
 
         # Dumping current state
-        accounts = ledger.accounts()
-        tax_codes = ledger.tax_codes()
-        ledger_entries = ledger.ledger()
-        assets = ledger.assets()
+        accounts = ledger.accounts.list()
+        tax_codes = ledger.tax_codes.list()
+        ledger_entries = ledger.ledger.list()
+        assets = ledger.assets.list()
+        price_history = ledger.price_history.list()
+        revaluations = ledger.revaluations.list()
         ledger.dump_to_zip(tmp_path / "ledger.zip")
 
         # Remove or alter data
@@ -62,13 +71,21 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert ledger.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
         )
-        assert_frame_equal(tax_codes, ledger.tax_codes(), ignore_row_order=True, ignore_index=True)
-        assert_frame_equal(assets, ledger.assets(), ignore_row_order=True, ignore_index=True)
+        assert_frame_equal(assets, ledger.assets.list(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(
-            accounts, ledger.accounts(), ignore_row_order=True, ignore_index=True
+            price_history, ledger.price_history.list(), ignore_row_order=True, ignore_index=True
+        )
+        assert_frame_equal(
+            revaluations, ledger.revaluations.list(), ignore_row_order=True, ignore_index=True
+        )
+        assert_frame_equal(
+            tax_codes, ledger.tax_codes.list(), ignore_row_order=True, ignore_index=True
+        )
+        assert_frame_equal(
+            accounts, ledger.accounts.list(), ignore_row_order=True, ignore_index=True
         )
         assert sorted(ledger.txn_to_str(ledger_entries).values()) == \
-               sorted(ledger.txn_to_str(ledger.ledger()).values())
+               sorted(ledger.txn_to_str(ledger.ledger.list()).values())
 
     def test_clear(self, ledger):
         ledger.restore(
@@ -76,11 +93,14 @@ class BaseTestDumpRestoreClear(BaseTest):
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,
-            assets=self.ASSETS
+            assets=self.ASSETS,
+            price_history=self.PRICES,
+            revaluations=self.REVALUATIONS,
         )
         ledger.clear()
-        assert ledger.ledger().empty, "Ledger was not cleared"
-        assert ledger.tax_codes().empty, "Tax codes were not cleared"
-        assert ledger.accounts().empty, "Accounts was not cleared"
-        assert ledger.assets().empty, "Assets was not cleared"
-        # TODO: Expand test logic to test price history and revaluations when implemented
+        assert ledger.ledger.list().empty, "Ledger was not cleared"
+        assert ledger.tax_codes.list().empty, "Tax codes were not cleared"
+        assert ledger.assets.list().empty, "Assets was not cleared"
+        assert ledger.accounts.list().empty, "Accounts was not cleared"
+        assert ledger.price_history.list().empty, "Price history was not cleared"
+        assert ledger.revaluations.list().empty, "Revaluations was not cleared"

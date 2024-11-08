@@ -86,7 +86,7 @@ from pyledger import TestLedger
 ledger = TestLedger()
 
 # Get accounts
-ledger.accounts()
+ledger.accounts.list()
 ##         currency tax_code                                        description
 ## account
 ## 1000         CHF      NaN                                       Cash on hand
@@ -97,14 +97,14 @@ ledger.accounts()
 ## [..snip..]
 
 # Post transactions to the general ledger
-ledger.add_ledger_entry({
+ledger.ledger.add({
     'date': datetime.date.today(),
     'account': 1020,
     'contra': 6000,
     'currency': 'CHF',
     "description": "First Test Transaction",
     'amount': -100})
-ledger.add_ledger_entry({
+ledger.ledger.add({
     'date': datetime.date.today(),
     'account': 1020,
     'contra': 4000,

@@ -38,9 +38,9 @@ class StandaloneLedger(LedgerEngine):
             pd.DataFrame: A new DataFrame with tax journal entries.
             Returns empty DataFrame with the correct structure if no tax codes are present.
         """
-        tax_definitions = self.tax_codes().set_index("id").to_dict("index")
+        tax_definitions = self.tax_codes.list().set_index("id").to_dict("index")
         tax_journal_entries = []
-        accounts = self.accounts()
+        accounts = self.accounts.list()
         for _, row in df.loc[df["tax_code"].notna()].iterrows():
             tax = tax_definitions[row["tax_code"]]
             account_tax_code = (
@@ -121,11 +121,11 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        return self.serialize_ledger(self.complete_ledger(self.ledger()))
+        return self.serialize_ledger(self.complete_ledger(self.ledger.list()))
 
     def complete_ledger(self, ledger=None) -> pd.DataFrame:
         # Ledger definition
-        df = self.standardize_ledger(ledger)
+        df = self.ledger.standardize(ledger)
         df = self.sanitize_ledger(df)
         df = df.sort_values(["date", "id"])
 
@@ -141,7 +141,7 @@ class StandaloneLedger(LedgerEngine):
         )
 
         # Add ledger entries for (currency or other) revaluations
-        revalue = self.revaluation_entries(ledger=df, revaluations=self.revaluations())
+        revalue = self.revaluation_entries(ledger=df, revaluations=self.revaluations.list())
         return pd.concat([df, revalue], ignore_index=True)
 
     def revaluation_entries(self, ledger: pd.DataFrame, revaluations: pd.DataFrame) -> pd.DataFrame:
@@ -149,7 +149,7 @@ class StandaloneLedger(LedgerEngine):
         result = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            revalue = self.standardize_ledger_columns(pd.DataFrame(result))
+            revalue = self.ledger.standardize(pd.DataFrame(result))
             df = self.serialize_ledger(pd.concat([ledger, revalue]))
             date = row["date"]
             accounts = self.account_range(row["account"])
@@ -189,7 +189,7 @@ class StandaloneLedger(LedgerEngine):
                             "description": row["description"]
                         })
 
-        return self.standardize_ledger_columns(pd.DataFrame(result))
+        return self.ledger.standardize(pd.DataFrame(result))
 
     def _balance_from_serialized_ledger(self,
                                         ledger: pd.DataFrame,
@@ -298,7 +298,7 @@ class StandaloneLedger(LedgerEngine):
             `price` history sorted by `date` with `NaT` values first.
         """
         result = {}
-        for (ticker, currency), group in self.price_history().groupby(["ticker", "currency"]):
+        for (ticker, currency), group in self.price_history.list().groupby(["ticker", "currency"]):
             group = group[["date", "price"]].sort_values("date", na_position="first")
             group = group.reset_index(drop=True)
             if ticker not in result.keys():
@@ -327,7 +327,7 @@ class StandaloneLedger(LedgerEngine):
                 .sort_values("date", na_position="first")
                 .reset_index(drop=True)
             )
-            for ticker, group in self.assets().groupby("ticker")
+            for ticker, group in self.assets.list().groupby("ticker")
         }
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:

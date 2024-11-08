@@ -4,7 +4,7 @@ import json
 import pandas as pd
 from abc import ABC
 from io import StringIO
-from pyledger import LedgerEngine
+from pyledger import MemoryLedger
 
 
 TAX_CSV = """
@@ -149,11 +149,12 @@ EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
 # flake8: enable
 
 class BaseTest(ABC):
+    engine = MemoryLedger()
     SETTINGS = {"REPORTING_CURRENCY": "USD"}
-    TAX_CODES = LedgerEngine.standardize_tax_codes(TAX_CODES)
-    ACCOUNTS = LedgerEngine.standardize_accounts(ACCOUNTS)
-    LEDGER_ENTRIES = LedgerEngine.standardize_ledger_columns(LEDGER)
-    ASSETS = LedgerEngine.standardize_assets(ASSETS)
-    PRICES = LedgerEngine.standardize_price_df(PRICES)
-    REVALUATIONS = LedgerEngine.standardize_revaluations(REVALUATIONS)
+    ASSETS = engine.assets.standardize(ASSETS)
+    ACCOUNTS = engine.accounts.standardize(ACCOUNTS)
+    PRICES = engine.price_history.standardize(PRICES)
+    LEDGER_ENTRIES = engine.ledger.standardize(LEDGER)
+    TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
+    REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
     EXPECTED_BALANCE = EXPECTED_BALANCE
