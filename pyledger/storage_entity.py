@@ -312,8 +312,11 @@ class StandaloneTabularEntity(TabularEntity):
 
     def modify(self, data: pd.DataFrame):
         current = self.list()
-        incoming = enforce_schema(pd.DataFrame(data), self._schema.query("id"),
-                                  keep_extra_columns=True)
+        data = pd.DataFrame(data)
+        cols = set(self._schema["column"]).intersection(data.columns)
+        cols = cols.union(self._schema.query("id")["column"])
+        reduced_schema = self._schema.query("column in @cols")
+        incoming = enforce_schema(data, reduced_schema, keep_extra_columns=True)
         missing = incoming[self._id_columns].merge(
             current[self._id_columns], on=self._id_columns, how='left', indicator=True
         )
@@ -330,7 +333,7 @@ class StandaloneTabularEntity(TabularEntity):
         for current_col, incoming_col in zip(current_cols, incoming_cols):
             merged.loc[mask, current_col] = merged.loc[mask, incoming_col]
         new = merged.drop(columns=["_merge", *incoming_cols])
-        self._store(self.standardize(new))
+        self._store(new)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
         current = self.list()
