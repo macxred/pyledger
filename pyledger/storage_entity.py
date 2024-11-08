@@ -113,8 +113,14 @@ class TabularEntity(AccountingEntity):
         """
         Modifies entries.
 
+        For entries with unique identifier columns present in `data`,
+        overwrites remaining columns present in `data` with the incoming values.
+        Current values in columns not present in `data` are left unchanged.
+
         Parameters:
-            data (pd.DataFrame): The DataFrame containing entries to be modified.
+            data (pd.DataFrame): The DataFrame with entries to be modified. It
+                must contain all id columns defined in the data frame schema,
+                other columns are optional.
 
         Raises:
             ValueError: If the IDs in `date` are not present.
@@ -306,20 +312,25 @@ class StandaloneTabularEntity(TabularEntity):
 
     def modify(self, data: pd.DataFrame):
         current = self.list()
-        incoming = self.standardize(pd.DataFrame(data))
-        missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
-        if not missing[missing['_merge'] != 'both'].empty:
+        incoming = enforce_schema(pd.DataFrame(data), self._schema.query("id"),
+                                  keep_extra_columns=True)
+        missing = incoming[self._id_columns].merge(
+            current[self._id_columns], on=self._id_columns, how='left', indicator=True
+        )
+        if any(missing['_merge'] != 'both'):
             raise ValueError("Some elements in 'data' are not present.")
-        if set(current.columns) != set(incoming.columns):
-            raise NotImplementedError(
-                "Modify with a differing set of columns is not implemented yet.")
         merged = current.merge(
             incoming, on=self._id_columns, how='left', suffixes=('', '_incoming'), indicator=True
         )
+        if any(merged['_merge'] == 'right_only'):
+            raise ValueError("Some elements in 'data' are not present.")
+        incoming_cols = merged.columns[merged.columns.str.endswith("_incoming")]
+        current_cols = incoming_cols.str.replace("_incoming$", "", regex=True)
         mask = merged["_merge"] == "both"
-        for col in current.columns:
-            current.loc[mask, col] = incoming[col].values
-        self._store(current)
+        for current_col, incoming_col in zip(current_cols, incoming_cols):
+            merged.loc[mask, current_col] = merged.loc[mask, incoming_col]
+        new = merged.drop(columns=["_merge", *incoming_cols])
+        self._store(self.standardize(new))
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
         current = self.list()

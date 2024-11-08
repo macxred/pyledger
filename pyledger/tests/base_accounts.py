@@ -63,7 +63,7 @@ class BaseTestAccounts(BaseTest):
         accounts = ledger.accounts.list()
         new_account = {
             "account": 1146,
-            "currency": "CHF",
+            "currency": "USD",
             "description": "test update account",
             "tax_code": "Test",
             "group": "/Assets",
@@ -84,11 +84,10 @@ class BaseTestAccounts(BaseTest):
         accounts = ledger.accounts.list()
         new_account = {
             "account": 1145,
-            "currency": "USD",
             "description": "test update account without tax",
             "tax_code": None,
-            "group": "/Assets",
         }
+        original_account = ledger.accounts.list().query("account == @new_account['account']")
         ledger.accounts.modify([new_account])
         updated_accounts = ledger.accounts.list()
         outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
@@ -100,10 +99,9 @@ class BaseTestAccounts(BaseTest):
         assert len(created_accounts) == 1, "Expected exactly one row to be added"
         assert created_accounts["account"].item() == new_account["account"]
         assert created_accounts["description"].item() == new_account["description"]
-        assert created_accounts["account"].item() == new_account["account"]
-        assert created_accounts["currency"].item() == new_account["currency"]
+        assert created_accounts["currency"].item() == original_account["currency"].item()
         assert pd.isna(created_accounts["tax_code"].item())
-        assert created_accounts["group"].item() == new_account["group"]
+        assert created_accounts["group"].item() == original_account["group"].item()
 
         ledger.accounts.delete({"account": [1145]})
         ledger.accounts.delete({"account": [1146]})
