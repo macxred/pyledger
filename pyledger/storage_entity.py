@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
-from pyledger.decorators import timed_cache
 
 
 class AccountingEntity(ABC):
@@ -351,13 +350,11 @@ class DataFrameEntity(StandaloneTabularEntity):
         super().__init__(schema, *args, **kwargs)
         self._df = self.standardize(None)
 
-    @timed_cache(15)
     def list(self) -> pd.DataFrame:
         return self._df.copy()
 
     def _store(self, data: pd.DataFrame):
         self._df = data.reset_index(drop=True)
-        self.list.cache_clear()
 
 
 class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
