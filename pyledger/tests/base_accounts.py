@@ -2,6 +2,7 @@
 
 import pytest
 import pandas as pd
+import datetime
 from abc import abstractmethod
 from consistent_df import assert_frame_equal
 from .base_test import BaseTest
@@ -164,3 +165,18 @@ class BaseTestAccounts(BaseTest):
         assert not ledger.accounts.list().empty, "Accounts were not populated"
         ledger.accounts.mirror(ledger.accounts.standardize(None), delete=True)
         assert ledger.accounts.list().empty, "Mirroring empty df should erase all accounts"
+
+    def test_account_balance(self, ledger):
+        ledger.restore(
+            accounts=self.ACCOUNTS, settings=self.SETTINGS, tax_codes=self.TAX_CODES,
+            ledger=self.LEDGER_ENTRIES, assets=self.ASSETS, price_history=self.PRICES,
+            revaluations=self.REVALUATIONS
+        )
+        for _, row in self.EXPECTED_BALANCE.iterrows():
+            date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
+            account = row['account']
+            expected = row['balance']
+            actual = ledger.account_balance(date=date, account=row['account'])
+            assert expected == actual, (
+                f"Account balance for {account} on {date} of {actual} differs from {expected}."
+            )
