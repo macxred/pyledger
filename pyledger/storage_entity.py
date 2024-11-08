@@ -194,9 +194,6 @@ class TabularLedgerEntity(TabularEntity):
     TabularEntity adapted to specific needs of ledger entries, with custom
     standardize and mirror methods.
     """
-    # # Standardize data frame schema, discard incoherent entries with a warning
-    #
-    # target = self.sanitize_ledger(target)
 
     def __init__(self, schema, *args, **kwargs):
         super().__init__(schema, *args, **kwargs)
