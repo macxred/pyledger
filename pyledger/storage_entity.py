@@ -104,7 +104,14 @@ class TabularEntity(AccountingEntity):
         Raises:
             ValueError: If required columns are missing or data types are incorrect.
         """
-        return enforce_schema(data, self._schema, keep_extra_columns=keep_extra_columns)
+        df = enforce_schema(data, self._schema, keep_extra_columns=keep_extra_columns)
+
+        # Convert -0.0 to 0.0
+        for col in df.columns:
+            if pd.api.types.is_float_dtype(df[col]):
+                df.loc[df[col].notna() & (df[col] == 0.0), col] = 0.0
+
+        return df
 
     @abstractmethod
     def list(self) -> pd.DataFrame:
@@ -231,8 +238,8 @@ class TabularLedgerEntity(TabularEntity):
         - Deletion may alter existing IDs.
     """
 
-    def __init__(self, schema, *args, **kwargs):
-        super().__init__(schema, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def standardize(self, data: pd.DataFrame, keep_extra_columns: bool = False) -> pd.DataFrame:
         """
@@ -252,7 +259,7 @@ class TabularLedgerEntity(TabularEntity):
         Raises:
             ValueError: If required columns are missing or data types are incorrect.
         """
-        df = enforce_schema(data, self._schema, keep_extra_columns=keep_extra_columns)
+        df = super().standardize(data=data, keep_extra_columns=keep_extra_columns)
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
         if df["id"].isna().all():
@@ -263,11 +270,6 @@ class TabularLedgerEntity(TabularEntity):
         df["date"] = df.groupby("id")["date"].ffill()
         df["date"] = df.groupby("id")["date"].bfill()
         df["date"] = df["date"].dt.tz_localize(None).dt.floor('D')
-
-        # Convert -0.0 to 0.0
-        for col in df.columns:
-            if pd.Float64Dtype.is_dtype(df[col]):
-                df.loc[df[col].notna() & (df[col] == 0), col] = 0.0
 
         return df
 
@@ -365,8 +367,8 @@ class StandaloneTabularEntity(TabularEntity):
     without relying on an external system.
     """
 
-    def __init__(self, schema, prepare_for_mirroring=lambda x: x, *args, **kwargs):
-        super().__init__(schema, prepare_for_mirroring, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     @abstractmethod
     def _store(self, data: pd.DataFrame) -> None:
@@ -428,8 +430,8 @@ class DataFrameEntity(StandaloneTabularEntity):
     Stores tabular accounting data as a DataFrame in memory.
     """
 
-    def __init__(self, schema, *args, **kwargs):
-        super().__init__(schema, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._df = self.standardize(None)
 
     def list(self) -> pd.DataFrame:
@@ -465,6 +467,5 @@ class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
         Notes:
             - IDs are not preserved during modification.
         """
-        # DataFrameEntity.modify does not work for duplicate ids
         self.delete(data, allow_missing=False)
         self.add(data)
