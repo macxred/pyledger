@@ -1,14 +1,16 @@
 """Provides abstract storage entities for accounting data."""
 
 from abc import ABC, abstractmethod
+from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
 
 
 class AccountingEntity(ABC):
     """
-    Abstract base class for accounting entities, such as general ledger, account chart,
-    tax codes or configuration settings.
+    Abstract base class representing an accounting entity (e.g., general ledger,
+    account chart, tax codes, or configuration settings). Defines the standard
+    interface that all accounting entities must implement.
     """
 
     def __init__(self, *args, **kwargs):
@@ -16,37 +18,68 @@ class AccountingEntity(ABC):
 
     @abstractmethod
     def standardize(self, data):
-        pass
+        """Convert data to a consistent representation."""
 
     @abstractmethod
     def list(self):
-        pass
+        """Retrieve all entries."""
 
     @abstractmethod
     def add(self, data):
-        pass
+        """Add new entries."""
 
     @abstractmethod
     def modify(self, data):
-        pass
+        """Modify existing entries."""
 
     @abstractmethod
     def delete(self, id, allow_missing: bool = False):
-        pass
+        """
+        Delete entries.
+
+        Args:
+            id (pd.DataFrame): Identifiers of entries to delete.
+            allow_missing (bool, optional): If True, don't raise an error if an ID is not present.
+        """
 
     @abstractmethod
-    def mirror(self, target, delete: bool = False):
-        pass
+    def mirror(self, target, delete: bool = False) -> Dict[str, int]:
+        """
+        Synchronize the current data with the incoming target data.
+
+        Args:
+            target (pd.DataFrame): The desired target state.
+            delete (bool, optional): If True, deletes current entries not present in `target`.
+
+        Returns:
+            Dict[str, int]: Summary statistics of the mirroring process.
+        """
 
 
 class TabularEntity(AccountingEntity):
     """
-    Abstract base class for storage of accounting entities in tabular form,
-    such as general ledger, account chart or tax codes. Accessors return type
-    consistent pandas DataFrames in each entity's specific column schema.
+    Abstract base class for accounting entities stored in tabular form (e.g.,
+    general ledger, account chart, tax codes). Accessors return pandas DataFrames
+    consistent with the entity's specific column schema.
     """
 
-    def __init__(self, schema, prepare_for_mirroring=lambda x: x, *args, **kwargs):
+    def __init__(
+        self,
+        schema: pd.DataFrame,
+        prepare_for_mirroring: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x,
+        *args: Any,
+        **kwargs: Any
+    ) -> None:
+        """
+        Initialize the TabularEntity.
+
+        Args:
+            schema (pd.DataFrame): DataFrame with columns 'column', 'dtype', 'id' (boolean)
+                                   defining the entity's DataFrame schema.
+            prepare_for_mirroring (Callable[[pd.DataFrame], pd.DataFrame], optional):
+                Function to prepare data for mirroring. Defaults to identity function.
+            *args, **kwargs: Additional arguments passed to the superclass.
+        """
         super().__init__(*args, **kwargs)
         self._schema = schema
         self._id_columns = schema.query("id == True")["column"].to_list()
@@ -54,103 +87,103 @@ class TabularEntity(AccountingEntity):
 
     def standardize(self, data: pd.DataFrame, keep_extra_columns: bool = False) -> pd.DataFrame:
         """
-        Convert data to a consistent representation.
+        Standardize the given DataFrame to conform to the entity's schema.
 
         Validates that required columns are present, fills any missing optional
         columns with NA, and enforces specified data types for each column.
-        If applicable, performs entity-specific data standardization.
+        Child classes may perform additional, entity-specific data conversions.
 
         Args:
-            data (pd.DataFrame): The DataFrame to standardize.
-            keep_extra_columns (bool): If True, retains columns outside the defined schema.
+            data (pd.DataFrame): DataFrame compatible with the entity's DataFrame schema.
+            keep_extra_columns (bool, optional): If True, retains columns
+                                                 outside the defined schema.
 
         Returns:
             pd.DataFrame: The standardized DataFrame.
 
         Raises:
-            ValueError: If data types are incorrect or a required column is missing.
+            ValueError: If required columns are missing or data types are incorrect.
         """
         return enforce_schema(data, self._schema, keep_extra_columns=keep_extra_columns)
 
     @abstractmethod
     def list(self) -> pd.DataFrame:
-        """Retrieves all entries.
+        """
+        Retrieve all entries.
 
         Returns:
-            pd.DataFrame that adheres to the entity's column schema.
+            pd.DataFrame: DataFrame adhering to the entity's column schema.
         """
 
     @abstractmethod
     def add(self, data: pd.DataFrame) -> None:
         """
-        Adds new entries.
+        Add new entries.
 
-        Parameters:
-            data (pd.DataFrame): DataFrame with new entries to add.
+        Args:
+            data (pd.DataFrame): DataFrame containing new entries to add,
+                                 compatible with the entity's DataFrame schema.
 
         Raises:
-            ValueError: If the IDs in `date` are already present.
+            ValueError: If the IDs in `data` are already present.
         """
-        pass
 
     @abstractmethod
-    def delete(self, id: pd.DataFrame, allow_missing: bool = False) -> pd.DataFrame:
+    def delete(self, id: pd.DataFrame, allow_missing: bool = False) -> None:
         """
-        Deletes entries.
+        Delete entries.
 
-        Parameters:
-            id (pd.DataFrame): DataFrame with IDs of entries to be deleted.
-            allow_missing (bool): If True, no error is raised if an id is not present.
+        Args:
+            id (pd.DataFrame): DataFrame containing IDs of entries to delete.
+                               Must contain all ID columns defined in the schema.
+            allow_missing (bool, optional): If True, does not raise an error if a combination
+                                            of identifier columns is not present.
 
         Raises:
-            ValueError: If the IDs in `date` are not present and not `allow_missing`.
+            ValueError: If combination of ID columns is not present and `allow_missing` is False.
         """
-        pass
 
     @abstractmethod
-    def modify(self, data: pd.DataFrame) -> pd.DataFrame:
+    def modify(self, data: pd.DataFrame) -> None:
         """
-        Modifies entries.
+        Modify existing entries.
 
-        For entries with unique identifier columns present in `data`,
-        overwrites remaining columns present in `data` with the incoming values.
-        Current values in columns not present in `data` are left unchanged.
+        For entries identified by the unique identifier columns in `data`,
+        overwrite existing values with the incoming values from `data`.
+        Columns not present in `data` remain unchanged.
 
-        Parameters:
-            data (pd.DataFrame): The DataFrame with entries to be modified. It
-                must contain all id columns defined in the data frame schema,
-                other columns are optional.
+        Args:
+            data (pd.DataFrame): DataFrame containing entries to modify. Must contain all ID
+                                 columns defined in the schema; other columns are optional.
 
         Raises:
-            ValueError: If the IDs in `date` are not present.
+            ValueError: If a combination of ID columns is not present in `data`.
         """
-        pass
 
-    def mirror(self, target: pd.DataFrame, delete: bool = False) -> dict:
-        """Align current data with the incoming target data.
+    def mirror(self, target: pd.DataFrame, delete: bool = False) -> Dict[str, int]:
+        """
+        Align the current data with the incoming target data.
 
         Updates the current data to match the `target` by adding new entries,
         modifying existing ones, and optionally deleting entries not present
         in `target`.
 
-        Invokes a 'prepare_for_mirroring' method set by the owning instance
-        as the initial step in the mirroring process. This method
-        matches the incoming DataFrame with the current system's requirements
-        and aligns it with existing data, facilitating the identification
-        of entries that need to be added, modified, or removed.
+        Invokes the 'prepare_for_mirroring' function set by the owning system
+        to align the incoming data with the system's requirements and existing
+        data prior to mirroring.
 
         Args:
-            target (pd.DataFrame): The desired target state.
-            delete (bool): If True, deletes current entries that are not
-                           present in the `target`.
+            target (pd.DataFrame): DataFrame representing the desired target state,
+                                   compatible with the entity's DataFrame schema.
+            delete (bool, optional): If True, deletes current entries not present in `target`.
 
         Returns:
-            dict: Summary statistics of the mirroring process:
-                - 'initial' (int): Number of assets before synchronization.
-                - 'target' (int): Number of assets in the target DataFrame.
-                - 'added' (int): Number of assets added.
-                - 'deleted' (int): Number of assets deleted.
-                - 'updated' (int): Number of assets updated.
+            Dict[str, int]: Summary statistics of the mirroring process containing:
+                - 'initial' (int): Number of entries before synchronization.
+                - 'target' (int): Number of entries in the target DataFrame.
+                - 'added' (int): Number of entries added.
+                - 'deleted' (int): Number of entries deleted.
+                - 'updated' (int): Number of entries updated.
         """
         current = self.list()
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
@@ -190,14 +223,35 @@ class TabularEntity(AccountingEntity):
 
 class TabularLedgerEntity(TabularEntity):
     """
-    TabularEntity adapted to specific needs of ledger entries, with custom
-    standardize and mirror methods.
+    Specialized TabularEntity for general ledger entries, with custom
+    `standardize` and `mirror` methods tailored to ledger-specific needs.
+
+    Notes:
+        - IDs are not preserved during operations.
+        - Deletion may alter existing IDs.
     """
 
     def __init__(self, schema, *args, **kwargs):
         super().__init__(schema, *args, **kwargs)
 
     def standardize(self, data: pd.DataFrame, keep_extra_columns: bool = False) -> pd.DataFrame:
+        """
+        Standardize ledger data to conform to the entity's schema.
+
+        Performs additional processing specific to ledger entries, including:
+        - Adds 'id' column if missing, assigning IDs based on consecutive non-null dates.
+        - Fills missing 'date' values by forward and backward filling within 'id' groups.
+
+        Args:
+            data (pd.DataFrame): DataFrame compatible with the entity's DataFrame schema.
+            keep_extra_columns (bool, optional): If True, retain columns outside the schema.
+
+        Returns:
+            pd.DataFrame: The standardized DataFrame.
+
+        Raises:
+            ValueError: If required columns are missing or data types are incorrect.
+        """
         df = enforce_schema(data, self._schema, keep_extra_columns=keep_extra_columns)
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
@@ -217,7 +271,29 @@ class TabularLedgerEntity(TabularEntity):
 
         return df
 
-    def mirror(self, target: pd.DataFrame, delete: bool = False) -> dict:
+    def mirror(self, target: pd.DataFrame, delete: bool = False) -> Dict[str, int]:
+        """
+        Synchronize the current ledger data with the target ledger data.
+
+        Custom implementation for ledger entries that accounts for
+        transactions spanning multiple rows.
+
+        Args:
+            target (pd.DataFrame): DataFrame representing the desired target ledger state.
+            delete (bool, optional): If True, deletes current ledger entries not present in target.
+
+        Returns:
+            Dict[str, int]: Summary statistics of the mirroring process containing:
+                - 'initial' (int): Number of ledger entries before synchronization.
+                - 'target' (int): Number of ledger entries in the target DataFrame.
+                - 'added' (int): Number of ledger entries added.
+                - 'deleted' (int): Number of ledger entries deleted.
+                - 'updated' (int): Number of ledger entries updated (always 0 for ledger entries).
+
+        Notes:
+            - IDs are not preserved during the mirroring process.
+            - Deletions may alter existing IDs.
+        """
 
         def nest_ledger(df: pd.DataFrame) -> pd.DataFrame:
             """Nest to create one row per transaction, add unique string identifier."""
@@ -233,7 +309,6 @@ class TabularLedgerEntity(TabularEntity):
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
         incoming = nest_ledger(incoming)
         if incoming["id"].duplicated().any():
-            # We expect nesting to combine all rows with the same
             raise ValueError("Non-unique dates in `target` transactions.")
 
         # Count occurrences of each unique transaction in current and incoming,
@@ -286,16 +361,21 @@ class TabularLedgerEntity(TabularEntity):
 
 class StandaloneTabularEntity(TabularEntity):
     """
-    Abstract base class for local storage of tabular accounting data, without
-    relying on an external system.
+    Abstract base class for local storage of tabular accounting data,
+    without relying on an external system.
     """
 
     def __init__(self, schema, prepare_for_mirroring=lambda x: x, *args, **kwargs):
         super().__init__(schema, prepare_for_mirroring, *args, **kwargs)
 
     @abstractmethod
-    def _store(self, data: pd.DataFrame):
-        """Update storage with an updated version of the DataFrame."""
+    def _store(self, data: pd.DataFrame) -> None:
+        """
+        Update storage with an updated version of the DataFrame.
+
+        Args:
+            data (pd.DataFrame): The updated DataFrame to store.
+        """
 
     def add(self, data: pd.DataFrame):
         current = self.list()
@@ -344,7 +424,9 @@ class StandaloneTabularEntity(TabularEntity):
 
 
 class DataFrameEntity(StandaloneTabularEntity):
-    """Stores tabular accounting data as a DataFrame in memory."""
+    """
+    Stores tabular accounting data as a DataFrame in memory.
+    """
 
     def __init__(self, schema, *args, **kwargs):
         super().__init__(schema, *args, **kwargs)
@@ -358,8 +440,31 @@ class DataFrameEntity(StandaloneTabularEntity):
 
 
 class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
+    """
+    Ledger entity that stores ledger entries as a DataFrame in memory.
 
-    def modify(self, data: pd.DataFrame):
+    Notes:
+        - IDs are not preserved during modification.
+        - Deleting entries may alter existing IDs.
+    """
+
+    def modify(self, data: pd.DataFrame) -> None:
+        """
+        Modify existing ledger entries.
+
+        Overrides the base implementation because DataFrameEntity.modify does
+        not support duplicate IDs.
+
+        Args:
+            data (pd.DataFrame): DataFrame containing ledger entries to modify. Must contain all
+                                 ID columns defined in the schema; other columns are optional.
+
+        Raises:
+            ValueError: If a combination of ID columns is not present in `data`.
+
+        Notes:
+            - IDs are not preserved during modification.
+        """
         # DataFrameEntity.modify does not work for duplicate ids
         self.delete(data, allow_missing=False)
         self.add(data)
