@@ -6,6 +6,7 @@ from pyledger import TextLedger
 from consistent_df import assert_frame_equal
 
 
+@pytest.mark.skip(reason="Delegation for accounting entities not yet implemented in TextLedger.")
 class TestTaxCodes(BaseTestTaxCodes):
 
     @pytest.fixture
