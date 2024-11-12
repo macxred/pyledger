@@ -6,7 +6,8 @@ from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
 from pyledger.decorators import timed_cache
-from pyledger.helpers import write_fixed_width_csv
+from pyledger.helpers import save_files, write_fixed_width_csv
+from pyledger.constants import LEDGER_SCHEMA
 
 
 class AccountingEntity(ABC):
@@ -532,3 +533,171 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         df.drop(columns=to_drop, inplace=True)
         n_fixed = self._schema["column"].isin(df.columns).sum()
         write_fixed_width_csv(df, file=self._file_path, n=n_fixed)
+
+
+# TODO: remove once old systems are migrated
+LEDGER_COLUMN_SHORTCUTS = {
+    "cur": "currency",
+    "vat": "tax_code",
+    "base_amount": "report_amount",
+    "counter": "contra",
+}
+
+
+class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
+    """
+    Stores ledger entries in multiple CSV files, with files determined by the IDs of the entries.
+    """
+
+    def __init__(
+        self,
+        root_path: Path,
+        write_file: Callable[[pd.DataFrame, Path], None] = None,
+        *args,
+        **kwargs
+    ):
+        super().__init__(file_path=root_path, *args, **kwargs)
+        self._root_path = root_path
+        self._write_file = write_file
+
+    @timed_cache(15)
+    def list(self) -> pd.DataFrame:
+        return self._read_files()
+
+    def _store(self, data: pd.DataFrame, file_path: Path):
+        if data.empty:
+            file_path.unlink(missing_ok=True)
+        else:
+            self._write_file(data, file_path)
+        self.list.cache_clear()
+
+    def _csv_path(self, id: pd.Series) -> pd.Series:
+        """Extract storage path from ledger id."""
+        return id.str.replace(":[^:]+$", "", regex=True)
+
+    def _id_from_path(self, id: pd.Series) -> pd.Series:
+        """Extract numeric portion of ledger id."""
+        return id.str.replace("^.*:", "", regex=True)
+
+    def _read_files(self) -> pd.DataFrame:
+        """Reads ledger entries from CSV files in the root directory.
+
+        Iterates through all CSV files in the root directory, reading each file
+        into a DataFrame and ensuring the data conforms to `LEDGER_SCHEMA`.
+        Files that cannot be processed are skipped with a warning. The Data
+        from all valid files is then combined into a single DataFrame.
+
+        IDs are not stored in ledger files but are dynamically generated when
+        reading each file. The `id` is constructed by combining the relative
+        path to the root directory with the row's position, separated by a
+        colon (`{path}:{position}`). These IDs are non-persistent and may
+        change if a file's entries are modified. Successive rows that belong to
+        the same transaction are identified by recording the date only on the
+        first row; subsequent rows without a date are considered part of the
+        same transaction.
+
+        Returns:
+            pd.DataFrame: The aggregated ledger data conforming to `LEDGER_SCHEMA`.
+        """
+
+        root = self._root_path / 'ledger'
+        if not root.exists():
+            return self.standardize(None)
+        if not root.is_dir():
+            raise NotADirectoryError(f"Ledger root folder is not a directory: {root}")
+
+        ledger = []
+        for file in root.rglob("*.csv"):
+            relative_path = str(file.relative_to(root))
+            try:
+                df = pd.read_csv(file, skipinitialspace=True)
+                # TODO: Remove the following line once legacy systems are migrated.
+                df = df.rename(columns=LEDGER_COLUMN_SHORTCUTS)
+                df = self.standardize(df)
+                if not df.empty:
+                    df["id"] = relative_path + ":" + df["id"]
+                ledger.append(df)
+            except Exception as e:
+                self._logger.warning(f"Skipping {relative_path}: {e}")
+
+        if ledger:
+            result = pd.concat(ledger, ignore_index=True)
+            result = enforce_schema(result, LEDGER_SCHEMA, sort_columns=True)
+        else:
+            result = None
+
+        return self.standardize(result)
+
+    def write_directory(self, df: pd.DataFrame | None = None):
+        """Save ledger entries to multiple CSV files in the ledger directory.
+
+        Saves ledger entries to several fixed-width CSV files, formatted by
+        `_write_file`. The storage location within the `<root>/ledger`
+        directory is determined by the portion of the ID up to the last
+        colon (':').
+
+        Args:
+            df (pd.DataFrame, optional): The ledger DataFrame to save.
+                If not provided, defaults to the current ledger data.
+        """
+        if df is None:
+            df = self.list()
+
+        df = self.standardize(df)
+        df["__csv_path__"] = self._csv_path(df["id"])
+        save_files(df, root=self._root_path / "ledger", func=self._write_file)
+        self.list.cache_clear()
+
+    def add(self, data: pd.DataFrame, path: str = "default.csv") -> dict:
+        current = self.list()
+        incoming = self.standardize(pd.DataFrame(data))
+        df_same_file = current[self._csv_path(current["id"]) == path]
+
+        if df_same_file.empty:
+            start_id = 1
+        else:
+            ids_same_file = self._id_from_path(df_same_file["id"]).astype(int)
+            start_id = ids_same_file.max() + 1
+
+        # Assign unique IDs incrementing from the max ID
+        unique_incoming = incoming["id"].unique()
+        id_map = {val: f"{path}:{start_id + i}" for i, val in enumerate(unique_incoming)}
+        incoming["id"] = incoming["id"].map(id_map)
+
+        df = pd.concat([df_same_file, incoming], ignore_index=True)
+        full_path = self._root_path / "ledger" / path
+        Path(full_path).parent.mkdir(parents=True, exist_ok=True)
+        self._store(df, full_path)
+
+        return incoming[self._id_columns].iloc[0].to_dict()
+
+    def modify(self, data: pd.DataFrame):
+        incoming = self.standardize(pd.DataFrame(data))
+        for id in incoming["id"].unique():
+            current = self.list()
+            path = self._csv_path(pd.Series(id)).item()
+            df_same_file = current[self._csv_path(current["id"]) == path]
+            if id not in df_same_file["id"].values:
+                raise ValueError(f"Ledger entry with id '{id}' not present in the data.")
+
+            df_same_file = pd.concat([
+                df_same_file[df_same_file["id"] != id], incoming.query("id == @id")
+            ])
+            self._store(df_same_file, self._root_path / "ledger" / path)
+
+    def delete(self, id: pd.DataFrame, allow_missing: bool = False):
+        incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
+        current = self.list()
+        existing_ids = current["id"].unique()
+        ids_to_delete = incoming["id"].unique()
+
+        missing_ids = set(ids_to_delete) - set(existing_ids)
+        if missing_ids and not allow_missing:
+            raise ValueError(f"Ledger entries with ids '{', '.join(missing_ids)}' not found.")
+
+        remaining = current[~current["id"].isin(ids_to_delete)]
+        paths_to_update = self._csv_path(pd.Series(ids_to_delete)).unique()
+        for path in paths_to_update:
+            df_same_file = remaining[self._csv_path(remaining["id"]) == path]
+            file_path = self._root_path / "ledger" / path
+            self._store(df_same_file, file_path)
