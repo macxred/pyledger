@@ -577,7 +577,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
 
     def _id_from_path(self, id: pd.Series) -> pd.Series:
         """Extract numeric portion of ledger id."""
-        return id.str.replace("^.*:", "", regex=True)
+        return id.str.replace("^.*:", "", regex=True).astype(int)
 
     def _read_files(self) -> pd.DataFrame:
         """Reads ledger entries from CSV files in the root directory.
@@ -653,16 +653,10 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         incoming = self.standardize(pd.DataFrame(data))
         df_same_file = current[self._csv_path(current["id"]) == path]
 
-        if df_same_file.empty:
-            start_id = 1
-        else:
-            ids_same_file = self._id_from_path(df_same_file["id"]).astype(int)
-            start_id = ids_same_file.max() + 1
-
         # Assign unique IDs incrementing from the max ID
-        unique_incoming = incoming["id"].unique()
-        id_map = {val: f"{path}:{start_id + i}" for i, val in enumerate(unique_incoming)}
-        incoming["id"] = incoming["id"].map(id_map)
+        id = 0 if df_same_file.empty else self._id_from_path(df_same_file["id"]).max()
+        incoming["id"] = incoming["id"].rank(method="dense").astype(int) + id
+        incoming["id"] = f"{path}:" + incoming["id"].astype(str)
 
         df = pd.concat([df_same_file, incoming], ignore_index=True)
         full_path = self._root_path / "ledger" / path
