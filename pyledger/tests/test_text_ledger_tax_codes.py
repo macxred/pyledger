@@ -1,7 +1,7 @@
 """Test suite for TextLedger tax code operations"""
 
 import pytest
-from .base_tax_codes import BaseTestTaxCodes
+from .base_test_tax_codes import BaseTestTaxCodes
 from pyledger import TextLedger
 from consistent_df import assert_frame_equal
 

@@ -3,7 +3,7 @@
 """This module exposes base test classes for testing ledger system."""
 
 
-from .base_tax_codes import BaseTestTaxCodes
+from .base_test_tax_codes import BaseTestTaxCodes
 from .base_test_accounts import BaseTestAccounts
 from .base_test_ledger import BaseTestLedger
 from .base_test_assets import BaseTestAssets
