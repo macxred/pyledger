@@ -15,100 +15,48 @@ class BaseTestAccounts(BaseTest):
     def ledger(self):
         pass
 
-    def test_account_mutators(self, ledger):
-        tax_codes = self.TAX_CODES[self.TAX_CODES["id"] == "Test"]
-        accounts = self.ACCOUNTS[self.ACCOUNTS["account"] == 9999]
-        ledger.restore(tax_codes=tax_codes, accounts=accounts, settings=self.SETTINGS)
-        new_account = {
-            "account": 1145,
-            "currency": "CHF",
-            "description": "test create account",
-            "tax_code": "Test",
-            "group": "/Assets",
-        }
-        accounts = ledger.accounts.list()
-        ledger.accounts.add([new_account])
-        updated_accounts = ledger.accounts.list()
-        outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
-        created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
+    def test_account_accessor_mutators(self, ledger, ignore_row_order=False):
+        tax_accounts = self.ACCOUNTS.query("account in [4000, 5000]")
+        ledger.restore(tax_codes=self.TAX_CODES, accounts=tax_accounts, settings=self.SETTINGS)
 
-        assert len(created_accounts) == 1, "Expected exactly one row to be added"
-        assert created_accounts["account"].item() == new_account["account"]
-        assert created_accounts["description"].item() == new_account["description"]
-        assert created_accounts["account"].item() == new_account["account"]
-        assert created_accounts["currency"].item() == new_account["currency"]
-        assert created_accounts["tax_code"].item() == "Test"
-        assert created_accounts["group"].item() == new_account["group"]
-
-        accounts = ledger.accounts.list()
-        new_account = {
-            "account": 1146,
-            "currency": "CHF",
-            "description": "test create account",
-            "tax_code": None,
-            "group": "/Assets",
-        }
-        ledger.accounts.add([new_account])
-        updated_accounts = ledger.accounts.list()
-        outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
-        created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(created_accounts) == 1, "Expected exactly one row to be added"
-        assert created_accounts["account"].item() == new_account["account"]
-        assert created_accounts["description"].item() == new_account["description"]
-        assert created_accounts["account"].item() == new_account["account"]
-        assert created_accounts["currency"].item() == new_account["currency"]
-        assert pd.isna(created_accounts["tax_code"].item())
-        assert created_accounts["group"].item() == new_account["group"]
-
-        accounts = ledger.accounts.list()
-        new_account = {
-            "account": 1146,
-            "currency": "USD",
-            "description": "test update account",
-            "tax_code": "Test",
-            "group": "/Assets",
-        }
-        ledger.accounts.modify([new_account])
-        updated_accounts = ledger.accounts.list()
-        outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
-        modified_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(modified_accounts) == 1, "Expected exactly one updated row"
-        assert modified_accounts["account"].item() == new_account["account"]
-        assert modified_accounts["description"].item() == new_account["description"]
-        assert modified_accounts["account"].item() == new_account["account"]
-        assert modified_accounts["currency"].item() == new_account["currency"]
-        assert modified_accounts["tax_code"].item() == "Test"
-        assert modified_accounts["group"].item() == new_account["group"]
-
-        accounts = ledger.accounts.list()
-        new_account = {
-            "account": 1145,
-            "description": "test update account without tax",
-            "tax_code": None,
-        }
-        original_account = ledger.accounts.list().query("account == @new_account['account']")
-        ledger.accounts.modify([new_account])
-        updated_accounts = ledger.accounts.list()
-        outer_join = pd.merge(accounts, updated_accounts, how="outer", indicator=True)
-        created_accounts = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(accounts) == len(updated_accounts), (
-            "Expected accounts to have same length before and after modification"
+        # Add accounts
+        accounts = self.ACCOUNTS.query("account not in [4000, 5000]").sample(frac=1)
+        for account in accounts.to_dict('records'):
+            ledger.accounts.add([account])
+        accounts = pd.concat([tax_accounts, accounts], ignore_index=True)
+        assert_frame_equal(
+            ledger.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
-        assert len(created_accounts) == 1, "Expected exactly one row to be added"
-        assert created_accounts["account"].item() == new_account["account"]
-        assert created_accounts["description"].item() == new_account["description"]
-        assert created_accounts["currency"].item() == original_account["currency"].item()
-        assert pd.isna(created_accounts["tax_code"].item())
-        assert created_accounts["group"].item() == original_account["group"].item()
 
-        ledger.accounts.delete({"account": [1145]})
-        ledger.accounts.delete({"account": [1146]})
-        updated_accounts = ledger.accounts.list()
-        assert 1145 not in updated_accounts["account"].values
-        assert 1146 not in updated_accounts["account"].values
+        # Modify accounts
+        rows = [0, 3, len(accounts) - 1]
+        for i in rows:
+            accounts.loc[i, "description"] = f"New Description: {i}"
+            ledger.accounts.modify([accounts.loc[i]])
+            assert_frame_equal(
+                ledger.accounts.list(), accounts,
+                check_like=True, ignore_row_order=ignore_row_order
+            )
+
+        # Modify method receive only one needed field to modify
+        rows = [0, 3, len(accounts) - 1]
+        for i in rows:
+            accounts.loc[i, "description"] = f"Modify Description: {i}"
+            ledger.accounts.modify({
+                "account": [accounts.loc[i, "account"]],
+                "description": [f"Modify Description: {i}"]
+            })
+            assert_frame_equal(
+                ledger.accounts.list(), accounts,
+                check_like=True, ignore_row_order=ignore_row_order
+            )
+
+        # Delete accounts
+        ledger.accounts.delete([{"account": accounts['account'].iloc[rows[0]]}])
+        accounts = accounts.drop(rows[0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
+        )
 
     def test_add_already_existed_raise_error(
         self, ledger, error_class=ValueError, error_message="already exist"
