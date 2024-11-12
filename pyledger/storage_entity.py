@@ -486,7 +486,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
 
         Args:
             file_path (Path): Path to the CSV file.
-            column_shortcuts (dict, optional): Mapping of column shortcuts to full names.
+            column_shortcuts (dict, optional): Mapping of column old names to new names.
         """
         super().__init__(*args, **kwargs)
         self._file_path = file_path
@@ -498,8 +498,8 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         return self._read_file()
 
     def _store(self, data: pd.DataFrame):
-        """Store the DataFrame to the CSV file.
-        If the DataFrame is empty, the CSV file is deleted if it exists.
+        """
+        Store the DataFrame to the CSV file. If the DataFrame is empty, the CSV file is deleted.
         """
         if data.empty:
             self._file_path.unlink(missing_ok=True)
@@ -566,6 +566,9 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         return self._read_files()
 
     def _store(self, data: pd.DataFrame, file_path: Path):
+        """
+        Store the DataFrame to the CSV file. If the DataFrame is empty, the CSV file is deleted.
+        """
         if data.empty:
             file_path.unlink(missing_ok=True)
         else:

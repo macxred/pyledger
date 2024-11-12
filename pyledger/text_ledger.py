@@ -165,6 +165,9 @@ class TextLedger(StandaloneLedger):
 
         return df
 
+    # ----------------------------------------------------------------------
+    # Currency
+
     @property
     def reporting_currency(self):
         return self.settings["reporting_currency"]
