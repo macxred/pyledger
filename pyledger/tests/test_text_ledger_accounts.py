@@ -1,7 +1,7 @@
 """Test suite for TextLedger accounts operations."""
 
 import pytest
-from .base_accounts import BaseTestAccounts
+from .base_test_accounts import BaseTestAccounts
 from pyledger import TextLedger
 from consistent_df import assert_frame_equal
 

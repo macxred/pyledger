@@ -1,7 +1,7 @@
 """Test suite for accounts operations."""
 
 import pytest
-from .base_accounts import BaseTestAccounts
+from .base_test_accounts import BaseTestAccounts
 from pyledger import MemoryLedger
 
 
