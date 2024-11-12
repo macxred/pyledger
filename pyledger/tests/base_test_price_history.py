@@ -17,6 +17,8 @@ class BaseTestPriceHistory(BaseTest):
 
     def test_price_accessor_mutators(self, ledger, ignore_row_order=False):
         ledger.restore(settings=self.SETTINGS)
+
+        # Add prices
         price_history = self.PRICES.sample(frac=1).reset_index(drop=True)
         for price in price_history.to_dict('records'):
             ledger.price_history.add([price])
@@ -25,6 +27,7 @@ class BaseTestPriceHistory(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
+        # Modify prices
         rows = [0, 3, len(price_history) - 1]
         for i in rows:
             price_history.loc[i, "price"] = 0.001
@@ -34,6 +37,7 @@ class BaseTestPriceHistory(BaseTest):
                 check_like=True, ignore_row_order=ignore_row_order
             )
 
+        # Delete prices
         ledger.price_history.delete([{
             "ticker": price_history['ticker'].iloc[rows[0]],
             "date": price_history['date'].iloc[rows[0]],
