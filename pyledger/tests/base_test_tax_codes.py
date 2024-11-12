@@ -1,7 +1,6 @@
 """Definition of abstract base class for testing tax operations."""
 
 import pytest
-import pandas as pd
 from abc import abstractmethod
 from consistent_df import assert_frame_equal
 from .base_test import BaseTest
@@ -14,62 +13,43 @@ class BaseTestTaxCodes(BaseTest):
     def ledger(self):
         pass
 
-    def test_accessors_mutators(self, ledger):
-        # Ensure there is no 'TestCode' tax_code
-        ledger.tax_codes.delete({"id": ["TestCode"]}, allow_missing=True)
-        assert "TestCode" not in ledger.tax_codes.list()["id"].values
+    def test_tax_codes_accessor_mutators(self, ledger, ignore_row_order=False):
         ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
 
-        # Test adding a valid tax_code
-        initial_tax_codes = ledger.tax_codes.list()
-        new_tax_code = {
-            "id": "TestCode",
-            "description": "tax 2%",
-            "account": 9990,
-            "rate": 0.02,
-            "is_inclusive": True,
-        }
-        ledger.tax_codes.add([new_tax_code])
-        updated_tax_codes = ledger.tax_codes.list()
-        outer_join = pd.merge(initial_tax_codes, updated_tax_codes, how="outer", indicator=True)
-        created_tax_codes = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(created_tax_codes) == 1, "Expected exactly one row to be added"
-        assert created_tax_codes["id"].item() == new_tax_code["id"]
-        assert created_tax_codes["description"].item() == new_tax_code["description"]
-        assert created_tax_codes["account"].item() == new_tax_code["account"]
-        assert created_tax_codes["rate"].item() == new_tax_code["rate"]
-        assert created_tax_codes["is_inclusive"].item() == new_tax_code["is_inclusive"]
-
-        # Test updating a tax code with valid inputs.
-        initial_tax_codes = ledger.tax_codes.list()
-        new_tax_code = {
-            "id": "TestCode",
-            "description": "tax 20%",
-            "account": 9990,
-            "rate": 0.20,
-            "is_inclusive": True,
-        }
-        ledger.tax_codes.modify([new_tax_code])
-        updated_tax_codes = ledger.tax_codes.list()
-        outer_join = pd.merge(initial_tax_codes, updated_tax_codes, how="outer", indicator=True)
-        modified_tax_codes = outer_join[outer_join["_merge"] == "right_only"].drop("_merge", axis=1)
-
-        assert len(initial_tax_codes) == len(updated_tax_codes), (
-            "Expected tax codes to have same length before and after modification"
+        # Add tax codes
+        tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
+        for tax_code in tax_codes.to_dict('records'):
+            ledger.tax_codes.add([tax_code])
+        assert_frame_equal(
+            ledger.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
         )
-        assert len(modified_tax_codes) == 1, "Expected exactly one updated row"
-        assert modified_tax_codes["id"].item() == new_tax_code["id"]
-        assert modified_tax_codes["description"].item() == new_tax_code["description"]
-        assert modified_tax_codes["account"].item() == new_tax_code["account"]
-        assert modified_tax_codes["rate"].item() == new_tax_code["rate"]
-        assert modified_tax_codes["is_inclusive"].item() == new_tax_code["is_inclusive"]
 
-        # Test deleting an existent tax code.
-        ledger.tax_codes.delete({"id": ["TestCode"]})
-        updated_tax_codes = ledger.tax_codes.list()
+        # Modify tax codes
+        rows = [0, 3, len(tax_codes) - 1]
+        for i in rows:
+            tax_codes.loc[i, "description"] = f"New Description: {i}"
+            ledger.tax_codes.modify([tax_codes.loc[i]])
+            assert_frame_equal(
+                ledger.tax_codes.list(), tax_codes,
+                check_like=True, ignore_row_order=ignore_row_order
+            )
 
-        assert "TestCode" not in updated_tax_codes["id"].values
+        # Modify method receive only one needed field to modify
+        rows = [0, 3, len(tax_codes) - 1]
+        for i in rows:
+            tax_codes.loc[i, "rate"] = 0.99
+            ledger.tax_codes.modify({"id": [tax_codes.loc[i, "id"]], "rate": [0.99]})
+            assert_frame_equal(
+                ledger.tax_codes.list(), tax_codes,
+                check_like=True, ignore_row_order=ignore_row_order
+            )
+
+        # Delete tax codes
+        ledger.tax_codes.delete([{"id": tax_codes['id'].iloc[rows[0]]}])
+        tax_codes = tax_codes.drop(rows[0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
+        )
 
     def test_create_already_existed_raise_error(
         self, ledger, error_class=ValueError, error_message="Unique identifiers already exist."
