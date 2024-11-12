@@ -1,9 +1,12 @@
 """Provides abstract storage entities for accounting data."""
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
+from pyledger.decorators import timed_cache
+from pyledger.helpers import write_fixed_width_csv
 
 
 class AccountingEntity(ABC):
@@ -469,3 +472,63 @@ class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
         """
         self.delete(data, allow_missing=False)
         self.add(data)
+
+
+class CSVDataFrameEntity(StandaloneTabularEntity):
+    """Stores tabular accounting data in a fixed-width CSV file."""
+
+    def __init__(
+        self, file_path: Path, column_shortcuts: dict = {}, *args, **kwargs
+    ):
+        """Initialize the CSVDataFrameEntity.
+
+        Args:
+            file_path (Path): Path to the CSV file.
+            column_shortcuts (dict, optional): Mapping of column shortcuts to full names.
+        """
+        super().__init__(*args, **kwargs)
+        self._file_path = file_path
+        # TODO: remove once the old system is migrated
+        self._column_shortcuts = column_shortcuts
+
+    @timed_cache(15)
+    def list(self) -> pd.DataFrame:
+        return self._read_file()
+
+    def _store(self, data: pd.DataFrame):
+        """Store the DataFrame to the CSV file.
+        If the DataFrame is empty, the CSV file is deleted if it exists.
+        """
+        if data.empty:
+            self._file_path.unlink(missing_ok=True)
+        else:
+            self._write_file(data)
+        self.list.cache_clear()
+
+    def _read_file(self) -> pd.DataFrame:
+        """Read data from the CSV file.
+
+        This method reads data from the file and enforces the standard
+        data format. If an error occurs during reading or standardization, an empty
+        DataFrame with standard SCHEMA is returned.
+        """
+        try:
+            data = pd.read_csv(self._file_path, skipinitialspace=True)
+            data.rename(columns=self._column_shortcuts, inplace=True)
+        except Exception:
+            data = None
+        return self.standardize(data)
+
+    def _write_file(self, df: pd.DataFrame):
+        """Save data to a fixed-width CSV file.
+
+        This method stores data in a fixed-width CSV format.
+        Values are padded with spaces to maintain consistent column width and improve readability.
+        Optional columns that contain only NA values are dropped for conciseness.
+        """
+        df = enforce_schema(df, self._schema, sort_columns=True, keep_extra_columns=True)
+        optional = self._schema.loc[~self._schema["mandatory"], "column"].to_list()
+        to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
+        df.drop(columns=to_drop, inplace=True)
+        n_fixed = self._schema["column"].isin(df.columns).sum()
+        write_fixed_width_csv(df, file=self._file_path, n=n_fixed)
