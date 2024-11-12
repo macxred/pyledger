@@ -1,5 +1,7 @@
 """This module defines TextLedger, extending StandaloneLedger to store data in text files."""
 
+from datetime import datetime
+import math
 import pandas as pd
 import yaml
 from pathlib import Path
@@ -8,6 +10,7 @@ from pyledger.standalone_ledger import StandaloneLedger
 from pyledger.constants import (
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
+    DEFAULT_PRECISION,
     DEFAULT_SETTINGS,
     LEDGER_SCHEMA,
     PRICE_SCHEMA,
@@ -153,6 +156,25 @@ class TextLedger(StandaloneLedger):
         # Record date only on the first row of collective transactions
         df = df.iloc[self.ledger._id_from_path(df["id"]).argsort(kind="mergesort")]
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
+
+        # Apply the smallest precision
+        def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
+            """Formats a series to a specific decimal precision."""
+            decimal_places = -1 * math.floor(math.log10(precision))
+            return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
+
+        def precision(ticker: str, date: datetime.date = None) -> float:
+            """Get currency/date increment or DEFAULT_PRECISION if missing."""
+            try:
+                return self.precision(ticker, date)
+            except ValueError:
+                return DEFAULT_PRECISION
+
+        increment = df.apply(lambda row: precision(row["currency"], row["date"]), axis=1).min()
+        df["amount"] = format_with_precision(df["amount"], increment)
+        df["report_amount"] = format_with_precision(
+            df["report_amount"], precision(self.reporting_currency)
+        )
 
         # Drop columns that are all NA and not required by the schema
         na_columns = df.columns[df.isna().all()]
