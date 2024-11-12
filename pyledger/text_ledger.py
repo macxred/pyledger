@@ -60,10 +60,12 @@ class TextLedger(StandaloneLedger):
             schema=ASSETS_SCHEMA, file_path=root_path / "assets.csv"
         )
         self._accounts = CSVDataFrameEntity(
-            schema=ACCOUNT_SCHEMA, file_path=root_path / "accounts.csv"
+            schema=ACCOUNT_SCHEMA, file_path=root_path / "accounts.csv",
+            column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS
         )
         self._tax_codes = CSVDataFrameEntity(
-            schema=TAX_CODE_SCHEMA, file_path=root_path / "tax_codes.csv"
+            schema=TAX_CODE_SCHEMA, file_path=root_path / "tax_codes.csv",
+            column_shortcuts=TAX_CODE_COLUMN_SHORTCUTS
         )
         self._price_history = CSVDataFrameEntity(
             schema=PRICE_SCHEMA, file_path=root_path / "price_history.csv"
@@ -127,10 +129,6 @@ class TextLedger(StandaloneLedger):
     # ----------------------------------------------------------------------
     # Ledger
 
-    def _id_from_path(self, id: pd.Series) -> pd.Series:
-        """Extract numeric portion of ledger id."""
-        return id.str.replace("^.*:", "", regex=True).astype(int)
-
     def write_ledger_file(self, df: pd.DataFrame, file: str) -> pd.DataFrame:
         """Save ledger entries to a fixed-width CSV file.
 
@@ -153,7 +151,7 @@ class TextLedger(StandaloneLedger):
         df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
 
         # Record date only on the first row of collective transactions
-        df = df.iloc[self._id_from_path(df["id"]).argsort(kind="mergesort")]
+        df = df.iloc[self.ledger._id_from_path(df["id"]).argsort(kind="mergesort")]
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
 
         # Drop columns that are all NA and not required by the schema
