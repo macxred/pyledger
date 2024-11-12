@@ -16,7 +16,9 @@ class BaseTestRevaluations(BaseTest):
         pass
 
     def test_revaluations_accessor_mutators(self, ledger, ignore_row_order=False):
-        ledger.restore(settings=self.SETTINGS)
+        ledger.restore(settings=self.SETTINGS, accounts=self.ACCOUNTS)
+
+        # Add revaluations
         revaluations = self.REVALUATIONS.sample(frac=1).reset_index(drop=True)
         for revaluation in revaluations.to_dict('records'):
             ledger.revaluations.add([revaluation])
@@ -25,6 +27,7 @@ class BaseTestRevaluations(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
+        # Modify revaluations
         rows = [0, 3, len(revaluations) - 1]
         for i in rows:
             revaluations.loc[i, "description"] = "New description"
@@ -34,6 +37,21 @@ class BaseTestRevaluations(BaseTest):
                 check_like=True, ignore_row_order=ignore_row_order
             )
 
+        # Modify method receive only one needed field to modify
+        rows = [0, 3, len(revaluations) - 1]
+        for i in rows:
+            revaluations.loc[i, "debit"] = 1005
+            ledger.revaluations.modify({
+                "account": [revaluations.loc[i, "account"]],
+                "date": [revaluations.loc[i, "date"]],
+                "debit": [1005]
+            })
+            assert_frame_equal(
+                ledger.revaluations.list(), revaluations,
+                check_like=True, ignore_row_order=ignore_row_order
+            )
+
+        # Delete revaluations
         ledger.revaluations.delete([{
             "account": revaluations['account'].iloc[rows[0]],
             "date": revaluations['date'].iloc[rows[0]],
