@@ -413,7 +413,8 @@ class StandaloneTabularEntity(TabularEntity):
         current_cols = incoming_cols.str.replace("_incoming$", "", regex=True)
         mask = merged["_merge"] == "both"
         for current_col, incoming_col in zip(current_cols, incoming_cols):
-            merged.loc[mask, current_col] = merged.loc[mask, incoming_col]
+            updated = merged.loc[mask, incoming_col].astype(merged[current_col].dtype)
+            merged.loc[mask, current_col] = updated
         new = merged.drop(columns=["_merge", *incoming_cols])
         self._store(new)
 
