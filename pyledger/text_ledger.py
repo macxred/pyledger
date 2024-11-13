@@ -1,6 +1,5 @@
 """This module defines TextLedger, extending StandaloneLedger to store data in text files."""
 
-from datetime import datetime
 import math
 import pandas as pd
 import yaml
@@ -10,7 +9,6 @@ from pyledger.standalone_ledger import StandaloneLedger
 from pyledger.constants import (
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
-    DEFAULT_PRECISION,
     DEFAULT_SETTINGS,
     LEDGER_SCHEMA,
     PRICE_SCHEMA,
@@ -163,17 +161,10 @@ class TextLedger(StandaloneLedger):
             decimal_places = -1 * math.floor(math.log10(precision))
             return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
 
-        def precision(ticker: str, date: datetime.date = None) -> float:
-            """Get currency/date increment or DEFAULT_PRECISION if missing."""
-            try:
-                return self.precision(ticker, date)
-            except ValueError:
-                return DEFAULT_PRECISION
-
-        increment = df.apply(lambda row: precision(row["currency"], row["date"]), axis=1).min()
+        increment = df.apply(lambda row: self.precision(row["currency"], row["date"]), axis=1).min()
         df["amount"] = format_with_precision(df["amount"], increment)
         df["report_amount"] = format_with_precision(
-            df["report_amount"], precision(self.reporting_currency)
+            df["report_amount"], self.precision(self.reporting_currency)
         )
 
         # Drop columns that are all NA and not required by the schema
