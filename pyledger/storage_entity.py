@@ -497,19 +497,32 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
 
     @timed_cache(15)
     def list(self) -> pd.DataFrame:
-        return self._read_file()
+        return self._read_data()
 
-    def _store(self, data: pd.DataFrame):
+    def _store(self, data: pd.DataFrame, path: Path = None):
         """
-        Store the DataFrame to the CSV file. If the DataFrame is empty, the CSV file is deleted.
+        Store the DataFrame to a CSV file. If the DataFrame is empty, the CSV file is deleted.
+
+        Args:
+            data (pd.DataFrame): DataFrame to be stored.
+            path (Path, optional): Path where the CSV file will be saved.
+                Defaults to the instance's defined path.
+
+        Notes:
+            - Deletes the CSV file if the DataFrame is empty.
+            - Clears the cache after storing or deleting the file.
         """
+
+        if path is None:
+            path = self._path
+
         if data.empty:
-            self._path.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
         else:
-            self._write_file(data)
+            self._write_file(data, path)
         self.list.cache_clear()
 
-    def _read_file(self) -> pd.DataFrame:
+    def _read_data(self) -> pd.DataFrame:
         """Read data from the CSV file.
 
         This method reads data from the file and enforces the standard
@@ -525,7 +538,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
 
         return self.standardize(data)
 
-    def _write_file(self, df: pd.DataFrame):
+    def _write_file(self, df: pd.DataFrame, path: Path):
         """Save data to a fixed-width CSV file.
 
         This method stores data in a fixed-width CSV format.
@@ -537,7 +550,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
         df.drop(columns=to_drop, inplace=True)
         n_fixed = self._schema["column"].isin(df.columns).sum()
-        write_fixed_width_csv(df, file=self._path, n=n_fixed)
+        write_fixed_width_csv(df, file=path, n=n_fixed)
 
 
 # TODO: remove once old systems are migrated
@@ -564,20 +577,6 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         super().__init__(path=path, *args, **kwargs)
         self._write_file = write_file
 
-    @timed_cache(15)
-    def list(self) -> pd.DataFrame:
-        return self._read_files()
-
-    def _store(self, data: pd.DataFrame, path: Path):
-        """
-        Store the DataFrame to the CSV file. If the DataFrame is empty, the CSV file is deleted.
-        """
-        if data.empty:
-            path.unlink(missing_ok=True)
-        else:
-            self._write_file(data, path)
-        self.list.cache_clear()
-
     def _csv_path(self, id: pd.Series) -> pd.Series:
         """Extract storage path from ledger id."""
         return id.str.replace(":[^:]+$", "", regex=True)
@@ -586,7 +585,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         """Extract numeric portion of ledger id."""
         return id.str.replace("^.*:", "", regex=True).astype(int)
 
-    def _read_files(self) -> pd.DataFrame:
+    def _read_data(self) -> pd.DataFrame:
         """Reads ledger entries from CSV files in the root directory.
 
         Iterates through all CSV files in the root directory, reading each file
