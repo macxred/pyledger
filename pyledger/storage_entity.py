@@ -8,7 +8,6 @@ import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
 from .decorators import timed_cache
 from .helpers import save_files, write_fixed_width_csv
-from .constants import LEDGER_SCHEMA
 
 
 class AccountingEntity(ABC):
@@ -580,7 +579,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         """Reads ledger entries from CSV files in the root directory.
 
         Iterates through all CSV files in the root directory, reading each file
-        into a DataFrame and ensuring the data conforms to `LEDGER_SCHEMA`.
+        into a DataFrame and ensuring the data conforms to `self._schema`.
         Files that cannot be processed are skipped with a warning. The Data
         from all valid files is then combined into a single DataFrame.
 
@@ -594,7 +593,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         same transaction.
 
         Returns:
-            pd.DataFrame: The aggregated ledger data conforming to `LEDGER_SCHEMA`.
+            pd.DataFrame: The aggregated ledger data conforming to `self._schema`.
         """
 
         if not self._path.exists():
@@ -618,7 +617,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
 
         if ledger:
             result = pd.concat(ledger, ignore_index=True)
-            result = enforce_schema(result, LEDGER_SCHEMA, sort_columns=True)
+            result = enforce_schema(result, self._schema, sort_columns=True)
         else:
             result = None
 
