@@ -519,8 +519,10 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         try:
             data = pd.read_csv(self._path, skipinitialspace=True)
             data.rename(columns=self._column_shortcuts, inplace=True)
-        except Exception:
+        except Exception as e:
             data = None
+            self._logger.warning(f"Error while reading {self._path} file: {e}")
+
         return self.standardize(data)
 
     def _write_file(self, df: pd.DataFrame):
@@ -622,7 +624,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
                     df["id"] = relative_path + ":" + df["id"]
                 ledger.append(df)
             except Exception as e:
-                self._logger.warning(f"Skipping {relative_path}: {e}")
+                self._logger.warning(f"Error while reading {self._path} file: {e}")
 
         if ledger:
             result = pd.concat(ledger, ignore_index=True)
