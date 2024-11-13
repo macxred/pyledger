@@ -636,21 +636,15 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         self.list.cache_clear()
 
     def add(self, data: pd.DataFrame, path: str = "default.csv") -> dict:
-        """Add new ledger entries to the existing within the specified file.
+        """Add new entries.
+
+        IDs in the input `data` are not conserved. IDs are not stored in ledger
+        files but are dynamically generated when reading each file.
 
         Args:
-            data (pd.DataFrame): Ledger entries to be added.
+            data (pd.DataFrame): DataFrame containing new entries to add,
+                                compatible with the entity's DataFrame schema.
             path (str, optional): The file path where the data will be stored.
-                Defaults to "default.csv".
-
-        Returns:
-            dict: A dictionary containing the IDs of the added records.
-
-        Notes:
-            - The 'id' column in the input data are ignored. New IDs are assigned for
-            each transaction, incrementing from the maximum existing ID from the file dataset.
-            If the file isn't exist, IDs start from 1.
-            - New transactions will be added to the bottom of the existing data.
         """
 
         current = self.list()
