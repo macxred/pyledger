@@ -1,5 +1,6 @@
 """Provides abstract storage entities for accounting data."""
 
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Callable, Dict, Any
@@ -19,6 +20,7 @@ class AccountingEntity(ABC):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._logger = logging.getLogger("ledger")
 
     @abstractmethod
     def standardize(self, data):
