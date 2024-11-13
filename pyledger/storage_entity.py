@@ -528,10 +528,10 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         data format. If an error occurs during reading or standardization, an empty
         DataFrame with standard SCHEMA is returned.
         """
-        try:
+        if self._path.exists():
             data = pd.read_csv(self._path, skipinitialspace=True)
             data.rename(columns=self._column_shortcuts, inplace=True)
-        except Exception:
+        else:
             data = None
         return self.standardize(data)
 
