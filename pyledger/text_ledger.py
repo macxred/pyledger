@@ -58,25 +58,25 @@ class TextLedger(StandaloneLedger):
         root_path = Path(root_path).expanduser()
         self.root_path = root_path
         self._assets = CSVDataFrameEntity(
-            schema=ASSETS_SCHEMA, file_path=root_path / "assets.csv"
+            schema=ASSETS_SCHEMA, path=root_path / "assets.csv"
         )
         self._accounts = CSVDataFrameEntity(
-            schema=ACCOUNT_SCHEMA, file_path=root_path / "accounts.csv",
+            schema=ACCOUNT_SCHEMA, path=root_path / "accounts.csv",
             column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS
         )
         self._tax_codes = CSVDataFrameEntity(
-            schema=TAX_CODE_SCHEMA, file_path=root_path / "tax_codes.csv",
+            schema=TAX_CODE_SCHEMA, path=root_path / "tax_codes.csv",
             column_shortcuts=TAX_CODE_COLUMN_SHORTCUTS
         )
         self._price_history = CSVDataFrameEntity(
-            schema=PRICE_SCHEMA, file_path=root_path / "price_history.csv"
+            schema=PRICE_SCHEMA, path=root_path / "price_history.csv"
         )
         self._revaluations = CSVDataFrameEntity(
-            schema=REVALUATION_SCHEMA, file_path=root_path / "revaluations.csv"
+            schema=REVALUATION_SCHEMA, path=root_path / "revaluations.csv"
         )
         self._ledger = LedgerCSVDataFrameEntity(
             schema=LEDGER_SCHEMA,
-            root_path=root_path,
+            path=root_path,
             write_file=self.write_ledger_file,
             prepare_for_mirroring=self.sanitize_ledger
         )

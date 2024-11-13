@@ -480,7 +480,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
     """Stores tabular accounting data in a fixed-width CSV file."""
 
     def __init__(
-        self, file_path: Path, column_shortcuts: dict = {}, *args, **kwargs
+        self, path: Path, column_shortcuts: dict = {}, *args, **kwargs
     ):
         """Initialize the CSVDataFrameEntity.
 
@@ -489,7 +489,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
             column_shortcuts (dict, optional): Mapping of column old names to new names.
         """
         super().__init__(*args, **kwargs)
-        self._file_path = file_path
+        self._path = path
         # TODO: remove once the old system is migrated
         self._column_shortcuts = column_shortcuts
 
@@ -502,7 +502,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         Store the DataFrame to the CSV file. If the DataFrame is empty, the CSV file is deleted.
         """
         if data.empty:
-            self._file_path.unlink(missing_ok=True)
+            self._path.unlink(missing_ok=True)
         else:
             self._write_file(data)
         self.list.cache_clear()
@@ -515,7 +515,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         DataFrame with standard SCHEMA is returned.
         """
         try:
-            data = pd.read_csv(self._file_path, skipinitialspace=True)
+            data = pd.read_csv(self._path, skipinitialspace=True)
             data.rename(columns=self._column_shortcuts, inplace=True)
         except Exception:
             data = None
@@ -533,7 +533,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
         df.drop(columns=to_drop, inplace=True)
         n_fixed = self._schema["column"].isin(df.columns).sum()
-        write_fixed_width_csv(df, file=self._file_path, n=n_fixed)
+        write_fixed_width_csv(df, file=self._path, n=n_fixed)
 
 
 # TODO: remove once old systems are migrated
@@ -552,27 +552,26 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
 
     def __init__(
         self,
-        root_path: Path,
+        path: Path,
         write_file: Callable[[pd.DataFrame, Path], None] = None,
         *args,
         **kwargs
     ):
-        super().__init__(file_path=root_path, *args, **kwargs)
-        self._root_path = root_path
+        super().__init__(path=path, *args, **kwargs)
         self._write_file = write_file
 
     @timed_cache(15)
     def list(self) -> pd.DataFrame:
         return self._read_files()
 
-    def _store(self, data: pd.DataFrame, file_path: Path):
+    def _store(self, data: pd.DataFrame, path: Path):
         """
         Store the DataFrame to the CSV file. If the DataFrame is empty, the CSV file is deleted.
         """
         if data.empty:
-            file_path.unlink(missing_ok=True)
+            path.unlink(missing_ok=True)
         else:
-            self._write_file(data, file_path)
+            self._write_file(data, path)
         self.list.cache_clear()
 
     def _csv_path(self, id: pd.Series) -> pd.Series:
@@ -604,7 +603,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
             pd.DataFrame: The aggregated ledger data conforming to `LEDGER_SCHEMA`.
         """
 
-        root = self._root_path / 'ledger'
+        root = self._path / 'ledger'
         if not root.exists():
             return self.standardize(None)
         if not root.is_dir():
@@ -649,7 +648,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
 
         df = self.standardize(df)
         df["__csv_path__"] = self._csv_path(df["id"])
-        save_files(df, root=self._root_path / "ledger", func=self._write_file)
+        save_files(df, root=self._path / "ledger", func=self._write_file)
         self.list.cache_clear()
 
     def add(self, data: pd.DataFrame, path: str = "default.csv") -> dict:
@@ -663,7 +662,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         incoming["id"] = f"{path}:" + incoming["id"].astype(str)
 
         df = pd.concat([df_same_file, incoming], ignore_index=True)
-        full_path = self._root_path / "ledger" / path
+        full_path = self._path / "ledger" / path
         Path(full_path).parent.mkdir(parents=True, exist_ok=True)
         self._store(df, full_path)
 
@@ -681,7 +680,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
             df_same_file = pd.concat([
                 df_same_file[df_same_file["id"] != id], incoming.query("id == @id")
             ])
-            self._store(df_same_file, self._root_path / "ledger" / path)
+            self._store(df_same_file, self._path / "ledger" / path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
         incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
@@ -697,5 +696,5 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         paths_to_update = self._csv_path(pd.Series(ids_to_delete)).unique()
         for path in paths_to_update:
             df_same_file = remaining[self._csv_path(remaining["id"]) == path]
-            file_path = self._root_path / "ledger" / path
+            file_path = self._path / "ledger" / path
             self._store(df_same_file, file_path)
