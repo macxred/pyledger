@@ -76,7 +76,7 @@ class TextLedger(StandaloneLedger):
         )
         self._ledger = LedgerCSVDataFrameEntity(
             schema=LEDGER_SCHEMA,
-            path=root_path,
+            path=root_path / "ledger",
             write_file=self.write_ledger_file,
             prepare_for_mirroring=self.sanitize_ledger
         )

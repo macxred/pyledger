@@ -603,15 +603,14 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
             pd.DataFrame: The aggregated ledger data conforming to `LEDGER_SCHEMA`.
         """
 
-        root = self._path / 'ledger'
-        if not root.exists():
+        if not self._path.exists():
             return self.standardize(None)
-        if not root.is_dir():
-            raise NotADirectoryError(f"Ledger root folder is not a directory: {root}")
+        if not self._path.is_dir():
+            raise NotADirectoryError(f"Root folder is not a directory: {self._path}")
 
         ledger = []
-        for file in root.rglob("*.csv"):
-            relative_path = str(file.relative_to(root))
+        for file in self._path.rglob("*.csv"):
+            relative_path = str(file.relative_to(self._path))
             try:
                 df = pd.read_csv(file, skipinitialspace=True)
                 # TODO: Remove the following line once legacy systems are migrated.
@@ -648,7 +647,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
 
         df = self.standardize(df)
         df["__csv_path__"] = self._csv_path(df["id"])
-        save_files(df, root=self._path / "ledger", func=self._write_file)
+        save_files(df, root=self._path, func=self._write_file)
         self.list.cache_clear()
 
     def add(self, data: pd.DataFrame, path: str = "default.csv") -> dict:
@@ -662,7 +661,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         incoming["id"] = f"{path}:" + incoming["id"].astype(str)
 
         df = pd.concat([df_same_file, incoming], ignore_index=True)
-        full_path = self._path / "ledger" / path
+        full_path = self._path / path
         Path(full_path).parent.mkdir(parents=True, exist_ok=True)
         self._store(df, full_path)
 
@@ -680,7 +679,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
             df_same_file = pd.concat([
                 df_same_file[df_same_file["id"] != id], incoming.query("id == @id")
             ])
-            self._store(df_same_file, self._path / "ledger" / path)
+            self._store(df_same_file, self._path / path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
         incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
@@ -696,5 +695,5 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         paths_to_update = self._csv_path(pd.Series(ids_to_delete)).unique()
         for path in paths_to_update:
             df_same_file = remaining[self._csv_path(remaining["id"]) == path]
-            file_path = self._path / "ledger" / path
+            file_path = self._path / path
             self._store(df_same_file, file_path)
