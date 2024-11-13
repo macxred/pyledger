@@ -685,18 +685,15 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
             self._store(df_same_file, self._path / path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
-        incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
         current = self.list()
-        existing_ids = current["id"].unique()
-        ids_to_delete = incoming["id"].unique()
+        incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
+        if not allow_missing:
+            missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
+            if not missing[missing['_merge'] != 'both'].empty:
+                raise ValueError("Some ids are not present in the data.")
+        new = current.merge(incoming, on=self._id_columns, how='left', indicator=True)
+        new = new[new['_merge'] == 'left_only'].drop(columns=['_merge'])
 
-        missing_ids = set(ids_to_delete) - set(existing_ids)
-        if missing_ids and not allow_missing:
-            raise ValueError(f"Ledger entries with ids '{', '.join(missing_ids)}' not found.")
-
-        remaining = current[~current["id"].isin(ids_to_delete)]
-        paths_to_update = self._csv_path(pd.Series(ids_to_delete)).unique()
+        paths_to_update = self._csv_path(incoming["id"]).unique()
         for path in paths_to_update:
-            df_same_file = remaining[self._csv_path(remaining["id"]) == path]
-            file_path = self._path / path
-            self._store(df_same_file, file_path)
+            self._store(new[self._csv_path(new["id"]) == path], self._path / path)
