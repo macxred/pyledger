@@ -8,7 +8,7 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 from pyledger.decorators import timed_cache
-from .constants import LEDGER_SCHEMA
+from .constants import DEFAULT_ASSETS, LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -341,7 +341,11 @@ class StandaloneLedger(LedgerEngine):
 
         increment = self._assets_as_dict_of_df.get(ticker)
         if increment is None:
-            raise ValueError(f"No asset definition available for ticker '{ticker}'.")
+            if not DEFAULT_ASSETS["ticker"].unique():
+                raise ValueError("Default assets must contain unique ticker values.")
+            increment = DEFAULT_ASSETS.query(f"ticker == '{ticker}'")
+            if increment.empty:
+                raise ValueError(f"No asset definition available for ticker '{ticker}'.")
 
         mask = increment["date"].isna() | (increment["date"] <= pd.Timestamp(date))
         if not mask.any():
