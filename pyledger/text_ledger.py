@@ -21,6 +21,12 @@ from .storage_entity import CSVDataFrameEntity, LedgerCSVDataFrameEntity
 
 
 # TODO: remove once old systems are migrated
+LEDGER_COLUMN_SHORTCUTS = {
+    "cur": "currency",
+    "vat": "tax_code",
+    "base_amount": "report_amount",
+    "counter": "contra",
+}
 TAX_CODE_COLUMN_SHORTCUTS = {
     "text": "description",
     "inclusive": "is_inclusive",
@@ -78,6 +84,7 @@ class TextLedger(StandaloneLedger):
             schema=LEDGER_SCHEMA,
             path=root_path / "ledger",
             write_file=self.write_ledger_file,
+            column_shortcuts=LEDGER_COLUMN_SHORTCUTS,
             prepare_for_mirroring=self.sanitize_ledger
         )
 

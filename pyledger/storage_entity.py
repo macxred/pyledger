@@ -553,15 +553,6 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         write_fixed_width_csv(df, file=path, n=n_fixed)
 
 
-# TODO: remove once old systems are migrated
-LEDGER_COLUMN_SHORTCUTS = {
-    "cur": "currency",
-    "vat": "tax_code",
-    "base_amount": "report_amount",
-    "counter": "contra",
-}
-
-
 class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
     """
     Stores ledger entries in multiple CSV files, with files determined by the IDs of the entries.
@@ -617,7 +608,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
             try:
                 df = pd.read_csv(file, skipinitialspace=True)
                 # TODO: Remove the following line once legacy systems are migrated.
-                df = df.rename(columns=LEDGER_COLUMN_SHORTCUTS)
+                df = df.rename(columns=self._column_shortcuts)
                 df = self.standardize(df)
                 if not df.empty:
                     df["id"] = relative_path + ":" + df["id"]
