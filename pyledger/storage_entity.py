@@ -506,12 +506,7 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
             data (pd.DataFrame): DataFrame to be stored.
             path (Path, optional): Path where the CSV file will be saved.
                 Defaults to the instance's defined path.
-
-        Notes:
-            - Deletes the CSV file if the DataFrame is empty.
-            - Clears the cache after storing or deleting the file.
         """
-
         if path is None:
             path = self._path
 
@@ -577,7 +572,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         """Reads ledger entries from CSV files in the root directory.
 
         Iterates through all CSV files in the root directory, reading each file
-        into a DataFrame and ensuring the data conforms to `self._schema`.
+        into a DataFrame and ensuring the data conforms to the entity's schema.
         Files that cannot be processed are skipped with a warning. The Data
         from all valid files is then combined into a single DataFrame.
 
@@ -591,7 +586,7 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         same transaction.
 
         Returns:
-            pd.DataFrame: The aggregated ledger data conforming to `self._schema`.
+            pd.DataFrame: DataFrame adhering to the entity's column schema.
         """
 
         if not self._path.exists():
