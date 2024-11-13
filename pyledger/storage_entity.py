@@ -552,12 +552,11 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
 
     def __init__(
         self,
-        path: Path,
         write_file: Callable[[pd.DataFrame, Path], None] = None,
         *args,
         **kwargs
     ):
-        super().__init__(path=path, *args, **kwargs)
+        super().__init__(*args, **kwargs)
         self._write_file = write_file
 
     def _csv_path(self, id: pd.Series) -> pd.Series:
