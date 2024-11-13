@@ -339,15 +339,19 @@ class StandaloneLedger(LedgerEngine):
         elif not isinstance(date, datetime.date):
             date = pd.to_datetime(date).date()
 
-        increment = self._assets_as_dict_of_df.get(ticker)
-        if increment is None:
-            if not DEFAULT_ASSETS["ticker"].unique():
-                raise ValueError("Default assets must contain unique ticker values.")
-            increment = DEFAULT_ASSETS.query(f"ticker == '{ticker}'")
-            if increment.empty:
+        asset = self._assets_as_dict_of_df.get(ticker)
+        if asset is None:
+            # Asset is not defined by the user, fall back to hard-coded defaults
+            increment = DEFAULT_ASSETS.loc[DEFAULT_ASSETS["ticker"] == ticker, "increment"]
+            if len(increment) < 1:
                 raise ValueError(f"No asset definition available for ticker '{ticker}'.")
-
-        mask = increment["date"].isna() | (increment["date"] <= pd.Timestamp(date))
-        if not mask.any():
-            raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
-        return increment.loc[mask[mask].index[-1], "increment"]
+            if len(increment) > 1:
+                raise ValueError(f"Multiple default definitions for asset '{ticker}'.")
+            return increment.item()
+        else:
+            mask = asset["date"].isna() | (asset["date"] <= pd.Timestamp(date))
+            if not mask.any():
+                raise ValueError(
+                    f"No asset definition available for '{ticker}' on or before {date}."
+                )
+            return asset.loc[mask[mask].index[-1], "increment"].item()
