@@ -6,7 +6,6 @@ from pyledger import TextLedger
 from consistent_df import assert_frame_equal
 
 
-@pytest.mark.skip(reason="Delegation for accounting entities not yet implemented in TextLedger.")
 class TestTaxCodes(BaseTestTaxCodes):
 
     @pytest.fixture
@@ -19,20 +18,15 @@ class TestTaxCodes(BaseTestTaxCodes):
         """
         tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
         for tax_code in tax_codes.to_dict('records'):
-            # TODO: Remove this pop when interface for tax codes is updated
-            tax_code.pop("contra", None)
-            ledger.add_tax_code(**tax_code)
-        assert_frame_equal(ledger.tax_codes(), tax_codes, check_like=True)
+            ledger.tax_codes.add([tax_code])
+        assert_frame_equal(ledger.tax_codes.list(), tax_codes, check_like=True)
 
         rows = [0, 3, len(tax_codes) - 1]
         for i in rows:
             tax_codes.loc[i, "description"] = f"New description {i + 1}"
-            tax_code = tax_codes.loc[i].to_dict()
-            # TODO: Remove this pop when interface for tax codes is updated
-            tax_code.pop("contra", None)
-            ledger.modify_tax_code(**tax_code)
-            assert_frame_equal(ledger.tax_codes(), tax_codes, check_like=True)
+            ledger.tax_codes.modify([tax_codes.loc[i]])
+            assert_frame_equal(ledger.tax_codes.list(), tax_codes, check_like=True)
 
-        ledger.delete_tax_codes(tax_codes['id'].iloc[rows])
+        ledger.tax_codes.delete({"id": tax_codes['id'].iloc[rows]})
         expected = tax_codes.drop(rows).reset_index(drop=True)
-        assert_frame_equal(ledger.tax_codes(), expected, check_like=True)
+        assert_frame_equal(ledger.tax_codes.list(), expected, check_like=True)

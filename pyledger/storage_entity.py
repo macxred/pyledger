@@ -1,9 +1,13 @@
 """Provides abstract storage entities for accounting data."""
 
+import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
+from .decorators import timed_cache
+from .helpers import save_files, write_fixed_width_csv
 
 
 class AccountingEntity(ABC):
@@ -15,6 +19,7 @@ class AccountingEntity(ABC):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._logger = logging.getLogger("ledger")
 
     @abstractmethod
     def standardize(self, data):
@@ -409,7 +414,8 @@ class StandaloneTabularEntity(TabularEntity):
         current_cols = incoming_cols.str.replace("_incoming$", "", regex=True)
         mask = merged["_merge"] == "both"
         for current_col, incoming_col in zip(current_cols, incoming_cols):
-            merged.loc[mask, current_col] = merged.loc[mask, incoming_col]
+            updated = merged.loc[mask, incoming_col].astype(merged[current_col].dtype)
+            merged.loc[mask, current_col] = updated
         new = merged.drop(columns=["_merge", *incoming_cols])
         self._store(new)
 
@@ -469,3 +475,218 @@ class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
         """
         self.delete(data, allow_missing=False)
         self.add(data)
+
+
+class CSVDataFrameEntity(StandaloneTabularEntity):
+    """Stores tabular accounting data in a fixed-width CSV file."""
+
+    def __init__(
+        self, path: Path, column_shortcuts: dict = {}, *args, **kwargs
+    ):
+        """Initialize the CSVDataFrameEntity.
+
+        Args:
+            file_path (Path): Path to the CSV file.
+            column_shortcuts (dict, optional): Mapping of column old names to new names.
+        """
+        super().__init__(*args, **kwargs)
+        self._path = path
+        # TODO: remove once the old system is migrated
+        self._column_shortcuts = column_shortcuts
+
+    @timed_cache(15)
+    def list(self) -> pd.DataFrame:
+        return self._read_data()
+
+    def _store(self, data: pd.DataFrame, path: Path = None):
+        """
+        Store the DataFrame to a CSV file. If the DataFrame is empty, the CSV file is deleted.
+
+        Args:
+            data (pd.DataFrame): DataFrame to be stored.
+            path (Path, optional): Path where the CSV file will be saved.
+                Defaults to the instance's defined path.
+        """
+        if path is None:
+            path = self._path
+
+        if data.empty:
+            path.unlink(missing_ok=True)
+        else:
+            self._write_file(data, path)
+        self.list.cache_clear()
+
+    def _read_data(self) -> pd.DataFrame:
+        """Read data from the CSV file.
+
+        This method reads data from the file and enforces the standard
+        data format. If an error occurs during reading or standardization, an empty
+        DataFrame with standard SCHEMA is returned.
+        """
+        if self._path.exists():
+            data = pd.read_csv(self._path, skipinitialspace=True)
+            data.rename(columns=self._column_shortcuts, inplace=True)
+        else:
+            data = None
+        return self.standardize(data)
+
+    def _write_file(self, df: pd.DataFrame, path: Path):
+        """Save data to a fixed-width CSV file.
+
+        This method stores data in a fixed-width CSV format.
+        Values are padded with spaces to maintain consistent column width and improve readability.
+        Optional columns that contain only NA values are dropped for conciseness.
+        """
+        df = enforce_schema(df, self._schema, sort_columns=True, keep_extra_columns=True)
+        optional = self._schema.loc[~self._schema["mandatory"], "column"].to_list()
+        to_drop = [col for col in optional if df[col].isna().all() and not df.empty]
+        df.drop(columns=to_drop, inplace=True)
+        n_fixed = self._schema["column"].isin(df.columns).sum()
+        write_fixed_width_csv(df, file=path, n=n_fixed)
+
+
+class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
+    """
+    Stores ledger entries in multiple CSV files, with files determined by the IDs of the entries.
+    """
+
+    def __init__(
+        self,
+        write_file: Callable[[pd.DataFrame, Path], None] = None,
+        *args,
+        **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self._write_file = write_file
+
+    def _csv_path(self, id: pd.Series) -> pd.Series:
+        """Extract storage path from ledger id."""
+        return id.str.replace(":[^:]+$", "", regex=True)
+
+    def _id_from_path(self, id: pd.Series) -> pd.Series:
+        """Extract numeric portion of ledger id."""
+        return id.str.replace("^.*:", "", regex=True).astype(int)
+
+    def _read_data(self) -> pd.DataFrame:
+        """Reads ledger entries from CSV files in the root directory.
+
+        Iterates through all CSV files in the root directory, reading each file
+        into a DataFrame and ensuring the data conforms to the entity's schema.
+        Files that cannot be processed are skipped with a warning. The Data
+        from all valid files is then combined into a single DataFrame.
+
+        IDs are not stored in ledger files but are dynamically generated when
+        reading each file. The `id` is constructed by combining the relative
+        path to the root directory with the row's position, separated by a
+        colon (`{path}:{position}`). These IDs are non-persistent and may
+        change if a file's entries are modified. Successive rows that belong to
+        the same transaction are identified by recording the date only on the
+        first row; subsequent rows without a date are considered part of the
+        same transaction.
+
+        Returns:
+            pd.DataFrame: DataFrame adhering to the entity's column schema.
+        """
+
+        if not self._path.exists():
+            return self.standardize(None)
+        if not self._path.is_dir():
+            raise NotADirectoryError(f"Root folder is not a directory: {self._path}")
+
+        ledger = []
+        for file in self._path.rglob("*.csv"):
+            relative_path = str(file.relative_to(self._path))
+            try:
+                df = pd.read_csv(file, skipinitialspace=True)
+                # TODO: Remove the following line once legacy systems are migrated.
+                df = df.rename(columns=self._column_shortcuts)
+                df = self.standardize(df)
+                if not df.empty:
+                    df["id"] = relative_path + ":" + df["id"]
+                ledger.append(df)
+            except Exception as e:
+                self._logger.warning(f"Skipping {relative_path}: {e}")
+
+        if ledger:
+            result = pd.concat(ledger, ignore_index=True)
+            result = enforce_schema(result, self._schema, sort_columns=True)
+        else:
+            result = None
+
+        return self.standardize(result)
+
+    def write_directory(self, df: pd.DataFrame | None = None):
+        """Save ledger entries to multiple CSV files in the ledger directory.
+
+        Saves ledger entries to several fixed-width CSV files, formatted by
+        `_write_file`. The storage location within the `<root>/ledger`
+        directory is determined by the portion of the ID up to the last
+        colon (':').
+
+        Args:
+            df (pd.DataFrame, optional): The ledger DataFrame to save.
+                If not provided, defaults to the current ledger data.
+        """
+        if df is None:
+            df = self.list()
+
+        df = self.standardize(df)
+        df["__csv_path__"] = self._csv_path(df["id"])
+        save_files(df, root=self._path, func=self._write_file)
+        self.list.cache_clear()
+
+    def add(self, data: pd.DataFrame, path: str = "default.csv") -> dict:
+        """Add new entries.
+
+        IDs in the input `data` are not conserved. IDs are not stored in ledger
+        files but are dynamically generated when reading each file.
+
+        Args:
+            data (pd.DataFrame): DataFrame containing new entries to add,
+                                compatible with the entity's DataFrame schema.
+            path (str, optional): The file path where the data will be stored.
+        """
+
+        current = self.list()
+        incoming = self.standardize(pd.DataFrame(data))
+        df_same_file = current[self._csv_path(current["id"]) == path]
+
+        # Assign unique IDs incrementing from the max ID
+        id = 0 if df_same_file.empty else self._id_from_path(df_same_file["id"]).max()
+        incoming["id"] = incoming["id"].rank(method="dense").astype(int) + id
+        incoming["id"] = f"{path}:" + incoming["id"].astype(str)
+
+        df = pd.concat([df_same_file, incoming], ignore_index=True)
+        full_path = self._path / path
+        Path(full_path).parent.mkdir(parents=True, exist_ok=True)
+        self._store(df, full_path)
+
+        return incoming[self._id_columns].iloc[0].to_dict()
+
+    def modify(self, data: pd.DataFrame):
+        incoming = self.standardize(pd.DataFrame(data))
+        for id in incoming["id"].unique():
+            current = self.list()
+            path = self._csv_path(pd.Series(id)).item()
+            df_same_file = current[self._csv_path(current["id"]) == path]
+            if id not in df_same_file["id"].values:
+                raise ValueError(f"Ledger entry with id '{id}' not present in the data.")
+
+            df_same_file = pd.concat([
+                df_same_file[df_same_file["id"] != id], incoming.query("id == @id")
+            ])
+            self._store(df_same_file, self._path / path)
+
+    def delete(self, id: pd.DataFrame, allow_missing: bool = False):
+        current = self.list()
+        incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
+        if not allow_missing:
+            missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
+            if not missing[missing['_merge'] != 'both'].empty:
+                raise ValueError("Some ids are not present in the data.")
+        new = current.merge(incoming, on=self._id_columns, how='left', indicator=True)
+        new = new[new['_merge'] == 'left_only'].drop(columns=['_merge'])
+
+        paths_to_update = self._csv_path(incoming["id"]).unique()
+        for path in paths_to_update:
+            self._store(new[self._csv_path(new["id"]) == path], self._path / path)

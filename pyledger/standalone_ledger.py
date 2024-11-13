@@ -8,7 +8,7 @@ from typing import Dict
 import numpy as np
 import pandas as pd
 from pyledger.decorators import timed_cache
-from .constants import LEDGER_SCHEMA
+from .constants import DEFAULT_ASSETS, LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -339,11 +339,19 @@ class StandaloneLedger(LedgerEngine):
         elif not isinstance(date, datetime.date):
             date = pd.to_datetime(date).date()
 
-        increment = self._assets_as_dict_of_df.get(ticker)
-        if increment is None:
-            raise ValueError(f"No asset definition available for ticker '{ticker}'.")
-
-        mask = increment["date"].isna() | (increment["date"] <= pd.Timestamp(date))
-        if not mask.any():
-            raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
-        return increment.loc[mask[mask].index[-1], "increment"]
+        asset = self._assets_as_dict_of_df.get(ticker)
+        if asset is None:
+            # Asset is not defined by the user, fall back to hard-coded defaults
+            increment = DEFAULT_ASSETS.loc[DEFAULT_ASSETS["ticker"] == ticker, "increment"]
+            if len(increment) < 1:
+                raise ValueError(f"No asset definition available for ticker '{ticker}'.")
+            if len(increment) > 1:
+                raise ValueError(f"Multiple default definitions for asset '{ticker}'.")
+            return increment.item()
+        else:
+            mask = asset["date"].isna() | (asset["date"] <= pd.Timestamp(date))
+            if not mask.any():
+                raise ValueError(
+                    f"No asset definition available for '{ticker}' on or before {date}."
+                )
+            return asset.loc[mask[mask].index[-1], "increment"].item()

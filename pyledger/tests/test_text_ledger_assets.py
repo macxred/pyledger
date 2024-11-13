@@ -5,7 +5,6 @@ from .base_test_assets import BaseTestAssets
 from pyledger import TextLedger
 
 
-@pytest.mark.skip(reason="Delegation for accounting entities not yet implemented in TextLedger.")
 class TestAssets(BaseTestAssets):
 
     @pytest.fixture

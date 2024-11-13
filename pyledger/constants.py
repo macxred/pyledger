@@ -81,6 +81,8 @@ ASSETS_CSV = """
        USD,      0.01,
 """
 
+DEFAULT_PRECISION = 0.01
+
 DEFAULT_ASSETS = enforce_schema(
     pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True), ASSETS_SCHEMA
 )

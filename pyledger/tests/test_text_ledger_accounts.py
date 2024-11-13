@@ -6,7 +6,6 @@ from pyledger import TextLedger
 from consistent_df import assert_frame_equal
 
 
-@pytest.mark.skip(reason="Delegation for accounting entities not yet implemented in TextLedger.")
 class TestAccounts(BaseTestAccounts):
 
     @pytest.fixture
@@ -19,15 +18,15 @@ class TestAccounts(BaseTestAccounts):
         """
         accounts = self.ACCOUNTS.sample(frac=1).reset_index(drop=True)
         for account in accounts.to_dict('records'):
-            ledger.add_account(**account)
-        assert_frame_equal(ledger.accounts(), accounts, check_like=True)
+            ledger.accounts.add([account])
+        assert_frame_equal(ledger.accounts.list(), accounts, check_like=True)
 
         rows = [0, 3, len(accounts) - 1]
         for i in rows:
             accounts.loc[i, "description"] = f"New description {i + 1}"
-            ledger.modify_account(**accounts.loc[i].to_dict())
-            assert_frame_equal(ledger.accounts(), accounts, check_like=True)
+            ledger.accounts.modify([accounts.loc[i]])
+            assert_frame_equal(ledger.accounts.list(), accounts, check_like=True)
 
-        ledger.delete_accounts(accounts['account'].iloc[rows])
+        ledger.accounts.delete({"account": accounts['account'].iloc[rows]})
         expected = accounts.drop(rows).reset_index(drop=True)
-        assert_frame_equal(ledger.accounts(), expected, check_like=True)
+        assert_frame_equal(ledger.accounts.list(), expected, check_like=True)
