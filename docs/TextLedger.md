@@ -41,81 +41,101 @@ import pandas as pd
 from io import StringIO
 from pyledger import TextLedger
 
-# Sample ledger entries
-# Rows without a date form a collective entry with the last row with a date
+# Sample accounting data
+
+TAX_CODES_CSV = """
+    id,      account, rate, description
+    EXEMPT,         , 0.00, Exempt from VAT
+    IN_STD,     1300, 0.20, Input VAT at Standard Rate 20%
+    IN_RED,     1300, 0.05, Input VAT at Reduced Rate 5%
+    OUT_STD,    2200, 0.20, Output VAT at Standard Rate 20%
+    OUT_RED,    2200, 0.05, Output VAT at Reduced Rate 5%
+"""
+TAX_CODES = pd.read_csv(StringIO(TAX_CODES_CSV), skipinitialspace=True)
+
+ACCOUNT_CHART_CSV = """
+    group,       account, currency, tax_code, description
+    Assets,         1000,      USD,         , Cash in Bank
+    Assets,         1100,      USD,         , Accounts Receivable
+    Assets,         1300,      USD,         , VAT Recoverable (Input VAT)
+    Liabilities,    2000,      USD,         , Accounts Payable
+    Liabilities,    2200,      USD,         , VAT Payable (Output VAT)
+    Equity,         3000,      USD,         , Owner's Equity
+    Revenue,        4000,      USD,  OUT_STD, Sales Revenue
+    Expenses,       5000,      USD,   IN_STD, Purchases
+    Expenses,       6000,      USD,   IN_RED, Utilities Expense
+    Expenses,       7000,      USD,         , Rent Expense
+    Other Income,   8000,      USD,         , Interest Income
+"""
+ACCOUNT_CHART = pd.read_csv(StringIO(ACCOUNT_CHART_CSV), skipinitialspace=True)
+
 LEDGER_CSV = """
-          date, account, contra, currency,     amount, tax_code,  description
-    2024-05-24,    9992,   9995,      CHF,     100.00,   OutRed,  Ledger Entry 1
-    2024-05-24,    9991,       ,      USD,    -100.00,   OutRed,  Ledger Entry 2
-              ,    9991,       ,      USD,       1.00,   OutRed,  Ledger Entry 2
-              ,    9991,       ,      USD,      99.00,   OutRed,  Ledger Entry 2
-    2024-04-24,        ,   9990,      EUR,     200.00,   OutRed,  Ledger Entry 3
-              ,    9990,       ,      EUR,     200.00,   OutRed,  Ledger Entry 3
-    2024-05-24,    9991,   9994,      USD,     300.00,   OutRed,  Ledger Entry 4
-    2024-04-04,    9995,       ,      CHF, -125000.00,         ,  Ledger Entry 5
-              ,    9994,       ,      USD,  138138.75,         ,  Ledger Entry 5
+          date, account, contra, currency,   amount, tax_code, description
+    2023-01-01,    1000,   3000,      USD, 10000.00,         , Owner Investment
+    2023-01-05,    1000,   5000,      USD, -5000.00,   IN_STD, Purchase of Equipment
+    2023-01-10,    1000,   4000,      USD,  3600.00,  OUT_STD, Sale of Goods
+    2023-01-15,    1000,   2000,      USD, -2000.00,         , Payment to Supplier
+    2023-01-20,    1000,   6000,      USD,  -500.00,   IN_RED, Utilities Expense
+    2023-01-25,    1000,   5000,      USD, -1000.00,   IN_STD, Purchase of Inventory
+    2023-01-30,    1000,   4000,      USD,  2400.00,  OUT_STD, Sale of Goods
+    2023-02-01,    1000,   7000,      USD,  -800.00,         , Rent Expense
 """
 LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 
 # Initialize TextLedger and populate with sample data
-ledger = TextLedger(root_path="/system-root-path")
-ledger.mirror_ledger(LEDGER_ENTRIES)
+engine = TextLedger(root_path="/system-root-path")
+engine.restore(
+    reporting_currency="USD",
+    tax_codes=TAX_CODES,
+    accounts=ACCOUNT_CHART,
+    ledger=LEDGER_ENTRIES)
 ```
 
-#### Git Diff After Mirroring:
+### 2. Managing Ledger Entries
 
-![Git Diff Mirroring Example](/assets/git-diff-mirroring.png)
+You can efficiently manage ledger entries by adding, modifying, and deleting entries as needed.
 
-### 2. Adding a Ledger Entry
+1. **Add**: Record a new transaction:
 
-Adding a new ledger entry results in a clean Git diff showing only the addition.
+    ```python
+    NEW_ENTRY_CSV = """
+          date, account, contra, currency,   amount, tax_code, description
+    2023-01-18,    1000,   8000,      USD,    100.00,        , Interest Income
+    """
+    NEW_ENTRY = pd.read_csv(StringIO(NEW_ENTRY_CSV), skipinitialspace=True)
+    engine.ledger.add(NEW_ENTRY)
+    ```
 
-```python
-# New ledger entry
-ENTRY_CSV = """
-          date,  account, contra, currency, amount,  description
-    2024-05-24,    9992,   9995,      CHF, 100.00,  Ledger Entry 6
-"""
-new_entry = pd.read_csv(StringIO(ENTRY_CSV), skipinitialspace=True)
-ledger.add_ledger_entry(new_entry)
+2. **Modify**: Adjust an existing entry, such as updating the amount for the sale of goods on `2023-01-10` from `$3,600.00` to `$4,000.00`.
+
+    ```python
+    # Modify the amount for the sale of goods on 2023-01-10
+    entries = engine.ledger.list()
+    id_to_modify = entries.query("'date'] == '2023-01-10'")['id']
+    engine.ledger.modify({'id': id_to_modify, 'amount': 4000.00})
+    ```
+
+3. **Delete**: Remove an erroneous entry, such as the purchase of inventory on `2023-01-25`.
+
+    ```python
+    # Delete the purchase of inventory on 2023-01-25
+    entries = engine.ledger.list()
+    id_to_delete = entries.query("'date'] == '2023-01-25'")['id']
+    engine.ledger.delete({'id': id_to_delete})
+    ```
+
+These operations result in clean Git diffs, making it easier to track and review changes:
+
+```diff
+          date, account, contra, currency,   amount, tax_code, description
+    2023-01-01,    1000,   3000,      USD, 10000.00,         , Owner Investment
+    2023-01-05,    1000,   5000,      USD, -5000.00,   IN_STD, Purchase of Equipment
+-   2023-01-10,    1000,   4000,      USD,  3600.00,  OUT_STD, Sale of Goods
++   2023-01-10,    1000,   4000,      USD,  4000.00,  OUT_STD, Sale of Goods
+    2023-01-15,    1000,   2000,      USD, -2000.00,         , Payment to Supplier
++   2023-01-18,    1000,   8000,      USD,   100.00,         , Interest Income
+    2023-01-20,    1000,   6000,      USD,  -500.00,   IN_RED, Utilities Expense
+-   2023-01-25,    1000,   5000,      USD, -1000.00,   IN_STD, Purchase of Inventory
+    2023-01-30,    1000,   4000,      USD,  2400.00,  OUT_STD, Sale of Goods
+    2023-02-01,    1000,   7000,      USD,  -800.00,         , Rent Expense
 ```
-
-#### Git Diff After Adding Entry:
-
-![Git Diff Add Example](/assets/git-diff-add.png)
-
-### 3. Modifying a Ledger Entry
-
-Changing the `amount` from `300.00` to `400.00` affects only that specific value.
-
-```python
-# Modified ledger entry
-modified_entry = pd.DataFrame({
-    'id': [4],
-    'date': ['2024-05-24'],
-    'account': [9991],
-    'contra': [9994],
-    'currency': ['USD'],
-    'amount': [400.00],
-    'tax_code': ['OutRed'],
-    'description': ['Ledger Entry 4'],
-})
-
-ledger.modify_ledger_entry(modified_entry)
-```
-
-#### Git Diff After Modifying Entry:
-
-![Git Diff Modify Example](/assets/git-diff-modify.png)
-
-### 4. Deleting a Ledger Entry
-
-Removing a ledger entry only deletes that row without affecting others.
-
-```python
-ledger.delete_ledger_entries(ids=[4])
-```
-
-#### Git Diff After Deleting Entry:
-
-![Git Diff Delete Example](/assets/git-diff-delete.png)
