@@ -163,7 +163,7 @@ class BaseTestLedger(BaseTest):
         remote = ledger_engine.ledger.list()
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
-    def add_already_existed_raise_error(
+    def test_add_already_existed_raise_error(
         self, ledger_engine, error_class=ValueError, error_message="already exists"
     ):
         target = self.LEDGER_ENTRIES.query("id == '1'").copy()
@@ -171,7 +171,7 @@ class BaseTestLedger(BaseTest):
         with pytest.raises(error_class, match=error_message):
             ledger_engine.ledger.add(target)
 
-    def add_with_ambiguous_id_raises_error(
+    def test_add_with_ambiguous_id_raises_error(
         self, ledger_engine, error_class=ValueError, error_message="Id needs to be unique"
     ):
         target = self.LEDGER_ENTRIES.query("id in ['1', '2']").copy()
@@ -186,7 +186,7 @@ class BaseTestLedger(BaseTest):
         with pytest.raises(error_class, match=error_message):
             ledger_engine.ledger.modify(target)
 
-    def add_modify_with_ambiguous_id_raises_error(
+    def test_modify_with_ambiguous_id_raises_error(
         self, ledger_engine, error_class=ValueError, error_message="Id needs to be unique"
     ):
         target = self.LEDGER_ENTRIES.query("id in [1, 2]").copy()
