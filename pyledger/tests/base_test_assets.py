@@ -17,6 +17,8 @@ class BaseTestAssets(BaseTest):
 
     def test_asset_accessor_mutators(self, ledger, ignore_row_order=False):
         ledger.restore(settings=self.SETTINGS)
+
+        # Add assets
         assets = self.ASSETS.sample(frac=1).reset_index(drop=True)
         for asset in assets.to_dict('records'):
             ledger.assets.add([asset])
@@ -24,6 +26,7 @@ class BaseTestAssets(BaseTest):
             ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
         )
 
+        # Modify assets
         rows = [0, 3, len(assets) - 1]
         for i in rows:
             assets.loc[i, "increment"] = 0.001
@@ -32,6 +35,7 @@ class BaseTestAssets(BaseTest):
                 ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
             )
 
+        # Delete assets
         ledger.assets.delete([{
             "ticker": assets['ticker'].iloc[rows[0]], "date": assets['date'].iloc[rows[0]]
         }])
