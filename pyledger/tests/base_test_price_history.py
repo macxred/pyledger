@@ -90,23 +90,28 @@ class BaseTestPriceHistory(BaseTest):
         # Ensure the DataFrame passed as argument to price_history.mirror() remains unchanged.
         assert_frame_equal(target, original_target, ignore_row_order=True)
         assert_frame_equal(
-            target, ledger.price_history.list(),
-            ignore_row_order=True, check_like=True
+            target, ledger.price_history.list(), ignore_row_order=True, check_like=True
         )
 
+        # Mirror with delete=False shouldn't change the data
         target = self.PRICES.query("ticker not in ['JPY']")
+        ledger.price_history.mirror(target, delete=False)
+        assert_frame_equal(
+            original_target, ledger.price_history.list(), ignore_row_order=True, check_like=True
+        )
+
+        # Mirror with delete=True should change the data
         ledger.price_history.mirror(target, delete=True)
         assert_frame_equal(
-            target, ledger.price_history.list(),
-            ignore_row_order=True, check_like=True
+            target, ledger.price_history.list(), ignore_row_order=True, check_like=True
         )
 
+        # Reshuffle target data randomly and modify one of the rows
         target = target.sample(frac=1).reset_index(drop=True)
         target.loc[target["ticker"] == "AUD", "price"] = 123
         ledger.price_history.mirror(target, delete=True)
         assert_frame_equal(
-            target, ledger.price_history.list(),
-            ignore_row_order=True, check_like=True
+            target, ledger.price_history.list(), ignore_row_order=True, check_like=True
         )
 
     def test_mirror_empty_prices(self, ledger):
