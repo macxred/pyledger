@@ -52,7 +52,7 @@ class BaseTestTaxCodes(BaseTest):
             ledger.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
         )
 
-    def test_create_already_existed_raise_error(
+    def test_create_existing__tax_code_raise_error(
         self, ledger, error_class=ValueError, error_message="Unique identifiers already exist."
     ):
         new_tax_code = {
@@ -66,7 +66,7 @@ class BaseTestTaxCodes(BaseTest):
         with pytest.raises(error_class, match=error_message):
             ledger.tax_codes.add([new_tax_code])
 
-    def test_update_non_existent_raise_error(
+    def test_update_nonexistent_tax_code_raise_error(
         self, ledger, error_class=ValueError, error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
@@ -75,7 +75,7 @@ class BaseTestTaxCodes(BaseTest):
                 "account": 9990, "rate": 0.02, "is_inclusive": True
             }])
 
-    def test_delete_tax_codes_allow_missing(
+    def test_delete_tax_code_allow_missing(
         self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):

@@ -58,7 +58,7 @@ class BaseTestAccounts(BaseTest):
             ledger.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
 
-    def test_add_already_existed_raise_error(
+    def test_add_existing_account_raise_error(
         self, ledger, error_class=ValueError, error_message="already exist"
     ):
         new_account = {
@@ -72,7 +72,7 @@ class BaseTestAccounts(BaseTest):
         with pytest.raises(error_class, match=error_message):
             ledger.accounts.add([new_account])
 
-    def test_modify_non_existed_raise_error(
+    def test_modify_nonexistent_account_raise_error(
         self, ledger, error_class=ValueError, error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
@@ -84,7 +84,7 @@ class BaseTestAccounts(BaseTest):
                 "group": "/Assets",
             }])
 
-    def test_delete_accounts_allow_missing(
+    def test_delete_account_allow_missing(
         self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
