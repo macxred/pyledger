@@ -103,23 +103,28 @@ class BaseTestRevaluations(BaseTest):
         # Ensure the DataFrame passed as argument to revaluations.mirror() remains unchanged.
         assert_frame_equal(target, original_target, ignore_row_order=True)
         assert_frame_equal(
-            target, ledger.revaluations.list(),
-            ignore_row_order=True, check_like=True
+            target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
         )
 
+        # Mirror with delete=False shouldn't change the data
         target = self.REVALUATIONS.query("credit not in [8050]")
+        ledger.revaluations.mirror(target, delete=False)
+        assert_frame_equal(
+            original_target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
+        )
+
+        # Mirror with delete=True should change the data
         ledger.revaluations.mirror(target, delete=True)
         assert_frame_equal(
-            target, ledger.revaluations.list(),
-            ignore_row_order=True, check_like=True
+            target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
         )
 
+        # Reshuffle target data randomly and modify one of the rows
         target = target.sample(frac=1).reset_index(drop=True)
         target.loc[target["account"] == "1000:2999", "description"] = "New Description"
         ledger.revaluations.mirror(target, delete=True)
         assert_frame_equal(
-            target, ledger.revaluations.list(),
-            ignore_row_order=True, check_like=True
+            target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
         )
 
     def test_mirror_empty_revaluations(self, ledger):
