@@ -164,7 +164,7 @@ class BaseTestLedger(BaseTest):
         assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
 
     def test_add_already_existed_raise_error(
-        self, ledger_engine, error_class=ValueError, error_message="already exists"
+        self, ledger_engine, error_class=ValueError, error_message="identifiers already exist."
     ):
         target = self.LEDGER_ENTRIES.query("id == '1'").copy()
         ledger_engine.ledger.add(target)
