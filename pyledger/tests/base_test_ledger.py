@@ -193,6 +193,13 @@ class BaseTestLedger(BaseTest):
         with pytest.raises(error_class, match=error_message):
             ledger_engine.ledger.modify(target)
 
+    def test_delete_entry_allow_missing(
+        self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
+    ):
+        with pytest.raises(error_class, match=error_message):
+            ledger.ledger.delete({"id": ["FAKE_ID"]}, allow_missing=False)
+        ledger.ledger.delete({"id": ["FAKE_ID"]}, allow_missing=True)
+
     def test_mirror_ledger(self, ledger_engine):
         ledger_engine.accounts.mirror(self.ACCOUNTS, delete=False)
         # Mirror with one single and one collective transaction
