@@ -56,9 +56,10 @@ class BaseTestAssets(BaseTest):
                 "ticker": "FAKE", "increment": 100.0, "date": datetime.date(2023, 1, 1)
             }])
 
-    def test_delete_asset_allow_missing(self, ledger):
-        ledger.restore(assets=self.ASSETS, settings=self.SETTINGS)
-        with pytest.raises(ValueError, match="Some ids are not present in the data."):
+    def test_delete_assets_allow_missing(
+        self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
+    ):
+        with pytest.raises(error_class, match=error_message):
             ledger.assets.delete([{
                 "ticker": "FAKE", "increment": 100.0, "date": datetime.date(2023, 1, 1)
             }], allow_missing=False)
