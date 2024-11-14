@@ -74,6 +74,19 @@ class BaseTestTaxCodes(BaseTest):
                 "account": 9990, "rate": 0.02, "is_inclusive": True
             }])
 
+    def test_delete_tax_codes_allow_missing(
+        self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
+    ):
+        with pytest.raises(error_class, match=error_message):
+            ledger.tax_codes.delete([{
+                "id": "TestCode", "description": "tax 20%",
+                "account": 9990, "rate": 0.02, "is_inclusive": True
+            }], allow_missing=False)
+        ledger.tax_codes.delete([{
+            "id": "TestCode", "description": "tax 20%",
+            "account": 9990, "rate": 0.02, "is_inclusive": True
+        }], allow_missing=True)
+
     def test_mirror(self, ledger):
         # Standardize TAX_CODES before testing
         standardized_df = ledger.tax_codes.standardize(self.TAX_CODES)
