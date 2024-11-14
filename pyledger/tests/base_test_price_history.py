@@ -69,9 +69,10 @@ class BaseTestPriceHistory(BaseTest):
                 "currency": "USD", "price": 123
             }])
 
-    def test_delete_price_allow_missing(self, ledger):
-        ledger.restore(price_history=self.PRICES, settings=self.SETTINGS)
-        with pytest.raises(ValueError, match="Some ids are not present in the data."):
+    def test_delete_price_allow_missing(
+        self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
+    ):
+        with pytest.raises(error_class, match=error_message):
             ledger.price_history.delete([{
                 "ticker": "FAKE", "date": datetime.date(2023, 1, 1),
                 "currency": "USD", "price": 123
