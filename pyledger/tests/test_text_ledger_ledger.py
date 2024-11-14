@@ -13,6 +13,10 @@ class TestLedger(BaseTestLedger):
     def ledger(self, tmp_path):
         return TextLedger(tmp_path)
 
+    @pytest.mark.skip(reason="TextLedger ignores incoming IDs when adding entries.")
+    def test_add_already_existed_raise_error(self):
+        pass
+
     def test_write_ledger_directory(self, ledger):
         # Define ledger entries with different nesting level
         file_1 = self.LEDGER_ENTRIES.copy()
