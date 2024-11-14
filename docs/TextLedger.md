@@ -113,8 +113,9 @@ You can efficiently manage ledger entries by adding, modifying, and deleting ent
     ```python
     # Modify the amount for the sale of goods on 2023-01-10
     entries = engine.ledger.list()
-    id_to_modify = entries.query("'date'] == '2023-01-10'")['id']
-    engine.ledger.modify({'id': id_to_modify, 'amount': 4000.00})
+    to_modify = entries.query("date == '2023-01-10'")
+    to_modify['amount'] = 4000.00
+    engine.ledger.modify(to_modify)
     ```
 
 3. **Delete**: Remove an erroneous entry, such as the purchase of inventory on `2023-01-25`.
@@ -122,7 +123,7 @@ You can efficiently manage ledger entries by adding, modifying, and deleting ent
     ```python
     # Delete the purchase of inventory on 2023-01-25
     entries = engine.ledger.list()
-    id_to_delete = entries.query("'date'] == '2023-01-25'")['id']
+    id_to_delete = entries.query("date == '2023-01-25'")['id']
     engine.ledger.delete({'id': id_to_delete})
     ```
 
