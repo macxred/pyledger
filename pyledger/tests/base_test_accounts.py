@@ -84,6 +84,17 @@ class BaseTestAccounts(BaseTest):
                 "group": "/Assets",
             }])
 
+    def test_delete_accounts_allow_missing(
+        self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
+    ):
+        with pytest.raises(error_class, match=error_message):
+            ledger.accounts.delete([{
+                "account": 77777, "currency": "CHF", "description": "test account"
+            }], allow_missing=False)
+        ledger.accounts.delete([{
+            "account": 77777, "currency": "CHF", "description": "test account"
+        }], allow_missing=True)
+
     def test_mirror_accounts(self, ledger):
         initial_accounts = ledger.accounts.list()
         accounts = ledger.accounts.standardize(self.ACCOUNTS)
