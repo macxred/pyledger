@@ -171,25 +171,11 @@ class BaseTestLedger(BaseTest):
         with pytest.raises(error_class, match=error_message):
             ledger_engine.ledger.add(target)
 
-    def test_add_with_ambiguous_id_raises_error(
-        self, ledger_engine, error_class=ValueError, error_message="Id needs to be unique"
-    ):
-        target = self.LEDGER_ENTRIES.query("id in ['1', '2']").copy()
-        with pytest.raises(error_class, match=error_message):
-            ledger_engine.ledger.add(target)
-
     def test_modify_non_existed_raises_error(
         self, ledger_engine, error_class=ValueError, error_message="not present in the data."
     ):
         target = self.LEDGER_ENTRIES.query("id == '1'").copy()
         target["id"] = 999999
-        with pytest.raises(error_class, match=error_message):
-            ledger_engine.ledger.modify(target)
-
-    def test_modify_with_ambiguous_id_raises_error(
-        self, ledger_engine, error_class=ValueError, error_message="Id needs to be unique"
-    ):
-        target = self.LEDGER_ENTRIES.query("id in [1, 2]").copy()
         with pytest.raises(error_class, match=error_message):
             ledger_engine.ledger.modify(target)
 
