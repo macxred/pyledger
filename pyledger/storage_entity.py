@@ -665,16 +665,20 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
 
     def modify(self, data: pd.DataFrame):
         incoming = self.standardize(pd.DataFrame(data))
-        for id in incoming["id"].unique():
-            current = self.list()
-            path = self._csv_path(pd.Series(id)).item()
-            df_same_file = current[self._csv_path(current["id"]) == path]
-            if id not in df_same_file["id"].values:
-                raise ValueError(f"Ledger entry with id '{id}' not present in the data.")
+        current = self.list()
 
-            df_same_file = pd.concat([
-                df_same_file[df_same_file["id"] != id], incoming.query("id == @id")
-            ])
+        missing_ids = set(incoming["id"].unique()) - set(current["id"].unique())
+        if missing_ids:
+            raise ValueError(f"Ledger entries with ids '{missing_ids}' not present in the data.")
+
+        current = current[~current["id"].isin(incoming["id"])]
+        updated = pd.concat([current, incoming], ignore_index=True)
+        paths_to_update = self._csv_path(incoming["id"]).unique()
+        for path in paths_to_update:
+            df_same_file = updated[self._csv_path(updated["id"]) == path]
+            df_same_file = df_same_file.iloc[
+                self._id_from_path(df_same_file["id"]).argsort(kind='mergesort')
+            ]
             self._store(df_same_file, self._path / path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
