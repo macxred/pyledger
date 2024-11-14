@@ -96,28 +96,30 @@ class BaseTestAccounts(BaseTest):
         }], allow_missing=True)
 
     def test_mirror_accounts(self, ledger):
-        initial_accounts = ledger.accounts.list()
-        accounts = ledger.accounts.standardize(self.ACCOUNTS)
-        target_df = pd.concat([accounts, initial_accounts], ignore_index=True)
-        target_df = ledger.accounts.standardize(target_df)
-        initial = target_df.copy()
-        ledger.accounts.mirror(target_df, delete=False)
-        mirrored_df = ledger.accounts.list()
-        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
-        # Mirroring should not change the initial df
-        assert_frame_equal(initial, target_df, ignore_row_order=True, check_like=True)
+        ledger.restore(settings=self.SETTINGS)
+        target = pd.concat([self.ACCOUNTS, ledger.accounts.list()], ignore_index=True)
+        original_target = target.copy()
+        ledger.accounts.mirror(target, delete=False)
+        # Ensure the DataFrame passed as argument to mirror() remains unchanged.
+        assert_frame_equal(target, original_target, ignore_row_order=True)
+        assert_frame_equal(target, ledger.accounts.list(), ignore_row_order=True, check_like=True)
 
-        target_df = target_df[~target_df["account"].isin([9995, 9996])]
-        ledger.accounts.mirror(target_df.copy(), delete=True)
-        mirrored_df = ledger.accounts.list()
-        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
+        # Mirror with delete=False shouldn't change the data
+        target = self.ACCOUNTS.query("account not in [1000, 1005]")
+        ledger.accounts.mirror(target, delete=False)
+        assert_frame_equal(
+            original_target, ledger.accounts.list(), ignore_row_order=True, check_like=True
+        )
 
-        target_df = target_df.sample(frac=1).reset_index(drop=True)
-        target_account = "2222"
-        target_df.loc[target_df["account"] == target_account, "description"] = "Updated Text"
-        ledger.accounts.mirror(target_df.copy(), delete=True)
-        mirrored_df = ledger.accounts.list()
-        assert_frame_equal(target_df, mirrored_df, ignore_row_order=True, check_like=True)
+        # Mirror with delete=False shouldn't change the data
+        ledger.accounts.mirror(target, delete=True)
+        assert_frame_equal(target, ledger.accounts.list(), ignore_row_order=True, check_like=True)
+
+        # Reshuffle target data randomly and modify one of the rows
+        target = target.sample(frac=1).reset_index(drop=True)
+        target.loc[target["account"] == "2000", "description"] = "Test mirror description"
+        ledger.accounts.mirror(target, delete=True)
+        assert_frame_equal(target, ledger.accounts.list(), ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_accounts(self, ledger):
         ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
