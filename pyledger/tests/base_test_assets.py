@@ -78,10 +78,16 @@ class BaseTestAssets(BaseTest):
             ledger.assets.standardize(target), ledger.assets.list(), ignore_row_order=True
         )
 
+        # Mirror with delete=False shouldn't change the data
         target = self.ASSETS.query("ticker not in ['USD', 'JPY']")
+        ledger.assets.mirror(target, delete=False)
+        assert_frame_equal(original_target, ledger.assets.list(), ignore_row_order=True)
+
+        # Mirror with delete=True should change the data
         ledger.assets.mirror(target, delete=True)
         assert_frame_equal(target, ledger.assets.list(), ignore_row_order=True)
 
+        # Reshuffle target data randomly and modify one of the rows
         target = target.sample(frac=1).reset_index(drop=True)
         target.loc[target["ticker"] == "AUD", "increment"] = 0.02
         ledger.assets.mirror(target, delete=True)
