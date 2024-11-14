@@ -44,12 +44,12 @@ from pyledger import TextLedger
 # Sample accounting data
 
 TAX_CODES_CSV = """
-    id,      account, rate, description
-    EXEMPT,         , 0.00, Exempt from VAT
-    IN_STD,     1300, 0.20, Input VAT at Standard Rate 20%
-    IN_RED,     1300, 0.05, Input VAT at Reduced Rate 5%
-    OUT_STD,    2200, 0.20, Output VAT at Standard Rate 20%
-    OUT_RED,    2200, 0.05, Output VAT at Reduced Rate 5%
+    id,      account, rate, is_inclusive, description
+    EXEMPT,         , 0.00,         True, Exempt from VAT
+    IN_STD,     1300, 0.20,         True, Input VAT at Standard Rate 20%
+    IN_RED,     1300, 0.05,         True, Input VAT at Reduced Rate 5%
+    OUT_STD,    2200, 0.20,         True, Output VAT at Standard Rate 20%
+    OUT_RED,    2200, 0.05,         True, Output VAT at Reduced Rate 5%
 """
 TAX_CODES = pd.read_csv(StringIO(TAX_CODES_CSV), skipinitialspace=True)
 
@@ -82,10 +82,12 @@ LEDGER_CSV = """
 """
 LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 
+SETTINGS = {"reporting_currency": "USD"}
+
 # Initialize TextLedger and populate with sample data
-engine = TextLedger(root_path="/system-root-path")
+engine = TextLedger(root_path="system-root-path")
 engine.restore(
-    reporting_currency="USD",
+    settings=SETTINGS,
     tax_codes=TAX_CODES,
     accounts=ACCOUNT_CHART,
     ledger=LEDGER_ENTRIES)
