@@ -1,5 +1,6 @@
 """Definition of abstract base class for testing tax operations."""
 
+import pandas as pd
 import pytest
 from abc import abstractmethod
 from consistent_df import assert_frame_equal
@@ -87,36 +88,31 @@ class BaseTestTaxCodes(BaseTest):
             "account": 9990, "rate": 0.02, "is_inclusive": True
         }], allow_missing=True)
 
-    def test_mirror(self, ledger):
-        # Standardize TAX_CODES before testing
-        standardized_df = ledger.tax_codes.standardize(self.TAX_CODES)
+    def test_mirror_tax_codes(self, ledger):
+        ledger.restore(settings=self.SETTINGS)
+        target = pd.concat([self.TAX_CODES, ledger.tax_codes.list()], ignore_index=True)
+        original_target = target.copy()
+        ledger.tax_codes.mirror(target, delete=False)
+        # Ensure the DataFrame passed as argument to mirror() remains unchanged.
+        assert_frame_equal(target, original_target, ignore_row_order=True)
+        assert_frame_equal(target, ledger.tax_codes.list(), ignore_row_order=True, check_like=True)
 
-        # Mirror test tax codes onto server with delete=False
-        initial = standardized_df.copy()
-        ledger.tax_codes.mirror(standardized_df, delete=False)
-        mirrored_df = ledger.tax_codes.list()
-        assert_frame_equal(standardized_df, mirrored_df, ignore_row_order=True, check_like=True)
-        # Mirroring should not change initial df
-        assert_frame_equal(initial, mirrored_df, ignore_row_order=True, check_like=True)
-
-        # Mirror target tax codes onto server with delete=True
-        tax_codes = self.TAX_CODES[~self.TAX_CODES["id"].isin(["OutStd", "OutRed"])]
-        ledger.tax_codes.mirror(tax_codes, delete=True)
-        mirrored_df = ledger.tax_codes.list()
-        expected = ledger.tax_codes.standardize(tax_codes)
+        # Mirror with delete=False shouldn't change the data
+        target = self.TAX_CODES.query("account not in ['OutStd', 'OutRed']")
+        ledger.tax_codes.mirror(target, delete=False)
         assert_frame_equal(
-            expected, mirrored_df, ignore_row_order=True, check_like=True
+            original_target, ledger.tax_codes.list(), ignore_row_order=True, check_like=True
         )
 
-        # Reshuffle target data randomly and modify one of the tax rates
-        tax_codes_shuffled = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
-        tax_codes_shuffled.loc[tax_codes_shuffled["id"] == "OutStdEx", "rate"] = 0.9
-        tax_codes_shuffled = ledger.tax_codes.standardize(tax_codes_shuffled)
+        # Mirror with delete=True should change the data
+        ledger.tax_codes.mirror(target, delete=True)
+        assert_frame_equal(target, ledger.tax_codes.list(), ignore_row_order=True, check_like=True)
 
-        # Mirror target tax codes onto server with updating
-        ledger.tax_codes.mirror(tax_codes_shuffled, delete=True)
-        mirrored_df = ledger.tax_codes.list()
-        assert_frame_equal(tax_codes_shuffled, mirrored_df, ignore_row_order=True, check_like=True)
+        # Reshuffle target data randomly and modify one of the rows
+        target = target.sample(frac=1).reset_index(drop=True)
+        target.loc[target["id"] == "OutStdEx", "rate"] = 0.9
+        ledger.tax_codes.mirror(target, delete=True)
+        assert_frame_equal(target, ledger.tax_codes.list(), ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_tax_codes(self, ledger):
         ledger.restore(tax_codes=self.TAX_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS)
