@@ -12,144 +12,144 @@ class BaseTestRevaluations(BaseTest):
 
     @abstractmethod
     @pytest.fixture
-    def ledger(self):
+    def engine(self):
         pass
 
-    def test_revaluations_accessor_mutators(self, ledger, ignore_row_order=False):
-        ledger.restore(settings=self.SETTINGS, accounts=self.ACCOUNTS)
+    def test_revaluations_accessor_mutators(self, engine, ignore_row_order=False):
+        engine.restore(settings=self.SETTINGS, accounts=self.ACCOUNTS)
 
         # Add revaluations one by one
         revaluations = self.REVALUATIONS.head(-3).sample(frac=1).reset_index(drop=True)
         for revaluation in revaluations.to_dict('records'):
-            ledger.revaluations.add([revaluation])
+            engine.revaluations.add([revaluation])
         assert_frame_equal(
-            ledger.revaluations.list(), revaluations,
+            engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Add revaluations as a DataFrame with a multiple rows
         tail_revaluations = self.REVALUATIONS.tail(3).sample(frac=1)
-        ledger.revaluations.add(tail_revaluations)
+        engine.revaluations.add(tail_revaluations)
         revaluations = pd.concat([revaluations, tail_revaluations], ignore_index=True)
         assert_frame_equal(
-            ledger.revaluations.list(), revaluations,
+            engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Modify with only id columns and one column to update
         revaluations.loc[0, "debit"] = 1005
-        ledger.revaluations.modify({
+        engine.revaluations.modify({
             "account": [revaluations.loc[0, "account"]],
             "date": [revaluations.loc[0, "date"]],
             "debit": [1005]
         })
         assert_frame_equal(
-            ledger.revaluations.list(), revaluations,
+            engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Modify with a DataFrame containing all columns from the schema
         revaluations.loc[3, "description"] = "Modify with all columns test"
-        ledger.revaluations.modify([revaluations.loc[3]])
+        engine.revaluations.modify([revaluations.loc[3]])
         assert_frame_equal(
-            ledger.revaluations.list(), revaluations,
+            engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Modify with a multiple rows at the same time
         revaluations.loc[revaluations.index[-2:], "description"] = "Modify multiple rows"
-        ledger.revaluations.modify(revaluations.loc[revaluations.index[-2:]])
+        engine.revaluations.modify(revaluations.loc[revaluations.index[-2:]])
         assert_frame_equal(
-            ledger.revaluations.list(), revaluations,
+            engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Delete single row
-        ledger.revaluations.delete([{
+        engine.revaluations.delete([{
             "account": revaluations['account'].iloc[0],
             "date": revaluations['date'].iloc[0],
         }])
         revaluations = revaluations.drop([0]).reset_index(drop=True)
         assert_frame_equal(
-            ledger.revaluations.list(), revaluations,
+            engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Delete multiple rows
-        ledger.revaluations.delete(revaluations.iloc[[1, -1]])
+        engine.revaluations.delete(revaluations.iloc[[1, -1]])
         revaluations = revaluations.drop(revaluations.index[[1, -1]]).reset_index(drop=True)
         assert_frame_equal(
-            ledger.revaluations.list(), revaluations,
+            engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
     def test_add_existing_revaluation_raises_error(
-        self, ledger, error_class=ValueError, error_message="Unique identifiers already exist."
+        self, engine, error_class=ValueError, error_message="Unique identifiers already exist."
     ):
         new_revaluation = {
             "account": "1000:5000", "date": datetime.date(2023, 1, 1),
             "debit": 1111, "credit": 2222, "description": "Revaluation description"
         }
-        ledger.revaluations.add([new_revaluation])
+        engine.revaluations.add([new_revaluation])
         with pytest.raises(error_class, match=error_message):
-            ledger.revaluations.add([new_revaluation])
+            engine.revaluations.add([new_revaluation])
 
     def test_modify_nonexistent_revaluation_raises_error(
-        self, ledger, error_class=ValueError, error_message="elements in 'data' are not present"
+        self, engine, error_class=ValueError, error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
-            ledger.revaluations.modify([{
+            engine.revaluations.modify([{
                 "account": "1000:5000", "date": datetime.date(2023, 1, 1),
                 "debit": 1111, "credit": 2222, "description": "Revaluation description"
             }])
 
     def test_delete_revaluation_allow_missing(
-        self, ledger, error_class=ValueError, error_message="Some ids are not present in the data."
+        self, engine, error_class=ValueError, error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
-            ledger.revaluations.delete([{
+            engine.revaluations.delete([{
                 "account": "1000:5000", "date": datetime.date(2023, 1, 1),
                 "debit": 1111, "credit": 2222, "description": "Revaluation description"
             }], allow_missing=False)
-        ledger.revaluations.delete([{
+        engine.revaluations.delete([{
             "account": "1000:5000", "date": datetime.date(2023, 1, 1),
             "debit": 1111, "credit": 2222, "description": "Revaluation description"
         }], allow_missing=True)
 
-    def test_mirror_revaluations(self, ledger):
-        ledger.restore(settings=self.SETTINGS)
-        target = pd.concat([self.REVALUATIONS, ledger.revaluations.list()], ignore_index=True)
+    def test_mirror_revaluations(self, engine):
+        engine.restore(settings=self.SETTINGS)
+        target = pd.concat([self.REVALUATIONS, engine.revaluations.list()], ignore_index=True)
         original_target = target.copy()
-        ledger.revaluations.mirror(target, delete=False)
+        engine.revaluations.mirror(target, delete=False)
         # Ensure the DataFrame passed as argument to revaluations.mirror() remains unchanged.
         assert_frame_equal(target, original_target, ignore_row_order=True)
         assert_frame_equal(
-            target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
+            target, engine.revaluations.list(), ignore_row_order=True, check_like=True
         )
 
         # Mirror with delete=False shouldn't change the data
         target = self.REVALUATIONS.query("credit not in [8050]")
-        ledger.revaluations.mirror(target, delete=False)
+        engine.revaluations.mirror(target, delete=False)
         assert_frame_equal(
-            original_target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
+            original_target, engine.revaluations.list(), ignore_row_order=True, check_like=True
         )
 
         # Mirror with delete=True should change the data
-        ledger.revaluations.mirror(target, delete=True)
+        engine.revaluations.mirror(target, delete=True)
         assert_frame_equal(
-            target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
+            target, engine.revaluations.list(), ignore_row_order=True, check_like=True
         )
 
         # Reshuffle target data randomly and modify one of the rows
         target = target.sample(frac=1).reset_index(drop=True)
         target.loc[target["account"] == "1000:2999", "description"] = "New Description"
-        ledger.revaluations.mirror(target, delete=True)
+        engine.revaluations.mirror(target, delete=True)
         assert_frame_equal(
-            target, ledger.revaluations.list(), ignore_row_order=True, check_like=True
+            target, engine.revaluations.list(), ignore_row_order=True, check_like=True
         )
 
-    def test_mirror_empty_revaluations(self, ledger):
-        ledger.restore(revaluations=self.REVALUATIONS, settings=self.SETTINGS)
-        assert not ledger.revaluations.list().empty
-        ledger.revaluations.mirror(ledger.revaluations.standardize(None), delete=True)
-        assert ledger.revaluations.list().empty
+    def test_mirror_empty_revaluations(self, engine):
+        engine.restore(revaluations=self.REVALUATIONS, settings=self.SETTINGS)
+        assert not engine.revaluations.list().empty
+        engine.revaluations.mirror(engine.revaluations.standardize(None), delete=True)
+        assert engine.revaluations.list().empty

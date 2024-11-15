@@ -8,5 +8,5 @@ from pyledger import TextLedger
 class TestRevaluations(BaseTestRevaluations):
 
     @pytest.fixture
-    def ledger(self, tmp_path):
+    def engine(self, tmp_path):
         return TextLedger(tmp_path)
