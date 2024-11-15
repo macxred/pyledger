@@ -22,9 +22,11 @@ class BaseTestLedger(BaseTest):
     def test_ledger_accessor_mutators(self, engine, ignore_row_order=False):
         # Add ledger entries one by one and with multiple rows
         expected = self.LEDGER_ENTRIES.copy()
-        for id in expected.head(-7)["id"].unique():
+        txn_ids = expected["id"].unique()
+        for id in txn_ids[:10]:
             engine.ledger.add(expected.query(f"id == '{id}'"))
-        engine.ledger.add(self.LEDGER_ENTRIES.tail(7))
+        remaining_ids = txn_ids[10:]  # noqa: F841
+        engine.ledger.add(expected.query("`id` in @remaining_ids"))
         assert_frame_equal(
             engine.ledger.list(), expected,
             ignore_columns=["id"], ignore_row_order=ignore_row_order
