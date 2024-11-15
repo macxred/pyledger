@@ -18,19 +18,11 @@ class BaseTestRevaluations(BaseTest):
     def test_revaluations_accessor_mutators(self, engine, ignore_row_order=False):
         engine.restore(settings=self.SETTINGS, accounts=self.ACCOUNTS)
 
-        # Add revaluations one by one
-        revaluations = self.REVALUATIONS.head(-3).sample(frac=1).reset_index(drop=True)
-        for revaluation in revaluations.to_dict('records'):
+        # Add revaluations one by one and with multiple rows
+        revaluations = self.REVALUATIONS.sample(frac=1).reset_index(drop=True)
+        for revaluation in revaluations.head(-3).to_dict('records'):
             engine.revaluations.add([revaluation])
-        assert_frame_equal(
-            engine.revaluations.list(), revaluations,
-            check_like=True, ignore_row_order=ignore_row_order
-        )
-
-        # Add revaluations as a DataFrame with a multiple rows
-        tail_revaluations = self.REVALUATIONS.tail(3).sample(frac=1)
-        engine.revaluations.add(tail_revaluations)
-        revaluations = pd.concat([revaluations, tail_revaluations], ignore_index=True)
+        engine.revaluations.add(revaluations.tail(3))
         assert_frame_equal(
             engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
