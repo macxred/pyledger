@@ -18,32 +18,60 @@ class BaseTestPriceHistory(BaseTest):
     def test_price_accessor_mutators(self, ledger, ignore_row_order=False):
         ledger.restore(settings=self.SETTINGS)
 
-        # Add prices
+        # Add prices one by one and with multiple rows
         price_history = self.PRICES.sample(frac=1).reset_index(drop=True)
-        for price in price_history.to_dict('records'):
+        for price in price_history.head(-3).to_dict('records'):
             ledger.price_history.add([price])
+        ledger.price_history.add(price_history.tail(3))
         assert_frame_equal(
             ledger.price_history.list(), price_history,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify prices
-        rows = [0, 3, len(price_history) - 1]
-        for i in rows:
-            price_history.loc[i, "price"] = 0.001
-            ledger.price_history.modify([price_history.loc[i]])
-            assert_frame_equal(
-                ledger.price_history.list(), price_history,
-                check_like=True, ignore_row_order=ignore_row_order
-            )
-
-        # Delete prices
-        ledger.price_history.delete([{
-            "ticker": price_history['ticker'].iloc[rows[0]],
-            "date": price_history['date'].iloc[rows[0]],
-            "currency": price_history['currency'].iloc[rows[0]]
+        # Modify only a single column in a specific row
+        price_history.loc[0, "price"] = 0.001
+        ledger.price_history.modify([{
+            "ticker": price_history.loc[0, "ticker"],
+            "date": price_history.loc[0, "date"],
+            "currency": price_history['currency'].iloc[0],
+            "price": 0.001
         }])
-        price_history = price_history.drop(rows[0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.price_history.list(), price_history,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Modify all columns from the schema in a specific row
+        price_history.loc[3, "price"] = 0.00001
+        ledger.price_history.modify([price_history.loc[3]])
+        assert_frame_equal(
+            ledger.price_history.list(), price_history,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Modify with a multiple rows
+        price_history.loc[price_history.index[[1, -1]], "price"] = 0.0000001
+        ledger.price_history.modify(price_history.loc[price_history.index[[1, -1]]])
+        assert_frame_equal(
+            ledger.price_history.list(), price_history,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete a single row
+        ledger.price_history.delete([{
+            "ticker": price_history['ticker'].iloc[0],
+            "date": price_history['date'].iloc[0],
+            "currency": price_history['currency'].iloc[0]
+        }])
+        price_history = price_history.drop([0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.price_history.list(), price_history,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete multiple rows
+        ledger.price_history.delete(price_history.iloc[[1, -1]])
+        price_history = price_history.drop(price_history.index[[1, -1]]).reset_index(drop=True)
         assert_frame_equal(
             ledger.price_history.list(), price_history,
             check_like=True, ignore_row_order=ignore_row_order
