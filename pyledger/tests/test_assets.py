@@ -8,5 +8,5 @@ from pyledger import MemoryLedger
 class TestAssets(BaseTestAssets):
 
     @pytest.fixture
-    def ledger(self):
+    def engine(self):
         return MemoryLedger()

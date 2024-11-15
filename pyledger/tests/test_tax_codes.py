@@ -8,5 +8,5 @@ from pyledger import MemoryLedger
 class TestTaxCodes(BaseTestTaxCodes):
 
     @pytest.fixture
-    def ledger(self):
+    def engine(self):
         return MemoryLedger()
