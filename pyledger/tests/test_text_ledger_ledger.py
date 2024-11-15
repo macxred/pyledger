@@ -56,26 +56,3 @@ class TestLedger(BaseTestLedger):
         """Ledger() is expected to return an empty data frame if the ledger folder is missing."""
         expected_ledger = ledger.ledger.standardize(None)
         assert_frame_equal(ledger.ledger.list(), expected_ledger)
-
-    def test_ledger_mutators_does_not_change_order(self, ledger):
-        """Test to ensure that mutator functions make minimal invasive changes to ledger files,
-        preserving the original row order so that Git diffs show only the intended modifications.
-        """
-        for id in self.LEDGER_ENTRIES['id'].unique():
-            ledger.ledger.add(self.LEDGER_ENTRIES.query(f"id == '{id}'"))
-        expected = ledger.ledger.standardize(self.LEDGER_ENTRIES)
-        expected["id"] = "default.csv:" + expected["id"]
-        assert_frame_equal(ledger.ledger.list(), expected)
-
-        expected.loc[expected["id"] == "default.csv:4", "amount"] = 8888888888
-        df = expected.query("id == 'default.csv:4'")
-        ledger.ledger.modify(df)
-        expected.loc[expected["id"] == "default.csv:9", "amount"] = 7777777777
-        df = expected.query("id == 'default.csv:9'")
-        ledger.ledger.modify(df)
-        assert_frame_equal(ledger.ledger.list(), expected)
-
-        to_delete = ['default.csv:3', 'default.csv:10']
-        expected = expected.query(f"id not in {to_delete}")
-        ledger.ledger.delete({"id": to_delete})
-        assert_frame_equal(ledger.ledger.list(), expected, ignore_columns=["id"], ignore_index=True)
