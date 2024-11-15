@@ -17,37 +17,52 @@ class BaseTestTaxCodes(BaseTest):
     def test_tax_codes_accessor_mutators(self, ledger, ignore_row_order=False):
         ledger.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
 
-        # Add tax codes
+        # Add tax codes one by one and with multiple rows
         tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
-        for tax_code in tax_codes.to_dict('records'):
+        for tax_code in tax_codes.head(-3).to_dict('records'):
             ledger.tax_codes.add([tax_code])
+        ledger.tax_codes.add(tax_codes.tail(3))
         assert_frame_equal(
             ledger.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify tax codes
-        rows = [0, 3, len(tax_codes) - 1]
-        for i in rows:
-            tax_codes.loc[i, "description"] = f"New Description: {i}"
-            ledger.tax_codes.modify([tax_codes.loc[i]])
-            assert_frame_equal(
-                ledger.tax_codes.list(), tax_codes,
-                check_like=True, ignore_row_order=ignore_row_order
-            )
+        # Modify only a single column in a specific row
+        tax_codes.loc[0, "description"] = "Modify only one column test"
+        ledger.tax_codes.modify([{
+            "id": tax_codes.loc[0, "id"],
+            "description": "Modify only one column test"
+        }])
+        assert_frame_equal(
+            ledger.tax_codes.list(), tax_codes,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
 
-        # Modify method receive only one needed field to modify
-        rows = [0, 3, len(tax_codes) - 1]
-        for i in rows:
-            tax_codes.loc[i, "rate"] = 0.99
-            ledger.tax_codes.modify({"id": [tax_codes.loc[i, "id"]], "rate": [0.99]})
-            assert_frame_equal(
-                ledger.tax_codes.list(), tax_codes,
-                check_like=True, ignore_row_order=ignore_row_order
-            )
+        # Modify all columns from the schema in a specific row
+        tax_codes.loc[3, "description"] = "Modify with all columns test"
+        ledger.tax_codes.modify([tax_codes.loc[3]])
+        assert_frame_equal(
+            ledger.tax_codes.list(), tax_codes,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
 
-        # Delete tax codes
-        ledger.tax_codes.delete([{"id": tax_codes['id'].iloc[rows[0]]}])
-        tax_codes = tax_codes.drop(rows[0]).reset_index(drop=True)
+        # Modify with a multiple rows
+        tax_codes.loc[tax_codes.index[[1, -1]], "description"] = "Modify multiple rows"
+        ledger.tax_codes.modify(tax_codes.loc[tax_codes.index[[1, -1]]])
+        assert_frame_equal(
+            ledger.tax_codes.list(), tax_codes,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete a single row
+        ledger.tax_codes.delete([{"id": tax_codes["id"].loc[0]}])
+        tax_codes = tax_codes.drop([0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete multiple rows
+        ledger.tax_codes.delete(tax_codes.iloc[[1, -1]])
+        tax_codes = tax_codes.drop(tax_codes.index[[1, -1]]).reset_index(drop=True)
         assert_frame_equal(
             ledger.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
         )
