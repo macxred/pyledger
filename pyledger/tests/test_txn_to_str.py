@@ -45,28 +45,28 @@ LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 
 
 def test_txn_to_str():
-    ledger = MemoryLedger()
-    result = ledger.txn_to_str(LEDGER_ENTRIES)
+    engine = MemoryLedger()
+    result = engine.txn_to_str(LEDGER_ENTRIES)
     assert result == EXPECTED, "Transactions were not converted correctly."
 
 
 def test_txn_to_str_empty_df():
-    ledger = MemoryLedger()
+    engine = MemoryLedger()
     df = pd.DataFrame(columns=LEDGER_ENTRIES.columns)
-    result = ledger.txn_to_str(df)
+    result = engine.txn_to_str(df)
     assert result == {}, "Empty DataFrame did not return an empty dict."
 
 
 def test_txn_to_str_non_unique_dates():
-    ledger = MemoryLedger()
+    engine = MemoryLedger()
     df = LEDGER_ENTRIES[LEDGER_ENTRIES["id"].isin(['1', '4'])]
     df.loc[df["id"] == '4', "id"] = '1'
     with pytest.raises(ValueError):
-        ledger.txn_to_str(df)
+        engine.txn_to_str(df)
 
 
 def test_txn_to_str_variations_of_same_transactions():
-    ledger = MemoryLedger()
+    engine = MemoryLedger()
     df1 = LEDGER_ENTRIES[LEDGER_ENTRIES["id"] == 2]
     # Reverse the column order
     df2 = df1[df1.columns[::-1]]
@@ -80,11 +80,11 @@ def test_txn_to_str_variations_of_same_transactions():
     df5 = df1.copy()
     df5 = df5.rename(columns={"reporting_currency": "report_amount"})
 
-    result1 = ledger.txn_to_str(df1)
-    result2 = ledger.txn_to_str(df2)
-    result3 = ledger.txn_to_str(df3)
-    result4 = ledger.txn_to_str(df4)
-    result5 = ledger.txn_to_str(df5)
+    result1 = engine.txn_to_str(df1)
+    result2 = engine.txn_to_str(df2)
+    result3 = engine.txn_to_str(df3)
+    result4 = engine.txn_to_str(df4)
+    result5 = engine.txn_to_str(df5)
     assert result1 == result2 == result3 == result4 == result5, (
         "Same transactions should have identical string representations."
     )
