@@ -18,28 +18,55 @@ class BaseTestAssets(BaseTest):
     def test_asset_accessor_mutators(self, ledger, ignore_row_order=False):
         ledger.restore(settings=self.SETTINGS)
 
-        # Add assets
+        # Add assets one by one and with multiple rows
         assets = self.ASSETS.sample(frac=1).reset_index(drop=True)
-        for asset in assets.to_dict('records'):
+        for asset in assets.head(-3).to_dict('records'):
             ledger.assets.add([asset])
+        ledger.assets.add(assets.tail(3))
         assert_frame_equal(
             ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify assets
-        rows = [0, 3, len(assets) - 1]
-        for i in rows:
-            assets.loc[i, "increment"] = 0.001
-            ledger.assets.modify([assets.loc[i]])
-            assert_frame_equal(
-                ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
-            )
-
-        # Delete assets
-        ledger.assets.delete([{
-            "ticker": assets['ticker'].iloc[rows[0]], "date": assets['date'].iloc[rows[0]]
+        # Modify only a single column in a specific row
+        assets.loc[0, "increment"] = 0.001
+        ledger.assets.modify([{
+            "ticker": assets.loc[0, "ticker"],
+            "date": assets.loc[0, "date"],
+            "increment": 0.001
         }])
-        assets = assets.drop(rows[0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.assets.list(), assets,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Modify all columns from the schema in a specific row
+        assets.loc[3, "increment"] = 0.000001
+        ledger.assets.modify([assets.loc[3]])
+        assert_frame_equal(
+            ledger.assets.list(), assets,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Modify with a multiple rows
+        assets.loc[assets.index[[1, -1]], "increment"] = 0.000001
+        ledger.assets.modify(assets.loc[assets.index[[1, -1]]])
+        assert_frame_equal(
+            ledger.assets.list(), assets,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete a single row
+        ledger.assets.delete([{
+            "ticker": assets['ticker'].iloc[0], "date": assets['date'].iloc[0]
+        }])
+        assets = assets.drop([0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete multiple rows
+        ledger.assets.delete(assets.iloc[[1, -1]])
+        assets = assets.drop(assets.index[[1, -1]]).reset_index(drop=True)
         assert_frame_equal(
             ledger.assets.list(), assets, check_like=True, ignore_row_order=ignore_row_order
         )
