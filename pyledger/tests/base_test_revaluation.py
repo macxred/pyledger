@@ -48,9 +48,9 @@ class BaseTestRevaluations(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify with a multiple rows at the same time
-        revaluations.loc[revaluations.index[-2:], "description"] = "Modify multiple rows"
-        engine.revaluations.modify(revaluations.loc[revaluations.index[-2:]])
+        # Modify with a multiple rows
+        revaluations.loc[revaluations.index[[1, -1]], "description"] = "Modify multiple rows"
+        engine.revaluations.modify(revaluations.loc[revaluations.index[[1, -1]]])
         assert_frame_equal(
             engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
