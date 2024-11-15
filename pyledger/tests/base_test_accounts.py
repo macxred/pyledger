@@ -48,7 +48,7 @@ class BaseTestAccounts(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify with a multiple rows
+        # Modify multiple rows
         accounts.loc[accounts.index[[1, -1]], "description"] = "Modify multiple rows"
         engine.accounts.modify(accounts.loc[accounts.index[[1, -1]]])
         assert_frame_equal(
