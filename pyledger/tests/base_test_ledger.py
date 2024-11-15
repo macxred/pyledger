@@ -30,7 +30,7 @@ class BaseTestLedger(BaseTest):
             ignore_columns=["id"], ignore_row_order=ignore_row_order
         )
 
-        # Modify all columns from the schema in a specific row
+        # Modify all columns from the schema in a ledger entry with a specific id
         expected = engine.ledger.list()
         id = expected.iloc[0]["id"]
         expected.loc[expected["id"] == id, "description"] = "Modify with all columns"
@@ -49,7 +49,7 @@ class BaseTestLedger(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify single transaction with a collective
+        # Replace an individual transaction by a collective transaction
         current = engine.ledger.list()
         single_txn_id = current[~current["id"].duplicated(keep=False)].iloc[0]["id"]
         collective_txn = self.LEDGER_ENTRIES.query("id == '1'").copy()
@@ -64,7 +64,7 @@ class BaseTestLedger(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify collective transaction with a single
+        # Replace a collective transaction by an individual transaction
         current = engine.ledger.list()
         collective_txn_id = current[current["id"].duplicated(keep=False)].iloc[0]["id"]
         collective_txn_indices = current[current["id"] == collective_txn_id].index
@@ -79,7 +79,7 @@ class BaseTestLedger(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Delete a single row
+        # Delete a single entry
         current = engine.ledger.list()
         id_to_drop = current.loc[0]["id"]
         engine.ledger.delete([{"id": id_to_drop}])
@@ -89,7 +89,7 @@ class BaseTestLedger(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Delete multiple rows
+        # Delete multiple entries
         current = engine.ledger.list()
         ids_to_drop = current["id"].iloc[[1, -1]]
         engine.ledger.delete(current.iloc[[1, -1]])
