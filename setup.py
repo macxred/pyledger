@@ -18,6 +18,7 @@ setup(
     long_description=open('README.md').read(),
     url='https://github.com/macxred/pyledger',
     packages=find_packages(),
+    exclude_package_data={"": ["assets/*", "assets/**"]},
     extras_require={
         "dev": [
             "flake8",
