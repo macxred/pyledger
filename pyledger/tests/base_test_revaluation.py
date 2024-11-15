@@ -28,7 +28,7 @@ class BaseTestRevaluations(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify with only id columns and one column to update
+        # Modify only a single column in a specific row
         revaluations.loc[0, "debit"] = 1005
         engine.revaluations.modify([{
             "account": revaluations.loc[0, "account"],
@@ -40,7 +40,7 @@ class BaseTestRevaluations(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify with a DataFrame containing all columns from the schema
+        # Modify all columns from the schema in a specific row
         revaluations.loc[3, "description"] = "Modify with all columns test"
         engine.revaluations.modify([revaluations.loc[3]])
         assert_frame_equal(
@@ -56,7 +56,7 @@ class BaseTestRevaluations(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Delete single row
+        # Delete a single row
         engine.revaluations.delete([{
             "account": revaluations['account'].iloc[0],
             "date": revaluations['date'].iloc[0],
