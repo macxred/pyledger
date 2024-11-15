@@ -20,7 +20,7 @@ class BaseTestLedger(BaseTest):
         return ledger
 
     def test_ledger_accessor_mutators(self, ledger, ignore_row_order=False):
-        # Add transactions one by one and multiple at once
+        # Add ledger entries one by one and with multiple rows
         expected = self.LEDGER_ENTRIES.copy()
         for id in expected.head(-7)["id"].unique():
             ledger.ledger.add(expected.query(f"id == '{id}'"))
@@ -30,7 +30,7 @@ class BaseTestLedger(BaseTest):
             ignore_columns=["id"], ignore_row_order=ignore_row_order
         )
 
-        # Modify one ledger entry
+        # Modify all columns from the schema in a specific row
         expected = ledger.ledger.list()
         id = expected.iloc[0]["id"]
         expected.loc[expected["id"] == id, "description"] = "Modify with all columns"
@@ -40,7 +40,7 @@ class BaseTestLedger(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify with a multiple rows at the same time
+        # Modify with multiple rows
         ids = expected.tail(3)["id"].unique()
         expected.loc[expected["id"].isin(ids), "description"] = "Modify multiple rows"
         ledger.ledger.modify(expected.loc[expected["id"].isin(ids)])
@@ -49,37 +49,37 @@ class BaseTestLedger(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify single txn with a collective
+        # Modify single transaction with a collective
         current = ledger.ledger.list()
         single_txn_id = current[~current["id"].duplicated(keep=False)].iloc[0]["id"]
-        to_update = self.LEDGER_ENTRIES.query("id == '1'").copy()
-        to_update.loc[:, "id"] = single_txn_id
+        collective_txn = self.LEDGER_ENTRIES.query("id == '1'").copy()
+        collective_txn.loc[:, "id"] = single_txn_id
         single_txn_index = current[current["id"] == single_txn_id].index[0]
         rows_before = current.loc[:single_txn_index - 1]
         rows_after = current.loc[single_txn_index + 1:]
-        expected = pd.concat([rows_before, to_update, rows_after], ignore_index=True)
-        ledger.ledger.modify(to_update)
+        expected = pd.concat([rows_before, collective_txn, rows_after], ignore_index=True)
+        ledger.ledger.modify(collective_txn)
         assert_frame_equal(
             ledger.ledger.list(), expected,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify collective txn with a single
+        # Modify collective transaction with a single
         current = ledger.ledger.list()
         collective_txn_id = current[current["id"].duplicated(keep=False)].iloc[0]["id"]
         collective_txn_indices = current[current["id"] == collective_txn_id].index
-        to_update = self.LEDGER_ENTRIES.query("id == '2'").copy()
-        to_update.loc[:, "id"] = collective_txn_id
+        single_txn = self.LEDGER_ENTRIES.query("id == '2'").copy()
+        single_txn.loc[:, "id"] = collective_txn_id
         rows_before = current.loc[:collective_txn_indices[0] - 1]
         rows_after = current.loc[collective_txn_indices[-1] + 1:]
-        expected = pd.concat([rows_before, to_update, rows_after], ignore_index=True)
-        ledger.ledger.modify(to_update)
+        expected = pd.concat([rows_before, single_txn, rows_after], ignore_index=True)
+        ledger.ledger.modify(single_txn)
         assert_frame_equal(
             ledger.ledger.list(), expected,
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Delete single row
+        # Delete a single row
         current = ledger.ledger.list()
         id_to_drop = current.loc[0]["id"]
         ledger.ledger.delete([{"id": id_to_drop}])
