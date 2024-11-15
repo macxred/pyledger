@@ -16,44 +16,56 @@ class BaseTestAccounts(BaseTest):
         pass
 
     def test_account_accessor_mutators(self, ledger, ignore_row_order=False):
+        ACCOUNTS = self.ACCOUNTS.query("account not in [4000, 5000]")
         tax_accounts = self.ACCOUNTS.query("account in [4000, 5000]")
         ledger.restore(tax_codes=self.TAX_CODES, accounts=tax_accounts, settings=self.SETTINGS)
 
-        # Add accounts
-        accounts = self.ACCOUNTS.query("account not in [4000, 5000]").sample(frac=1)
-        for account in accounts.to_dict('records'):
+        # Add accounts one by one and with multiple rows
+        for account in ACCOUNTS.head(-3).to_dict('records'):
             ledger.accounts.add([account])
-        accounts = pd.concat([tax_accounts, accounts], ignore_index=True)
+        ledger.accounts.add(ACCOUNTS.tail(3))
+        accounts = pd.concat([tax_accounts, ACCOUNTS], ignore_index=True)
         assert_frame_equal(
             ledger.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify accounts
-        rows = [0, 3, len(accounts) - 1]
-        for i in rows:
-            accounts.loc[i, "description"] = f"New Description: {i}"
-            ledger.accounts.modify([accounts.loc[i]])
-            assert_frame_equal(
-                ledger.accounts.list(), accounts,
-                check_like=True, ignore_row_order=ignore_row_order
-            )
+        # Modify only a single column in a specific row
+        accounts.loc[0, "description"] = "Modify only one column test"
+        ledger.accounts.modify([{
+            "account": accounts.loc[0, "account"],
+            "description": "Modify only one column test"
+        }])
+        assert_frame_equal(
+            ledger.accounts.list(), accounts,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
 
-        # Modify method receive only one needed field to modify
-        rows = [0, 3, len(accounts) - 1]
-        for i in rows:
-            accounts.loc[i, "description"] = f"Modify Description: {i}"
-            ledger.accounts.modify({
-                "account": [accounts.loc[i, "account"]],
-                "description": [f"Modify Description: {i}"]
-            })
-            assert_frame_equal(
-                ledger.accounts.list(), accounts,
-                check_like=True, ignore_row_order=ignore_row_order
-            )
+        # Modify all columns from the schema in a specific row
+        accounts.loc[3, "description"] = "Modify with all columns test"
+        ledger.accounts.modify([accounts.loc[3]])
+        assert_frame_equal(
+            ledger.accounts.list(), accounts,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
 
-        # Delete accounts
-        ledger.accounts.delete([{"account": accounts['account'].iloc[rows[0]]}])
-        accounts = accounts.drop(rows[0]).reset_index(drop=True)
+        # Modify with a multiple rows
+        accounts.loc[accounts.index[[1, -1]], "description"] = "Modify multiple rows"
+        ledger.accounts.modify(accounts.loc[accounts.index[[1, -1]]])
+        assert_frame_equal(
+            ledger.accounts.list(), accounts,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete a single row
+        ledger.accounts.delete([{"account": accounts['account'].iloc[0]}])
+        accounts = accounts.drop([0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete multiple rows
+        ledger.accounts.delete(accounts.iloc[[1, -1]])
+        accounts = accounts.drop(accounts.index[[1, -1]]).reset_index(drop=True)
         assert_frame_equal(
             ledger.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -61,13 +73,7 @@ class BaseTestAccounts(BaseTest):
     def test_add_existing_account_raise_error(
         self, ledger, error_class=ValueError, error_message="already exist"
     ):
-        new_account = {
-            "account": 77777,
-            "currency": "CHF",
-            "description": "test account",
-            "tax_code": None,
-            "group": "/Assets",
-        }
+        new_account = {"account": 77777, "currency": "CHF", "description": "test account"}
         ledger.accounts.add([new_account])
         with pytest.raises(error_class, match=error_message):
             ledger.accounts.add([new_account])
@@ -77,11 +83,7 @@ class BaseTestAccounts(BaseTest):
     ):
         with pytest.raises(error_class, match=error_message):
             ledger.accounts.modify([{
-                "account": 77777,
-                "currency": "CHF",
-                "description": "test account",
-                "tax_code": None,
-                "group": "/Assets",
+                "account": 77777, "currency": "CHF", "description": "test account"
             }])
 
     def test_delete_account_allow_missing(
