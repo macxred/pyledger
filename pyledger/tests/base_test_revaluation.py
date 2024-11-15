@@ -18,8 +18,8 @@ class BaseTestRevaluations(BaseTest):
     def test_revaluations_accessor_mutators(self, ledger, ignore_row_order=False):
         ledger.restore(settings=self.SETTINGS, accounts=self.ACCOUNTS)
 
-        # Add revaluations
-        revaluations = self.REVALUATIONS.sample(frac=1).reset_index(drop=True)
+        # Add revaluations one by one
+        revaluations = self.REVALUATIONS.head(-3).sample(frac=1).reset_index(drop=True)
         for revaluation in revaluations.to_dict('records'):
             ledger.revaluations.add([revaluation])
         assert_frame_equal(
@@ -27,36 +27,57 @@ class BaseTestRevaluations(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify revaluations
-        rows = [0, 3, len(revaluations) - 1]
-        for i in rows:
-            revaluations.loc[i, "description"] = "New description"
-            ledger.revaluations.modify([revaluations.loc[i]])
-            assert_frame_equal(
-                ledger.revaluations.list(), revaluations,
-                check_like=True, ignore_row_order=ignore_row_order
-            )
+        # Add revaluations as a DataFrame with a multiple rows
+        tail_revaluations = self.REVALUATIONS.tail(3).sample(frac=1)
+        ledger.revaluations.add(tail_revaluations)
+        revaluations = pd.concat([revaluations, tail_revaluations], ignore_index=True)
+        assert_frame_equal(
+            ledger.revaluations.list(), revaluations,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
 
-        # Modify method receive only one needed field to modify
-        rows = [0, 3, len(revaluations) - 1]
-        for i in rows:
-            revaluations.loc[i, "debit"] = 1005
-            ledger.revaluations.modify({
-                "account": [revaluations.loc[i, "account"]],
-                "date": [revaluations.loc[i, "date"]],
-                "debit": [1005]
-            })
-            assert_frame_equal(
-                ledger.revaluations.list(), revaluations,
-                check_like=True, ignore_row_order=ignore_row_order
-            )
+        # Modify with only id columns and one column to update
+        revaluations.loc[0, "debit"] = 1005
+        ledger.revaluations.modify({
+            "account": [revaluations.loc[0, "account"]],
+            "date": [revaluations.loc[0, "date"]],
+            "debit": [1005]
+        })
+        assert_frame_equal(
+            ledger.revaluations.list(), revaluations,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
 
-        # Delete revaluations
+        # Modify with a DataFrame containing all columns from the schema
+        revaluations.loc[3, "description"] = "Modify with all columns test"
+        ledger.revaluations.modify([revaluations.loc[3]])
+        assert_frame_equal(
+            ledger.revaluations.list(), revaluations,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Modify with a multiple rows at the same time
+        revaluations.loc[revaluations.index[-2:], "description"] = "Modify multiple rows"
+        ledger.revaluations.modify(revaluations.loc[revaluations.index[-2:]])
+        assert_frame_equal(
+            ledger.revaluations.list(), revaluations,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete single row
         ledger.revaluations.delete([{
-            "account": revaluations['account'].iloc[rows[0]],
-            "date": revaluations['date'].iloc[rows[0]],
+            "account": revaluations['account'].iloc[0],
+            "date": revaluations['date'].iloc[0],
         }])
-        revaluations = revaluations.drop(rows[0]).reset_index(drop=True)
+        revaluations = revaluations.drop([0]).reset_index(drop=True)
+        assert_frame_equal(
+            ledger.revaluations.list(), revaluations,
+            check_like=True, ignore_row_order=ignore_row_order
+        )
+
+        # Delete multiple rows
+        ledger.revaluations.delete(revaluations.iloc[[1, -1]])
+        revaluations = revaluations.drop(revaluations.index[[1, -1]]).reset_index(drop=True)
         assert_frame_equal(
             ledger.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
