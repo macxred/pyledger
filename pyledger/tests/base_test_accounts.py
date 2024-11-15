@@ -82,20 +82,14 @@ class BaseTestAccounts(BaseTest):
         self, engine, error_class=ValueError, error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.accounts.modify([{
-                "account": 77777, "currency": "CHF", "description": "test account"
-            }])
+            engine.accounts.modify([{"account": 77777, "currency": "CHF", "description": "test"}])
 
     def test_delete_account_allow_missing(
         self, engine, error_class=ValueError, error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.accounts.delete([{
-                "account": 77777, "currency": "CHF", "description": "test account"
-            }], allow_missing=False)
-        engine.accounts.delete([{
-            "account": 77777, "currency": "CHF", "description": "test account"
-        }], allow_missing=True)
+            engine.accounts.delete([{"account": 77777}], allow_missing=False)
+        engine.accounts.delete([{"account": 77777}], allow_missing=True)
 
     def test_mirror_accounts(self, engine):
         engine.restore(settings=self.SETTINGS)

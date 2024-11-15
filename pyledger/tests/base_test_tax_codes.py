@@ -94,14 +94,8 @@ class BaseTestTaxCodes(BaseTest):
         self, engine, error_class=ValueError, error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.tax_codes.delete([{
-                "id": "TestCode", "description": "tax 20%",
-                "account": 9990, "rate": 0.02, "is_inclusive": True
-            }], allow_missing=False)
-        engine.tax_codes.delete([{
-            "id": "TestCode", "description": "tax 20%",
-            "account": 9990, "rate": 0.02, "is_inclusive": True
-        }], allow_missing=True)
+            engine.tax_codes.delete([{"id": "TestCode"}], allow_missing=False)
+        engine.tax_codes.delete([{"id": "TestCode"}], allow_missing=True)
 
     def test_mirror_tax_codes(self, engine):
         engine.restore(settings=self.SETTINGS)
