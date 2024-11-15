@@ -30,11 +30,11 @@ class BaseTestRevaluations(BaseTest):
 
         # Modify with only id columns and one column to update
         revaluations.loc[0, "debit"] = 1005
-        engine.revaluations.modify({
-            "account": [revaluations.loc[0, "account"]],
-            "date": [revaluations.loc[0, "date"]],
-            "debit": [1005]
-        })
+        engine.revaluations.modify([{
+            "account": revaluations.loc[0, "account"],
+            "date": revaluations.loc[0, "date"],
+            "debit": 1005
+        }])
         assert_frame_equal(
             engine.revaluations.list(), revaluations,
             check_like=True, ignore_row_order=ignore_row_order
