@@ -19,149 +19,85 @@ class BaseTestLedger(BaseTest):
         ledger.restore(accounts=self.ACCOUNTS, tax_codes=self.TAX_CODES)
         return ledger
 
-    @pytest.mark.parametrize("ledger_id", BaseTest.LEDGER_ENTRIES["id"].astype(str).unique())
-    def test_add_ledger_entry(self, ledger_engine, ledger_id):
-        target = self.LEDGER_ENTRIES.query("id == @ledger_id")
-        id = ledger_engine.ledger.add(target)["id"]
-        remote = ledger_engine.ledger.list()
-        created = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
+    def test_ledger_accessor_mutators(self, ledger, ignore_row_order=False):
+        # Add transactions one by one and multiple at once
+        expected = self.LEDGER_ENTRIES.copy()
+        for id in expected.head(-7)["id"].unique():
+            ledger.ledger.add(expected.query(f"id == '{id}'"))
+        ledger.ledger.add(self.LEDGER_ENTRIES.tail(7))
         assert_frame_equal(
-            created, expected, ignore_columns=["id"], ignore_row_order=True, check_exact=True
+            ledger.ledger.list(), expected,
+            ignore_columns=["id"], ignore_row_order=ignore_row_order
         )
 
-    def test_accessor_mutators_single_transaction(self, ledger_engine):
-        # Test adding a ledger entry
-        target = self.LEDGER_ENTRIES.query("id == '1'")
-        id = ledger_engine.ledger.add(target)["id"]
-        remote = ledger_engine.ledger.list()
-        created = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
+        # Modify one ledger entry
+        expected = ledger.ledger.list()
+        id = expected.iloc[0]["id"]
+        expected.loc[expected["id"] == id, "description"] = "Modify with all columns"
+        ledger.ledger.modify(expected.loc[expected["id"] == id])
         assert_frame_equal(
-            created, expected, ignore_row_order=True, ignore_columns=["id"]
+            ledger.ledger.list(), expected,
+            check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Test updating the ledger entry
-        initial_ledger = ledger_engine.ledger.list()
-        target = self.LEDGER_ENTRIES.query("id == '4'").copy()
-        target["id"] = id
-        ledger_engine.ledger.modify(target)
-        remote = ledger_engine.ledger.list()
-        updated = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert_frame_equal(updated, expected, ignore_row_order=True)
-
-        # Test replacing with a collective ledger entry
-        target = self.LEDGER_ENTRIES.query("id == '2'").copy()
-        target["id"] = id
-        ledger_engine.ledger.modify(target)
-        remote = ledger_engine.ledger.list()
-        updated = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
-            "The number of unique 'id' values should be the same."
+        # Modify with a multiple rows at the same time
+        ids = expected.tail(3)["id"].unique()
+        expected.loc[expected["id"].isin(ids), "description"] = "Modify multiple rows"
+        ledger.ledger.modify(expected.loc[expected["id"].isin(ids)])
+        assert_frame_equal(
+            ledger.ledger.list(), expected,
+            check_like=True, ignore_row_order=ignore_row_order
         )
-        assert_frame_equal(updated, expected, ignore_row_order=True)
 
-        # Test deleting the created ledger entry
-        ledger_engine.ledger.delete({"id": [id]})
-        remote = ledger_engine.ledger.list()
-        assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
-
-    def test_accessor_mutators_single_transaction_without_tax(self, ledger_engine):
-        # Test adding a ledger entry without tax code
-        target = self.LEDGER_ENTRIES.query("id == '4'").copy()
-        target["tax_code"] = None
-        id = ledger_engine.ledger.add(target)["id"]
-        remote = ledger_engine.ledger.list()
-        created = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert_frame_equal(created, expected, ignore_row_order=True, ignore_columns=["id"])
-
-        # Test updating the ledger entry
-        initial_ledger = ledger_engine.ledger.list()
-        target = self.LEDGER_ENTRIES.query("id == '1'").copy()
-        target["id"] = id
-        target["tax_code"] = None
-        ledger_engine.ledger.modify(target)
-        remote = ledger_engine.ledger.list()
-        updated = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
-            "The number of unique 'id' values should be the same."
+        # Modify single txn with a collective
+        current = ledger.ledger.list()
+        single_txn_id = current[~current["id"].duplicated(keep=False)].iloc[0]["id"]
+        to_update = self.LEDGER_ENTRIES.query("id == '1'").copy()
+        to_update.loc[:, "id"] = single_txn_id
+        single_txn_index = current[current["id"] == single_txn_id].index[0]
+        rows_before = current.loc[:single_txn_index - 1]
+        rows_after = current.loc[single_txn_index + 1:]
+        expected = pd.concat([rows_before, to_update, rows_after], ignore_index=True)
+        ledger.ledger.modify(to_update)
+        assert_frame_equal(
+            ledger.ledger.list(), expected,
+            check_like=True, ignore_row_order=ignore_row_order
         )
-        assert_frame_equal(updated, expected, ignore_row_order=True)
 
-        # Test deleting the updated ledger entry
-        ledger_engine.ledger.delete({"id": [id]})
-        remote = ledger_engine.ledger.list()
-        assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
-
-    def test_accessor_mutators_collective_transaction(self, ledger_engine):
-        # Test adding a collective ledger entry
-        target = self.LEDGER_ENTRIES.query("id == '2'")
-        id = ledger_engine.ledger.add(target)["id"]
-        remote = ledger_engine.ledger.list()
-        created = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert_frame_equal(created, expected, ignore_row_order=True, ignore_columns=["id"])
-
-        # Test updating the ledger entry
-        initial_ledger = ledger_engine.ledger.list()
-        target = self.LEDGER_ENTRIES.query("id == '3'").copy()
-        target["id"] = id
-        ledger_engine.ledger.modify(target)
-        remote = ledger_engine.ledger.list()
-        updated = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert_frame_equal(updated, expected, ignore_row_order=True)
-
-        # Test replacing with an individual ledger entry
-        target = self.LEDGER_ENTRIES.iloc[[0]].copy()
-        target["id"] = id
-        target["tax_code"] = None
-        ledger_engine.ledger.modify(target)
-        remote = ledger_engine.ledger.list()
-        updated = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
-            "The number of unique 'id' values should be the same."
+        # Modify collective txn with a single
+        current = ledger.ledger.list()
+        collective_txn_id = current[current["id"].duplicated(keep=False)].iloc[0]["id"]
+        collective_txn_indices = current[current["id"] == collective_txn_id].index
+        to_update = self.LEDGER_ENTRIES.query("id == '2'").copy()
+        to_update.loc[:, "id"] = collective_txn_id
+        rows_before = current.loc[:collective_txn_indices[0] - 1]
+        rows_after = current.loc[collective_txn_indices[-1] + 1:]
+        expected = pd.concat([rows_before, to_update, rows_after], ignore_index=True)
+        ledger.ledger.modify(to_update)
+        assert_frame_equal(
+            ledger.ledger.list(), expected,
+            check_like=True, ignore_row_order=ignore_row_order
         )
-        assert_frame_equal(updated, expected, ignore_row_order=True)
 
-        # Test deleting the updated ledger entry
-        ledger_engine.ledger.delete({"id": [id]})
-        remote = ledger_engine.ledger.list()
-        assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
-
-    def test_accessor_mutators_collective_transaction_without_tax(self, ledger_engine):
-        # Test adding a collective ledger entry without tax code
-        target = self.LEDGER_ENTRIES.query("id == '2'").copy()
-        target["tax_code"] = None
-        id = ledger_engine.ledger.add(target)["id"]
-        remote = ledger_engine.ledger.list()
-        created = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert_frame_equal(created, expected, ignore_row_order=True, ignore_columns=["id"])
-
-        # Test updating the ledger entry
-        initial_ledger = ledger_engine.ledger.list()
-        target = self.LEDGER_ENTRIES.query("id == '3'").copy()
-        target["id"] = id
-        target["tax_code"] = None
-        ledger_engine.ledger.modify(target)
-        remote = ledger_engine.ledger.list()
-        updated = remote.loc[remote["id"] == id]
-        expected = ledger_engine.ledger.standardize(target)
-        assert initial_ledger["id"].nunique() == remote["id"].nunique(), (
-            "The number of unique 'id' values should be the same."
+        # Delete single row
+        current = ledger.ledger.list()
+        id_to_drop = current.loc[0]["id"]
+        ledger.ledger.delete([{"id": id_to_drop}])
+        ledger_entries = current[~current["id"].isin([id_to_drop])].reset_index(drop=True)
+        assert_frame_equal(
+            ledger.ledger.list(), ledger_entries, ignore_columns=["id"],
+            check_like=True, ignore_row_order=ignore_row_order
         )
-        assert_frame_equal(updated, expected, ignore_row_order=True)
 
-        # Test deleting the updated ledger entry
-        ledger_engine.ledger.delete({"id": [id]})
-        remote = ledger_engine.ledger.list()
-        assert all(remote["id"] != id), f"Ledger entry {id} was not deleted"
+        # Delete multiple rows
+        current = ledger.ledger.list()
+        ids_to_drop = current["id"].iloc[[1, -1]]
+        ledger.ledger.delete(current.iloc[[1, -1]])
+        ledger_entries = current[~current["id"].isin(ids_to_drop)].reset_index(drop=True)
+        assert_frame_equal(
+            ledger.ledger.list(), ledger_entries, ignore_columns=["id"],
+            check_like=True, ignore_row_order=ignore_row_order
+        )
 
     def test_add_already_existed_raise_error(
         self, ledger_engine, error_class=ValueError, error_message="identifiers already exist."
