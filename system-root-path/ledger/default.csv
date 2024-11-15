@@ -1,9 +1,9 @@
       date, account, contra, currency,   amount, tax_code, description
 2023-01-01,    1000,   3000,      USD, 10000.00,         , Owner Investment
 2023-01-05,    1000,   5000,      USD, -5000.00,   IN_STD, Purchase of Equipment
-2023-01-10,    1000,   4000,      USD,  3600.00,  OUT_STD, Sale of Goods
+2023-01-10,    1000,   4000,      USD,  4000.00,  OUT_STD, Sale of Goods
 2023-01-15,    1000,   2000,      USD, -2000.00,         , Payment to Supplier
 2023-01-20,    1000,   6000,      USD,  -500.00,   IN_RED, Utilities Expense
-2023-01-25,    1000,   5000,      USD, -1000.00,   IN_STD, Purchase of Inventory
 2023-01-30,    1000,   4000,      USD,  2400.00,  OUT_STD, Sale of Goods
 2023-02-01,    1000,   7000,      USD,  -800.00,         , Rent Expense
+2023-01-18,    1000,   8000,      USD,   100.00,         , Interest Income
