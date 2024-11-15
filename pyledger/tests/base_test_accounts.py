@@ -111,7 +111,7 @@ class BaseTestAccounts(BaseTest):
             original_target, ledger.accounts.list(), ignore_row_order=True, check_like=True
         )
 
-        # Mirror with delete=False shouldn't change the data
+        # Mirror with delete=True should change the data
         ledger.accounts.mirror(target, delete=True)
         assert_frame_equal(target, ledger.accounts.list(), ignore_row_order=True, check_like=True)
 
