@@ -129,4 +129,4 @@ You can efficiently manage ledger entries by adding, modifying, and deleting ent
 
 These operations result in clean Git diffs, making it easier to track and review changes:
 
-![Git Diff Modify Example](/assets/text-ledger-readme-git-diff-example.png)
+<img src="/assets/text-ledger-readme-git-diff-example.png" width=75% height=75%>
