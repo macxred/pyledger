@@ -11,15 +11,19 @@ class BaseTestLedger(BaseTest):
 
     @abstractmethod
     @pytest.fixture
-    def pristine_engine(self):
+    def engine(self):
         pass
 
     @pytest.fixture()
-    def engine(self, pristine_engine):
-        pristine_engine.restore(accounts=self.ACCOUNTS, tax_codes=self.TAX_CODES)
-        return pristine_engine
+    def restored_engine(self, engine):
+        """Accounting engine populated with accounts and tax codes,
+        clear of any ledger entries."""
+        engine.restore(accounts=self.ACCOUNTS, tax_codes=self.TAX_CODES, ledger=[])
+        return engine
 
-    def test_ledger_accessor_mutators(self, engine, ignore_row_order=False):
+    def test_ledger_accessor_mutators(self, restored_engine, ignore_row_order=False):
+        engine = restored_engine
+
         # Add ledger entries one by one and with multiple rows
         expected = self.LEDGER_ENTRIES.copy()
         txn_ids = expected["id"].unique()
@@ -102,30 +106,34 @@ class BaseTestLedger(BaseTest):
         )
 
     def test_add_already_existed_raise_error(
-        self, engine, error_class=ValueError, error_message="identifiers already exist."
+        self, restored_engine, error_class=ValueError,
+        error_message="identifiers already exist."
     ):
         target = self.LEDGER_ENTRIES.query("id == '1'").copy()
-        engine.ledger.add(target)
+        restored_engine.ledger.add(target)
         with pytest.raises(error_class, match=error_message):
-            engine.ledger.add(target)
+            restored_engine.ledger.add(target)
 
     def test_modify_non_existed_raises_error(
-        self, engine, error_class=ValueError, error_message="not present in the data."
+        self, restored_engine, error_class=ValueError, error_message="not present in the data."
     ):
         target = self.LEDGER_ENTRIES.query("id == '1'").copy()
         target["id"] = 999999
         with pytest.raises(error_class, match=error_message):
-            engine.ledger.modify(target)
+            restored_engine.ledger.modify(target)
 
     def test_delete_entry_allow_missing(
-        self, engine, error_class=ValueError, error_message="Some ids are not present in the data."
+        self, restored_engine, error_class=ValueError,
+        error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.ledger.delete({"id": ["FAKE_ID"]}, allow_missing=False)
-        engine.ledger.delete({"id": ["FAKE_ID"]}, allow_missing=True)
+            restored_engine.ledger.delete({"id": ["FAKE_ID"]}, allow_missing=False)
+        restored_engine.ledger.delete({"id": ["FAKE_ID"]}, allow_missing=True)
 
-    def test_mirror_ledger(self, engine):
+    def test_mirror_ledger(self, restored_engine):
+        engine = restored_engine
         engine.accounts.mirror(self.ACCOUNTS, delete=False)
+
         # Mirror with one single and one collective transaction
         target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
         engine.ledger.mirror(target=target, delete=True)
