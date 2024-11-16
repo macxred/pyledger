@@ -15,16 +15,24 @@ class BaseTestAccounts(BaseTest):
     def engine(self):
         pass
 
-    def test_account_accessor_mutators(self, engine, ignore_row_order=False):
-        ACCOUNTS = self.ACCOUNTS.query("account not in [4000, 5000]")
+    @pytest.fixture()
+    def restored_engine(self, engine):
+        """Accounting engine populated with tax codes, accounts, and settings"""
         tax_accounts = self.ACCOUNTS.query("account in [4000, 5000]")
-        engine.restore(tax_codes=self.TAX_CODES, accounts=tax_accounts, settings=self.SETTINGS)
+        engine.restore(accounts=tax_accounts, tax_codes=self.TAX_CODES, settings=self.SETTINGS)
+        return engine
+
+    def test_account_accessor_mutators(self, restored_engine, ignore_row_order=False):
+        engine = restored_engine
+        remote = engine.accounts.list()
+        accounts = self.ACCOUNTS.sample(frac=1).reset_index(drop=True)
+        accounts = accounts[~accounts["account"].isin(remote["account"])]
 
         # Add accounts one by one and with multiple rows
-        for account in ACCOUNTS.head(-3).to_dict('records'):
+        for account in accounts.head(-3).to_dict('records'):
             engine.accounts.add([account])
-        engine.accounts.add(ACCOUNTS.tail(3))
-        accounts = pd.concat([tax_accounts, ACCOUNTS], ignore_index=True)
+        engine.accounts.add(accounts.tail(3))
+        accounts = pd.concat([remote, accounts], ignore_index=True)
         assert_frame_equal(
             engine.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -71,29 +79,36 @@ class BaseTestAccounts(BaseTest):
         )
 
     def test_add_existing_account_raise_error(
-        self, engine, error_class=ValueError, error_message="already exist"
+        self, restored_engine, error_class=ValueError, error_message="already exist"
     ):
         new_account = {"account": 77777, "currency": "CHF", "description": "test account"}
-        engine.accounts.add([new_account])
+        restored_engine.accounts.add([new_account])
         with pytest.raises(error_class, match=error_message):
-            engine.accounts.add([new_account])
+            restored_engine.accounts.add([new_account])
 
     def test_modify_nonexistent_account_raise_error(
-        self, engine, error_class=ValueError, error_message="elements in 'data' are not present"
+        self, restored_engine, error_class=ValueError,
+        error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.accounts.modify([{"account": 77777, "currency": "CHF", "description": "test"}])
+            restored_engine.accounts.modify([{
+                "account": 77777, "currency": "CHF", "description": "test"
+            }])
 
     def test_delete_account_allow_missing(
-        self, engine, error_class=ValueError, error_message="Some ids are not present in the data."
+        self, restored_engine, error_class=ValueError,
+        error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.accounts.delete([{"account": 77777}], allow_missing=False)
-        engine.accounts.delete([{"account": 77777}], allow_missing=True)
+            restored_engine.accounts.delete([{"account": 77777}], allow_missing=False)
+        restored_engine.accounts.delete([{"account": 77777}], allow_missing=True)
 
-    def test_mirror_accounts(self, engine):
+    def test_mirror_accounts(self, restored_engine):
+        engine = restored_engine
         engine.restore(settings=self.SETTINGS)
-        target = pd.concat([self.ACCOUNTS, engine.accounts.list()], ignore_index=True)
+        target = pd.concat(
+            [self.ACCOUNTS, engine.accounts.list()], ignore_index=True
+        ).drop_duplicates()
         original_target = target.copy()
         engine.accounts.mirror(target, delete=False)
         # Ensure the DataFrame passed as argument to mirror() remains unchanged.
@@ -117,14 +132,16 @@ class BaseTestAccounts(BaseTest):
         engine.accounts.mirror(target, delete=True)
         assert_frame_equal(target, engine.accounts.list(), ignore_row_order=True, check_like=True)
 
-    def test_mirror_empty_accounts(self, engine):
-        engine.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
-        assert not engine.accounts.list().empty, "Accounts were not populated"
-        engine.accounts.mirror(engine.accounts.standardize(None), delete=True)
-        assert engine.accounts.list().empty, "Mirroring empty df should erase all accounts"
+    def test_mirror_empty_accounts(self, restored_engine):
+        restored_engine.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
+        assert not restored_engine.accounts.list().empty, "Accounts were not populated"
+        restored_engine.accounts.mirror(restored_engine.accounts.standardize(None), delete=True)
+        assert restored_engine.accounts.list().empty, (
+            "Mirroring empty df should erase all accounts"
+        )
 
-    def test_account_balance(self, engine):
-        engine.restore(
+    def test_account_balance(self, restored_engine):
+        restored_engine.restore(
             accounts=self.ACCOUNTS, settings=self.SETTINGS, tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES, assets=self.ASSETS, price_history=self.PRICES,
             revaluations=self.REVALUATIONS
@@ -133,7 +150,7 @@ class BaseTestAccounts(BaseTest):
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
             account = row['account']
             expected = row['balance']
-            actual = engine.account_balance(date=date, account=row['account'])
+            actual = restored_engine.account_balance(date=date, account=row['account'])
             assert expected == actual, (
                 f"Account balance for {account} on {date} of {actual} differs from {expected}."
             )
