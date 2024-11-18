@@ -53,36 +53,32 @@ class TextLedger(StandaloneLedger):
     the reporting currency, are stored in YAML format.
     """
 
-    def __init__(
-        self,
-        root_path: Path = Path.cwd(),
-    ):
+    def __init__(self, root: Path = Path.cwd()):
         """Initializes the TextLedger with a root path for file storage.
         If no root path is provided, defaults to the current working directory.
         """
         super().__init__()
-        root_path = Path(root_path).expanduser()
-        self.root_path = root_path
+        self.root = Path(root).expanduser()
         self._assets = CSVDataFrameEntity(
-            schema=ASSETS_SCHEMA, path=root_path / "assets.csv"
+            schema=ASSETS_SCHEMA, path=self.root / "assets.csv"
         )
         self._accounts = CSVDataFrameEntity(
-            schema=ACCOUNT_SCHEMA, path=root_path / "accounts.csv",
+            schema=ACCOUNT_SCHEMA, path=self.root / "accounts.csv",
             column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS
         )
         self._tax_codes = CSVDataFrameEntity(
-            schema=TAX_CODE_SCHEMA, path=root_path / "tax_codes.csv",
+            schema=TAX_CODE_SCHEMA, path=self.root / "tax_codes.csv",
             column_shortcuts=TAX_CODE_COLUMN_SHORTCUTS
         )
         self._price_history = CSVDataFrameEntity(
-            schema=PRICE_SCHEMA, path=root_path / "price_history.csv"
+            schema=PRICE_SCHEMA, path=self.root / "price_history.csv"
         )
         self._revaluations = CSVDataFrameEntity(
-            schema=REVALUATION_SCHEMA, path=root_path / "revaluations.csv"
+            schema=REVALUATION_SCHEMA, path=self.root / "revaluations.csv"
         )
         self._ledger = LedgerCSVDataFrameEntity(
             schema=LEDGER_SCHEMA,
-            path=root_path / "ledger",
+            path=self.root / "ledger",
             write_file=self.write_ledger_file,
             column_shortcuts=LEDGER_COLUMN_SHORTCUTS,
             prepare_for_mirroring=self.sanitize_ledger
@@ -94,7 +90,7 @@ class TextLedger(StandaloneLedger):
     @property
     @timed_cache(15)
     def settings(self):
-        return self.read_settings_file(self.root_path / "settings.yml").copy()
+        return self.read_settings_file(self.root / "settings.yml").copy()
 
     @settings.setter
     def settings(self, settings: dict):
@@ -107,7 +103,7 @@ class TextLedger(StandaloneLedger):
         Args:
             settings (dict): A dictionary containing the system settings to be saved.
         """
-        with open(self.root_path / "settings.yml", "w") as f:
+        with open(self.root / "settings.yml", "w") as f:
             yaml.dump(self.standardize_settings(settings), f, default_flow_style=False)
         self.__class__.settings.fget.cache_clear()
 

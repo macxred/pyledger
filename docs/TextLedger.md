@@ -85,7 +85,7 @@ LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 SETTINGS = {"reporting_currency": "USD"}
 
 # Initialize TextLedger and populate with sample data
-engine = TextLedger(root_path="system-root-path")
+engine = TextLedger("demo-accounting-system")
 engine.restore(
     settings=SETTINGS,
     tax_codes=TAX_CODES,

@@ -36,7 +36,7 @@ class TestLedger(BaseTestLedger):
         engine.ledger.write_directory(file_1)
         expected = engine.ledger.standardize(file_1)
         assert_frame_equal(expected, engine.ledger.list())
-        ledger_root = engine.root_path / "ledger"
+        ledger_root = engine.root / "ledger"
         assert not (ledger_root / "file2.csv").exists(), "'file2.csv' was not deleted."
 
         # Clear ledger directory and ensure all ledger files are deleted
@@ -46,7 +46,7 @@ class TestLedger(BaseTestLedger):
 
     def test_write_empty_ledger_directory(self, engine):
         engine.ledger.write_directory(engine.ledger.standardize(None))
-        ledger_path = engine.root_path / "ledger"
+        ledger_path = engine.root / "ledger"
         assert not ledger_path.exists() or not any(ledger_path.iterdir()), (
             "The ledger directory should be empty or non-existent"
         )
