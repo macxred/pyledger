@@ -681,14 +681,14 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
             - Modifying only specific columns isn't supported. Collective transactions span
             multiple rows and it is impossible to identify which row to update.
         """
-        incoming = self.standardize(pd.DataFrame(data))
         current = self.list()
+        incoming = self.standardize(pd.DataFrame(data))
 
-        missing_ids = set(incoming["id"].unique()) - set(current["id"].unique())
-        if missing_ids:
-            raise ValueError(f"Ledger entries with ids '{missing_ids}' not present in the data.")
+        missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
+        if not missing[missing['_merge'] != 'both'].empty:
+            raise ValueError("Some ids are not present in the data.")
 
-        current = current[~current["id"].isin(incoming["id"])]
+        current = current.query("id not in @incoming['id']")
         updated = pd.concat([current, incoming], ignore_index=True)
         paths_to_update = self._csv_path(incoming["id"]).unique()
         for path in paths_to_update:
