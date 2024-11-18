@@ -469,7 +469,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
             data.rename(columns=self._column_shortcuts, inplace=True)
         else:
             data = None
-        return self.standardize(data)
+        return self.standardize(data, keep_extra_columns=True)
 
     def _write_file(self, df: pd.DataFrame, path: Path):
         """Save data to a fixed-width CSV file.
@@ -546,7 +546,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
                 df = pd.read_csv(file, skipinitialspace=True)
                 # TODO: Remove the following line once legacy systems are migrated.
                 df = df.rename(columns=self._column_shortcuts)
-                df = self.standardize(df)
+                df = self.standardize(df, keep_extra_columns=True)
                 if not df.empty:
                     df["id"] = relative_path + ":" + df["id"]
                 ledger.append(df)
@@ -555,11 +555,12 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
 
         if ledger:
             result = pd.concat(ledger, ignore_index=True)
-            result = enforce_schema(result, self._schema, sort_columns=True)
+            result = enforce_schema(result, self._schema, sort_columns=True,
+                                    keep_extra_columns=True)
         else:
             result = None
 
-        return self.standardize(result)
+        return self.standardize(result, keep_extra_columns=True)
 
     def write_directory(self, df: pd.DataFrame | None = None):
         """Save ledger entries to multiple CSV files in the ledger directory.
@@ -576,7 +577,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         if df is None:
             df = self.list()
 
-        df = self.standardize(df)
+        df = self.standardize(df, keep_extra_columns=True)
         df["__csv_path__"] = self._csv_path(df["id"])
         save_files(df, root=self._path, func=self._write_file)
         self.list.cache_clear()
@@ -594,7 +595,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         """
 
         current = self.list()
-        incoming = self.standardize(pd.DataFrame(data))
+        incoming = self.standardize(pd.DataFrame(data), keep_extra_columns=True)
         df_same_file = current[self._csv_path(current["id"]) == path]
 
         # Assign unique IDs incrementing from the max ID
@@ -628,7 +629,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
             multiple rows and it is impossible to identify which row to update.
         """
         current = self.list()
-        incoming = self.standardize(pd.DataFrame(data))
+        incoming = self.standardize(pd.DataFrame(data), keep_extra_columns=True)
 
         missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
         if not missing[missing['_merge'] != 'both'].empty:
