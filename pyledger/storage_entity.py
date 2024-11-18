@@ -664,6 +664,23 @@ class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
         return incoming[self._id_columns].iloc[0].to_dict()
 
     def modify(self, data: pd.DataFrame):
+        """
+        Modify existing ledger entries.
+
+        Overrides the base implementation because `LedgerDataFrameEntity.modify`
+        does not preserve the order of rows within the file.
+
+        Args:
+            data (pd.DataFrame): DataFrame containing ledger entries to modify. Must contain all
+                required columns as defined in the schema; other columns are optional.
+
+        Raises:
+            ValueError: If a combination of ID columns is not present in `data`.
+
+        Notes:
+            - Modifying only specific columns isn't supported. Collective transactions span
+            multiple rows and it is impossible to identify which row to update.
+        """
         incoming = self.standardize(pd.DataFrame(data))
         current = self.list()
 
