@@ -47,7 +47,7 @@ class BaseTestLedger(BaseTest):
         )
 
         # Modify with multiple rows
-        ids = expected.tail(3)["id"].unique()
+        ids = expected["id"].unique()[[0, -1, -4]]
         assert len(ids) > 1, "Expecting several ids, got a single one."
         expected.loc[expected["id"].isin(ids), "description"] = "Modify multiple rows"
         engine.ledger.modify(expected.loc[expected["id"].isin(ids)])
