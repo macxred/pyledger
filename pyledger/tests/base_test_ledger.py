@@ -50,7 +50,9 @@ class BaseTestLedger(BaseTest):
         ids = expected["id"].unique()[[0, -1, -4]]
         assert len(ids) > 1, "Expecting several ids, got a single one."
         expected.loc[expected["id"].isin(ids), "description"] = "Modify multiple rows"
-        engine.ledger.modify(expected.loc[expected["id"].isin(ids)])
+        to_modify = expected.loc[expected["id"].isin(ids)]
+        to_modify = pd.DataFrame({"id": ids}).merge(to_modify, on="id", how="left", validate="1:m")
+        engine.ledger.modify(to_modify)
         assert_frame_equal(
             engine.ledger.list(), expected,
             check_like=True, ignore_row_order=ignore_row_order
