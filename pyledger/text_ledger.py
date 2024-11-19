@@ -177,6 +177,7 @@ class TextLedger(StandaloneLedger):
 
         # Write a CSV with fixed-width in all columns but the last two in the schema
         n_fixed = LEDGER_SCHEMA["column"].head(-2).isin(df.columns).sum()
+        Path(file).expanduser().parent.mkdir(parents=True, exist_ok=True)
         write_fixed_width_csv(df, file=file, n=n_fixed)
 
         return df
