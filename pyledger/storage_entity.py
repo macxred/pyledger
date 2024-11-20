@@ -12,9 +12,9 @@ from .helpers import save_files, write_fixed_width_csv
 
 class AccountingEntity(ABC):
     """
-    Abstract base class representing accounting entities stored in tabular
-    form (e.g., general ledger, account chart, tax codes). Defines the standard
-    interface that all accounting entities must implement.
+    Abstract base class representing accounting entities stored in tabular form
+    (e.g., general ledger, accounts, tax codes). Defines the standard interface
+    that all accounting entities must implement.
     Accessors and mutators receive or return pandas DataFrames consistent with
     the entity's specific column schema.
     """
