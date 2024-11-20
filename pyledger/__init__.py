@@ -37,3 +37,4 @@ from .tests import (
     BaseTestPriceHistory,
     BaseTestRevaluations,
 )
+from .storage_entity import AccountingEntity
