@@ -497,7 +497,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         write_fixed_width_csv(df, file=path, n=n_fixed)
 
 
-class LedgerCSVAccountingEntity(LedgerEntity, CSVAccountingEntity):
+class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
     """
     Stores ledger entries in multiple CSV files, with files determined by the IDs of the entries.
     """

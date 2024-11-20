@@ -17,7 +17,7 @@ from .constants import (
 )
 from .helpers import write_fixed_width_csv
 from consistent_df import enforce_schema
-from .storage_entity import CSVAccountingEntity, LedgerCSVAccountingEntity
+from .storage_entity import CSVAccountingEntity, CSVLedgerEntity
 
 
 # TODO: remove once old systems are migrated
@@ -76,7 +76,7 @@ class TextLedger(StandaloneLedger):
         self._revaluations = CSVAccountingEntity(
             schema=REVALUATION_SCHEMA, path=self.root / "revaluations.csv"
         )
-        self._ledger = LedgerCSVAccountingEntity(
+        self._ledger = CSVLedgerEntity(
             schema=LEDGER_SCHEMA,
             path=self.root / "ledger",
             write_file=self.write_ledger_file,
