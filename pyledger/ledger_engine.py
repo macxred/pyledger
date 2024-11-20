@@ -155,9 +155,7 @@ class LedgerEngine(ABC):
             archive_path (str): The file path of the ZIP archive.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
-            settings = {}
-            settings["REPORTING_CURRENCY"] = self.reporting_currency
-            archive.writestr('settings.json', json.dumps(settings))
+            archive.writestr('settings.json', json.dumps(self.settings_list()))
             archive.writestr('ledger.csv', self.ledger.list().to_csv(index=False))
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
@@ -232,8 +230,8 @@ class LedgerEngine(ABC):
             revaluations (pd.DataFrame | None): Revaluations of the restored system.
                 If `None`, revaluations remains unchanged.
         """
-        if settings is not None and "REPORTING_CURRENCY" in settings:
-            self.reporting_currency = settings["REPORTING_CURRENCY"]
+        if settings is not None:
+            self.settings_modify(settings)
         if assets is not None:
             self.assets.mirror(assets, delete=True)
         if price_history is not None:
@@ -259,6 +257,18 @@ class LedgerEngine(ABC):
         self.assets.mirror(None, delete=True)
         self.price_history.mirror(None, delete=True)
         self.revaluations.mirror(None, delete=True)
+
+    # ----------------------------------------------------------------------
+    # Settings
+
+    def settings_list(self) -> dict:
+        """Return a dict with all settings."""
+        return {"REPORTING_CURRENCY": self.reporting_currency}
+
+    def settings_modify(self, settings: dict = {}):
+        """Modify provided settings."""
+        if "REPORTING_CURRENCY" in settings:
+            self.reporting_currency = settings["REPORTING_CURRENCY"]
 
     # ----------------------------------------------------------------------
     # Tax rates
