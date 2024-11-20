@@ -17,7 +17,7 @@ from .constants import (
     LEDGER_SCHEMA,
     TAX_CODE_SCHEMA,
 )
-from .storage_entity import TabularEntity
+from .storage_entity import AccountingEntity
 from . import excel
 from .helpers import represents_integer
 from .time import parse_date_span
@@ -42,27 +42,27 @@ class LedgerEngine(ABC):
     # Storage entities
 
     @property
-    def accounts(self) -> TabularEntity:
+    def accounts(self) -> AccountingEntity:
         return self._accounts
 
     @property
-    def assets(self) -> TabularEntity:
+    def assets(self) -> AccountingEntity:
         return self._assets
 
     @property
-    def ledger(self) -> TabularEntity:
+    def ledger(self) -> AccountingEntity:
         return self._ledger
 
     @property
-    def revaluations(self) -> TabularEntity:
+    def revaluations(self) -> AccountingEntity:
         return self._revaluations
 
     @property
-    def tax_codes(self) -> TabularEntity:
+    def tax_codes(self) -> AccountingEntity:
         return self._tax_codes
 
     @property
-    def price_history(self) -> TabularEntity:
+    def price_history(self) -> AccountingEntity:
         return self._price_history
 
     # ----------------------------------------------------------------------
