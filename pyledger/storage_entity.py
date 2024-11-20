@@ -429,13 +429,13 @@ class LedgerDataFrameEntity(LedgerEntity, DataFrameEntity):
         self.add(data)
 
 
-class CSVDataFrameEntity(StandaloneAccountingEntity):
+class CSVAccountingEntity(StandaloneAccountingEntity):
     """Stores tabular accounting data in a fixed-width CSV file."""
 
     def __init__(
         self, path: Path, column_shortcuts: dict = {}, *args, **kwargs
     ):
-        """Initialize the CSVDataFrameEntity.
+        """Initialize the CSVAccountingEntity.
 
         Args:
             file_path (Path): Path to the CSV file.
@@ -497,7 +497,7 @@ class CSVDataFrameEntity(StandaloneAccountingEntity):
         write_fixed_width_csv(df, file=path, n=n_fixed)
 
 
-class LedgerCSVDataFrameEntity(LedgerEntity, CSVDataFrameEntity):
+class LedgerCSVAccountingEntity(LedgerEntity, CSVAccountingEntity):
     """
     Stores ledger entries in multiple CSV files, with files determined by the IDs of the entries.
     """

@@ -17,7 +17,7 @@ from .constants import (
 )
 from .helpers import write_fixed_width_csv
 from consistent_df import enforce_schema
-from .storage_entity import CSVDataFrameEntity, LedgerCSVDataFrameEntity
+from .storage_entity import CSVAccountingEntity, LedgerCSVAccountingEntity
 
 
 # TODO: remove once old systems are migrated
@@ -59,24 +59,24 @@ class TextLedger(StandaloneLedger):
         """
         super().__init__()
         self.root = Path(root).expanduser()
-        self._assets = CSVDataFrameEntity(
+        self._assets = CSVAccountingEntity(
             schema=ASSETS_SCHEMA, path=self.root / "assets.csv"
         )
-        self._accounts = CSVDataFrameEntity(
+        self._accounts = CSVAccountingEntity(
             schema=ACCOUNT_SCHEMA, path=self.root / "accounts.csv",
             column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS
         )
-        self._tax_codes = CSVDataFrameEntity(
+        self._tax_codes = CSVAccountingEntity(
             schema=TAX_CODE_SCHEMA, path=self.root / "tax_codes.csv",
             column_shortcuts=TAX_CODE_COLUMN_SHORTCUTS
         )
-        self._price_history = CSVDataFrameEntity(
+        self._price_history = CSVAccountingEntity(
             schema=PRICE_SCHEMA, path=self.root / "price_history.csv"
         )
-        self._revaluations = CSVDataFrameEntity(
+        self._revaluations = CSVAccountingEntity(
             schema=REVALUATION_SCHEMA, path=self.root / "revaluations.csv"
         )
-        self._ledger = LedgerCSVDataFrameEntity(
+        self._ledger = LedgerCSVAccountingEntity(
             schema=LEDGER_SCHEMA,
             path=self.root / "ledger",
             write_file=self.write_ledger_file,
