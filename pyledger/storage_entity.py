@@ -12,60 +12,11 @@ from .helpers import save_files, write_fixed_width_csv
 
 class AccountingEntity(ABC):
     """
-    Abstract base class representing an accounting entity (e.g., general ledger,
-    account chart, tax codes, or configuration settings). Defines the standard
-    interface that all accounting entities must implement.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._logger = logging.getLogger("ledger")
-
-    @abstractmethod
-    def standardize(self, data):
-        """Convert data to a consistent representation."""
-
-    @abstractmethod
-    def list(self):
-        """Retrieve all entries."""
-
-    @abstractmethod
-    def add(self, data):
-        """Add new entries."""
-
-    @abstractmethod
-    def modify(self, data):
-        """Modify existing entries."""
-
-    @abstractmethod
-    def delete(self, id, allow_missing: bool = False):
-        """
-        Delete entries.
-
-        Args:
-            id (pd.DataFrame): Identifiers of entries to delete.
-            allow_missing (bool, optional): If True, don't raise an error if an ID is not present.
-        """
-
-    @abstractmethod
-    def mirror(self, target, delete: bool = False) -> Dict[str, int]:
-        """
-        Synchronize the current data with the incoming target data.
-
-        Args:
-            target (pd.DataFrame): The desired target state.
-            delete (bool, optional): If True, deletes current entries not present in `target`.
-
-        Returns:
-            Dict[str, int]: Summary statistics of the mirroring process.
-        """
-
-
-class TabularEntity(AccountingEntity):
-    """
-    Abstract base class for accounting entities stored in tabular form (e.g.,
-    general ledger, account chart, tax codes). Accessors return pandas DataFrames
-    consistent with the entity's specific column schema.
+    Abstract base class representing accounting entities stored in tabular form
+    (e.g., general ledger, accounts, tax codes). Defines the standard interface
+    that all accounting entities must implement.
+    Accessors and mutators receive or return pandas DataFrames consistent with
+    the entity's specific column schema.
     """
 
     def __init__(
@@ -76,7 +27,7 @@ class TabularEntity(AccountingEntity):
         **kwargs: Any
     ) -> None:
         """
-        Initialize the TabularEntity.
+        Initialize the AccountingEntity.
 
         Args:
             schema (pd.DataFrame): DataFrame with columns 'column', 'dtype', 'id' (boolean)
@@ -86,6 +37,7 @@ class TabularEntity(AccountingEntity):
             *args, **kwargs: Additional arguments passed to the superclass.
         """
         super().__init__(*args, **kwargs)
+        self._logger = logging.getLogger("ledger")
         self._schema = schema
         self._id_columns = schema.query("id == True")["column"].to_list()
         self._prepare_for_mirroring = prepare_for_mirroring
@@ -233,14 +185,10 @@ class TabularEntity(AccountingEntity):
         }
 
 
-class TabularLedgerEntity(TabularEntity):
+class LedgerEntity(AccountingEntity):
     """
-    Specialized TabularEntity for general ledger entries, with custom
+    Specialized AccountingEntity for general ledger entries, with custom
     `standardize` and `mirror` methods tailored to ledger-specific needs.
-
-    Notes:
-        - IDs are not preserved during operations.
-        - Deletion may alter existing IDs.
     """
 
     def __init__(self, *args, **kwargs):
@@ -366,7 +314,7 @@ class TabularLedgerEntity(TabularEntity):
         }
 
 
-class StandaloneTabularEntity(TabularEntity):
+class StandaloneAccountingEntity(AccountingEntity):
     """
     Abstract base class for local storage of tabular accounting data,
     without relying on an external system.
@@ -431,7 +379,7 @@ class StandaloneTabularEntity(TabularEntity):
         self._store(new)
 
 
-class DataFrameEntity(StandaloneTabularEntity):
+class DataFrameEntity(StandaloneAccountingEntity):
     """
     Stores tabular accounting data as a DataFrame in memory.
     """
@@ -447,13 +395,9 @@ class DataFrameEntity(StandaloneTabularEntity):
         self._df = data.reset_index(drop=True)
 
 
-class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
+class LedgerDataFrameEntity(LedgerEntity, DataFrameEntity):
     """
     Ledger entity that stores ledger entries as a DataFrame in memory.
-
-    Notes:
-        - IDs are not preserved during modification.
-        - Deleting entries may alter existing IDs.
     """
 
     def modify(self, data: pd.DataFrame) -> None:
@@ -469,21 +413,18 @@ class LedgerDataFrameEntity(TabularLedgerEntity, DataFrameEntity):
 
         Raises:
             ValueError: If a combination of ID columns is not present in `data`.
-
-        Notes:
-            - IDs are not preserved during modification.
         """
         self.delete(data, allow_missing=False)
         self.add(data)
 
 
-class CSVDataFrameEntity(StandaloneTabularEntity):
+class CSVAccountingEntity(StandaloneAccountingEntity):
     """Stores tabular accounting data in a fixed-width CSV file."""
 
     def __init__(
         self, path: Path, column_shortcuts: dict = {}, *args, **kwargs
     ):
-        """Initialize the CSVDataFrameEntity.
+        """Initialize the CSVAccountingEntity.
 
         Args:
             file_path (Path): Path to the CSV file.
@@ -545,9 +486,14 @@ class CSVDataFrameEntity(StandaloneTabularEntity):
         write_fixed_width_csv(df, file=path, n=n_fixed)
 
 
-class LedgerCSVDataFrameEntity(TabularLedgerEntity, CSVDataFrameEntity):
+class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
     """
-    Stores ledger entries in multiple CSV files, with files determined by the IDs of the entries.
+    Stores ledger entries in multiple CSV files, with files determined by the
+    ID portion of the entries up to the first colon ':'.
+
+    IDs are not stored in ledger files but are dynamically generated when
+    reading each file. These IDs are non-persistent and may change if a file's
+    entries are modified. See `_read_data` for details.
     """
 
     def __init__(
