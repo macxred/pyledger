@@ -231,7 +231,7 @@ class LedgerEngine(ABC):
                 If `None`, revaluations remains unchanged.
         """
         if settings is not None:
-            self.settings_restore(settings)
+            self.settings_modify(settings)
         if assets is not None:
             self.assets.mirror(assets, delete=True)
         if price_history is not None:
@@ -262,20 +262,13 @@ class LedgerEngine(ABC):
     # Settings
 
     def settings_list(self) -> dict:
-        """Return a dict with all settings.
-
-        May be accessed as `settings.list()` in a future version.
-        """
+        """Return a dict with all settings."""
         return {"REPORTING_CURRENCY": self.reporting_currency}
 
-    def settings_restore(self, settings: dict = {}):
-        """Set provided settings (where present)
-
-        May be renamed to `settings.mirror()` in a future version.
-        """
+    def settings_modify(self, settings: dict = {}):
+        """Modify provided settings."""
         if "REPORTING_CURRENCY" in settings:
             self.reporting_currency = settings["REPORTING_CURRENCY"]
-
 
     # ----------------------------------------------------------------------
     # Tax rates
