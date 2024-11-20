@@ -189,10 +189,6 @@ class LedgerEntity(AccountingEntity):
     """
     Specialized AccountingEntity for general ledger entries, with custom
     `standardize` and `mirror` methods tailored to ledger-specific needs.
-
-    Notes:
-        - IDs are not preserved during operations.
-        - Deletion may alter existing IDs.
     """
 
     def __init__(self, *args, **kwargs):
@@ -402,10 +398,6 @@ class DataFrameEntity(StandaloneAccountingEntity):
 class LedgerDataFrameEntity(LedgerEntity, DataFrameEntity):
     """
     Ledger entity that stores ledger entries as a DataFrame in memory.
-
-    Notes:
-        - IDs are not preserved during modification.
-        - Deleting entries may alter existing IDs.
     """
 
     def modify(self, data: pd.DataFrame) -> None:
@@ -421,9 +413,6 @@ class LedgerDataFrameEntity(LedgerEntity, DataFrameEntity):
 
         Raises:
             ValueError: If a combination of ID columns is not present in `data`.
-
-        Notes:
-            - IDs are not preserved during modification.
         """
         self.delete(data, allow_missing=False)
         self.add(data)
@@ -499,7 +488,12 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
 
 class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
     """
-    Stores ledger entries in multiple CSV files, with files determined by the IDs of the entries.
+    Stores ledger entries in multiple CSV files, with files determined by the
+    ID portion of the entries up to the first colon ':'.
+
+    IDs are not stored in ledger files but are dynamically generated when
+    reading each file. These IDs are non-persistent and may change if a file's
+    entries are modified. See `_read_data` for details.
     """
 
     def __init__(
