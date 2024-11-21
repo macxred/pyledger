@@ -24,15 +24,15 @@ class BaseTestAccounts(BaseTest):
 
     def test_account_accessor_mutators(self, restored_engine, ignore_row_order=False):
         engine = restored_engine
-        remote = engine.accounts.list()
-        accounts = self.ACCOUNTS.sample(frac=1).reset_index(drop=True)
-        accounts = accounts[~accounts["account"].isin(remote["account"])]
+        existing = engine.accounts.list()
+        accounts = self.ACCOUNTS.query("`account` not in @existing['account']")
+        accounts = accounts.sample(frac=1).reset_index(drop=True)
 
         # Add accounts one by one and with multiple rows
         for account in accounts.head(-3).to_dict('records'):
             engine.accounts.add([account])
         engine.accounts.add(accounts.tail(3))
-        accounts = pd.concat([remote, accounts], ignore_index=True)
+        accounts = pd.concat([existing, accounts], ignore_index=True)
         assert_frame_equal(
             engine.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -108,7 +108,7 @@ class BaseTestAccounts(BaseTest):
         engine.restore(settings=self.SETTINGS)
         target = pd.concat(
             [self.ACCOUNTS, engine.accounts.list()], ignore_index=True
-        ).drop_duplicates()
+        ).drop_duplicates(["account"])
         original_target = target.copy()
         engine.accounts.mirror(target, delete=False)
         # Ensure the DataFrame passed as argument to mirror() remains unchanged.
