@@ -87,9 +87,6 @@ class BaseTestAccounts(BaseTest):
         to_delete = non_tax_accounts.iloc[[1, -1]]['account']
         engine.accounts.delete(to_delete)
         accounts = accounts.query("`account` not in @to_delete").reset_index(drop=True)
-        non_tax_accounts = non_tax_accounts.query(
-            "`account` not in @to_delete"
-        ).reset_index(drop=True)
         assert_frame_equal(
             engine.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -121,7 +118,6 @@ class BaseTestAccounts(BaseTest):
 
     def test_mirror_accounts(self, restored_engine):
         engine = restored_engine
-        engine.restore(settings=self.SETTINGS)
         target = pd.concat(
             [self.ACCOUNTS, engine.accounts.list()], ignore_index=True
         ).drop_duplicates(["account"])
