@@ -18,21 +18,24 @@ class BaseTestAccounts(BaseTest):
     @pytest.fixture()
     def restored_engine(self, engine):
         """Accounting engine populated with tax codes, accounts, and settings"""
-        tax_accounts = self.ACCOUNTS.query("account in [4000, 5000]")
+        tax_accounts = pd.concat([
+            self.TAX_CODES["account"], self.TAX_CODES["contra"]
+        ]).dropna().unique()
+        tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
         engine.restore(accounts=tax_accounts, tax_codes=self.TAX_CODES, settings=self.SETTINGS)
         return engine
 
     def test_account_accessor_mutators(self, restored_engine, ignore_row_order=False):
         engine = restored_engine
         existing = engine.accounts.list()
-        accounts = self.ACCOUNTS.query("`account` not in @existing['account']")
-        accounts = accounts.sample(frac=1).reset_index(drop=True)
+        new_accounts = self.ACCOUNTS.query("`account` not in @existing['account']")
+        new_accounts = new_accounts.sample(frac=1).reset_index(drop=True)
 
         # Add accounts one by one and with multiple rows
-        for account in accounts.head(-3).to_dict('records'):
+        for account in new_accounts.head(-3).to_dict('records'):
             engine.accounts.add([account])
-        engine.accounts.add(accounts.tail(3))
-        accounts = pd.concat([existing, accounts], ignore_index=True)
+        engine.accounts.add(new_accounts.tail(3))
+        accounts = pd.concat([existing, new_accounts], ignore_index=True)
         assert_frame_equal(
             engine.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -64,16 +67,29 @@ class BaseTestAccounts(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
+        # Get list of accounts that are assigned to a Tax Code
+        tax_accounts = pd.concat([  # noqa: F841
+            self.TAX_CODES["account"], self.TAX_CODES["contra"]
+        ]).dropna().unique()
+        # Filter ACCOUNTS to get that are not assigned to any Tax Code
+        non_tax_accounts = self.ACCOUNTS.query("`account` not in @tax_accounts")
+
         # Delete a single row
-        engine.accounts.delete([{"account": accounts['account'].iloc[0]}])
-        accounts = accounts.drop([0]).reset_index(drop=True)
+        to_delete = non_tax_accounts['account'].iloc[0]
+        engine.accounts.delete([{"account": to_delete}])
+        accounts = accounts.query("`account` != @to_delete").reset_index(drop=True)
+        non_tax_accounts = non_tax_accounts.query("`account` != @to_delete").reset_index(drop=True)
         assert_frame_equal(
             engine.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Delete multiple rows
-        engine.accounts.delete(accounts.iloc[[1, -1]])
-        accounts = accounts.drop(accounts.index[[1, -1]]).reset_index(drop=True)
+        to_delete = non_tax_accounts.iloc[[1, -1]]['account']
+        engine.accounts.delete(to_delete)
+        accounts = accounts.query("`account` not in @to_delete").reset_index(drop=True)
+        non_tax_accounts = non_tax_accounts.query(
+            "`account` not in @to_delete"
+        ).reset_index(drop=True)
         assert_frame_equal(
             engine.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
