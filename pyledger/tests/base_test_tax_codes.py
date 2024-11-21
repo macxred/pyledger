@@ -14,14 +14,23 @@ class BaseTestTaxCodes(BaseTest):
     def engine(self):
         pass
 
-    def test_tax_codes_accessor_mutators(self, engine, ignore_row_order=False):
-        engine.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
+    @pytest.fixture()
+    def restored_engine(self, engine):
+        """Accounting engine populated with accounts, tax codes, and settings"""
+        tax_accounts = pd.concat([
+            self.TAX_CODES["account"], self.TAX_CODES["contra"]
+        ]).dropna().unique()
+        tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
+        engine.restore(accounts=tax_accounts, tax_codes=[], settings=self.SETTINGS)
+        return engine
+
+    def test_tax_codes_accessor_mutators(self, restored_engine, ignore_row_order=False):
+        engine = restored_engine
+        tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
 
         # Add tax codes one by one and with multiple rows
-        tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
-        for tax_code in tax_codes.head(-3).to_dict('records'):
-            engine.tax_codes.add([tax_code])
-        engine.tax_codes.add(tax_codes.tail(3))
+        engine.tax_codes.add(tax_codes.head(1))
+        engine.tax_codes.add(tax_codes.tail(len(tax_codes) - 1))
         assert_frame_equal(
             engine.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -68,7 +77,8 @@ class BaseTestTaxCodes(BaseTest):
         )
 
     def test_create_existing__tax_code_raise_error(
-        self, engine, error_class=ValueError, error_message="Unique identifiers already exist."
+        self, restored_engine, error_class=ValueError,
+        error_message="Unique identifiers already exist."
     ):
         new_tax_code = {
             "id": "TestCode",
@@ -77,29 +87,31 @@ class BaseTestTaxCodes(BaseTest):
             "rate": 0.02,
             "is_inclusive": True,
         }
-        engine.tax_codes.add([new_tax_code])
+        restored_engine.tax_codes.add([new_tax_code])
         with pytest.raises(error_class, match=error_message):
-            engine.tax_codes.add([new_tax_code])
+            restored_engine.tax_codes.add([new_tax_code])
 
     def test_update_nonexistent_tax_code_raise_error(
-        self, engine, error_class=ValueError, error_message="elements in 'data' are not present"
+        self, restored_engine, error_class=ValueError,
+        error_message="elements in 'data' are not present"
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.tax_codes.modify([{
+            restored_engine.tax_codes.modify([{
                 "id": "TestCode", "description": "tax 20%",
                 "account": 9990, "rate": 0.02, "is_inclusive": True
             }])
 
     def test_delete_tax_code_allow_missing(
-        self, engine, error_class=ValueError, error_message="Some ids are not present in the data."
+        self, restored_engine, error_class=ValueError,
+        error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.tax_codes.delete([{"id": "TestCode"}], allow_missing=False)
-        engine.tax_codes.delete([{"id": "TestCode"}], allow_missing=True)
+            restored_engine.tax_codes.delete([{"id": "TestCode"}], allow_missing=False)
+        restored_engine.tax_codes.delete([{"id": "TestCode"}], allow_missing=True)
 
-    def test_mirror_tax_codes(self, engine):
-        engine.restore(settings=self.SETTINGS)
-        target = pd.concat([self.TAX_CODES, engine.tax_codes.list()], ignore_index=True)
+    def test_mirror_tax_codes(self, restored_engine):
+        engine = restored_engine
+        target = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
         original_target = target.copy()
         engine.tax_codes.mirror(target, delete=False)
         # Ensure the DataFrame passed as argument to mirror() remains unchanged.
@@ -123,7 +135,8 @@ class BaseTestTaxCodes(BaseTest):
         engine.tax_codes.mirror(target, delete=True)
         assert_frame_equal(target, engine.tax_codes.list(), ignore_row_order=True, check_like=True)
 
-    def test_mirror_empty_tax_codes(self, engine):
+    def test_mirror_empty_tax_codes(self, restored_engine):
+        engine = restored_engine
         engine.restore(tax_codes=self.TAX_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS)
         assert not engine.tax_codes.list().empty, "Tax codes were not populated"
         engine.tax_codes.mirror(engine.tax_codes.standardize(None), delete=True)
