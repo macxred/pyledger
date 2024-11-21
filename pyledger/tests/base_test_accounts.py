@@ -149,7 +149,9 @@ class BaseTestAccounts(BaseTest):
         assert_frame_equal(target, engine.accounts.list(), ignore_row_order=True, check_like=True)
 
     def test_mirror_empty_accounts(self, restored_engine):
-        restored_engine.restore(accounts=self.ACCOUNTS, settings=self.SETTINGS)
+        restored_engine.restore(
+            accounts=self.ACCOUNTS.assign(tax_code=pd.NA), settings=self.SETTINGS, tax_codes=[]
+        )
         assert not restored_engine.accounts.list().empty, "Accounts were not populated"
         restored_engine.accounts.mirror(restored_engine.accounts.standardize(None), delete=True)
         assert restored_engine.accounts.list().empty, (
