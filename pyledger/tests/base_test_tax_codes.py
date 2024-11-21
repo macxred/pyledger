@@ -17,20 +17,20 @@ class BaseTestTaxCodes(BaseTest):
     @pytest.fixture()
     def restored_engine(self, engine):
         """Accounting engine populated with accounts, tax codes, and settings"""
-        tax_codes = self.TAX_CODES.query("id in ['OUT_STD', 'IN_STD']")
-        engine.restore(accounts=self.ACCOUNTS, tax_codes=tax_codes, settings=self.SETTINGS)
+        tax_accounts = pd.concat([
+            self.TAX_CODES["account"], self.TAX_CODES["contra"]
+        ]).dropna().unique()
+        tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
+        engine.restore(accounts=tax_accounts, tax_codes=[], settings=self.SETTINGS)
         return engine
 
     def test_tax_codes_accessor_mutators(self, restored_engine, ignore_row_order=False):
         engine = restored_engine
-        remote = engine.tax_codes.list()
         tax_codes = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
-        tax_codes = tax_codes[~tax_codes["id"].isin(remote["id"])]
 
         # Add tax codes one by one and with multiple rows
         engine.tax_codes.add(tax_codes.head(1))
         engine.tax_codes.add(tax_codes.tail(len(tax_codes) - 1))
-        tax_codes = pd.concat([remote, tax_codes], ignore_index=True)
         assert_frame_equal(
             engine.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
         )
@@ -111,10 +111,7 @@ class BaseTestTaxCodes(BaseTest):
 
     def test_mirror_tax_codes(self, restored_engine):
         engine = restored_engine
-        engine.restore(settings=self.SETTINGS)
-        target = pd.concat(
-            [self.TAX_CODES, engine.tax_codes.list()], ignore_index=True
-        ).drop_duplicates()
+        target = self.TAX_CODES.sample(frac=1).reset_index(drop=True)
         original_target = target.copy()
         engine.tax_codes.mirror(target, delete=False)
         # Ensure the DataFrame passed as argument to mirror() remains unchanged.
