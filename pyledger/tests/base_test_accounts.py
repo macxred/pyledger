@@ -71,20 +71,17 @@ class BaseTestAccounts(BaseTest):
         tax_accounts = pd.concat([  # noqa: F841
             self.TAX_CODES["account"], self.TAX_CODES["contra"]
         ]).dropna().unique()
-        # Filter ACCOUNTS to get that are not assigned to any Tax Code
-        non_tax_accounts = self.ACCOUNTS.query("`account` not in @tax_accounts")
 
         # Delete a single row
-        to_delete = non_tax_accounts['account'].iloc[0]
+        to_delete = accounts.query("`account` not in @tax_accounts")['account'].iloc[0]
         engine.accounts.delete([{"account": to_delete}])
         accounts = accounts.query("`account` != @to_delete").reset_index(drop=True)
-        non_tax_accounts = non_tax_accounts.query("`account` != @to_delete").reset_index(drop=True)
         assert_frame_equal(
             engine.accounts.list(), accounts, check_like=True, ignore_row_order=ignore_row_order
         )
 
         # Delete multiple rows
-        to_delete = non_tax_accounts.iloc[[1, -1]]['account']
+        to_delete = accounts.query("`account` not in @tax_accounts")['account'].iloc[[1, -1]]
         engine.accounts.delete(to_delete)
         accounts = accounts.query("`account` not in @to_delete").reset_index(drop=True)
         assert_frame_equal(
