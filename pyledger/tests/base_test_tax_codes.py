@@ -76,7 +76,7 @@ class BaseTestTaxCodes(BaseTest):
             engine.tax_codes.list(), tax_codes, check_like=True, ignore_row_order=ignore_row_order
         )
 
-    def test_create_existing__tax_code_raise_error(
+    def test_create_existing_tax_code_raise_error(
         self, restored_engine, error_class=ValueError,
         error_message="Unique identifiers already exist."
     ):
