@@ -137,7 +137,11 @@ class BaseTestTaxCodes(BaseTest):
 
     def test_mirror_empty_tax_codes(self, restored_engine):
         engine = restored_engine
-        engine.restore(tax_codes=self.TAX_CODES, accounts=self.ACCOUNTS, settings=self.SETTINGS)
+        tax_accounts = pd.concat([
+            self.TAX_CODES["account"], self.TAX_CODES["contra"]
+        ]).dropna().unique()
+        tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
+        engine.restore(tax_codes=self.TAX_CODES, accounts=tax_accounts, settings=self.SETTINGS)
         assert not engine.tax_codes.list().empty, "Tax codes were not populated"
         engine.tax_codes.mirror(engine.tax_codes.standardize(None), delete=True)
         assert engine.tax_codes.list().empty, "Mirroring empty df should erase all tax codes"
