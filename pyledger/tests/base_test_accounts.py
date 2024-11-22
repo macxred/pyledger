@@ -137,7 +137,8 @@ class BaseTestAccounts(BaseTest):
 
         # Reshuffle target data randomly and modify one of the rows
         target = target.sample(frac=1).reset_index(drop=True)
-        target.loc[target["account"] == "2000", "description"] = "Test mirror description"
+        target.loc[target["account"] == 2000, "description"] = "Test mirror description"
+        target.loc[target["account"] == 5000, "description"] = pd.NA
         engine.accounts.mirror(target, delete=True)
         assert_frame_equal(target, engine.accounts.list(), ignore_row_order=True, check_like=True)
 

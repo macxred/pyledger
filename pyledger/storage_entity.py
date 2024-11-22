@@ -171,7 +171,10 @@ class AccountingEntity(ABC):
         incoming_cols = current_cols.str.replace("_current$", "", regex=True)
         both_rows = merged[merged['_merge'] == 'both']
         current_rows = both_rows[current_cols].rename(columns=lambda x: x.replace("_current", ""))
-        diff = current_rows.ne(both_rows[incoming_cols]).any(axis=1)
+        diff_values = current_rows.ne(both_rows[incoming_cols])
+        # Comparing of NA values isn't possible using .ne(), need to compare NA values separately.
+        diff_nans = current_rows.isna() != both_rows[incoming_cols].isna()
+        diff = (diff_values | diff_nans).any(axis=1)
         to_update = both_rows.loc[diff, incoming.columns]
         if len(to_update):
             self.modify(to_update)
