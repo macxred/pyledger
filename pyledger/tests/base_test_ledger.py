@@ -18,7 +18,11 @@ class BaseTestLedger(BaseTest):
     def restored_engine(self, engine):
         """Accounting engine populated with accounts and tax codes,
         clear of any ledger entries."""
-        engine.restore(accounts=self.ACCOUNTS, tax_codes=self.TAX_CODES, ledger=[])
+        accounts = engine.accounts.list()
+        accounts = pd.concat([accounts, self.ACCOUNTS])
+        engine.restore(
+            accounts=accounts, tax_codes=self.TAX_CODES, ledger=[], settings=self.SETTINGS
+        )
         return engine
 
     def test_ledger_accessor_mutators(self, restored_engine, ignore_row_order=False):
