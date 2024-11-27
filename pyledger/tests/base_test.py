@@ -50,12 +50,12 @@ LEDGER_CSV = """
      5, 2024-05-05,    1000,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with tax, 2024/payables/2024-05-05.pdf
      6, 2024-05-06,    1000,   5000,      USD,     -666.66,              ,   IN_RED, Purchase at reduced tax, 2024/payables/2024-05-06.pdf
      7, 2024-05-07,    1000,   5000,      USD,     -777.77,              ,   EXEMPT, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
-     8, 2024-05-08,    1000,       ,      USD,     -888.88,              ,         , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+     8, 2024-05-08,    1000,       ,      USD,     -999.99,              ,         , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
      8,           ,        ,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
      8,           ,        ,   5000,      USD,     -444.44,              ,   EXEMPT, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
-     9, 2024-07-01,    1010,       ,      EUR,     1500.00,              ,         , Sale at mixed VAT rate, /invoices/invoice_002.pdf
-     9,           ,    4000,       ,      EUR,     1000.00,              ,  OUT_STD, Sale at mixed VAT rate, /invoices/invoice_002.pdf
-     9,           ,        ,   4000,      EUR,      500.00,              ,  OUT_RED, Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9, 2024-07-01,    1010,       ,      EUR,     1500.00,       1612.25,         , Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,    4000,       ,      EUR,     1000.00,       1074.83,  OUT_STD, Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,        ,   4000,      EUR,      500.00,        537.42,  OUT_RED, Sale at mixed VAT rate, /invoices/invoice_002.pdf
     10, 2024-07-04,    1020,   1000,      JPY, 12345678.00,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
     10,           ,    1010,   1000,      EUR,    70791.78,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
     11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         , Payment from customer, 2024/banking/USD_2024-Q2.pdf
@@ -69,16 +69,16 @@ LEDGER_CSV = """
     16,           ,    1010,       ,      EUR,       20.00,         20.50,         , Collective transaction - leg with credit account,
     16,           ,        ,   1015,      EUR,       20.00,         20.50,         , Collective transaction - leg with debit account,
     17, 2024-09-09,    1010,   7050,      EUR,        0.00,         -5.55,         , Manual Foreign currency adjustment
-    18, 2024-09-10,    1020,       ,      JPY,        0.00,             0,         , Manual Foreign currency adjustment
+    18, 2024-09-10,    1020,       ,      JPY,        0.00,          5.55,         , Manual Foreign currency adjustment
     18,           ,        ,   8050,      USD,        5.55,              ,         , Manual Foreign currency adjustment
     19, 2024-12-01,    1000,   3000,      EUR, 10000000.00,              ,         , Capital Increase,
     20, 2024-12-02,    1010,   2010,      EUR, 90000000.00,   91111111.10,         , Value 90 Mio USD @1.0123456789 (10 decimal places),
     21, 2024-12-03,    2010,   1010,      EUR, 90000000.00,   91111111.10,         , Revert previous entry,
-    22, 2024-12-04,        ,   1000,      USD,  9500000.00,              ,         , Convert 9.5 Mio USD to EUR @1.050409356 (9 decimal places),
-    23, 2024-12-04,    1010,       ,      EUR,  9978888.88,    9500000.00,         , Convert 9.5 Mio USD to EUR @1.050409356 (9 decimal places),
-    24, 2024-12-05,        ,   1000,      USD,   200000.00,              ,         , Convert USD to EUR and JPY,
-    24,           ,    1010,       ,      EUR,    97750.00,     100000.00,         , Convert USD to EUR and JPY,
-    24,           ,    1020,       ,      CHF, 14285714.29,     100000.00,         , Convert USD to EUR and JPY,
+    22, 2024-12-04,        ,   1000,      USD,  9500000.00,              ,         , Convert 9.5 Mio USD to EUR @1.050409354 (9 decimal places),
+    22, 2024-12-04,    1010,       ,      EUR,  9978888.87,    9500000.00,         , Convert 9.5 Mio USD to EUR @1.050409354 (9 decimal places),
+    23, 2024-12-05,        ,   1000,      USD,   200000.00,              ,         , Convert USD to EUR and CHF,
+    23,           ,    1010,       ,      EUR,    97750.00,     100000.00,         , Convert USD to EUR and CHF,
+    23,           ,    1020,       ,      CHF, 14285714.29,     100000.00,         , Convert USD to EUR and CHF,
 """
 LEDGER = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 # flake8: enable
