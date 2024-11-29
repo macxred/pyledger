@@ -21,7 +21,8 @@ class BaseTestLedger(BaseTest):
         accounts = engine.accounts.list()
         accounts = pd.concat([accounts, self.ACCOUNTS]).drop_duplicates(["account"])
         engine.restore(
-            accounts=accounts, tax_codes=self.TAX_CODES, ledger=[], settings=self.SETTINGS
+            accounts=accounts, tax_codes=self.TAX_CODES, ledger=[],
+            settings=self.SETTINGS, price_history=self.PRICES
         )
         return engine
 
