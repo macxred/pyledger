@@ -13,6 +13,7 @@ import re
 import numpy as np
 import openpyxl
 import pandas as pd
+from .decorators import timed_cache
 from .constants import (
     LEDGER_SCHEMA,
     TAX_CODE_SCHEMA,
@@ -781,14 +782,17 @@ class LedgerEngine(ABC):
             ]
         return result
 
-    @abstractmethod
-    def price(
-        self, ticker: str, date: datetime.date, currency: str = None
-    ) -> tuple[str, float]:
-        """Retrieve price for a given ticker as of a specified date.
+    # ----------------------------------------------------------------------
+    # Price
 
-        If no price is available on the exact date, return latest price
-        observation prior to the specified date.
+    def price(
+        self,
+        ticker: str,
+        date: datetime.date = None,
+        currency: str | None = None
+    ) -> tuple[str, float]:
+        """Retrieve price for a given ticker as of a specified date. If no price is available
+        on the exact date, return latest price observation prior to the specified date.
 
         Args:
             ticker (str): Asset identifier.
@@ -797,6 +801,50 @@ class LedgerEngine(ABC):
 
         Returns:
             tuple: (currency, price) where 'currency' is a string indicating the currency
-                   of the price, and 'price' is a float representing the asset's price as
-                   of the specified date.
+            of the price, and 'price' is a float representing the asset's price as of the
+            specified date.
         """
+        if currency is not None and str(ticker) == str(currency):
+            return (currency, 1.0)
+
+        if date is None:
+            date = datetime.date.today()
+        elif not isinstance(date, datetime.date):
+            date = pd.to_datetime(date).date()
+
+        if ticker not in self._prices_as_dict_of_df:
+            raise ValueError(f"No price data available for '{ticker}'.")
+
+        if currency is None:
+            # Assuming the first currency is the default if none specified
+            currency = next(iter(self._prices_as_dict_of_df[ticker]))
+
+        if currency not in self._prices_as_dict_of_df[ticker]:
+            raise ValueError(f"No {currency} prices available for '{ticker}'.")
+
+        prc = self._prices_as_dict_of_df[ticker][currency]
+        prc = prc.loc[prc["date"].dt.normalize() <= pd.Timestamp(date), "price"]
+
+        if prc.empty:
+            raise ValueError(f"No {currency} prices available for '{ticker}' before {date}.")
+
+        return (currency, prc.iloc[-1].item())
+
+    @property
+    @timed_cache(15)
+    def _prices_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
+        """Organizes price data by ticker and currency for quick access.
+
+        Returns:
+            Dict[str, Dict[str, pd.DataFrame]]: Maps each asset ticker to
+            a nested dictionary of DataFrames by currency, with its
+            `price` history sorted by `date` with `NaT` values first.
+        """
+        result = {}
+        for (ticker, currency), group in self.price_history.list().groupby(["ticker", "currency"]):
+            group = group[["date", "price"]].sort_values("date", na_position="first")
+            group = group.reset_index(drop=True)
+            if ticker not in result.keys():
+                result[ticker] = {}
+            result[ticker][currency] = group
+        return result
