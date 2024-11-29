@@ -18,7 +18,11 @@ class BaseTestLedger(BaseTest):
     def restored_engine(self, engine):
         """Accounting engine populated with accounts and tax codes,
         clear of any ledger entries."""
-        engine.restore(accounts=self.ACCOUNTS, tax_codes=self.TAX_CODES, ledger=[])
+        accounts = engine.accounts.list()
+        accounts = pd.concat([accounts, self.ACCOUNTS]).drop_duplicates(["account"])
+        engine.restore(
+            accounts=accounts, tax_codes=self.TAX_CODES, ledger=[], settings=self.SETTINGS
+        )
         return engine
 
     def test_ledger_accessor_mutators(self, restored_engine, ignore_row_order=False):
@@ -61,7 +65,7 @@ class BaseTestLedger(BaseTest):
         # Replace an individual transaction by a collective transaction
         current = engine.ledger.list()
         single_txn_id = current[~current["id"].duplicated(keep=False)].iloc[0]["id"]
-        collective_txn = self.LEDGER_ENTRIES.query("id == '1'").copy()
+        collective_txn = self.LEDGER_ENTRIES.query("id == '8'").copy()
         collective_txn.loc[:, "id"] = single_txn_id
         single_txn_index = current[current["id"] == single_txn_id].index[0]
         rows_before = current.loc[:single_txn_index - 1]
@@ -120,7 +124,7 @@ class BaseTestLedger(BaseTest):
     def test_modify_non_existed_raises_error(
         self, restored_engine, error_class=ValueError, error_message="not present in the data."
     ):
-        target = self.LEDGER_ENTRIES.query("id == '1'").copy()
+        target = self.LEDGER_ENTRIES.query("id == '2'").copy()
         target["id"] = 999999
         with pytest.raises(error_class, match=error_message):
             restored_engine.ledger.modify(target)
@@ -135,10 +139,9 @@ class BaseTestLedger(BaseTest):
 
     def test_mirror_ledger(self, restored_engine):
         engine = restored_engine
-        engine.accounts.mirror(self.ACCOUNTS, delete=False)
 
         # Mirror with one single and one collective transaction
-        target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
+        target = self.LEDGER_ENTRIES.query("id in ['8', '2']")
         engine.ledger.mirror(target=target, delete=True)
         expected = engine.ledger.standardize(target)
         mirrored = engine.ledger.list()
@@ -148,8 +151,8 @@ class BaseTestLedger(BaseTest):
         # Mirror with duplicate transactions and delete=False
         target = pd.concat(
             [
-                self.LEDGER_ENTRIES.query("id == '1'").assign(id='4'),
-                self.LEDGER_ENTRIES.query("id == '1'").assign(id='5'),
+                self.LEDGER_ENTRIES.query("id == '8'").assign(id='4'),
+                self.LEDGER_ENTRIES.query("id == '8'").assign(id='5'),
                 self.LEDGER_ENTRIES.query("id == '2'").assign(id='6'),
                 self.LEDGER_ENTRIES.query("id == '2'").assign(id='7'),
             ]
@@ -162,7 +165,7 @@ class BaseTestLedger(BaseTest):
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror with complex transactions and delete=False
-        target = self.LEDGER_ENTRIES.query("id in ['15', '16', '17', '18']")
+        target = self.LEDGER_ENTRIES.query("id in ['15', '16', '17', '22']")
         engine.ledger.mirror(target=target, delete=False)
         expected = engine.ledger.standardize(target)
         expected = engine.sanitize_ledger(expected)
@@ -172,14 +175,14 @@ class BaseTestLedger(BaseTest):
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror existing transactions with delete=False has no impact
-        target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
+        target = self.LEDGER_ENTRIES.query("id in ['8', '2']")
         engine.ledger.mirror(target=target, delete=False)
         mirrored = engine.ledger.list()
         assert sorted(engine.txn_to_str(mirrored).values()) == \
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror with delete=True
-        target = self.LEDGER_ENTRIES.query("id in ['1', '2']")
+        target = self.LEDGER_ENTRIES.query("id in ['8', '2']")
         engine.ledger.mirror(target=target, delete=True)
         mirrored = engine.ledger.list()
         expected = engine.ledger.standardize(target)
