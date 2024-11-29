@@ -4,11 +4,9 @@ independently of third-party software.
 """
 
 import datetime
-from typing import Dict
 import numpy as np
 import pandas as pd
-from pyledger.decorators import timed_cache
-from .constants import DEFAULT_ASSETS, LEDGER_SCHEMA
+from .constants import LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -238,53 +236,3 @@ class StandaloneLedger(LedgerEngine):
                 reporting_currency, date=d)
             for a, t, d in zip(amount, currency, date)]
         return result
-
-    # ----------------------------------------------------------------------
-    # Assets
-
-    @property
-    @timed_cache(15)
-    def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
-        """Organize assets by ticker for quick access.
-
-        Splits assets by ticker for efficient lookup of increments by ticker
-        and date.
-
-        Returns:
-            Dict[str, pd.DataFrame]: Maps each asset ticker to a DataFrame of
-            its `increment` history, sorted by `date` with `NaT` values first.
-        """
-        return {
-            ticker: (
-                group[["date", "increment"]]
-                .sort_values("date", na_position="first")
-                .reset_index(drop=True)
-            )
-            for ticker, group in self.assets.list().groupby("ticker")
-        }
-
-    def precision(self, ticker: str, date: datetime.date = None) -> float:
-        if ticker == "reporting_currency":
-            ticker = self.reporting_currency
-
-        if date is None:
-            date = datetime.date.today()
-        elif not isinstance(date, datetime.date):
-            date = pd.to_datetime(date).date()
-
-        asset = self._assets_as_dict_of_df.get(ticker)
-        if asset is None:
-            # Asset is not defined by the user, fall back to hard-coded defaults
-            increment = DEFAULT_ASSETS.loc[DEFAULT_ASSETS["ticker"] == ticker, "increment"]
-            if len(increment) < 1:
-                raise ValueError(f"No asset definition available for ticker '{ticker}'.")
-            if len(increment) > 1:
-                raise ValueError(f"Multiple default definitions for asset '{ticker}'.")
-            return increment.item()
-        else:
-            mask = asset["date"].isna() | (asset["date"] <= pd.Timestamp(date))
-            if not mask.any():
-                raise ValueError(
-                    f"No asset definition available for '{ticker}' on or before {date}."
-                )
-            return asset.loc[mask[mask].index[-1], "increment"].item()

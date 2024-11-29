@@ -17,6 +17,7 @@ from .decorators import timed_cache
 from .constants import (
     LEDGER_SCHEMA,
     TAX_CODE_SCHEMA,
+    DEFAULT_ASSETS,
 )
 from .storage_entity import AccountingEntity
 from . import excel
@@ -715,23 +716,6 @@ class LedgerEngine(ABC):
     def reporting_currency(self, currency):
         """Set the reporting currency of the ledger system."""
 
-    @abstractmethod
-    def precision(
-        self, ticker: str, date: datetime.date = None
-    ) -> float:
-        """Returns the smallest increment for quotation of prices of a given asset or currency.
-
-        This is the precision, to which prices should be rounded.
-
-        Args:
-            ticker (str): Identifier of the currency or asset.
-            date (datetime.date, optional): Date for which to retrieve the precision.
-                                            Defaults to today's date.
-
-        Returns:
-            float: The smallest price increment.
-        """
-
     def round_to_precision(
         self,
         amount: float | List[float],
@@ -848,3 +832,66 @@ class LedgerEngine(ABC):
                 result[ticker] = {}
             result[ticker][currency] = group
         return result
+
+        # ----------------------------------------------------------------------
+    # Assets
+
+    @property
+    @timed_cache(15)
+    def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
+        """Organize assets by ticker for quick access.
+
+        Splits assets by ticker for efficient lookup of increments by ticker
+        and date.
+
+        Returns:
+            Dict[str, pd.DataFrame]: Maps each asset ticker to a DataFrame of
+            its `increment` history, sorted by `date` with `NaT` values first.
+        """
+        return {
+            ticker: (
+                group[["date", "increment"]]
+                .sort_values("date", na_position="first")
+                .reset_index(drop=True)
+            )
+            for ticker, group in self.assets.list().groupby("ticker")
+        }
+
+    def precision(self, ticker: str, date: datetime.date = None) -> float:
+        """Returns the smallest increment for quotation of prices of a given asset or currency.
+
+        This is the precision, to which prices should be rounded.
+
+        Args:
+            ticker (str): Identifier of the currency or asset.
+            date (datetime.date, optional): Date for which to retrieve the precision.
+                                            Defaults to today's date.
+
+        Returns:
+            float: The smallest price increment.
+        """
+
+        if ticker == "reporting_currency":
+            ticker = self.reporting_currency
+
+        if date is None:
+            date = datetime.date.today()
+        elif not isinstance(date, datetime.date):
+            date = pd.to_datetime(date).date()
+
+        asset = self._assets_as_dict_of_df.get(ticker)
+        if asset is None:
+            # Asset is not defined by the user, fall back to hard-coded defaults
+            increment = DEFAULT_ASSETS.loc[DEFAULT_ASSETS["ticker"] == ticker, "increment"]
+            if len(increment) < 1:
+                raise ValueError(f"No asset definition available for ticker '{ticker}'.")
+            if len(increment) > 1:
+                raise ValueError(f"Multiple default definitions for asset '{ticker}'.")
+            return increment.item()
+        else:
+            mask = asset["date"].isna() | (asset["date"] <= pd.Timestamp(date))
+            if not mask.any():
+                raise ValueError(
+                    f"No asset definition available for '{ticker}' on or before {date}."
+                )
+            return asset.loc[mask[mask].index[-1], "increment"].item()
