@@ -858,7 +858,7 @@ class LedgerEngine(ABC):
         }
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
-        """Returns the smallest increment for quotation of prices of a given asset or currency.
+        """Returns the smallest price increment of an asset or currency.
 
         This is the precision, to which prices should be rounded.
 
