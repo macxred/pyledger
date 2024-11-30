@@ -26,15 +26,18 @@ LEDGER_COLUMN_SHORTCUTS = {
     "vat": "tax_code",
     "base_amount": "report_amount",
     "counter": "contra",
+    "text": "description",
 }
 TAX_CODE_COLUMN_SHORTCUTS = {
     "text": "description",
     "inclusive": "is_inclusive",
     "inverse_account": "contra",
+    "text": "description",
 }
 ACCOUNT_COLUMN_SHORTCUTS = {
     "text": "description",
     "vat_code": "tax_code",
+    "text": "description",
 }
 
 
