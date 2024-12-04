@@ -584,7 +584,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         save_files(df, root=self._path, func=self._write_file)
         self.list.cache_clear()
 
-    def add(self, data: pd.DataFrame, path: str = "default.csv") -> dict:
+    def add(self, data: pd.DataFrame, path: str = "default.csv") -> list[str]:
         """Add new entries.
 
         IDs in the input `data` are not conserved. IDs are not stored in ledger
@@ -594,6 +594,9 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
             data (pd.DataFrame): DataFrame containing new entries to add,
                                 compatible with the entity's DataFrame schema.
             path (str, optional): The file path where the data will be stored.
+
+        Returns:
+            pd.DataFrame: A list containing the unique identifiers of the added data.
         """
 
         current = self.list()
@@ -610,7 +613,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         Path(full_path).parent.mkdir(parents=True, exist_ok=True)
         self._store(df, full_path)
 
-        return incoming[self._id_columns].iloc[0].to_dict()
+        return incoming["id"].to_list()
 
     def modify(self, data: pd.DataFrame):
         """
