@@ -6,6 +6,7 @@ independently of third-party software.
 import datetime
 import numpy as np
 import pandas as pd
+from .decorators import timed_cache
 from .constants import LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
@@ -113,6 +114,7 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Ledger
 
+    @timed_cache(15)
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with all ledger transactions in long format.
 
