@@ -32,18 +32,18 @@ class MemoryLedger(StandaloneLedger):
         self._assets = DataFrameEntity(ASSETS_SCHEMA)
         self._accounts = DataFrameEntity(
             ACCOUNT_SCHEMA,
-            on_change=self._clear_serialized_ledger_cache
+            on_change=self.serialized_ledger.cache_clear
         )
         self._tax_codes = DataFrameEntity(
             TAX_CODE_SCHEMA,
-            on_change=self._clear_serialized_ledger_cache
+            on_change=self.serialized_ledger.cache_clear
         )
         self._price_history = DataFrameEntity(PRICE_SCHEMA)
         self._revaluations = DataFrameEntity(REVALUATION_SCHEMA)
         self._ledger = LedgerDataFrameEntity(
             LEDGER_SCHEMA,
             prepare_for_mirroring=self.sanitize_ledger,
-            on_change=self._clear_serialized_ledger_cache
+            on_change=self.serialized_ledger.cache_clear
         )
 
     # ----------------------------------------------------------------------

@@ -23,7 +23,7 @@ class AccountingEntity(ABC):
         self,
         schema: pd.DataFrame,
         prepare_for_mirroring: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x,
-        on_change: Callable[[], None] = None,
+        on_change: Callable[[], None] = lambda: None,
         *args: Any,
         **kwargs: Any
     ) -> None:
@@ -44,7 +44,7 @@ class AccountingEntity(ABC):
         self._schema = schema
         self._id_columns = schema.query("id == True")["column"].to_list()
         self._prepare_for_mirroring = prepare_for_mirroring
-        self._on_change: Callable[[], None] = on_change,
+        self._on_change = on_change
 
     def standardize(self, data: pd.DataFrame, keep_extra_columns: bool = False) -> pd.DataFrame:
         """

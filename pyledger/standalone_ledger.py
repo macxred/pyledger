@@ -123,9 +123,6 @@ class StandaloneLedger(LedgerEngine):
         """
         return self.serialize_ledger(self.complete_ledger(self.ledger.list()))
 
-    def _clear_serialized_ledger_cache(self):
-        self.serialized_ledger.cache_clear()
-
     def complete_ledger(self, ledger=None) -> pd.DataFrame:
         # Ledger definition
         df = self.ledger.standardize(ledger)
