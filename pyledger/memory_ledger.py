@@ -30,12 +30,21 @@ class MemoryLedger(StandaloneLedger):
         super().__init__()
         self._reporting_currency = reporting_currency
         self._assets = DataFrameEntity(ASSETS_SCHEMA)
-        self._accounts = DataFrameEntity(ACCOUNT_SCHEMA)
-        self._tax_codes = DataFrameEntity(TAX_CODE_SCHEMA)
+        self._accounts = DataFrameEntity(
+            ACCOUNT_SCHEMA,
+            on_change=self._clear_serialized_ledger_cache
+        )
+        self._tax_codes = DataFrameEntity(
+            TAX_CODE_SCHEMA,
+            on_change=self._clear_serialized_ledger_cache
+        )
         self._price_history = DataFrameEntity(PRICE_SCHEMA)
         self._revaluations = DataFrameEntity(REVALUATION_SCHEMA)
-        self._ledger = LedgerDataFrameEntity(LEDGER_SCHEMA,
-                                             prepare_for_mirroring=self.sanitize_ledger)
+        self._ledger = LedgerDataFrameEntity(
+            LEDGER_SCHEMA,
+            prepare_for_mirroring=self.sanitize_ledger,
+            on_change=self._clear_serialized_ledger_cache
+        )
 
     # ----------------------------------------------------------------------
     # Currency

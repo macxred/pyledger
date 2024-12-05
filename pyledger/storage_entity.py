@@ -23,6 +23,7 @@ class AccountingEntity(ABC):
         self,
         schema: pd.DataFrame,
         prepare_for_mirroring: Callable[[pd.DataFrame], pd.DataFrame] = lambda x: x,
+        on_change: Callable[[], None] = None,
         *args: Any,
         **kwargs: Any
     ) -> None:
@@ -34,6 +35,8 @@ class AccountingEntity(ABC):
                                    defining the entity's DataFrame schema.
             prepare_for_mirroring (Callable[[pd.DataFrame], pd.DataFrame], optional):
                 Function to prepare data for mirroring. Defaults to identity function.
+            on_change (Callable[[], None], optional):
+                Callback that triggers after any data change.
             *args, **kwargs: Additional arguments passed to the superclass.
         """
         super().__init__(*args, **kwargs)
@@ -41,6 +44,7 @@ class AccountingEntity(ABC):
         self._schema = schema
         self._id_columns = schema.query("id == True")["column"].to_list()
         self._prepare_for_mirroring = prepare_for_mirroring
+        self._on_change: Callable[[], None] = on_change,
 
     def standardize(self, data: pd.DataFrame, keep_extra_columns: bool = False) -> pd.DataFrame:
         """
@@ -396,6 +400,7 @@ class DataFrameEntity(StandaloneAccountingEntity):
 
     def _store(self, data: pd.DataFrame):
         self._df = data.reset_index(drop=True)
+        self._on_change()
 
 
 class LedgerDataFrameEntity(LedgerEntity, DataFrameEntity):
@@ -459,6 +464,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         else:
             self._write_file(data, path)
         self.list.cache_clear()
+        self._on_change()
 
     def _read_data(self) -> pd.DataFrame:
         """Read data from the CSV file.
@@ -583,6 +589,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         df["__csv_path__"] = self._csv_path(df["id"])
         save_files(df, root=self._path, func=self._write_file)
         self.list.cache_clear()
+        self._on_change()
 
     def add(self, data: pd.DataFrame, path: str = "default.csv") -> list[str]:
         """Add new entries.

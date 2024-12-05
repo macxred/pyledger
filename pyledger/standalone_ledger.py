@@ -6,6 +6,7 @@ independently of third-party software.
 import datetime
 import numpy as np
 import pandas as pd
+from .decorators import timed_cache
 from .constants import LEDGER_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
@@ -122,8 +123,10 @@ class StandaloneLedger(LedgerEngine):
         """
         return self.serialize_ledger(self.complete_ledger(self.ledger.list()))
 
+    def _clear_serialized_ledger_cache(self):
+        self.serialized_ledger.cache_clear()
+
     def complete_ledger(self, ledger=None) -> pd.DataFrame:
-        # print(".")
         # Ledger definition
         df = self.ledger.standardize(ledger)
         df = self.sanitize_ledger(df)
