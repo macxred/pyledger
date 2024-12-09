@@ -7,8 +7,12 @@ import pytest
 from .base_test import BaseTest
 from pyledger import MemoryLedger
 
-# Disable logger messages for the test suite to keep output clean.
-logging.getLogger("ledger").setLevel(logging.CRITICAL)
+@pytest.fixture
+def logger():
+    logger = logging.getLogger("ledger")
+    original_level = logger.level
+    yield logger
+    logger.setLevel(original_level)
 
 
 @pytest.fixture
@@ -24,24 +28,27 @@ def engine():
     return engine
 
 
-def test_serialized_ledger_tax_codes_mutators_cache_invalidation(engine):
+def test_serialized_ledger_cache(engine):
     serialized_ledger = engine.serialized_ledger()
 
-    # Identify a tax code that is currently in use.
-    used_tax_name = serialized_ledger['tax_code'].dropna().iloc[0]  # noqa: F841
-    tax_code = BaseTest.TAX_CODES.query("id == @used_tax_name")
-
-    # Direct manipulation of the private DataFrame should NOT affect the cached ledger.
-    engine._tax_codes._df = pd.concat([
-        tax_code, BaseTest.TAX_CODES.head(2)
-    ]).drop_duplicates(["id"])
-    assert_frame_equal(engine.serialized_ledger(), serialized_ledger)
+    # Direct manipulation of the private DataFrame should NOT affect the cached data.
+    engine._ledger._df = engine._ledger._df.query("id in ['2', '3', '4', '5']")
+    assert serialized_ledger.equals(engine.serialized_ledger()), "serialized_ledger was not cached"
 
     # Manually clearing the cache should now reflect the changes.
     engine.serialized_ledger.cache_clear()
-    assert not serialized_ledger.equals(engine.serialized_ledger())
+    assert not serialized_ledger.equals(engine.serialized_ledger()), "cached was not cleared"
 
-    # Using mutator methods (delete, add, modify) should also invalidate the cache.
+
+def test_tax_code_mutators_invalidate_serialized_ledger(engine, logger):
+    # Identify a tax code that is in use.
+    used_tax_code = engine.ledger.list()['tax_code'].dropna().iloc[0]  # noqa: F841
+    tax_code = engine.tax_code.list().query("id == @used_tax_code")
+
+    # Mute log messages to keep console output clean.
+    logger.setLevel(logging.CRITICAL)
+
+    # Using mutator methods (delete, add, modify) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
     engine.tax_codes.delete(tax_code)
     assert not serialized_ledger.equals(engine.serialized_ledger())
@@ -51,27 +58,17 @@ def test_serialized_ledger_tax_codes_mutators_cache_invalidation(engine):
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
     serialized_ledger = engine.serialized_ledger()
-    tax_code.loc[:, "rate"] = 0.99
-    engine.tax_codes.modify(tax_code)
+    engine.tax_codes.modify(tax_code.assign(rate = lambda x: x / 2))
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
 
-def test_serialized_ledger_accounts_mutators_cache_invalidation(engine):
-    serialized_ledger = engine.serialized_ledger()
+def test_account_mutators_invalidate_serialized_ledger(engine, logger):
+    # Identify an account that is in use.
+    used_account = engine.ledger.list()['account'].dropna().iloc[0]  # noqa: F841
+    account =  engine.accounts.list().query("account == @used_account")
 
-    # Identify an account that is currently in use.
-    used_account = serialized_ledger['account'].dropna().iloc[0]  # noqa: F841
-    account = BaseTest.ACCOUNTS.query("account == @used_account")
-
-    # Direct manipulation of the private DataFrame should NOT affect the cached ledger.
-    engine._accounts._df = pd.concat([
-        account, BaseTest.ACCOUNTS.head(5)
-    ]).drop_duplicates(["account"])
-    assert_frame_equal(engine.serialized_ledger(), serialized_ledger)
-
-    # Manually clearing the cache should now reflect the changes.
-    engine.serialized_ledger.cache_clear()
-    assert not serialized_ledger.equals(engine.serialized_ledger())
+    # Mute log messages to keep console output clean.
+    logger.setLevel(logging.CRITICAL)
 
     # Using account mutator methods (delete, add) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
@@ -83,19 +80,8 @@ def test_serialized_ledger_accounts_mutators_cache_invalidation(engine):
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
 
-def test_serialized_ledger_ledger_mutators_cache_invalidation(engine):
-    ledger = BaseTest.LEDGER_ENTRIES.query("id == '1'")
-    serialized_ledger = engine.serialized_ledger()
-
-    # Direct manipulation of the private DataFrame should NOT affect the cached ledger.
-    engine._ledger._df = pd.concat([
-        BaseTest.LEDGER_ENTRIES.query("id in ['2', '3', '4', '5']"), ledger
-    ]).drop_duplicates(["id"])
-    assert_frame_equal(engine.serialized_ledger(), serialized_ledger)
-
-    # Manually clearing the cache should now reflect the changes.
-    engine.serialized_ledger.cache_clear()
-    assert not serialized_ledger.equals(engine.serialized_ledger())
+def test_ledger_mutators_invalidate_serialized_ledger(engine):
+    ledger = engine.ledger.list().query("id == '1'")
 
     # Using ledger mutator methods (delete, add, modify) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
@@ -107,6 +93,5 @@ def test_serialized_ledger_ledger_mutators_cache_invalidation(engine):
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
     serialized_ledger = engine.serialized_ledger()
-    ledger.loc[:, "description"] = "test description"
-    engine.ledger.modify(ledger)
+    engine.ledger.modify(ledger.assign(description = "test description"))
     assert not serialized_ledger.equals(engine.serialized_ledger())
