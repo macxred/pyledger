@@ -46,7 +46,7 @@ class AccountingEntity(ABC):
         self._prepare_for_mirroring = prepare_for_mirroring
         self._on_change = on_change
 
-    def standardize(self, data: pd.DataFrame, keep_extra_columns: bool = False) -> pd.DataFrame:
+    def standardize(self, data: pd.DataFrame, drop_extra_columns: bool = False) -> pd.DataFrame:
         """
         Standardize the given DataFrame to conform to the entity's schema.
 
@@ -56,7 +56,7 @@ class AccountingEntity(ABC):
 
         Args:
             data (pd.DataFrame): DataFrame compatible with the entity's DataFrame schema.
-            keep_extra_columns (bool, optional): If True, retains columns
+            drop_extra_columns (bool, optional): If True, drop columns
                                                  outside the defined schema.
 
         Returns:
@@ -65,7 +65,7 @@ class AccountingEntity(ABC):
         Raises:
             ValueError: If required columns are missing or data types are incorrect.
         """
-        df = enforce_schema(data, self._schema, keep_extra_columns=keep_extra_columns)
+        df = enforce_schema(data, self._schema, keep_extra_columns=not drop_extra_columns)
 
         # Convert -0.0 to 0.0
         for col in df.columns:
@@ -75,9 +75,13 @@ class AccountingEntity(ABC):
         return df
 
     @abstractmethod
-    def list(self) -> pd.DataFrame:
+    def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
         """
         Retrieve all entries.
+
+        Args:
+            drop_extra_columns (bool, optional): If True, drop columns
+                                                 outside the defined schema.
 
         Returns:
             pd.DataFrame: DataFrame adhering to the entity's column schema.
@@ -201,7 +205,7 @@ class LedgerEntity(AccountingEntity):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def standardize(self, data: pd.DataFrame, keep_extra_columns: bool = False) -> pd.DataFrame:
+    def standardize(self, data: pd.DataFrame, drop_extra_columns: bool = False) -> pd.DataFrame:
         """
         Standardize ledger data to conform to the entity's schema.
 
@@ -211,7 +215,7 @@ class LedgerEntity(AccountingEntity):
 
         Args:
             data (pd.DataFrame): DataFrame compatible with the entity's DataFrame schema.
-            keep_extra_columns (bool, optional): If True, retain columns outside the schema.
+            drop_extra_columns (bool, optional): If True, drop columns outside the schema.
 
         Returns:
             pd.DataFrame: The standardized DataFrame.
@@ -219,7 +223,7 @@ class LedgerEntity(AccountingEntity):
         Raises:
             ValueError: If required columns are missing or data types are incorrect.
         """
-        df = super().standardize(data=data, keep_extra_columns=keep_extra_columns)
+        df = super().standardize(data=data, drop_extra_columns=drop_extra_columns)
 
         # Add id column if missing: Entries without a date share id of the last entry with a date
         if df["id"].isna().all():
@@ -395,8 +399,8 @@ class DataFrameEntity(StandaloneAccountingEntity):
         super().__init__(*args, **kwargs)
         self._df = self.standardize(None)
 
-    def list(self) -> pd.DataFrame:
-        return self._df.copy()
+    def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+        return self.standardize(self._df.copy(), drop_extra_columns=drop_extra_columns)
 
     def _store(self, data: pd.DataFrame):
         self._df = data.reset_index(drop=True)
@@ -444,8 +448,8 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         self._column_shortcuts = column_shortcuts
 
     @timed_cache(15)
-    def list(self) -> pd.DataFrame:
-        return self._read_data()
+    def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+        return self._read_data(drop_extra_columns=drop_extra_columns)
 
     def _store(self, data: pd.DataFrame, path: Path = None):
         """
@@ -466,7 +470,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         self.list.cache_clear()
         self._on_change()
 
-    def _read_data(self) -> pd.DataFrame:
+    def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
         """Read data from the CSV file.
 
         This method reads data from the file and enforces the standard
@@ -478,7 +482,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
             data.rename(columns=self._column_shortcuts, inplace=True)
         else:
             data = None
-        return self.standardize(data)
+        return self.standardize(data, drop_extra_columns=drop_extra_columns)
 
     def _write_file(self, df: pd.DataFrame, path: Path):
         """Save data to a fixed-width CSV file.
@@ -522,7 +526,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         """Extract numeric portion of ledger id."""
         return id.str.replace("^.*:", "", regex=True).astype(int)
 
-    def _read_data(self) -> pd.DataFrame:
+    def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
         """Reads ledger entries from CSV files in the root directory.
 
         Iterates through all CSV files in the root directory, reading each file
@@ -555,7 +559,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
                 df = pd.read_csv(file, skipinitialspace=True)
                 # TODO: Remove the following line once legacy systems are migrated.
                 df = df.rename(columns=self._column_shortcuts)
-                df = self.standardize(df)
+                df = self.standardize(df, drop_extra_columns=drop_extra_columns)
                 if not df.empty:
                     df["id"] = relative_path + ":" + df["id"]
                 ledger.append(df)
@@ -564,11 +568,12 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
 
         if ledger:
             result = pd.concat(ledger, ignore_index=True)
-            result = enforce_schema(result, self._schema, sort_columns=True)
+            result = enforce_schema(result, self._schema,
+                                    sort_columns=True, keep_extra_columns=not drop_extra_columns)
         else:
             result = None
 
-        return self.standardize(result)
+        return self.standardize(result, drop_extra_columns=drop_extra_columns)
 
     def write_directory(self, df: pd.DataFrame | None = None):
         """Save ledger entries to multiple CSV files in the ledger directory.
@@ -585,7 +590,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         if df is None:
             df = self.list()
 
-        df = self.standardize(df)
+        df = self.standardize(df).copy()
         df["__csv_path__"] = self._csv_path(df["id"])
         save_files(df, root=self._path, func=self._write_file)
         self.list.cache_clear()
