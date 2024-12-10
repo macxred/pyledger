@@ -1,11 +1,10 @@
 """Unit tests for the serialized ledger caching mechanism."""
 
 import logging
-import pandas as pd
-from consistent_df import assert_frame_equal
 import pytest
 from .base_test import BaseTest
 from pyledger import MemoryLedger
+
 
 @pytest.fixture
 def muted_logger():
@@ -44,7 +43,7 @@ def test_serialized_ledger_cache(engine):
 def test_tax_code_mutators_invalidate_serialized_ledger(engine, muted_logger):
     # Identify a tax code that is in use.
     used_tax_code = engine.ledger.list()['tax_code'].dropna().iloc[0]  # noqa: F841
-    tax_code = engine.tax_code.list().query("id == @used_tax_code")
+    tax_code = engine.tax_codes.list().query("id == @used_tax_code")
 
     # Using mutator methods (delete, add, modify) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
@@ -56,14 +55,14 @@ def test_tax_code_mutators_invalidate_serialized_ledger(engine, muted_logger):
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
     serialized_ledger = engine.serialized_ledger()
-    engine.tax_codes.modify(tax_code.assign(rate = lambda x: x / 2))
+    engine.tax_codes.modify(tax_code.assign(rate=lambda x: x["rate"] / 2))
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
 
 def test_account_mutators_invalidate_serialized_ledger(engine, muted_logger):
     # Identify an account that is in use.
     used_account = engine.ledger.list()['account'].dropna().iloc[0]  # noqa: F841
-    account =  engine.accounts.list().query("account == @used_account")
+    account = engine.accounts.list().query("account == @used_account")
 
     # Using account mutator methods (delete, add) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
@@ -88,5 +87,5 @@ def test_ledger_mutators_invalidate_serialized_ledger(engine):
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
     serialized_ledger = engine.serialized_ledger()
-    engine.ledger.modify(ledger.assign(description = "test description"))
+    engine.ledger.modify(ledger.assign(description="test description"))
     assert not serialized_ledger.equals(engine.serialized_ledger())
