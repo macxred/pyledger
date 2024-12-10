@@ -19,12 +19,11 @@ class TestAccounts(BaseTestAccounts):
         engine.accounts.add(accounts)
 
         # Add accounts with a new column
-        expected = self.ACCOUNTS.tail(len(self.ACCOUNTS) - 3).copy()
+        expected = self.ACCOUNTS.tail(-3).copy()
         expected[extra_cols[0]] = "test value"
         engine.accounts.add(expected)
         current = engine.accounts.list()
-        account_numbers = accounts["account"].to_list()  # noqa: F841
-        assert current.query("account in @account_numbers")[extra_cols[0]].isna().all(), (
+        assert current.query("account in @accounts['account']")[extra_cols[0]].isna().all(), (
             "Pre existing accounts should have new column with all NA values"
         )
         assert_frame_equal(current, pd.concat([accounts, expected]), check_like=True)
