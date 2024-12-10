@@ -8,9 +8,10 @@ from .base_test import BaseTest
 from pyledger import MemoryLedger
 
 @pytest.fixture
-def logger():
+def muted_logger():
     logger = logging.getLogger("ledger")
     original_level = logger.level
+    logger.setLevel(logging.CRITICAL)
     yield logger
     logger.setLevel(original_level)
 
@@ -40,13 +41,10 @@ def test_serialized_ledger_cache(engine):
     assert not serialized_ledger.equals(engine.serialized_ledger()), "cached was not cleared"
 
 
-def test_tax_code_mutators_invalidate_serialized_ledger(engine, logger):
+def test_tax_code_mutators_invalidate_serialized_ledger(engine, muted_logger):
     # Identify a tax code that is in use.
     used_tax_code = engine.ledger.list()['tax_code'].dropna().iloc[0]  # noqa: F841
     tax_code = engine.tax_code.list().query("id == @used_tax_code")
-
-    # Mute log messages to keep console output clean.
-    logger.setLevel(logging.CRITICAL)
 
     # Using mutator methods (delete, add, modify) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
@@ -62,13 +60,10 @@ def test_tax_code_mutators_invalidate_serialized_ledger(engine, logger):
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
 
-def test_account_mutators_invalidate_serialized_ledger(engine, logger):
+def test_account_mutators_invalidate_serialized_ledger(engine, muted_logger):
     # Identify an account that is in use.
     used_account = engine.ledger.list()['account'].dropna().iloc[0]  # noqa: F841
     account =  engine.accounts.list().query("account == @used_account")
-
-    # Mute log messages to keep console output clean.
-    logger.setLevel(logging.CRITICAL)
 
     # Using account mutator methods (delete, add) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
