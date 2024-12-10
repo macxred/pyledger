@@ -64,11 +64,13 @@ class TextLedger(StandaloneLedger):
         )
         self._accounts = CSVAccountingEntity(
             schema=ACCOUNT_SCHEMA, path=self.root / "accounts.csv",
-            column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS
+            column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS,
+            on_change=self.serialized_ledger.cache_clear
         )
         self._tax_codes = CSVAccountingEntity(
             schema=TAX_CODE_SCHEMA, path=self.root / "tax_codes.csv",
-            column_shortcuts=TAX_CODE_COLUMN_SHORTCUTS
+            column_shortcuts=TAX_CODE_COLUMN_SHORTCUTS,
+            on_change=self.serialized_ledger.cache_clear
         )
         self._price_history = CSVAccountingEntity(
             schema=PRICE_SCHEMA, path=self.root / "price_history.csv"
@@ -81,7 +83,8 @@ class TextLedger(StandaloneLedger):
             path=self.root / "ledger",
             write_file=self.write_ledger_file,
             column_shortcuts=LEDGER_COLUMN_SHORTCUTS,
-            prepare_for_mirroring=self.sanitize_ledger
+            prepare_for_mirroring=self.sanitize_ledger,
+            on_change=self.serialized_ledger.cache_clear,
         )
 
     # ----------------------------------------------------------------------

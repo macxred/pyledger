@@ -587,7 +587,7 @@ class LedgerEngine(ABC):
                         f"Discard unknown tax codes {', '.join([f'{x}' for x in codes])} at '{id}'."
                     )
                 else:
-                    self._logger.warning(f"Discard unknown tax code '{codes[0]}' at '{id}'.")
+                    self._logger.warning(f"Discard unknown tax code '{codes.iloc[0]}' at '{id}'.")
             ledger.loc[invalid, "tax_code"] = None
 
         # Collect postings to be discarded as pd.DataFrame with columns 'id' and
