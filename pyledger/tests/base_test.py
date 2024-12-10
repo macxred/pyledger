@@ -29,7 +29,8 @@ ACCOUNT_CSV = """
     Liabilities,                    2010,      USD,         , Accounts Payable EUR
     Liabilities,                    2200,      USD,         , VAT Payable (Output VAT)
     Equity,                         3000,      USD,         , Owner's Equity
-    Revenue,                        4000,      USD,  OUT_STD, Sales Revenue
+    Revenue,                        4000,      USD,  OUT_STD, Sales Revenue - USD
+    Revenue,                        4001,      EUR,  OUT_STD, Sales Revenue - EUR
     Expenses,                       5000,      USD,   IN_STD, Purchases
     Expenses/Financial Expenses,    7050,      USD,         , Foreign Exchange Gain/Loss
     Revenue/Financial Gain,         8050,      USD,         , Foreign Exchange Gain
@@ -45,7 +46,7 @@ LEDGER_CSV = """
      1,           ,        ,   3000,      USD,  1098332.82,              ,         , Opening balance, 2023/financials/balance_sheet.pdf
      2, 2024-01-24,    1000,   4000,      USD,     1200.00,              ,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
      3, 2024-04-12,        ,   1000,      USD,    21288.24,              ,         , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
-     3,           ,    1010,   1000,      EUR,    20000.00,      21288.24,         , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+     3,           ,    1010,       ,      EUR,    20000.00,      21288.24,         , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
      4, 2024-05-25,    1010,   5000,      EUR,     -800.00,              ,   IN_STD, Purchase goods, 2024/payables/2024-05-25.pdf
      5, 2024-05-05,    1000,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with tax, 2024/payables/2024-05-05.pdf
      6, 2024-05-06,    1000,   5000,      USD,     -666.66,              ,   IN_RED, Purchase at reduced tax, 2024/payables/2024-05-06.pdf
@@ -54,8 +55,8 @@ LEDGER_CSV = """
      8,           ,        ,   5000,      USD,     -555.55,              ,   IN_STD, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
      8,           ,        ,   5000,      USD,     -444.44,              ,   EXEMPT, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
      9, 2024-07-01,    1010,       ,      EUR,     1500.00,              ,         , Sale at mixed VAT rate, /invoices/invoice_002.pdf
-     9,           ,    4000,       ,      EUR,     1000.00,              ,  OUT_STD, Sale at mixed VAT rate, /invoices/invoice_002.pdf
-     9,           ,        ,   4000,      EUR,      500.00,              ,  OUT_RED, Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,    4001,       ,      EUR,    -1000.00,              ,  OUT_STD, Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,        ,   4001,      EUR,      500.00,              ,  OUT_RED, Sale at mixed VAT rate, /invoices/invoice_002.pdf
     10, 2024-07-04,    1020,   1000,      JPY, 12345678.00,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
     10,           ,    1010,   1000,      EUR,    70791.78,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
     11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         , Payment from customer, 2024/banking/USD_2024-Q2.pdf
