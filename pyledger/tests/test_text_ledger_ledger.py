@@ -56,3 +56,33 @@ class TestLedger(BaseTestLedger):
         """Ledger() is expected to return an empty data frame if the ledger folder is missing."""
         expected_ledger = engine.ledger.standardize(None)
         assert_frame_equal(engine.ledger.list(), expected_ledger)
+
+    def test_extra_columns(self, engine):
+        extra_cols = ["new_column", "second_new_column"]
+
+        # Add ledger entries with a new column
+        expected = self.LEDGER_ENTRIES.query("id in ['1', '2']").copy()
+        expected[extra_cols[0]] = "test value"
+        engine.ledger.add(expected)
+        assert_frame_equal(engine.ledger.list(), expected, ignore_columns=["id"])
+
+        # Modify ledger entries with a new column
+        expected = engine.ledger.list()
+        expected[extra_cols[1]] = "second test value"
+        engine.ledger.modify(expected)
+        assert_frame_equal(
+            engine.ledger.list(), expected, ignore_columns=["id"]
+        )
+
+        # Standardize() method with drop_extra_columns=True should drop extra columns
+        expected_without_extra_cols = expected.copy().drop(columns=extra_cols)
+        assert_frame_equal(
+            engine.ledger.standardize(expected, drop_extra_columns=True),
+            expected_without_extra_cols, ignore_columns=["id"]
+        )
+
+        # List() method with drop_extra_columns=True should drop extra columns
+        assert_frame_equal(
+            engine.ledger.list(drop_extra_columns=True), expected_without_extra_cols,
+            ignore_columns=["id"]
+        )
