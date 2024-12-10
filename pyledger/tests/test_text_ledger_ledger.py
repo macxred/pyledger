@@ -59,12 +59,18 @@ class TestLedger(BaseTestLedger):
 
     def test_extra_columns(self, engine):
         extra_cols = ["new_column", "second_new_column"]
+        entries = self.LEDGER_ENTRIES.query("id in ['1', '2']").copy()
+        ids = engine.ledger.add(entries)  # noqa: F841
 
         # Add ledger entries with a new column
-        expected = self.LEDGER_ENTRIES.query("id in ['1', '2']").copy()
+        expected = self.LEDGER_ENTRIES.query("id in ['3', '4']").copy()
         expected[extra_cols[0]] = "test value"
         engine.ledger.add(expected)
-        assert_frame_equal(engine.ledger.list(), expected, ignore_columns=["id"])
+        current = engine.ledger.list()
+        assert current.query("id in @ids")[extra_cols[0]].isna().all(), (
+            "Pre existing entries should have new column with all NA values"
+        )
+        assert_frame_equal(current, pd.concat([entries, expected]), ignore_columns=["id"])
 
         # Modify ledger entries with a new column
         expected = engine.ledger.list()

@@ -1,5 +1,6 @@
 """Test suite for TextLedger accounts operations."""
 
+import pandas as pd
 import pytest
 from .base_test_accounts import BaseTestAccounts
 from pyledger import TextLedger
@@ -14,14 +15,19 @@ class TestAccounts(BaseTestAccounts):
 
     def test_extra_columns(self, engine):
         extra_cols = ["new_column", "second_new_column"]
+        accounts = self.ACCOUNTS.head(3).copy()
+        engine.accounts.add(accounts)
 
         # Add accounts with a new column
-        expected = self.ACCOUNTS.copy()
+        expected = self.ACCOUNTS.tail(len(self.ACCOUNTS) - 3).copy()
         expected[extra_cols[0]] = "test value"
         engine.accounts.add(expected)
-        assert_frame_equal(
-            engine.accounts.list(), expected, check_like=True,
+        current = engine.accounts.list()
+        account_numbers = accounts["account"].to_list()  # noqa: F841
+        assert current.query("account in @account_numbers")[extra_cols[0]].isna().all(), (
+            "Pre existing accounts should have new column with all NA values"
         )
+        assert_frame_equal(current, pd.concat([accounts, expected]), check_like=True)
 
         # Modify accounts with a new column
         expected = engine.accounts.list()
