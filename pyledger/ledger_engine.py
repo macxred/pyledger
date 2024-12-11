@@ -15,7 +15,11 @@ import openpyxl
 import pandas as pd
 from .decorators import timed_cache
 from .constants import (
+    ACCOUNT_SCHEMA,
+    ASSETS_SCHEMA,
     LEDGER_SCHEMA,
+    PRICE_SCHEMA,
+    REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
 )
@@ -276,36 +280,150 @@ class LedgerEngine(ABC):
     # Tax rates
 
     @classmethod
-    def sanitize_tax_codes(cls, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
-        """Validates and standardizes the 'tax_codes' DataFrame to ensure it contains
-        the required columns, correct data types, and logical consistency in the data.
+    def sanitize_tax_codes(cls,
+                           df: pd.DataFrame,
+                           accounts_df: pd.DataFrame = None,
+                           keep_extra_columns=False) -> pd.DataFrame:
+        """Validates and sanitizes the tax_codes DataFrame.
+
+        If no accounts DataFrame is provided, it is fetched via the list() method.
+        This parameter is needed since tax codes reference accounts, and their validity
+        depends on the existence and correctness of these accounts.
+
+        Invalid rates, missing account/contra fields for non-zero rates, and references
+        to unknown accounts are handled by discarding those entries.
+        Logs a warning for each discarded or modified entry.
 
         Args:
-            df (pd.DataFrame): The DataFrame representing the tax codes.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
+            df (pd.DataFrame): The raw tax_codes DataFrame.
+            accounts_df (pd.DataFrame, optional): Accounts DataFrame for reference validation.
+                If None, accounts are fetched by list(). Providing this DataFrame ensures
+                strict validation of account references in tax codes.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
 
         Returns:
-            pd.DataFrame: The standardized tax codes DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing, if data types are incorrect,
-                        or if logical inconsistencies are found (e.g., non-zero rates
-                        without defined accounts).
+            pd.DataFrame: The sanitized tax_codes DataFrame.
         """
-        # Enforce data frame schema
         df = enforce_schema(df, TAX_CODE_SCHEMA, keep_extra_columns=keep_extra_columns)
 
-        # Ensure account is defined if rate is other than zero
-        missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
-        if len(missing) > 0:
-            # TODO: Drop entries with missing account with a warning, rather than raising an error
-            raise ValueError(f"Account must be defined for non-zero rate in tax_codes: {missing}.")
+        # Validate rates
+        invalid_rates = (df["rate"] < 0) | (df["rate"] > 1)
+        if invalid_rates.any():
+            invalid_codes = df.loc[invalid_rates, "id"].tolist()
+            cls._logger.warning(
+                f"Discarding tax codes with invalid rates (not in [0,1]): {', '.join(map(str, invalid_codes))}."
+            )
+            df = df[~invalid_rates]
+
+        # If no accounts_df provided, fetch it
+        if accounts_df is None:
+            accounts_df = cls.accounts.list()
+
+        # Ensure account or contra is defined for non-zero rates
+        missing_accounts = (df["rate"] != 0) & ((df["account"].isna()) | (df["contra"].isna()))
+        if missing_accounts.any():
+            missing_codes = df.loc[missing_accounts, "id"].tolist()
+            cls._logger.warning(
+                f"Discarding tax codes with non-zero rates and missing accounts/contra: "
+                f"{', '.join(map(str, missing_codes))}."
+            )
+            df = df[~missing_accounts]
+
+        # Validate referenced accounts
+        valid_accounts = set(accounts_df["id"])
+        invalid_accounts_mask = ~df["account"].isin(valid_accounts) & df["account"].notna()
+        if invalid_accounts_mask.any():
+            invalid_codes = df.loc[invalid_accounts_mask, "id"].tolist()
+            cls._logger.warning(
+                f"Discarding tax codes with non-existent accounts: {', '.join(map(str, invalid_codes))}."
+            )
+            df = df[~invalid_accounts_mask]
 
         return df
 
     # ----------------------------------------------------------------------
     # Accounts
+
+    @classmethod
+    def sanitize_accounts(cls,
+                          df: pd.DataFrame,
+                          tax_codes_df: pd.DataFrame = None,
+                          keep_extra_columns=False) -> pd.DataFrame:
+        """Validates and sanitizes the accounts DataFrame.
+
+        If no tax_codes DataFrame is provided, it is fetched via the list() method.
+        This parameter is essential because accounts and tax codes are interdependent;
+        accounts may reference tax codes that must be verified against the known set of tax codes.
+
+        Invalid currencies and references to unknown tax codes are handled by dropping
+        or setting them to NA.
+        Logs a warning for each discarded or modified entry.
+
+        Args:
+            df (pd.DataFrame): The raw accounts DataFrame.
+            tax_codes_df (pd.DataFrame, optional): Tax codes DataFrame for validation. If None,
+                tax codes are fetched by list(). Providing this DataFrame allows the method to
+                strictly validate tax_code references in accounts.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized accounts DataFrame.
+        """
+        df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=keep_extra_columns)
+
+        # Validate assets
+        valid_assets = set(cls.sanitize_assets(cls.assets.list()))
+        invalid_asset_mask = ~df["currency"].isin(valid_assets)
+        if invalid_asset_mask.any():
+            invalid_asset_ids = df.loc[invalid_asset_mask, "id"].unique().tolist()
+            cls._logger.warning(
+                f"Discarding accounts with invalid currencies: {', '.join(map(str, invalid_asset_ids))}."
+            )
+            df = df[~invalid_asset_mask]
+
+        # Validate tax codes
+        if tax_codes_df is None:
+            tax_codes_df = cls.tax_codes.list()
+        valid_tax_codes = set(tax_codes_df["id"])
+        invalid_tax_code_mask = ~df["tax_code"].isin(valid_tax_codes) & df["tax_code"].notna()
+        if invalid_tax_code_mask.any():
+            invalid_tax_code_ids = df.loc[invalid_tax_code_mask, "id"].tolist()
+            cls._logger.warning(
+                f"Invalid tax codes found in accounts: {', '.join(map(str, invalid_tax_code_ids))}. "
+                f"Setting 'tax_code' to NA for these entries."
+            )
+            df.loc[invalid_tax_code_mask, "tax_code"] = pd.NA
+
+        return df
+
+    @classmethod
+    def sanitized_accounts_tax_codes(cls):
+        """Orchestrates the sanitization of interdependent accounts and tax codes DataFrames.
+
+        This method handles their mutual dependencies in a multi-step process:
+        1. Sanitize accounts with no confirmed tax_codes, setting invalid ones to NA.
+        2. Sanitize tax_codes using the partially sanitized accounts.
+        3. Re-sanitize accounts now that we have a validated tax_codes DataFrame, ensuring
+           accounts reference only valid, sanitized tax codes.
+
+        Logs warnings for each discarded or adjusted entry. This stepwise process ensures
+        both DataFrames end up consistent with each other.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: The fully sanitized accounts and tax_codes DataFrames.
+        """
+        # Step 1: Partial accounts sanitization
+        raw_accounts = cls.accounts.list()
+        raw_tax_codes = cls.tax_codes.list()
+        accounts_df_step1 = cls.sanitize_accounts(raw_accounts)
+
+        # Step 2: Sanitize tax_codes using partially sanitized accounts
+        tax_codes_df = cls.sanitize_tax_codes(raw_tax_codes, accounts_df=accounts_df_step1)
+
+        # Step 3: Re-validate accounts with the now fully validated tax_codes
+        accounts_df_final = cls.sanitize_accounts(raw_accounts, tax_codes_df=tax_codes_df)
+
+        return accounts_df_final, tax_codes_df
 
     def account_currency(self, account: int) -> str:
         accounts = self.accounts.list()
@@ -575,9 +693,11 @@ class LedgerEngine(ABC):
         Returns:
             pd.DataFrame: DataFrame with sanitized ledger entries.
         """
+        accounts, tax_codes = self.sanitized_accounts_tax_codes()
+
         # Discard undefined tax codes
         ledger["tax_code"] = ledger["tax_code"].str.strip()
-        invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(self.tax_codes.list()["id"])
+        invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(tax_codes["id"])
         if invalid.any():
             df = ledger.loc[invalid, ["id", "tax_code"]]
             df = df.groupby("id").agg({"tax_code": lambda x: x.unique()})
@@ -604,7 +724,7 @@ class LedgerEngine(ABC):
             to_discard.append(df.reset_index()[["id", "description"]])
 
         # 2. Discard journal entries with undefined accounts
-        valid_accounts = self.accounts.list()["account"].values
+        valid_accounts = accounts["account"].values
         invalid_accounts = []
         for col in ["account", "contra"]:
             invalid = ledger[col].notna() & ~ledger[col].isin(valid_accounts)
@@ -769,6 +889,36 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Price
 
+    @classmethod
+    def sanitize_prices(cls, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
+        """Validates and sanitizes the prices DataFrame.
+
+        Ensures that each price record references a valid ticker present in the ASSETS entity.
+        If a ticker does not exist in ASSETS, that price entry is discarded.
+
+        Args:
+            df (pd.DataFrame): The raw prices DataFrame.
+            assets_df (pd.DataFrame, optional): Assets DataFrame for validation.
+                If None, assets are fetched by list().
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized prices DataFrame.
+        """
+        df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
+
+        assets_df = cls.sanitize_assets(cls.assets.list())
+        valid_tickers = set(assets_df["ticker"])
+        invalid_ticker_mask = ~df["ticker"].isin(valid_tickers)
+        if invalid_ticker_mask.any():
+            invalid_tickers = df.loc[invalid_ticker_mask, "ticker"].unique().tolist()
+            cls._logger.warning(
+                f"Discarding prices with non-existent tickers: {', '.join(map(str, invalid_tickers))}."
+            )
+            df = df[~invalid_ticker_mask]
+
+        return df
+
     def price(
         self,
         ticker: str,
@@ -836,6 +986,33 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Assets
 
+    @classmethod
+    def sanitize_assets(cls, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
+        """Validates and sanitizes the assets DataFrame.
+
+        Ensures that each asset has a strictly positive increment.
+        If an asset violates this rule, that entry is discarded.
+
+        Args:
+            df (pd.DataFrame): The raw assets DataFrame.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized assets DataFrame.
+        """
+        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
+
+        # Validate increment > 0
+        invalid_increment_mask = df["increment"] <= 0
+        if invalid_increment_mask.any():
+            invalid_assets = df.loc[invalid_increment_mask, "ticker"].unique().tolist()
+            cls._logger.warning(
+                f"Discarding assets with non-positive increments: {', '.join(map(str, invalid_assets))}."
+            )
+            df = df[~invalid_increment_mask]
+
+        return df
+
     @property
     @timed_cache(15)
     def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
@@ -895,3 +1072,84 @@ class LedgerEngine(ABC):
                     f"No asset definition available for '{ticker}' on or before {date}."
                 )
             return asset.loc[mask[mask].index[-1], "increment"].item()
+
+    @classmethod
+    def sanitize_revaluations(cls,
+                            df: pd.DataFrame,
+                            keep_extra_columns=False) -> pd.DataFrame:
+        """Validates and sanitizes the revaluations DataFrame.
+
+        Validation Rules:
+
+        Valid Date:
+            - Each date must be valid. If invalid, discard that revaluation entry.
+
+        Valid Account Reference:
+            - At least one of credit or debit must be specified (not both None).
+            - The 'account', 'credit', and 'debit' fields (if not NA) must exist in the ACCOUNTS entity.
+            If these rules are violated, discard that revaluation.
+
+        Valid Price:
+            - For all involved accounts (account, credit, debit) where the account's currency is not
+            the reporting currency, a price must be available on the revaluation date to convert
+            that currency to the base currency. If no price is available, discard that revaluation.
+
+        Args:
+            df (pd.DataFrame): The raw revaluations DataFrame.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized revaluations DataFrame.
+        """
+        # Enforce schema
+        df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=keep_extra_columns)
+
+        # Validate date: discard rows with invalid dates (NaT)
+        invalid_date_mask = df["date"].isna()
+        if invalid_date_mask.any():
+            count = invalid_date_mask.sum()
+            cls._logger.warning(
+                f"Discarding {count} revaluations with invalid dates."
+            )
+            df = df[~invalid_date_mask]
+
+        # Valid Account Reference:
+        # Check at least one of credit or debit is specified (not NA)
+        both_missing_mask = df["credit"].isna() & df["debit"].isna()
+        if both_missing_mask.any():
+            count = both_missing_mask.sum()
+            cls._logger.warning(
+                f"Discarding {count} revaluations with no credit nor debit specified."
+            )
+            df = df[~both_missing_mask]
+
+        # Get sanitized accounts to validate account references
+        accounts_df = cls.sanitized_accounts_tax_codes()[0]  # accounts_df with columns ["id", "currency"]
+        valid_accounts = set(accounts_df["id"])
+
+        credit_mask = not df["credit"].isna() and (df["credit"] not in valid_accounts)
+        if credit_mask.any():
+            cls._logger.warning(
+                f""
+            )
+            # discard entries
+
+        debit_mask = not df["debit"].isna() and (df["debit"] not in valid_accounts)
+        if debit_mask.any():
+            cls._logger.warning(
+                f""
+            )
+            # discard entries
+
+        for row in df:
+            accounts = cls.account_range(row['account'])
+            accounts = set(accounts['add']) - set(accounts['subtract'])
+            for account in accounts:
+                currency = cls.account_currency(account)
+                if not currency == cls.reporting_currency:
+                    # suggest price() use sanitized data under the hood - need to update this
+                    cls.price(ticker=currency, currency=cls.reporting_currency)
+                    # if no error here and price are valid - good
+                    # else find a way to drop that only revaluation booking range account
+
+        return df
