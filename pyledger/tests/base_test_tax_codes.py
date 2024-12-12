@@ -21,7 +21,8 @@ class BaseTestTaxCodes(BaseTest):
             self.TAX_CODES["account"], self.TAX_CODES["contra"]
         ]).dropna().unique()
         tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
-        engine.restore(accounts=tax_accounts, tax_codes=[], settings=self.SETTINGS)
+        engine.restore(accounts=tax_accounts, tax_codes=[],
+                       settings=self.SETTINGS, assets=self.ASSETS)
         return engine
 
     def test_tax_codes_accessor_mutators(self, restored_engine, ignore_row_order=False):
