@@ -15,7 +15,9 @@ import openpyxl
 import pandas as pd
 from .decorators import timed_cache
 from .constants import (
+    ASSETS_SCHEMA,
     LEDGER_SCHEMA,
+    PRICE_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
 )
@@ -769,6 +771,43 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Price
 
+    def sanitize_prices(self, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
+        """Discards inconsistent price entries.
+
+        Ensures that each price entry references a valid ticker and currency present in the ASSETS.
+        If an price entry violates this rule, that entry is discarded.
+
+        Args:
+            df (pd.DataFrame): The raw prices DataFrame.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized prices DataFrame.
+        """
+        df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
+        id_columns = PRICE_SCHEMA.query("id == True")["column"].tolist()
+
+        def validate_asset_reference(column):
+            """Validates specified column values for asset references"""
+            def is_valid(row):
+                try:
+                    self.precision(ticker=row[column], date=row["date"])
+                    return True
+                except ValueError as e:
+                    self._logger.warning(
+                        f"Discard price entry ({row[id_columns].to_dict()}): Invalid {column}: {e}"
+                    )
+                    return False
+
+            return df.apply(is_valid, axis=1)
+
+        ticker_mask = validate_asset_reference("ticker")
+        currency_mask = validate_asset_reference("currency")
+        valid_mask = ticker_mask & currency_mask
+        df = df[valid_mask].reset_index(drop=True)
+
+        return df
+
     def price(
         self,
         ticker: str,
@@ -825,7 +864,8 @@ class LedgerEngine(ABC):
             `price` history sorted by `date` with `NaT` values first.
         """
         result = {}
-        for (ticker, currency), group in self.price_history.list().groupby(["ticker", "currency"]):
+        prices = self.sanitize_prices(self.price_history.list()).groupby(["ticker", "currency"])
+        for (ticker, currency), group in prices:
             group = group[["date", "price"]].sort_values("date", na_position="first")
             group = group.reset_index(drop=True)
             if ticker not in result.keys():
@@ -835,6 +875,34 @@ class LedgerEngine(ABC):
 
     # ----------------------------------------------------------------------
     # Assets
+
+    def sanitize_assets(self, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
+        """Discards inconsistent assets entries.
+
+        Ensures that each asset has a strictly positive increment.
+        If an asset violates this rule, that entry is discarded.
+
+        Args:
+            df (pd.DataFrame): The raw assets DataFrame.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized assets DataFrame.
+        """
+        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
+
+        # Validate increment > 0
+        invalid_increment_mask = df["increment"] <= 0
+        if invalid_increment_mask.any():
+            id_columns = ASSETS_SCHEMA.query("id == True")["column"].tolist()
+            invalid_assets = df.loc[invalid_increment_mask, id_columns].to_dict("records")
+            self._logger.warning(
+                f"Discarding assets with non-positive increments: "
+                f"{', '.join(map(str, invalid_assets))}."
+            )
+            df = df[~invalid_increment_mask].reset_index(drop=True)
+
+        return df
 
     @property
     @timed_cache(15)
@@ -854,7 +922,7 @@ class LedgerEngine(ABC):
                 .sort_values("date", na_position="first")
                 .reset_index(drop=True)
             )
-            for ticker, group in self.assets.list().groupby("ticker")
+            for ticker, group in self.sanitize_assets(self.assets.list()).groupby("ticker")
         }
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
