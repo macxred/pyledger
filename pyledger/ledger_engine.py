@@ -18,6 +18,7 @@ from .constants import (
     ASSETS_SCHEMA,
     LEDGER_SCHEMA,
     PRICE_SCHEMA,
+    REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
 )
@@ -971,3 +972,86 @@ class LedgerEngine(ABC):
                     f"No asset definition available for '{ticker}' on or before {date}."
                 )
             return asset.loc[mask[mask].index[-1], "increment"].item()
+
+    # ----------------------------------------------------------------------
+    # Revaluations
+
+    def sanitize_revaluations(self, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
+        """
+        Discards inconsistent revaluation entries.
+
+        Args:
+            df (pd.DataFrame): The raw revaluations DataFrame.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized revaluations DataFrame.
+        """
+        # Enforce schema
+        df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=keep_extra_columns)
+        id_columns = REVALUATION_SCHEMA.query("id == True")["column"].tolist()
+
+        # Validate date: discard rows with invalid dates (NaT)
+        invalid_date_mask = df["date"].isna()
+        if invalid_date_mask.any():
+            invalid_rows = df[invalid_date_mask][id_columns]
+            self._logger.warning(
+                f"Discarding {len(invalid_rows)} revaluation rows with invalid dates: "
+                f"{invalid_rows.to_dict(orient='records')}"
+            )
+            df = df[~invalid_date_mask]
+
+        # TODO: use sanitized accounts
+        valid_accounts = set(self.accounts.list()["account"])
+
+        # Ensure at least one of credit or debit is specified
+        both_missing_mask = df["credit"].isna() & df["debit"].isna()
+        if both_missing_mask.any():
+            invalid_rows = df[both_missing_mask][id_columns]
+            self._logger.warning(
+                f"Discarding {len(invalid_rows)} revaluations with no credit nor debit specified: "
+                f"{invalid_rows.to_dict(orient='records')}"
+            )
+            df = df[~both_missing_mask]
+
+        # Ensure non-missing credit and debit accounts exist in the accounts entity
+        invalid_credit_mask = ~df["credit"].isna() & ~df["credit"].isin(valid_accounts)
+        invalid_debit_mask = ~df["debit"].isna() & ~df["debit"].isin(valid_accounts)
+        invalid_account_mask = invalid_credit_mask | invalid_debit_mask
+
+        if invalid_account_mask.any():
+            invalid_rows = df[invalid_account_mask][id_columns]
+            self._logger.warning(
+                f"Discarding {len(invalid_rows)} revaluations with non-existent credit or "
+                f"debit accounts: {invalid_rows.to_dict(orient='records')}"
+            )
+            df = df[~invalid_account_mask]
+
+        def validate_account_currency(row):
+            """Validate account currencies prices against reporting currency"""
+            accounts = self.account_range(row["account"])
+            accounts = set(accounts["add"]) - set(accounts["subtract"])
+            for account in accounts:
+                account_currency = self.account_currency(account)
+                if account_currency != self.reporting_currency:
+                    try:
+                        self.price(
+                            ticker=account_currency,
+                            date=row["date"],
+                            currency=self.reporting_currency,
+                        )
+                    except Exception as e:
+                        invalid_row = row[id_columns].to_dict()
+                        self._logger.warning(
+                            f"Discarding revaluation row with no price definition for "
+                            f"account '{account}': {invalid_row}, Error: {e}"
+                        )
+                        return False
+            return True
+
+        currency_validation_mask = df.apply(validate_account_currency, axis=1)
+        if not currency_validation_mask.empty and not currency_validation_mask.all():
+            invalid_rows = df[~currency_validation_mask][id_columns]
+            df = df[currency_validation_mask]
+
+        return df.reset_index(drop=True)
