@@ -278,32 +278,64 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Tax rates
 
-    @classmethod
-    def sanitize_tax_codes(cls, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
-        """Validates and standardizes the 'tax_codes' DataFrame to ensure it contains
-        the required columns, correct data types, and logical consistency in the data.
+    def sanitize_tax_codes(self,
+                           df: pd.DataFrame,
+                           accounts_df: pd.DataFrame = None,
+                           keep_extra_columns=False) -> pd.DataFrame:
+        """Discards inconsistent tax codes.
+
+        If no accounts DataFrame is provided, it is fetched via the list() method.
+        This parameter is needed since tax codes reference accounts, and their validity
+        depends on the existence and correctness of these accounts.
+
+        Invalid rates, missing account/contra fields for non-zero rates, and references
+        to unknown accounts are handled by discarding those entries.
+        Logs a warning for each discarded or modified entry.
 
         Args:
-            df (pd.DataFrame): The DataFrame representing the tax codes.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
+            df (pd.DataFrame): The raw tax_codes DataFrame.
+            accounts_df (pd.DataFrame, optional): Accounts DataFrame for reference validation.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
 
         Returns:
-            pd.DataFrame: The standardized tax codes DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing, if data types are incorrect,
-                        or if logical inconsistencies are found (e.g., non-zero rates
-                        without defined accounts).
+            pd.DataFrame: The sanitized tax_codes DataFrame.
         """
-        # Enforce data frame schema
+
         df = enforce_schema(df, TAX_CODE_SCHEMA, keep_extra_columns=keep_extra_columns)
 
-        # Ensure account is defined if rate is other than zero
-        missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
-        if len(missing) > 0:
-            # TODO: Drop entries with missing account with a warning, rather than raising an error
-            raise ValueError(f"Account must be defined for non-zero rate in tax_codes: {missing}.")
+        # Validate rates
+        invalid_rates = (df["rate"] < 0) | (df["rate"] > 1)
+        if invalid_rates.any():
+            invalid_codes = df.loc[invalid_rates, "id"].tolist()
+            self._logger.warning(
+                "Discarding tax codes with invalid rates (must be between 0 and 1): "
+                f"{', '.join(map(str, invalid_codes))}."
+            )
+            df = df[~invalid_rates]
+
+        # Use current accounts if no provided
+        if accounts_df is None:
+            accounts_df = self.accounts.list()
+
+        # Ensure account or contra is defined for non-zero rates
+        missing_accounts = (df["rate"] != 0) & ((df["account"].isna()) | (df["contra"].isna()))
+        if missing_accounts.any():
+            missing_codes = df.loc[missing_accounts, "id"].tolist()
+            self._logger.warning(
+                f"Discarding tax codes with non-zero rates and missing accounts/contra: "
+                f"{', '.join(map(str, missing_codes))}."
+            )
+            df = df[~missing_accounts]
+
+        # Validate referenced accounts
+        valid_accounts = set(accounts_df["id"])
+        invalid_accounts_mask = ~df["account"].isin(valid_accounts) & df["account"].notna()
+        if invalid_accounts_mask.any():
+            invalid_codes = df.loc[invalid_accounts_mask, "id"].tolist()
+            self._logger.warning(
+                f"Discarding tax codes with non-existent accounts: {', '.join(map(str, invalid_codes))}."
+            )
+            df = df[~invalid_accounts_mask]
 
         return df
 
