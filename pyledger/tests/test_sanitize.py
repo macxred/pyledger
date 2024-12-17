@@ -135,3 +135,33 @@ def test_sanitize_revaluations(engine, capture_logs):
     )
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) > 0
+
+
+def test_sanitize_tax_codes(engine, capture_logs):
+    ACCOUNT_CSV = """
+        group,         account, currency, tax_code, description
+        Assets,           1000,      USD,         , Cash in Bank USD
+        Liabilities,      2000,      USD,         , Accounts Payable
+    """
+    TAX_CSV = """
+        id,            account,  rate,  is_inclusive,    description,             contra
+        EXEMPT,               ,  0.00,          True,    Exempt from VAT,
+        INVALID_RATE,      1000, 1.50,         False,    Invalid rate tax code,   1000
+        MISSING_ACCOUNT,   9999, 0.10,         False,    Account does not exist,  2000
+        MISSING_CONTRA,    1000, 0.10,         False,    Missing contra,
+        VALID,             1000, 0.05,         False,    Valid tax code,          2000
+    """
+    EXPECTED_TAX_CSV = """
+        id,      account,  rate,  is_inclusive,  description,      contra
+        EXEMPT,         ,  0.00,          True,  Exempt from VAT,
+        VALID,       1000, 0.05,         False,  Valid tax code,   2000
+    """
+    accounts = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    tax_codes = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    expected_tax_codes = pd.read_csv(StringIO(EXPECTED_TAX_CSV), skipinitialspace=True)
+    tax_codes = engine.tax_codes.standardize(tax_codes)
+
+    sanitized_tax_codes = engine.sanitize_tax_codes(tax_codes, accounts=accounts)
+    assert_frame_equal(engine.tax_codes.standardize(expected_tax_codes), sanitized_tax_codes)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) > 0
