@@ -280,7 +280,7 @@ class LedgerEngine(ABC):
 
     def sanitize_tax_codes(self,
                            df: pd.DataFrame,
-                           accounts_df: pd.DataFrame = None,
+                           accounts: pd.DataFrame = None,
                            keep_extra_columns=False) -> pd.DataFrame:
         """Discards inconsistent tax codes.
 
@@ -294,7 +294,7 @@ class LedgerEngine(ABC):
 
         Args:
             df (pd.DataFrame): The raw tax_codes DataFrame.
-            accounts_df (pd.DataFrame, optional): Accounts DataFrame for reference validation.
+            accounts (pd.DataFrame, optional): Accounts DataFrame for reference validation.
             keep_extra_columns (bool): If True, retains columns not defined in the schema.
 
         Returns:
@@ -314,8 +314,8 @@ class LedgerEngine(ABC):
             df = df[~invalid_rates]
 
         # Use current accounts if no provided
-        if accounts_df is None:
-            accounts_df = self.accounts.list()
+        if accounts is None:
+            accounts = self.accounts.list()
 
         # Ensure account or contra is defined for non-zero rates
         missing_accounts = (df["rate"] != 0) & ((df["account"].isna()) | (df["contra"].isna()))
@@ -328,16 +328,17 @@ class LedgerEngine(ABC):
             df = df[~missing_accounts]
 
         # Validate referenced accounts
-        valid_accounts = set(accounts_df["id"])
-        invalid_accounts_mask = ~df["account"].isin(valid_accounts) & df["account"].notna()
+        accounts = set(accounts["account"])
+        invalid_accounts_mask = ~df["account"].isin(accounts) & df["account"].notna()
         if invalid_accounts_mask.any():
             invalid_codes = df.loc[invalid_accounts_mask, "id"].tolist()
             self._logger.warning(
-                f"Discarding tax codes with non-existent accounts: {', '.join(map(str, invalid_codes))}."
+                "Discarding tax codes with non-existent accounts: "
+                f"{', '.join(map(str, invalid_codes))}."
             )
             df = df[~invalid_accounts_mask]
 
-        return df
+        return df.reset_index(drop=True)
 
     # ----------------------------------------------------------------------
     # Accounts
