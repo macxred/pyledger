@@ -15,6 +15,7 @@ import openpyxl
 import pandas as pd
 from .decorators import timed_cache
 from .constants import (
+    ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
     LEDGER_SCHEMA,
     PRICE_SCHEMA,
@@ -342,6 +343,69 @@ class LedgerEngine(ABC):
 
     # ----------------------------------------------------------------------
     # Accounts
+
+    def sanitize_accounts(
+        self,
+        df: pd.DataFrame,
+        tax_codes: pd.DataFrame = None,
+        keep_extra_columns=False,
+    ) -> pd.DataFrame:
+        """Sanitizes accounts by validating currencies and tax codes.
+
+        If no tax_codes DataFrame is provided, it is fetched via the list() method.
+        This parameter is essential because accounts and tax codes are interdependent;
+        accounts may reference tax codes that must be verified against the known set of tax codes.
+
+        Invalid currency references are handled by dropping them, invalid tax code references
+        setting them to NA. Logs a warning for each discarded or modified entry.
+
+        Args:
+            df (pd.DataFrame): The raw accounts DataFrame.
+            tax_codes (pd.DataFrame, optional): Tax codes DataFrame for validation.
+            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+
+        Returns:
+            pd.DataFrame: The sanitized accounts DataFrame.
+        """
+        df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=keep_extra_columns)
+        id_columns = ACCOUNT_SCHEMA.query("id == True")["column"].tolist()
+
+        def validate_currency() -> pd.Series:
+            """Validates the currency column using the precision() method."""
+            def is_valid(row):
+                try:
+                    self.precision(ticker=row["currency"])
+                    return True
+                except ValueError as e:
+                    self._logger.warning(
+                        f"Discard account entry ({row[id_columns].to_dict()}): Invalid currency: {e}"
+                    )
+                    return False
+
+            return df.apply(is_valid, axis=1)
+
+        # Validate currencies
+        valid_currency_mask = validate_currency()
+        if not valid_currency_mask.all():
+            self._logger.warning(
+                f"Discarding {(~valid_currency_mask).sum()} accounts with invalid currencies."
+            )
+            df = df.loc[valid_currency_mask]
+
+        # Validate tax codes
+        if tax_codes is None:
+            tax_codes = self.tax_codes.list()
+        tax_codes = set(tax_codes["id"])
+        invalid_tax_code_mask = ~df["tax_code"].isin(tax_codes) & df["tax_code"].notna()
+        if invalid_tax_code_mask.any():
+            invalid_ids = df.loc[invalid_tax_code_mask, id_columns].to_dict(orient="records")
+            self._logger.warning(
+                "Found accounts with invalid tax code references: "
+                f"{invalid_ids}. Setting 'tax_code' to NA for these entries."
+            )
+            df.loc[invalid_tax_code_mask, "tax_code"] = pd.NA
+
+        return df.reset_index(drop=True)
 
     def account_currency(self, account: int) -> str:
         accounts = self.accounts.list()
