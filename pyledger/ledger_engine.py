@@ -428,10 +428,10 @@ class LedgerEngine(ABC):
         accounts_df_step1 = self.sanitize_accounts(raw_accounts)
 
         # Step 2: Sanitize tax_codes using partially sanitized accounts
-        tax_codes_df = self.sanitize_tax_codes(raw_tax_codes, accounts_df=accounts_df_step1)
+        tax_codes_df = self.sanitize_tax_codes(raw_tax_codes, accounts=accounts_df_step1)
 
         # Step 3: Re-validate accounts with the now fully validated tax_codes
-        accounts_df_final = self.sanitize_accounts(raw_accounts, tax_codes_df=tax_codes_df)
+        accounts_df_final = self.sanitize_accounts(raw_accounts, tax_codes=tax_codes_df)
 
         return accounts_df_final, tax_codes_df
 
