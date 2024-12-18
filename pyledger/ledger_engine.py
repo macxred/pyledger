@@ -771,7 +771,7 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Price
 
-    def sanitize_prices(self, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
+    def sanitize_prices(self, df: pd.DataFrame) -> pd.DataFrame:
         """Discard incoherent price data.
 
         Discard price entries referencing tickers or currencies not defined as
@@ -779,12 +779,11 @@ class LedgerEngine(ABC):
 
         Args:
             df (pd.DataFrame): The input DataFrame with price data to validate.
-            keep_extra_columns (bool): If True, retains columns not defined in the schema.
 
         Returns:
             pd.DataFrame: The sanitized DataFrame with valid price entries.
         """
-        df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
+        df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=True)
         id_columns = PRICE_SCHEMA.query("id == True")["column"].tolist()
 
         def validate_asset_reference(column):
@@ -876,7 +875,7 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Assets
 
-    def sanitize_assets(self, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
+    def sanitize_assets(self, df: pd.DataFrame) -> pd.DataFrame:
         """Discard incoherent asset data.
 
         Discard entries with negative increment and log removed entries as
@@ -888,7 +887,7 @@ class LedgerEngine(ABC):
         Returns:
             pd.DataFrame: The sanitized DataFrame with valid asset entries.
         """
-        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
+        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=True)
 
         # Validate increment > 0
         invalid_increment_mask = df["increment"] <= 0
