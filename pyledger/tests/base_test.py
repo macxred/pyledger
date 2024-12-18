@@ -24,6 +24,7 @@ ACCOUNT_CSV = """
     Assets,                         1010,      EUR,         , Cash in Bank EUR
     Assets,                         1015,      EUR,         , Cash in other Bank EUR
     Assets,                         1020,      JPY,         , Cash in Bank JPY
+    Assets,                         1025,      CHF,         , Cash in Bank CHF
     Assets,                         1300,      USD,         , VAT Recoverable (Input VAT)
     Liabilities,                    2000,      USD,         , Accounts Payable USD
     Liabilities,                    2010,      USD,         , Accounts Payable EUR
@@ -79,7 +80,7 @@ LEDGER_CSV = """
     22, 2024-12-04,    1010,       ,      EUR,  9978888.88,    9500000.00,         , Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places),
     23, 2024-12-05,        ,   1000,      USD,   200000.00,              ,         , Convert USD to EUR and CHF,
     23,           ,    1010,       ,      EUR,    97750.00,     100000.00,         , Convert USD to EUR and CHF,
-    23,           ,    1020,       ,      CHF, 14285714.29,     100000.00,         , Convert USD to EUR and CHF,
+    23,           ,    1025,       ,      CHF, 14285714.29,     100000.00,         , Convert USD to EUR and CHF,
 """
 LEDGER = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 # flake8: enable
@@ -113,6 +114,7 @@ PRICES_CSV = """
     2024-03-29,    JPY, 0.0066, USD
     2024-06-28,    JPY, 0.0062, USD
     2024-09-30,    JPY, 0.0070, USD
+    2023-12-29,    CHF,  0.007, USD
 """
 PRICES = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
 
@@ -128,9 +130,9 @@ REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 # flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
     date,         account, balance
-    2023-12-31, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0}"
-    2024-01-01, 1000:9999, "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0}"
-    2024-01-01, 1000:1999, "{reporting_currency: 1098332.82, USD:   800000.00, EUR: 120.0, JPY: 42000000.0}"
+    2023-12-31, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-01-01, 1000:9999, "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-01-01, 1000:1999, "{reporting_currency: 1098332.82, USD:   800000.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-01-01,      1000, "{reporting_currency:  800000.00, USD:   800000.00}"
     2024-01-01,      1010, "{reporting_currency:     132.82, EUR:      120.00}"
     2024-01-01,      1020, "{reporting_currency:  298200.00, JPY: 42000000.00}"
@@ -138,8 +140,8 @@ EXPECTED_BALANCE_CSV = """
     2024-01-23,      2200, "{reporting_currency:       0.00, USD:        0.00}"
     2024-01-24,      1000, "{reporting_currency:  801200.00, USD:   801200.00}"
     2024-01-24,      2200, "{reporting_currency:    -200.00, USD:     -200.00}"
-    2024-03-30, 1000:1999, "{reporting_currency: 1099532.82, USD:   801200.00, EUR: 120.0, JPY: 42000000.0}"
-    2024-03-31, 1000:1999, "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0}"
+    2024-03-30, 1000:1999, "{reporting_currency: 1099532.82, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-03-31, 1000:1999, "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-03-31,      7050, "{reporting_currency:   21003.29, USD:    21003.29}"
     2024-03-31,      8050, "{reporting_currency:       0.00, USD:        0.00}"
 """
