@@ -772,17 +772,17 @@ class LedgerEngine(ABC):
     # Price
 
     def sanitize_prices(self, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
-        """Discards inconsistent price entries.
+        """Discard incoherent price data.
 
-        Ensures that each price entry references a valid ticker and currency present in the ASSETS.
-        If an price entry violates this rule, that entry is discarded.
+        Discard price entries referencing tickers or currencies not defined as
+        assets. Removed entries are logged as warnings.
 
         Args:
-            df (pd.DataFrame): The raw prices DataFrame.
+            df (pd.DataFrame): The input DataFrame with price data to validate.
             keep_extra_columns (bool): If True, retains columns not defined in the schema.
 
         Returns:
-            pd.DataFrame: The sanitized prices DataFrame.
+            pd.DataFrame: The sanitized DataFrame with valid price entries.
         """
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=keep_extra_columns)
         id_columns = PRICE_SCHEMA.query("id == True")["column"].tolist()
@@ -877,17 +877,16 @@ class LedgerEngine(ABC):
     # Assets
 
     def sanitize_assets(self, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
-        """Discards inconsistent assets entries.
+        """Discard incoherent asset data.
 
-        Ensures that each asset has a strictly positive increment.
-        If an asset violates this rule, that entry is discarded.
+        Discard entries with negative increment and log removed entries as
+        warnings.
 
         Args:
-            df (pd.DataFrame): The raw assets DataFrame.
-            keep_extra_columns (bool): If True, retains columns not defined in the schema.
+            df (pd.DataFrame): The input DataFrame with assets to validate.
 
         Returns:
-            pd.DataFrame: The sanitized assets DataFrame.
+            pd.DataFrame: The sanitized DataFrame with valid asset entries.
         """
         df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=keep_extra_columns)
 

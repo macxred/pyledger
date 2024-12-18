@@ -1,4 +1,4 @@
-"""Test suit for testing sanitize ledger operations"""
+"""Test suit for sanitize_xy methods."""
 
 from io import StringIO
 import logging
