@@ -407,6 +407,34 @@ class LedgerEngine(ABC):
 
         return df.reset_index(drop=True)
 
+    def sanitized_accounts_tax_codes(self):
+        """Orchestrates the sanitization of interdependent accounts and tax codes DataFrames.
+
+        This method handles their mutual dependencies in a multi-step process:
+        1. Sanitize accounts with no confirmed tax_codes, setting invalid ones to NA.
+        2. Sanitize tax_codes using the partially sanitized accounts.
+        3. Re-sanitize accounts now that we have a validated tax_codes DataFrame, ensuring
+           accounts reference only valid, sanitized tax codes.
+
+        Logs warnings for each discarded or adjusted entry. This stepwise process ensures
+        both DataFrames end up consistent with each other.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: The fully sanitized accounts and tax_codes DataFrames.
+        """
+        # Step 1: Partial accounts sanitization
+        raw_accounts = self.accounts.list()
+        raw_tax_codes = self.tax_codes.list()
+        accounts_df_step1 = self.sanitize_accounts(raw_accounts)
+
+        # Step 2: Sanitize tax_codes using partially sanitized accounts
+        tax_codes_df = self.sanitize_tax_codes(raw_tax_codes, accounts_df=accounts_df_step1)
+
+        # Step 3: Re-validate accounts with the now fully validated tax_codes
+        accounts_df_final = self.sanitize_accounts(raw_accounts, tax_codes_df=tax_codes_df)
+
+        return accounts_df_final, tax_codes_df
+
     def account_currency(self, account: int) -> str:
         accounts = self.accounts.list()
         if not int(account) in accounts["account"].values:
