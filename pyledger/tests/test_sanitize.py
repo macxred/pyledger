@@ -161,10 +161,16 @@ def test_sanitize_tax_codes(engine, capture_logs):
     expected_tax_codes = pd.read_csv(StringIO(EXPECTED_TAX_CSV), skipinitialspace=True)
     tax_codes = engine.tax_codes.standardize(tax_codes)
 
+    # Test sanitize process with specified accounts DataFrame
     sanitized_tax_codes = engine.sanitize_tax_codes(tax_codes, accounts=accounts)
     assert_frame_equal(engine.tax_codes.standardize(expected_tax_codes), sanitized_tax_codes)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) > 0
+
+    # Test sanitize process with populated accounts
+    engine.restore(accounts=accounts)
+    sanitized_tax_codes = engine.sanitize_tax_codes(tax_codes)
+    assert_frame_equal(engine.tax_codes.standardize(expected_tax_codes), sanitized_tax_codes)
 
 
 def test_sanitize_accounts(engine, capture_logs):
