@@ -784,27 +784,42 @@ class LedgerEngine(ABC):
             pd.DataFrame: The sanitized DataFrame with valid price entries.
         """
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=True)
-        id_columns = PRICE_SCHEMA.query("id == True")["column"].tolist()
 
-        def validate_asset_reference(column):
-            """Validates specified column values for asset references"""
-            def is_valid(row):
+        # The `precision` method validates the existence of a valid asset definition
+        # and relies on sanitized data, serving as a centralized validation point.
+        def invalid_asset_reference(ticker: pd.Series, date: pd.Series) -> pd.Series:
+            """Validate specified column values for asset references."""
+            def is_valid(ticker, date):
                 try:
-                    self.precision(ticker=row[column], date=row["date"])
+                    self.precision(ticker=ticker, date=date)
                     return True
-                except ValueError as e:
-                    self._logger.warning(
-                        f"Discard price entry ({row[id_columns].to_dict()}): Invalid {column}: {e}"
-                    )
+                except ValueError:
                     return False
+            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
 
-            return df.apply(is_valid, axis=1)
+        ticker_mask = invalid_asset_reference(df["ticker"], df["date"])
+        currency_mask = invalid_asset_reference(df["currency"], df["date"])
 
-        ticker_mask = validate_asset_reference("ticker")
-        currency_mask = validate_asset_reference("currency")
+        if not ticker_mask.all():
+            invalid_tickers = df.loc[~ticker_mask, "ticker"].unique().tolist()
+            truncated_tickers = (invalid_tickers[:3] + ["..."]
+                                 if len(invalid_tickers) > 3 else invalid_tickers)
+            self._logger.warning(
+                f"Discard {len(df) - sum(ticker_mask)} price entries with invalid "
+                f"tickers {truncated_tickers}."
+            )
+        if not currency_mask.all():
+            invalid_currencies = df.loc[~currency_mask, "currency"].unique().tolist()
+            truncated_currencies = (invalid_currencies[:3] + ["..."]
+                                    if len(invalid_currencies) > 3 else
+                                    invalid_currencies)
+            self._logger.warning(
+                f"Discard {len(df) - sum(currency_mask)} price entries with invalid "
+                f"currencies {truncated_currencies}."
+            )
+
         valid_mask = ticker_mask & currency_mask
         df = df[valid_mask].reset_index(drop=True)
-
         return df
 
     def price(
