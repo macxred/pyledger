@@ -141,7 +141,8 @@ class StandaloneLedger(LedgerEngine):
         )
 
         # Add ledger entries for (currency or other) revaluations
-        revalue = self.revaluation_entries(ledger=df, revaluations=self.revaluations.list())
+        revaluations = self.sanitize_revaluations(self.revaluations.list())
+        revalue = self.revaluation_entries(ledger=df, revaluations=revaluations)
         return pd.concat([df, revalue], ignore_index=True)
 
     def revaluation_entries(self, ledger: pd.DataFrame, revaluations: pd.DataFrame) -> pd.DataFrame:
