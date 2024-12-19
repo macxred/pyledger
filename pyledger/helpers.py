@@ -2,7 +2,7 @@
 writing fixed-width CSV files and checking if values can be represented as integers.
 """
 
-from typing import Any
+from typing import Any, List
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -133,3 +133,26 @@ def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv):
         full_path = root / path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         func(group.drop(columns="__csv_path__"), full_path)
+
+
+def first_elements_as_str(x: List[Any], n: int = 5) -> str:
+    """
+    Return a concise, comma-separated string of the first `n` elements of the list `x`.
+
+    If the list has more than `n` elements, append "..." at the end.
+    This is useful for logging or error messages when the full list
+    would be too long to display.
+
+    Args:
+        x (List[Any]): The list to preview.
+        n (int): The number of elements to include in the preview.
+
+    Returns:
+        str: A comma-separated preview of the first `n` elements, possibly ending in "...".
+    """
+    if not x:
+        return ""
+    result = [str(i) for i in x[:n]]
+    if len(x) > n:
+        result.append("...")
+    return ", ".join(result)

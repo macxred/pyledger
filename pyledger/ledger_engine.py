@@ -15,13 +15,15 @@ import openpyxl
 import pandas as pd
 from .decorators import timed_cache
 from .constants import (
+    ASSETS_SCHEMA,
     LEDGER_SCHEMA,
+    PRICE_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
 )
 from .storage_entity import AccountingEntity
 from . import excel
-from .helpers import represents_integer
+from .helpers import first_elements_as_str, represents_integer
 from .time import parse_date_span
 
 
@@ -769,6 +771,52 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Price
 
+    def sanitize_prices(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard incoherent price data.
+
+        Discard price entries referencing tickers or currencies not defined as
+        assets. Removed entries are logged as warnings.
+
+        Args:
+            df (pd.DataFrame): The input DataFrame with price data to validate.
+
+        Returns:
+            pd.DataFrame: The sanitized DataFrame with valid price entries.
+        """
+        df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=True)
+
+        # The `precision` method validates the existence of a valid asset definition
+        # and relies on sanitized data, serving as a centralized validation point.
+        def invalid_asset_reference(ticker: pd.Series, date: pd.Series) -> pd.Series:
+            """Validate specified column values for asset references."""
+            def is_valid(ticker, date):
+                try:
+                    self.precision(ticker=ticker, date=date)
+                    return False
+                except ValueError:
+                    return True
+            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
+
+        invalid_tickers_mask = invalid_asset_reference(df["ticker"], df["date"])
+        invalid_currencies_mask = invalid_asset_reference(df["currency"], df["date"])
+
+        if invalid_tickers_mask.any():
+            invalid_tickers = df.loc[invalid_tickers_mask, "ticker"].unique().tolist()
+            self._logger.warning(
+                f"Discard {len(invalid_tickers)} price entries with invalid "
+                f"tickers: {first_elements_as_str(invalid_tickers)}."
+            )
+        if invalid_currencies_mask.any():
+            invalid_currencies = df.loc[invalid_currencies_mask, "currency"].unique().tolist()
+            self._logger.warning(
+                f"Discard {len(invalid_currencies)} price entries with invalid "
+                f"currencies: {first_elements_as_str(invalid_currencies)}."
+            )
+
+        invalid_mask = invalid_tickers_mask | invalid_currencies_mask
+        df = df[~invalid_mask].reset_index(drop=True)
+        return df
+
     def price(
         self,
         ticker: str,
@@ -825,7 +873,8 @@ class LedgerEngine(ABC):
             `price` history sorted by `date` with `NaT` values first.
         """
         result = {}
-        for (ticker, currency), group in self.price_history.list().groupby(["ticker", "currency"]):
+        prices = self.sanitize_prices(self.price_history.list()).groupby(["ticker", "currency"])
+        for (ticker, currency), group in prices:
             group = group[["date", "price"]].sort_values("date", na_position="first")
             group = group.reset_index(drop=True)
             if ticker not in result.keys():
@@ -835,6 +884,33 @@ class LedgerEngine(ABC):
 
     # ----------------------------------------------------------------------
     # Assets
+
+    def sanitize_assets(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard incoherent asset data.
+
+        Discard entries with negative increment and log removed entries as
+        warnings.
+
+        Args:
+            df (pd.DataFrame): The input DataFrame with assets to validate.
+
+        Returns:
+            pd.DataFrame: The sanitized DataFrame with valid asset entries.
+        """
+        df = enforce_schema(df, ASSETS_SCHEMA, keep_extra_columns=True)
+
+        # Validate increment > 0
+        invalid_increment_mask = df["increment"] <= 0
+        if invalid_increment_mask.any():
+            id_columns = ASSETS_SCHEMA.query("id == True")["column"].tolist()
+            invalid_assets = df.loc[invalid_increment_mask, id_columns].to_dict("records")
+            self._logger.warning(
+                f"Discarding assets with non-positive increments: "
+                f"{first_elements_as_str(invalid_assets)}."
+            )
+            df = df[~invalid_increment_mask].reset_index(drop=True)
+
+        return df
 
     @property
     @timed_cache(15)
@@ -854,7 +930,7 @@ class LedgerEngine(ABC):
                 .sort_values("date", na_position="first")
                 .reset_index(drop=True)
             )
-            for ticker, group in self.assets.list().groupby("ticker")
+            for ticker, group in self.sanitize_assets(self.assets.list()).groupby("ticker")
         }
 
     def precision(self, ticker: str, date: datetime.date = None) -> float:
