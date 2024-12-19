@@ -998,10 +998,9 @@ class LedgerEngine(ABC):
         invalid_date_mask = df["date"].isna()
         if invalid_date_mask.any():
             invalid = df.loc[invalid_date_mask, id_columns].to_dict(orient='records')
-            truncated_rows = invalid[:3] + ["..."] if len(invalid) > 3 else invalid
             self._logger.warning(
                 f"Discarding {len(invalid)} revaluation rows with invalid dates: "
-                f"{truncated_rows}"
+                f"{first_elements_as_str(invalid)}"
             )
             df = df.loc[~invalid_date_mask]
 
@@ -1012,10 +1011,9 @@ class LedgerEngine(ABC):
         both_missing_mask = df["credit"].isna() & df["debit"].isna()
         if both_missing_mask.any():
             invalid = df.loc[both_missing_mask, id_columns].to_dict(orient='records')
-            truncated_rows = invalid[:3] + ["..."] if len(invalid) > 3 else invalid
             self._logger.warning(
                 f"Discarding {len(invalid)} revaluations with no credit nor debit specified: "
-                f"{truncated_rows}"
+                f"{first_elements_as_str(invalid)}"
             )
             df = df.loc[~both_missing_mask]
 
@@ -1025,10 +1023,9 @@ class LedgerEngine(ABC):
         invalid_account_mask = invalid_credit_mask | invalid_debit_mask
         if invalid_account_mask.any():
             invalid = df.loc[invalid_account_mask, id_columns].to_dict(orient='records')
-            truncated_rows = invalid[:3] + ["..."] if len(invalid) > 3 else invalid
             self._logger.warning(
                 f"Discarding {len(invalid)} revaluations with non-existent "
-                f"credit or debit accounts: {truncated_rows}"
+                f"credit or debit accounts: {first_elements_as_str(invalid)}"
             )
             df = df.loc[~invalid_account_mask]
 
@@ -1061,10 +1058,9 @@ class LedgerEngine(ABC):
         currency_validation_mask = validate_account_prices(df["account"], df["date"])
         if not currency_validation_mask.all():
             invalid = df.loc[~currency_validation_mask, id_columns].to_dict(orient='records')
-            truncated_rows = invalid[:3] + ["..."] if len(invalid) > 3 else invalid
             self._logger.warning(
                 f"Discarding {len(invalid)} revaluation rows with no price definition "
-                f"for required currencies: {truncated_rows}"
+                f"for required currencies: {first_elements_as_str(invalid)}"
             )
             df = df.loc[currency_validation_mask]
 
