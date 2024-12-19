@@ -23,7 +23,7 @@ from .constants import (
 )
 from .storage_entity import AccountingEntity
 from . import excel
-from .helpers import represents_integer
+from .helpers import first_elements_as_str, represents_integer
 from .time import parse_date_span
 
 
@@ -792,34 +792,29 @@ class LedgerEngine(ABC):
             def is_valid(ticker, date):
                 try:
                     self.precision(ticker=ticker, date=date)
-                    return True
-                except ValueError:
                     return False
+                except ValueError:
+                    return True
             return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
 
-        ticker_mask = invalid_asset_reference(df["ticker"], df["date"])
-        currency_mask = invalid_asset_reference(df["currency"], df["date"])
+        invalid_tickers_mask = invalid_asset_reference(df["ticker"], df["date"])
+        invalid_currencies_mask = invalid_asset_reference(df["currency"], df["date"])
 
-        if not ticker_mask.all():
-            invalid_tickers = df.loc[~ticker_mask, "ticker"].unique().tolist()
-            truncated_tickers = (invalid_tickers[:3] + ["..."]
-                                 if len(invalid_tickers) > 3 else invalid_tickers)
+        if invalid_tickers_mask.any():
+            invalid_tickers = df.loc[invalid_tickers_mask, "ticker"].unique().tolist()
             self._logger.warning(
-                f"Discard {len(df) - sum(ticker_mask)} price entries with invalid "
-                f"tickers {truncated_tickers}."
+                f"Discard {len(invalid_tickers)} price entries with invalid "
+                f"tickers: {first_elements_as_str(invalid_tickers)}."
             )
-        if not currency_mask.all():
-            invalid_currencies = df.loc[~currency_mask, "currency"].unique().tolist()
-            truncated_currencies = (invalid_currencies[:3] + ["..."]
-                                    if len(invalid_currencies) > 3 else
-                                    invalid_currencies)
+        if invalid_currencies_mask.any():
+            invalid_currencies = df.loc[invalid_currencies_mask, "currency"].unique().tolist()
             self._logger.warning(
-                f"Discard {len(df) - sum(currency_mask)} price entries with invalid "
-                f"currencies {truncated_currencies}."
+                f"Discard {len(invalid_currencies)} price entries with invalid "
+                f"currencies: {first_elements_as_str(invalid_currencies)}."
             )
 
-        valid_mask = ticker_mask & currency_mask
-        df = df[valid_mask].reset_index(drop=True)
+        invalid_mask = invalid_tickers_mask | invalid_currencies_mask
+        df = df[~invalid_mask].reset_index(drop=True)
         return df
 
     def price(
@@ -911,7 +906,7 @@ class LedgerEngine(ABC):
             invalid_assets = df.loc[invalid_increment_mask, id_columns].to_dict("records")
             self._logger.warning(
                 f"Discarding assets with non-positive increments: "
-                f"{', '.join(map(str, invalid_assets))}."
+                f"{first_elements_as_str(invalid_assets)}."
             )
             df = df[~invalid_increment_mask].reset_index(drop=True)
 
