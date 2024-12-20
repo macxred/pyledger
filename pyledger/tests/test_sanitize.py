@@ -209,6 +209,7 @@ def test_sanitize_accounts(engine, capture_logs):
     sanitized = engine.sanitize_accounts(standardized_accounts)
     assert_frame_equal(engine.accounts.standardize(expected), sanitized)
 
+
 def test_sanitized_accounts_tax_codes(engine, capture_logs):
     TAX_CSV = """
         id,            account, rate,  is_inclusive,    description,            contra
