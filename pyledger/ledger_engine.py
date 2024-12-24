@@ -691,93 +691,160 @@ class LedgerEngine(ABC):
         """
         return self.serialize_ledger(self.ledger.list())
 
-    def sanitize_ledger(self, ledger: pd.DataFrame) -> pd.DataFrame:
-        """Discards inconsistent ledger entries and inconsistent tax codes.
+    def sanitize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discards inconsistent ledger entries.
 
         Logs a warning for each discarded entry with reason for dropping.
 
         Args:
-            ledger (pd.DataFrame): Ledger data as a DataFrame.
+            df (pd.DataFrame): Ledger data as a DataFrame.
 
         Returns:
             pd.DataFrame: DataFrame with sanitized ledger entries.
         """
-        # Discard undefined tax codes
-        ledger["tax_code"] = ledger["tax_code"].str.strip()
-        invalid = ledger["tax_code"].notna() & ~ledger["tax_code"].isin(self.tax_codes.list()["id"])
-        if invalid.any():
-            df = ledger.loc[invalid, ["id", "tax_code"]]
-            df = df.groupby("id").agg({"tax_code": lambda x: x.unique()})
-            for id, codes in df.iterrows():
-                if len(codes) > 1:
-                    self._logger.warning(
-                        f"Discard unknown tax codes {', '.join([f'{x}' for x in codes])} at '{id}'."
-                    )
-                else:
-                    self._logger.warning(f"Discard unknown tax code '{codes.iloc[0]}' at '{id}'.")
-            ledger.loc[invalid, "tax_code"] = None
 
-        # Collect postings to be discarded as pd.DataFrame with columns 'id' and
-        # "description". The latter specifies the reason(s) why the entry is discarded.
-        to_discard = []  # List[pd.DataFrame['id', "description"]]
-
-        # 1. Discard journal entries with non-unique dates
-        grouped = ledger[["date", "id"]].groupby("id")
-        df = grouped.filter(lambda x: x["date"].nunique() > 1)
-        if df.shape[0] > 0:
-            df = df.drop_duplicates()
-            df["description"] = df["date"].astype(pd.StringDtype())
-            df = df.groupby("id").agg({"description": lambda x: f"multiple dates {', '.join(x)}"})
-            to_discard.append(df.reset_index()[["id", "description"]])
-
-        # 2. Discard journal entries with undefined accounts
-        valid_accounts = self.accounts.list()["account"].values
-        invalid_accounts = []
-        for col in ["account", "contra"]:
-            invalid = ledger[col].notna() & ~ledger[col].isin(valid_accounts)
-            if invalid.any():
-                df = ledger.loc[invalid, ["id", col]]
-                df = df.rename(columns={col: "account"})
-                invalid_accounts.append(df)
-        if len(invalid_accounts) > 0:
-            df = pd.concat(invalid_accounts)
-            df = df.groupby("id").agg({"account": lambda x: x.unique()})
-            df["description"] = [
-                f"Accounts {', '.join([str(y) for y in x])} not defined"
-                if len(x) > 1
-                else f"Account {x[0]} not defined"
-                for x in df["account"]
-            ]
-            to_discard.append(df.reset_index()[["id", "description"]])
-
-        # 2. Discard journal entries without amount or balance or with both
-        if "target_balance" in ledger.columns:
-            invalid = ledger["amount"].isna() & ledger["target_balance"].isna()
-        else:
-            invalid = ledger["amount"].isna()
-        if invalid.any():
-            df = pd.DataFrame(
-                {"id": ledger.loc[invalid, "id"].unique(), "description": "amount missing"}
+        # Identify rows where one transaction (i.e., same 'id') spans multiple dates
+        grouped = df.groupby("id")
+        invalid_mask = grouped["date"].transform("nunique") > 1
+        if invalid_mask.any():
+            invalid_ids = df.loc[invalid_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries where a single 'id' "
+                f"has more than one 'date': {first_elements_as_str(invalid_ids)}"
             )
-            to_discard.append(df)
-        if "target_balance" in ledger.columns:
-            invalid = ledger["amount"].notna() & ledger["target_balance"].notna()
-            if invalid.any():
-                df = pd.DataFrame({
-                    "id": ledger.loc[invalid, "id"].unique(),
-                    "description": "both amount and target amount defined"
-                })
-                to_discard.append(df)
+            df = df.query("id not in @invalid_ids")
 
-        # Discard journal postings identified above
-        if len(to_discard) > 0:
-            df = pd.concat(to_discard)
-            df = df.groupby("id").agg({"description": lambda x: ", ".join(x)})
-            for id, description in zip(df.index, df["description"]):
-                self._logger.warning(f"Discard ledger entry '{id}': {description}.")
-            ledger = ledger.loc[~ledger["id"].isin(df.index), :]
+        accounts, tax_codes = self.sanitized_accounts_tax_codes()
 
-        return ledger
+        # Validate tax codes reference
+        invalid_tax_code_mask = ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
+        if invalid_tax_code_mask.any():
+            invalid_ids = df.loc[invalid_tax_code_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries with invalid tax codes: "
+                f"{first_elements_as_str(invalid_ids)}"
+            )
+            df = df.query("id not in @invalid_ids")
+
+        # Validate that at least one of 'account' or 'contra' is specified
+        missing_account_mask = df["account"].isna() & df["contra"].isna()
+        if missing_account_mask.any():
+            invalid_ids = df.loc[missing_account_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries with neither 'account' "
+                f"nor 'contra' specified: {first_elements_as_str(invalid_ids)}"
+            )
+            df = df.query("id not in @invalid_ids")
+
+        # Validate account reference
+        accounts_set = set(accounts["account"])
+        invalid_account_mask = ~df["account"].isna() & ~df["account"].isin(accounts_set)
+        invalid_contra_mask = ~df["contra"].isna() & ~df["contra"].isin(accounts_set)
+        invalid_accounts_mask = invalid_account_mask | invalid_contra_mask
+        if invalid_accounts_mask.any():
+            invalid_ids = df.loc[invalid_accounts_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries with invalid account "
+                f"or contra references: {first_elements_as_str(invalid_ids)}"
+            )
+            df = df.query("id not in @invalid_ids")
+
+        # Validate assets reference
+
+        # The `precision` method validates the existence of a valid asset definition
+        # and relies on sanitized data, serving as a centralized validation point.
+        def invalid_asset_reference(ticker: pd.Series, date: pd.Series) -> pd.Series:
+            """Validate specified column values for asset references."""
+            def is_valid(ticker, date):
+                try:
+                    self.precision(ticker=ticker, date=date)
+                    return False
+                except ValueError:
+                    return True
+            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
+        invalid_tickers_mask = invalid_asset_reference(df["currency"], df["date"])
+        if invalid_tickers_mask.any():
+            invalid_ids = df.loc[invalid_tickers_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries with invalid currency: "
+                f"{first_elements_as_str(invalid_ids)}"
+            )
+            df = df.query("id not in @invalid_ids")
+
+        # Validate transaction currency
+        def validate_transaction_currency(row) -> bool:
+            """Validate that the transaction currency matches the account or contra currency."""
+            if row["amount"] == 0:
+                return True
+            if pd.notna(row["account"]) & pd.isna(row["contra"]):
+                account_currency = self.account_currency(row["account"])
+                if row["currency"] == account_currency:
+                    return True
+            if pd.notna(row["contra"]) & pd.isna(row["account"]):
+                contra_currency = self.account_currency(row["contra"])
+                if row["currency"] == contra_currency:
+                    return True
+            return True
+        invalid_currency_mask = ~df.apply(validate_transaction_currency, axis=1)
+        if invalid_currency_mask.any():
+            invalid_ids = df.loc[invalid_currency_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries with mismatched "
+                f"transaction currency: {first_elements_as_str(invalid_ids)}"
+            )
+            df = df.query("id not in @invalid_ids")
+
+        # Validate price reference
+        def validate_prices(
+            ticker: pd.Series, date: pd.Series, report_amount: pd.Series
+        ) -> pd.Series:
+            """Validate specified column values for asset references."""
+            def is_valid(ticker, date):
+                if ticker == self.reporting_currency or pd.notna(report_amount):
+                    return True
+                try:
+                    self.price(ticker=ticker, date=date, currency=self.reporting_currency)
+                    return False
+                except ValueError:
+                    return True
+            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
+        invalid_prices_mask = validate_prices(df["account"], df["date"])
+        if invalid_prices_mask.any():
+            invalid_ids = df.loc[invalid_prices_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries with invalid price: "
+                f"{first_elements_as_str(invalid_ids)}"
+            )
+            df = df.query("id not in @invalid_ids")
+
+        # Validate balancing amounts
+        def validate_balancing_amounts(group: pd.DataFrame) -> bool:
+            """Validate that the sum of amounts balances to zero per currency for each group."""
+            def compute_effective_amount(row):
+                """Compute the effective amount for each row."""
+                if not pd.isna(row["account"]) and not pd.isna(row["contra"]):
+                    return 0  # Account and contra cancel each other out
+                if not pd.isna(row["account"]):
+                    return row["amount"]  # Positive for account
+                if not pd.isna(row["contra"]):
+                    return -row["amount"]  # Negative for contra
+                return 0  # Default fallback for invalid rows
+            group["effective_amount"] = group.apply(compute_effective_amount, axis=1)
+            net_amounts = group.groupby("currency")["effective_amount"].sum()
+            return (net_amounts.round(2) == 0).all()
+        grouped = df.groupby("id")
+        invalid_balance_ids = [
+            group_id for group_id, group in grouped
+            if not validate_balancing_amounts(group)
+        ]
+        if invalid_balance_ids:
+            self._logger.warning(
+                f"Discarding {len(invalid_balance_ids)} ledger entries where "
+                f"amounts do not balance to zero: {first_elements_as_str(invalid_balance_ids)}"
+            )
+            df = df.query("id not in @invalid_balance_ids")
+
+        return df.reset_index(drop=True)
 
     def serialize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
         """Serializes the ledger into a long format.
