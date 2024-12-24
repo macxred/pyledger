@@ -313,7 +313,7 @@ class LedgerEngine(ABC):
             accounts = self.sanitize_accounts(self.accounts.list(), tax_codes=df)
 
         # Ensure account/contra is defined for non-zero rates
-        missing_accounts = (df["rate"] != 0) & ((df["account"].isna()) | (df["contra"].isna()))
+        missing_accounts = (df["rate"] != 0) & df["account"].isna() & df["contra"].isna()
         if missing_accounts.any():
             invalid = df.loc[missing_accounts, "id"].tolist()
             self._logger.warning(
