@@ -310,7 +310,7 @@ class LedgerEngine(ABC):
 
         # Use current accounts if none provided
         if accounts is None:
-            accounts = self.accounts.list()
+            accounts = self.sanitize_accounts(self.accounts.list(), tax_codes=df)
 
         # Ensure account/contra is defined for non-zero rates
         missing_accounts = (df["rate"] != 0) & ((df["account"].isna()) | (df["contra"].isna()))
@@ -325,13 +325,15 @@ class LedgerEngine(ABC):
         # Validate referenced accounts
         valid_accounts = set(accounts["account"])
         invalid_accounts_mask = df["account"].notna() & ~df["account"].isin(valid_accounts)
-        if invalid_accounts_mask.any():
-            invalid = df.loc[invalid_accounts_mask, "id"].tolist()
+        invalid_contra_mask = df["contra"].notna() & ~df["contra"].isin(valid_accounts)
+        invalid_mask = invalid_accounts_mask | invalid_contra_mask
+        if invalid_mask.any():
+            invalid = df.loc[invalid_mask, "id"].tolist()
             self._logger.warning(
                 f"Discarding {len(invalid)} tax codes with non-existent accounts: "
                 f"{first_elements_as_str(invalid)}."
             )
-            df = df.loc[~invalid_accounts_mask]
+            df = df.loc[~invalid_mask]
 
         return df.reset_index(drop=True)
 
@@ -378,7 +380,7 @@ class LedgerEngine(ABC):
 
         # Validate tax codes
         if tax_codes is None:
-            tax_codes = self.tax_codes.list()
+            tax_codes = self.sanitize_tax_codes(self.tax_codes.list(), accounts=df)
         valid_tax_codes = set(tax_codes["id"])
 
         invalid_tax_code_mask = df["tax_code"].notna() & ~df["tax_code"].isin(valid_tax_codes)
@@ -410,7 +412,7 @@ class LedgerEngine(ABC):
         # Step 1: Partial accounts sanitization
         raw_accounts = self.accounts.list()
         raw_tax_codes = self.tax_codes.list()
-        accounts_df_step1 = self.sanitize_accounts(raw_accounts)
+        accounts_df_step1 = self.sanitize_accounts(raw_accounts, tax_codes=raw_tax_codes)
 
         # Step 2: Sanitize tax_codes using partially sanitized accounts
         tax_codes_df = self.sanitize_tax_codes(raw_tax_codes, accounts=accounts_df_step1)
