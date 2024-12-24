@@ -255,3 +255,50 @@ def test_sanitized_accounts_tax_codes(engine, capture_logs):
     assert_frame_equal(expected_tax_df, final_tax_codes_df)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) > 0
+
+def test_sanitize_ledger(engine, capture_logs):
+    ACCOUNT_CSV = """
+        group,          account, currency,   tax_code,   description
+        Assets,            1000,      USD,           , VALID_CURR
+        Liabilities,       2000,      USD,           , NO_TAX_CODE
+        Revenue,           3000,      USD,           , INVALID_TAX_CODE
+    """
+    TAX_CSV = """
+        id,            account, rate,  is_inclusive,    description,      contra
+        EXEMPT,               , 0.00,          True,    Exempt from VAT,
+        VALID,            1000, 0.05,          True,    Valid tax code,
+    """
+    ASSETS_CSV = """
+        ticker, increment,      date
+        EUR,        0.01, 2024-01-01
+        USD,        0.01, 2024-01-01
+        JPY,        1.00, 2024-01-02
+    """
+    PRICES_CSV = """
+        date,       ticker,  price, currency
+        2023-12-28,    EUR, 1.1068, USD
+        2023-12-29,    JPY, 0.0071, USD
+        2023-12-29,    CHF,  0.007, USD
+    """
+    LEDGER_CSV = """
+        id,       date, account, contra, currency,      amount, report_amount, tax_code, description, document
+         1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,          , Invalid date,
+         1, 2024-01-02,    1000,       ,      USD,   800000.00,              ,          , Invalid date,
+    """
+    EXPECTED_LEDGER_CSV = """
+        id,       date, account, contra, currency,      amount, report_amount, tax_code, description, document
+    """
+    prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
+    assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
+    tax_df = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    accounts_df = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    expected_ledger = pd.read_csv(StringIO(EXPECTED_LEDGER_CSV), skipinitialspace=True)
+    ledger = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
+    engine.restore(accounts=accounts_df, tax_codes=tax_df, price_history=prices, assets=assets)
+
+
+    expected_ledger_df = engine.accounts.standardize(expected_ledger)
+    sanitized = engine.sanitize_ledger(ledger)
+    assert_frame_equal(expected_ledger_df, sanitized)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) > 0
