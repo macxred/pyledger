@@ -144,12 +144,13 @@ def test_sanitize_tax_codes(engine, capture_logs):
         Liabilities,      2000,      USD,         , Accounts Payable
     """
     TAX_CSV = """
-        id,            account,  rate,  is_inclusive,    description,             contra
-        EXEMPT,               ,  0.00,          True,    Exempt from VAT,
-        INVALID_RATE,      1000, 1.50,         False,    Invalid rate tax code,   1000
-        MISSING_ACCOUNT,   9999, 0.10,         False,    Account does not exist,  2000
-        MISSING_CONTRA,    1000, 0.10,         False,    Missing contra,
-        VALID,             1000, 0.05,         False,    Valid tax code,          2000
+        id,                   account,  rate,  is_inclusive,    description,             contra
+        EXEMPT,                      ,  0.00,          True,    Exempt from VAT,
+        INVALID_RATE,            1000,  1.50,         False,    Invalid rate tax code,   1000
+        NON_EXISTENT_ACCOUNT,    9999,  0.10,         False,    Account does not exist,  2000
+        NON_EXISTENT_CONTRA ,    1000,  0.10,         False,    Contra does not exist,   9999
+        MISSING_CONTRA,          1000,  0.10,         False,    Missing contra,
+        VALID,                   1000,  0.05,         False,    Valid tax code,          2000
     """
     EXPECTED_TAX_CSV = """
         id,      account,  rate,  is_inclusive,  description,      contra
@@ -212,21 +213,21 @@ def test_sanitize_accounts(engine, capture_logs):
 
 def test_sanitized_accounts_tax_codes(engine, capture_logs):
     TAX_CSV = """
-        id,            account, rate,  is_inclusive,    description,            contra
-        EXEMPT,               , 0.00,          True,    Exempt from VAT,
+        id,             account, rate,  is_inclusive,    description,            contra
+        EXEMPT,                , 0.00,          True,    Exempt from VAT,
         INVALID_RATE,      1000, 1.50,        False,    Invalid rate tax code,  1000
-        MISSING_ACCOUNT,   9999, 0.10,        False,    Account does not exist, 2000
-        VALID,             1000, 0.05,        False,    Valid tax code,         2000
+        MISSING_ACCOUNT,   9999, 0.10,        False,    Account does not exist, 2002
+        VALID,             1000, 0.05,        False,    Valid tax code,         2002
     """
     ACCOUNT_CSV = """
-        group,         account, currency,         tax_code, description
+        group,          account, currency,         tax_code, description
         Assets,            1000,      USD,           VALID, VALID_CURR
         Assets,            2001,      XXX,          EXEMPT, INVALID_CURR
         Liabilities,       2002,      USD,                , NO_TAX_CODE
         Revenue,           3000,      USD, MISSING_ACCOUNT, INVALID_TAX_CODE
     """
     EXPECTED_ACCOUNT_CSV = """
-        group,         account, currency, tax_code,         description
+        group,          account, currency, tax_code,         description
         Assets,            1000,      USD,      VALID, VALID_CURR
         Liabilities,       2002,      USD,           , NO_TAX_CODE
         Revenue,           3000,      USD,           , INVALID_TAX_CODE
@@ -234,7 +235,7 @@ def test_sanitized_accounts_tax_codes(engine, capture_logs):
     EXPECTED_TAX_CSV = """
         id,            account, rate,  is_inclusive,    description,      contra
         EXEMPT,               , 0.00,          True,    Exempt from VAT,
-        VALID,             1000, 0.05,        False,    Valid tax code,   2000
+        VALID,            1000, 0.05,         False,    Valid tax code,   2002
     """
 
     tax_df = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
