@@ -18,26 +18,26 @@ LEDGER_CSV = """
 EXPECTED = {
     "1": (
         "2024-05-24\n"
-        "account,amount,contra,currency,description,document,report_amount,tax_code\n"
-        "1023,100.0,1993,CHF,single 1,file1.txt,,In8%"
+        "account,amount,contra,cost_center,currency,description,document,report_amount,tax_code\n"
+        "1023,100.0,1993,,CHF,single 1,file1.txt,,In8%"
     ),
     "2": (
         "2024-05-24\n"
-        "account,amount,contra,currency,description,document,report_amount,tax_code\n"
-        "1022,-100.0,,USD,coll 1,dir/file.txt,-88.88,In5%\n"
-        "1022,1.0,,USD,coll 1,dir/file.txt,0.89,\n"
-        "1022,99.0,,USD,coll 1,,87.99,"
+        "account,amount,contra,cost_center,currency,description,document,report_amount,tax_code\n"
+        "1022,-100.0,,,USD,coll 1,dir/file.txt,-88.88,In5%\n"
+        "1022,1.0,,,USD,coll 1,dir/file.txt,0.89,\n"
+        "1022,99.0,,,USD,coll 1,,87.99,"
     ),
     "3": (
         "2024-04-24\n"
-        "account,amount,contra,currency,description,document,report_amount,tax_code\n"
-        "1021,200.0,,EUR,coll 2B,doc2.pdf,,\n"
-        ",200.0,1021,EUR,coll 2A,doc1.pdf,,In5%"
+        "account,amount,contra,cost_center,currency,description,document,report_amount,tax_code\n"
+        "1021,200.0,,,EUR,coll 2B,doc2.pdf,,\n"
+        ",200.0,1021,,EUR,coll 2A,doc1.pdf,,In5%"
     ),
     "4": (
         "2024-05-25\n"
-        "account,amount,contra,currency,description,document,report_amount,tax_code\n"
-        "1022,300.0,1992,USD,single 2,doc3.pdf,450.45,In2%"
+        "account,amount,contra,cost_center,currency,description,document,report_amount,tax_code\n"
+        "1022,300.0,1992,,USD,single 2,doc3.pdf,450.45,In2%"
     )
 }
 
