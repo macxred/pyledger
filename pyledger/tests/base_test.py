@@ -127,6 +127,16 @@ REVALUATIONS_CSV = """
 """
 REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 
+COST_CENTERS_CSV = """
+    cost_center,
+           Shop,
+           Bank,
+         Bakery,
+     Restaurant,
+           Cafe,
+"""
+COST_CENTERS = pd.read_csv(StringIO(COST_CENTERS_CSV), skipinitialspace=True)
+
 # flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
     date,         account, balance
@@ -160,4 +170,5 @@ class BaseTest(ABC):
     LEDGER_ENTRIES = engine.ledger.standardize(LEDGER)
     TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
+    COST_CENTERS = engine.cost_centers.standardize(COST_CENTERS)
     EXPECTED_BALANCE = EXPECTED_BALANCE
