@@ -71,6 +71,10 @@ class LedgerEngine(ABC):
     def price_history(self) -> AccountingEntity:
         return self._price_history
 
+    @property
+    def cost_centers(self) -> AccountingEntity:
+        return self._cost_centers
+
     # ----------------------------------------------------------------------
     # Settings
 
