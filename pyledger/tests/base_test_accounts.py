@@ -157,13 +157,15 @@ class BaseTestAccounts(BaseTest):
         restored_engine.restore(
             accounts=self.ACCOUNTS, settings=self.SETTINGS, tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES, assets=self.ASSETS, price_history=self.PRICES,
-            revaluations=self.REVALUATIONS
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
         for _, row in self.EXPECTED_BALANCE.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
             account = row['account']
             expected = row['balance']
-            actual = restored_engine.account_balance(date=date, account=row['account'])
+            profit_centers = row["profit_center"]
+            actual = restored_engine.account_balance(date=date, account=account, profit_centers=profit_centers)
             assert expected == actual, (
-                f"Account balance for {account} on {date} of {actual} differs from {expected}."
+                f"Account balance for {account} on {date} with "
+                f"{profit_centers} profit centers of {actual} differs from {expected}."
             )

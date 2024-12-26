@@ -41,12 +41,12 @@ ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 # flake8: noqa: E501
 LEDGER_CSV = """
     id,       date, account, contra, currency,      amount, report_amount, tax_code, profit_center, description, document
-     1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
-     1,           ,    1010,       ,      EUR,      120.00,        132.82,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
-     1,           ,    1020,       ,      JPY, 42000000.00,     298200.00,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
-     1,           ,        ,   3000,      USD,  1098332.82,              ,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
-     2, 2024-01-24,    1000,   4000,      USD,     1200.00,              ,  OUT_STD,              , Sell cakes, 2024/receivables/2024-01-24.pdf
-     3, 2024-04-12,        ,   1000,      USD,    21288.24,              ,         ,              , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+     1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         ,          Shop, Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,    1010,       ,      EUR,      120.00,        132.82,         ,          Shop, Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,    1020,       ,      JPY, 42000000.00,     298200.00,         ,          Shop, Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,        ,   3000,      USD,  1098332.82,              ,         ,          Shop, Opening balance, 2023/financials/balance_sheet.pdf
+     2, 2024-01-24,    1000,   4000,      USD,     1200.00,              ,  OUT_STD,          Shop, Sell cakes, 2024/receivables/2024-01-24.pdf
+     3, 2024-04-12,        ,   1000,      USD,    21288.24,              ,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
      3,           ,    1010,       ,      EUR,    20000.00,      21288.24,         ,              , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
      4, 2024-05-25,    1010,   5000,      EUR,     -800.00,              ,   IN_STD,              , Purchase goods, 2024/payables/2024-05-25.pdf
      5, 2024-05-05,    1000,   5000,      USD,     -555.55,              ,   IN_STD,              , Purchase with tax, 2024/payables/2024-05-05.pdf
@@ -58,10 +58,10 @@ LEDGER_CSV = """
      9, 2024-07-01,    1010,       ,      EUR,     1500.00,              ,         ,              , Sale at mixed VAT rate, /invoices/invoice_002.pdf
      9,           ,    4001,       ,      EUR,    -1000.00,              ,  OUT_STD,              , Sale at mixed VAT rate, /invoices/invoice_002.pdf
      9,           ,        ,   4001,      EUR,      500.00,              ,  OUT_RED,              , Sale at mixed VAT rate, /invoices/invoice_002.pdf
-    10, 2024-07-04,    1020,       ,      JPY, 12345678.00,      76386.36,         ,              , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
-    10,           ,    1010,       ,      EUR,   -70791.78,     -76386.36,         ,              , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
-    11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         ,              , Payment from customer, 2024/banking/USD_2024-Q2.pdf
-    12, 2024-08-07,    1000,   2000,      USD,     -200.00,              ,         ,              , Payment to supplier,
+    10, 2024-07-04,    1020,       ,      JPY, 12345678.00,      76386.36,         ,          Bank, Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+    10,           ,    1010,       ,      EUR,   -70791.78,     -76386.36,         ,          Bank, Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+    11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         ,          Bank, Payment from customer, 2024/banking/USD_2024-Q2.pdf
+    12, 2024-08-07,    1000,   2000,      USD,     -200.00,              ,         ,          Bank, Payment to supplier,
     13, 2024-08-08,    2000,   1000,      USD,     1000.00,              ,         ,              , Correction of previous entry,
     14, 2024-08-08,    1010,   2010,      EUR,        0.00,              ,         ,              , Zero amount transaction,
     15, 2024-05-24,    1000,       ,      USD,      100.00,              ,         ,              , Collective transaction with zero amount,
@@ -139,26 +139,37 @@ PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True
 
 # flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
-    date,         account, balance
-    2023-12-31, 1000:9999, "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-01-01, 1000:9999, "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-01-01, 1000:1999, "{reporting_currency: 1098332.82, USD:   800000.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-01-01,      1000, "{reporting_currency:  800000.00, USD:   800000.00}"
-    2024-01-01,      1010, "{reporting_currency:     132.82, EUR:      120.00}"
-    2024-01-01,      1020, "{reporting_currency:  298200.00, JPY: 42000000.00}"
-    2024-01-23,      1000, "{reporting_currency:  800000.00, USD:   800000.00}"
-    2024-01-23,      2200, "{reporting_currency:       0.00, USD:        0.00}"
-    2024-01-24,      1000, "{reporting_currency:  801200.00, USD:   801200.00}"
-    2024-01-24,      2200, "{reporting_currency:    -200.00, USD:     -200.00}"
-    2024-03-30, 1000:1999, "{reporting_currency: 1099532.82, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-03-31, 1000:1999, "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-03-31,      7050, "{reporting_currency:   21003.29, USD:    21003.29}"
-    2024-03-31,      8050, "{reporting_currency:       0.00, USD:        0.00}"
+    date,         account,  profit_center, balance
+    2023-12-31, 1000:9999,               , "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-01-01, 1000:9999,               , "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-01-01, 1000:1999,               , "{reporting_currency: 1098332.82, USD:   800000.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-01-01,      1000,               , "{reporting_currency:  800000.00, USD:   800000.00}"
+    2024-01-01,      1010,               , "{reporting_currency:     132.82, EUR:      120.00}"
+    2024-01-01,      1020,               , "{reporting_currency:  298200.00, JPY: 42000000.00}"
+    2024-01-23,      1000,               , "{reporting_currency:  800000.00, USD:   800000.00}"
+    2024-01-23,      2200,               , "{reporting_currency:       0.00, USD:        0.00}"
+    2024-01-24,      1000,               , "{reporting_currency:  801200.00, USD:   801200.00}"
+    2024-01-24,      2200,               , "{reporting_currency:    -200.00, USD:     -200.00}"
+    2024-03-30, 1000:1999,               , "{reporting_currency: 1099532.82, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-03-31, 1000:1999,               , "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-03-31,      7050,               , "{reporting_currency:   21003.29, USD:    21003.29}"
+    2024-03-31,      8050,               , "{reporting_currency:       0.00, USD:        0.00}"
+    2024-01-01,      1000,         "Shop", "{reporting_currency:   800000.0, USD:    800000.0}"
+    2024-12-01, 1000:9999,         "Shop", "{reporting_currency:  -21288.24, USD: -319621.06, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-12-01, 1000:9999,   "Shop, Bank", "{reporting_currency: -21288.24,  USD: -319621.06, EUR: -70671.78, JPY: 54345678.0, CHF: 0.0}"
+    2024-12-31, 1000:9999,       "Bakery", "{reporting_currency:        0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
 """
 EXPECTED_BALANCE = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), skipinitialspace=True)
 EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
                                .str.replace(r'(\w+):', r'"\1":', regex=True)
                                .apply(json.loads))
+
+def parse_profit_center(value):
+    """Function to split values by commas and convert to list"""
+    if pd.isna(value) or value.strip() == "":
+        return None
+    return [item.strip() for item in value.split(",")]
+EXPECTED_BALANCE["profit_center"] = EXPECTED_BALANCE["profit_center"].apply(parse_profit_center)
 # flake8: enable
 
 class BaseTest(ABC):
