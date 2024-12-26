@@ -443,7 +443,7 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def _single_account_balance(
-        self, account: int, date: datetime.date = None, cost_centers: list[str] | str = None
+        self, account: int, date: datetime.date = None, profit_centers: list[str] | str = None
     ) -> dict:
         """Retrieve the balance of a single account up to a specified date.
 
@@ -451,21 +451,21 @@ class LedgerEngine(ABC):
             account (int): Account number.
             date (datetime.date, optional): Date for which to retrieve the balance.
                                             Defaults to None.
-            cost_centers: (list[str], str): Filter for ledger entries. If not None, the result is
+            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
                                             calculated only from ledger entries assigned to one
-                                            of the cost centers in the filter.
+                                            of the profit centers in the filter.
 
         Returns:
             dict: Dictionary containing the balance of the account in various currencies.
         """
 
     def _account_balance_list(
-        self, accounts: list[int], date: datetime.date = None, cost_centers: list[str] | str = None
+        self, accounts: list[int], date: datetime.date = None, profit_centers: list[str] | str = None
     ) -> dict:
         result = {}
         for account in accounts:
             account_balance = self._single_account_balance(
-                account, date=date, cost_centers=cost_centers
+                account, date=date, profit_centers=profit_centers
             )
             for currency, value in account_balance.items():
                 result[currency] = result.get(currency, 0) + value
@@ -473,12 +473,12 @@ class LedgerEngine(ABC):
 
     def _account_balance_range(
         self, accounts: dict[str, list[int]],
-        date: datetime.date = None, cost_centers: list[str] | str = None
+        date: datetime.date = None, profit_centers: list[str] | str = None
     ) -> dict:
         result = {}
-        add = self._account_balance_list(accounts["add"], date=date, cost_centers=cost_centers)
+        add = self._account_balance_list(accounts["add"], date=date, profit_centers=profit_centers)
         subtract = self._account_balance_list(
-            accounts["subtract"], date=date, cost_centers=cost_centers
+            accounts["subtract"], date=date, profit_centers=profit_centers
         )
         for currency, value in add.items():
             result[currency] = result.get(currency, 0) + value
@@ -488,7 +488,7 @@ class LedgerEngine(ABC):
 
     def account_balance(
         self, account: int | str | dict, date: datetime.date = None,
-        cost_centers: list[str] | str = None
+        profit_centers: list[str] | str = None
     ) -> dict:
         """Balance of a single account or a list of accounts.
 
@@ -504,9 +504,9 @@ class LedgerEngine(ABC):
             accounts 1020:1025.
             date (datetime.date, optional): The date as of which the account
                                             balance is calculated. Defaults to None.
-            cost_centers: (list[str], str): Filter for ledger entries. If not None, the result is
+            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
                                             calculated only from ledger entries assigned to one
-                                            of the cost centers in the filter.
+                                            of the profit centers in the filter.
 
         Returns:
             dict: Dictionary containing the balance of the account(s) in various currencies.
@@ -516,7 +516,7 @@ class LedgerEngine(ABC):
             # Account balance per a single point in time
             if represents_integer(account):
                 result = self._single_account_balance(
-                    account=abs(int(account)), date=end, cost_centers=cost_centers
+                    account=abs(int(account)), date=end, profit_centers=profit_centers
                 )
                 if int(account) < 0:
                     result = {key: -1.0 * val for key, val in result.items()}
@@ -526,12 +526,12 @@ class LedgerEngine(ABC):
                 and ("subtract" in account.keys())
             ):
                 result = self._account_balance_range(
-                    accounts=account, date=end, cost_centers=cost_centers
+                    accounts=account, date=end, profit_centers=profit_centers
                 )
             elif isinstance(account, str):
                 accounts = self.account_range(account)
                 result = self._account_balance_range(
-                    accounts=accounts, date=end, cost_centers=cost_centers
+                    accounts=accounts, date=end, profit_centers=profit_centers
                 )
             else:
                 raise ValueError(
@@ -542,9 +542,9 @@ class LedgerEngine(ABC):
             at_start = self.account_balance(
                 account=account,
                 date=start - datetime.timedelta(days=1),
-                cost_centers=cost_centers
+                profit_centers=profit_centers
             )
-            at_end = self.account_balance(account=account, date=end, cost_centers=cost_centers)
+            at_end = self.account_balance(account=account, date=end, profit_centers=profit_centers)
             result = {
                 currency: at_end.get(currency, 0) - at_start.get(currency, 0)
                 for currency in (at_start | at_end).keys()
@@ -561,7 +561,7 @@ class LedgerEngine(ABC):
 
     def account_history(
         self, account: int | str | dict, period: datetime.date = None,
-        cost_centers: list[str] | str = None
+        profit_centers: list[str] | str = None
     ) -> pd.DataFrame:
         """Transaction and balance history of an account or a list of accounts.
 
@@ -577,9 +577,9 @@ class LedgerEngine(ABC):
             accounts 1020:1025.
             period (datetime.date, optional): The date as of which the account balance
                                               is calculated. Defaults to None.
-            cost_centers: (list[str], str): Filter for ledger entries. If not None, the result is
+            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
                                             calculated only from ledger entries assigned to one
-                                            of the cost centers in the filter.
+                                            of the profit centers in the filter.
 
         Returns:
             pd.DataFrame: DataFrame containing the transaction and balance
@@ -592,7 +592,7 @@ class LedgerEngine(ABC):
             if account not in self.accounts.list()[["account"]].values:
                 raise ValueError(f"No account matching '{account}'.")
             out = self._fetch_account_history(
-                account, start=start, end=end, cost_centers=cost_centers
+                account, start=start, end=end, profit_centers=profit_centers
             )
         elif (
             isinstance(account, dict)
@@ -601,13 +601,13 @@ class LedgerEngine(ABC):
         ):
             accounts = list(set(account["add"]) - set(account["subtract"]))
             out = self._fetch_account_history(
-                accounts, start=start, end=end, cost_centers=cost_centers
+                accounts, start=start, end=end, profit_centers=profit_centers
             )
         elif isinstance(account, str):
             accounts = self.account_range(account)
             accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
             out = self._fetch_account_history(
-                accounts, start=start, end=end, cost_centers=cost_centers
+                accounts, start=start, end=end, profit_centers=profit_centers
             )
         elif isinstance(account, list):
             not_integer = [i for i in account if not represents_integer(i)]
@@ -615,7 +615,7 @@ class LedgerEngine(ABC):
                 raise ValueError(f"Non-integer list elements in `account`: {not_integer}.")
             accounts = account = [int(i) for i in account]
             out = self._fetch_account_history(
-                accounts, start=start, end=end, cost_centers=cost_centers
+                accounts, start=start, end=end, profit_centers=profit_centers
             )
         else:
             raise ValueError(
@@ -626,7 +626,7 @@ class LedgerEngine(ABC):
 
     def _fetch_account_history(
         self, account: int | list[int], start: datetime.date = None, end: datetime.date = None,
-        cost_centers: list[str] | str = None
+        profit_centers: list[str] | str = None
     ) -> pd.DataFrame:
         """Fetch transaction history of a list of accounts and compute balance.
 
@@ -634,9 +634,9 @@ class LedgerEngine(ABC):
             account (int, list[int]): The account or list of accounts to fetch the history for.
             start (datetime.date, optional): Start date for the history. Defaults to None.
             end (datetime.date, optional): End date for the history. Defaults to None.
-            cost_centers: (list[str], str): Filter for ledger entries. If not None, the result is
+            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
                                             calculated only from ledger entries assigned to one
-                                            of the cost centers in the filter.
+                                            of the profit centers in the filter.
 
         Returns:
             pd.DataFrame: DataFrame containing the transaction history of the account(s).
@@ -648,12 +648,14 @@ class LedgerEngine(ABC):
             filter = ledger["account"] == account
         if end is not None:
             filter = filter & (ledger["date"] <= pd.to_datetime(end))
-        if cost_centers is not None:
-            filter = filter & (ledger["cost_center"] == cost_centers)
-        if cost_centers is not None:
-            if isinstance(cost_centers, str):
-                cost_centers = [cost_centers]
-            filter = filter & (ledger["cost_center"].isin(cost_centers))
+        if profit_centers is not None:
+            if isinstance(profit_centers, str):
+                profit_centers = [profit_centers]
+            valid_profit_centers = set(self.profit_centers.list()["profit_center"])
+            invalid_profit_centers = set(profit_centers) - valid_profit_centers
+            if invalid_profit_centers:
+                raise ValueError(f"Profit centers: {', '.join(invalid_profit_centers)} do not exist.")
+            filter = filter & (ledger["profit_center"].isin(profit_centers))
         df = ledger.loc[filter, :]
         df = df.sort_values("date")
         df.insert(df.columns.get_loc("amount") + 1, "balance", df["amount"].cumsum())
