@@ -135,3 +135,123 @@ def test_sanitize_revaluations(engine, capture_logs):
     )
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) > 0
+
+
+def test_sanitize_tax_codes(engine, capture_logs):
+    ACCOUNT_CSV = """
+        group,         account, currency, tax_code, description
+        Assets,           1000,      USD,         , Cash in Bank USD
+        Liabilities,      2000,      USD,         , Accounts Payable
+    """
+    TAX_CSV = """
+        id,                   account,  rate,  is_inclusive,    description,             contra
+        EXEMPT,                      ,  0.00,          True,    Exempt from VAT,
+        INVALID_RATE,            1000,  1.50,         False,    Invalid rate tax code,   1000
+        NON_EXISTENT_ACCOUNT,    9999,  0.10,         False,    Account does not exist,  2000
+        NON_EXISTENT_CONTRA,     1000,  0.10,         False,    Contra does not exist,   9999
+        NON_EXISTENT_ACCOUNTS,       ,  0.10,         False,    Accounts do not exist,
+        MISSING_CONTRA,          1000,  0.10,         False,    Missing contra,
+        MISSING_ACCOUNT,             ,  0.10,         False,    Missing account,         1000
+        VALID,                   1000,  0.05,         False,    Valid tax code,          2000
+    """
+    EXPECTED_TAX_CSV = """
+        id,          account,  rate,  is_inclusive,  description,      contra
+        EXEMPT,             ,  0.00,          True,  Exempt from VAT,
+        MISSING_CONTRA, 1000,  0.10,         False,  Missing contra,
+        MISSING_ACCOUNT,    ,  0.10,         False,  Missing account,  1000
+        VALID,          1000,  0.05,         False,  Valid tax code,   2000
+    """
+    accounts = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    tax_codes = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    expected_tax_codes = pd.read_csv(StringIO(EXPECTED_TAX_CSV), skipinitialspace=True)
+    tax_codes = engine.tax_codes.standardize(tax_codes)
+
+    # Test sanitize process with specified accounts DataFrame
+    sanitized_tax_codes = engine.sanitize_tax_codes(tax_codes, accounts=accounts)
+    assert_frame_equal(engine.tax_codes.standardize(expected_tax_codes), sanitized_tax_codes)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) > 0
+
+    # Test sanitize process with populated accounts
+    engine.restore(accounts=accounts)
+    sanitized_tax_codes = engine.sanitize_tax_codes(tax_codes)
+    assert_frame_equal(engine.tax_codes.standardize(expected_tax_codes), sanitized_tax_codes)
+
+
+def test_sanitize_accounts(engine, capture_logs):
+    TAX_CSV = """
+        id,      account, rate,  is_inclusive,           description
+        EXEMPT,         , 0.00,          True, Exempt from VAT
+        OUT_STD,    2200, 0.20,          True, Output VAT at Standard Rate 20%
+    """
+    ACCOUNT_CSV = """
+        group,         account, currency, tax_code, description
+        Assets,           1000,      USD,   EXEMPT, VALID_CURR
+        Assets,           2001,      XXX,   EXEMPT, INVALID_CURR
+        Liabilities,      2002,      USD,         , NO_TAX_CODE
+        Revenue,          3000,      USD,  MISSING, INVALID_TAX_CODE
+    """
+    EXPECTED_ACCOUNT_CSV = """
+        group,         account, currency, tax_code, description
+        Assets,           1000,      USD,   EXEMPT, VALID_CURR
+        Liabilities,      2002,      USD,         , NO_TAX_CODE
+        Revenue,          3000,      USD,         , INVALID_TAX_CODE
+    """
+
+    tax_codes = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    accounts = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    expected = pd.read_csv(StringIO(EXPECTED_ACCOUNT_CSV), skipinitialspace=True)
+    standardized_accounts = engine.accounts.standardize(accounts)
+
+    # Test sanitize process with specified tax codes DataFrame
+    sanitized = engine.sanitize_accounts(standardized_accounts, tax_codes=tax_codes)
+    assert_frame_equal(engine.accounts.standardize(expected), sanitized)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) > 0
+
+    # Test sanitize process with populated system tax codes
+    engine.restore(tax_codes=tax_codes)
+    sanitized = engine.sanitize_accounts(standardized_accounts)
+    assert_frame_equal(engine.accounts.standardize(expected), sanitized)
+
+
+def test_sanitized_accounts_tax_codes(engine, capture_logs):
+    TAX_CSV = """
+        id,             account, rate,  is_inclusive,    description,            contra
+        EXEMPT,                , 0.00,          True,    Exempt from VAT,
+        INVALID_RATE,      1000, 1.50,        False,    Invalid rate tax code,  1000
+        MISSING_ACCOUNT,   9999, 0.10,        False,    Account does not exist, 2002
+        VALID,             1000, 0.05,        False,    Valid tax code,         2002
+    """
+    ACCOUNT_CSV = """
+        group,          account, currency,         tax_code, description
+        Assets,            1000,      USD,           VALID, VALID_CURR
+        Assets,            2001,      XXX,          EXEMPT, INVALID_CURR
+        Liabilities,       2002,      USD,                , NO_TAX_CODE
+        Revenue,           3000,      USD, MISSING_ACCOUNT, INVALID_TAX_CODE
+    """
+    EXPECTED_ACCOUNT_CSV = """
+        group,          account, currency, tax_code,         description
+        Assets,            1000,      USD,      VALID, VALID_CURR
+        Liabilities,       2002,      USD,           , NO_TAX_CODE
+        Revenue,           3000,      USD,           , INVALID_TAX_CODE
+    """
+    EXPECTED_TAX_CSV = """
+        id,            account, rate,  is_inclusive,    description,      contra
+        EXEMPT,               , 0.00,          True,    Exempt from VAT,
+        VALID,            1000, 0.05,         False,    Valid tax code,   2002
+    """
+
+    tax_df = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    accounts_df = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    expected_accounts_df = pd.read_csv(StringIO(EXPECTED_ACCOUNT_CSV), skipinitialspace=True)
+    expected_accounts_df = engine.accounts.standardize(expected_accounts_df)
+    expected_tax_df = pd.read_csv(StringIO(EXPECTED_TAX_CSV), skipinitialspace=True)
+    expected_tax_df = engine.tax_codes.standardize(expected_tax_df)
+    engine.restore(accounts=accounts_df, tax_codes=tax_df)
+
+    final_accounts_df, final_tax_codes_df = engine.sanitized_accounts_tax_codes()
+    assert_frame_equal(expected_accounts_df, final_accounts_df, check_like=True)
+    assert_frame_equal(expected_tax_df, final_tax_codes_df)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) > 0

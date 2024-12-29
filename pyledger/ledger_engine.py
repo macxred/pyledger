@@ -15,6 +15,7 @@ import openpyxl
 import pandas as pd
 from .decorators import timed_cache
 from .constants import (
+    ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
     LEDGER_SCHEMA,
     PRICE_SCHEMA,
@@ -278,37 +279,148 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Tax rates
 
-    @classmethod
-    def sanitize_tax_codes(cls, df: pd.DataFrame, keep_extra_columns=False) -> pd.DataFrame:
-        """Validates and standardizes the 'tax_codes' DataFrame to ensure it contains
-        the required columns, correct data types, and logical consistency in the data.
+    def sanitize_tax_codes(self, df: pd.DataFrame, accounts: pd.DataFrame = None) -> pd.DataFrame:
+        """Discard incoherent tax code data.
+
+        Discard tax code entries that have invalid rates, missing account references
+        for non-zero rates, or references to non-existent accounts. Removed entries
+        are logged as warnings.
+
+        If no accounts DataFrame is provided, it will be fetched via the `accounts.list()` method,
+        as the validity of tax codes depends on the existence of these accounts.
 
         Args:
-            df (pd.DataFrame): The DataFrame representing the tax codes.
-            keep_extra_columns (bool): If True, columns that do not appear in the data frame
-                                       schema are left in the resulting DataFrame.
+            df (pd.DataFrame): The raw tax_codes DataFrame to validate.
+            accounts (pd.DataFrame, optional): Accounts DataFrame for reference validation.
 
         Returns:
-            pd.DataFrame: The standardized tax codes DataFrame.
-
-        Raises:
-            ValueError: If required columns are missing, if data types are incorrect,
-                        or if logical inconsistencies are found (e.g., non-zero rates
-                        without defined accounts).
+            pd.DataFrame: The sanitized DataFrame with valid tax code entries.
         """
-        # Enforce data frame schema
-        df = enforce_schema(df, TAX_CODE_SCHEMA, keep_extra_columns=keep_extra_columns)
+        df = enforce_schema(df, schema=TAX_CODE_SCHEMA, keep_extra_columns=True)
 
-        # Ensure account is defined if rate is other than zero
-        missing = list(df["id"][(df["rate"] != 0) & df["account"].isna()])
-        if len(missing) > 0:
-            # TODO: Drop entries with missing account with a warning, rather than raising an error
-            raise ValueError(f"Account must be defined for non-zero rate in tax_codes: {missing}.")
+        # Validate rates (must be between 0 and 1)
+        invalid_rates = (df["rate"] < 0) | (df["rate"] > 1)
+        if invalid_rates.any():
+            invalid = df.loc[invalid_rates, "id"].tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid)} tax codes with invalid rates: "
+                f"{first_elements_as_str(invalid)}."
+            )
+            df = df.loc[~invalid_rates]
 
-        return df
+        # Use current accounts if none provided
+        if accounts is None:
+            accounts = self.sanitize_accounts(self.accounts.list(), tax_codes=df)
+
+        # Ensure account/contra is defined for non-zero rates
+        missing_accounts = (df["rate"] != 0) & df["account"].isna() & df["contra"].isna()
+        if missing_accounts.any():
+            invalid = df.loc[missing_accounts, "id"].tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid)} tax codes with non-zero rates and missing "
+                f"accounts/contra: {first_elements_as_str(invalid)}."
+            )
+            df = df.loc[~missing_accounts]
+
+        # Validate referenced accounts
+        valid_accounts = set(accounts["account"])
+        invalid_accounts_mask = df["account"].notna() & ~df["account"].isin(valid_accounts)
+        invalid_contra_mask = df["contra"].notna() & ~df["contra"].isin(valid_accounts)
+        invalid_mask = invalid_accounts_mask | invalid_contra_mask
+        if invalid_mask.any():
+            invalid = df.loc[invalid_mask, "id"].tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid)} tax codes with non-existent accounts: "
+                f"{first_elements_as_str(invalid)}."
+            )
+            df = df.loc[~invalid_mask]
+
+        return df.reset_index(drop=True)
 
     # ----------------------------------------------------------------------
     # Accounts
+
+    def sanitize_accounts(self, df: pd.DataFrame, tax_codes: pd.DataFrame = None) -> pd.DataFrame:
+        """Discard incoherent account data.
+
+        Discard accounts with invalid currencies, and set invalid tax code references
+        to NA. Removed or modified entries are logged as warnings.
+
+        If no tax_codes DataFrame is provided, it will be fetched via the `tax_codes.list()` method,
+        as the validity of accounts may depend on referenced tax codes.
+
+        Args:
+            df (pd.DataFrame): The raw accounts DataFrame to validate.
+            tax_codes (pd.DataFrame, optional): Tax codes DataFrame for reference validation.
+
+        Returns:
+            pd.DataFrame: The sanitized DataFrame with valid account entries.
+        """
+        df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=True)
+
+        def validate_currency() -> pd.Series:
+            """Validate that each account's currency is supported using the precision() method."""
+            def is_valid(row):
+                try:
+                    self.precision(ticker=row["currency"])
+                    return True
+                except ValueError:
+                    return False
+            return df.apply(is_valid, axis=1)
+
+        # Validate currencies
+        valid_currency_mask = validate_currency()
+        if not valid_currency_mask.all():
+            invalid = df.loc[~valid_currency_mask, "account"].tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid)} accounts with invalid currencies: "
+                f"{first_elements_as_str(invalid)}."
+            )
+            df = df.loc[valid_currency_mask]
+
+        # Validate tax codes
+        if tax_codes is None:
+            tax_codes = self.sanitize_tax_codes(self.tax_codes.list(), accounts=df)
+        valid_tax_codes = set(tax_codes["id"])
+
+        invalid_tax_code_mask = df["tax_code"].notna() & ~df["tax_code"].isin(valid_tax_codes)
+        if invalid_tax_code_mask.any():
+            invalid = df.loc[invalid_tax_code_mask, "account"].tolist()
+            self._logger.warning(
+                f"Found {len(invalid)} accounts with invalid tax code references: "
+                f"{first_elements_as_str(invalid)}. Setting 'tax_code' to NA for these entries."
+            )
+            df.loc[invalid_tax_code_mask, "tax_code"] = pd.NA
+
+        return df.reset_index(drop=True)
+
+    def sanitized_accounts_tax_codes(self):
+        """Orchestrates the sanitization of interdependent accounts and tax codes DataFrames.
+
+        This method handles their mutual dependencies in a multi-step process:
+        1. Sanitize accounts with no confirmed tax_codes, setting invalid ones to NA.
+        2. Sanitize tax_codes using the partially sanitized accounts.
+        3. Re-sanitize accounts now that we have a validated tax_codes DataFrame, ensuring
+           accounts reference only valid, sanitized tax codes.
+
+        Logs warnings for each discarded or adjusted entry. This stepwise process ensures
+        both DataFrames end up coherent with each other.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: The sanitized accounts and tax_codes DataFrames.
+        """
+        # Step 1: Partial accounts sanitization
+        raw_accounts = self.accounts.list()
+        raw_tax_codes = self.tax_codes.list()
+        accounts_df_step1 = self.sanitize_accounts(raw_accounts, tax_codes=raw_tax_codes)
+
+        # Step 2: Sanitize tax_codes using partially sanitized accounts
+        tax_codes_df = self.sanitize_tax_codes(raw_tax_codes, accounts=accounts_df_step1)
+
+        # Step 3: Re-validate accounts with the now fully validated tax_codes
+        accounts_df_final = self.sanitize_accounts(raw_accounts, tax_codes=tax_codes_df)
+
+        return accounts_df_final, tax_codes_df
 
     def account_currency(self, account: int) -> str:
         accounts = self.accounts.list()
