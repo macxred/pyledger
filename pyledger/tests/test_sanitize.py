@@ -149,15 +149,16 @@ def test_sanitize_tax_codes(engine, capture_logs):
         INVALID_RATE,            1000,  1.50,         False,    Invalid rate tax code,   1000
         NON_EXISTENT_ACCOUNT,    9999,  0.10,         False,    Account does not exist,  2000
         NON_EXISTENT_CONTRA,     1000,  0.10,         False,    Contra does not exist,   9999
+        NON_EXISTENT_ACCOUNTS,       ,  0.10,         False,    Accounts do not exist,
         MISSING_CONTRA,          1000,  0.10,         False,    Missing contra,
-        MISSING_ACCOUNT,             ,  0.10,         False,    Missing contra,          1000
+        MISSING_ACCOUNT,             ,  0.10,         False,    Missing account,         1000
         VALID,                   1000,  0.05,         False,    Valid tax code,          2000
     """
     EXPECTED_TAX_CSV = """
         id,          account,  rate,  is_inclusive,  description,      contra
         EXEMPT,             ,  0.00,          True,  Exempt from VAT,
         MISSING_CONTRA, 1000,  0.10,         False,  Missing contra,
-        MISSING_ACCOUNT,    ,  0.10,         False,  Missing contra,   1000
+        MISSING_ACCOUNT,    ,  0.10,         False,  Missing account,  1000
         VALID,          1000,  0.05,         False,  Valid tax code,   2000
     """
     accounts = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
