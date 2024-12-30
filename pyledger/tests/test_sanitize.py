@@ -256,6 +256,7 @@ def test_sanitized_accounts_tax_codes(engine, capture_logs):
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) > 0
 
+
 def test_sanitize_ledger(engine, capture_logs):
     ACCOUNT_CSV = """
         group,          account, currency,   tax_code,   description
@@ -270,9 +271,10 @@ def test_sanitize_ledger(engine, capture_logs):
     """
     ASSETS_CSV = """
         ticker, increment,      date
-        EUR,        0.01, 2024-01-01
-        USD,        0.01, 2024-01-01
-        JPY,        1.00, 2024-01-02
+        EUR,        0.01, 2022-01-01
+        JPY,        1.00, 2022-01-02
+        USD,        0.01, 2022-01-01
+        CHF,        0.01, 2022-01-01
     """
     PRICES_CSV = """
         date,       ticker,  price, currency
@@ -280,13 +282,35 @@ def test_sanitize_ledger(engine, capture_logs):
         2023-12-29,    JPY, 0.0071, USD
         2023-12-29,    CHF,  0.007, USD
     """
+    # flake8: noqa: E501
     LEDGER_CSV = """
-        id,       date, account, contra, currency,      amount, report_amount, tax_code, description, document
-         1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,          , Invalid date,
-         1, 2024-01-02,    1000,       ,      USD,   800000.00,              ,          , Invalid date,
+        id,        date, account, contra, currency,      amount, report_amount, tax_code, description, document
+         1,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Invalid date,
+         1,  2024-01-02,    1000,       ,      USD,   800000.00,              ,         , Invalid date,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
+         3,  2024-01-01,    1000,       ,      USD,   800000.00,              ,  Invalid, Invalid tax code,
+         4,  2024-01-01,    1000,       ,      USD,   800000.00,              ,    VALID, Valid tax code,
+         5,  2024-01-01,        ,       ,      USD,   800000.00,              ,         , No account or contra,
+         6,  2024-01-01,    1111,       ,      USD,   800000.00,              ,         , Invalid account reference,
+         7,  2024-01-01,    2222,       ,      USD,   800000.00,              ,         , Invalid contra reference,
+         8,  2024-01-01,    1000,       ,      AAA,   800000.00,              ,         , Invalid currency,
+         9,  2024-01-01,    1000,       ,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
+         11, 2024-01-01,        ,   1000,      CHF,           1,              ,         , Currencies mismatch invalid,
+         12, 2024-01-01,    1000,       ,      CHF,           1,              ,         , Currencies mismatch invalid,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,         , Currencies mismatch valid with both account,
+         14, 2021-01-01,    1000,       ,      USD,   800000.00,              ,         , No price reference,
+
     """
     EXPECTED_LEDGER_CSV = """
-        id,       date, account, contra, currency,      amount, report_amount, tax_code, description, document
+        id,        date, account, contra, currency,      amount, report_amount, tax_code, description, document
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
+         4,  2024-01-01,    1000,       ,      USD,   800000.00,              ,    VALID, Valid tax code,
+         9,  2024-01-01,    1000,       ,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,         , Currencies mismatch valid with both account,
     """
     prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
     assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
@@ -296,8 +320,7 @@ def test_sanitize_ledger(engine, capture_logs):
     ledger = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
     engine.restore(accounts=accounts_df, tax_codes=tax_df, price_history=prices, assets=assets)
 
-
-    expected_ledger_df = engine.accounts.standardize(expected_ledger)
+    expected_ledger_df = engine.ledger.standardize(expected_ledger)
     sanitized = engine.sanitize_ledger(ledger)
     assert_frame_equal(expected_ledger_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
