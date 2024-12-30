@@ -134,7 +134,7 @@ class StandaloneLedger(LedgerEngine):
 
         # Insert missing reporting currency amounts
         index = df["report_amount"].isna()
-        df.loc[index, "report_amount"] = self._report_amount(
+        df.loc[index, "report_amount"] = self.report_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
@@ -222,20 +222,4 @@ class StandaloneLedger(LedgerEngine):
             amount = sub.groupby("currency").agg({"amount": "sum"})
             amount = {currency: amount for currency, amount in zip(amount.index, amount["amount"])}
             result = {"reporting_currency": reporting_amount} | amount
-        return result
-
-    # ----------------------------------------------------------------------
-    # Currency
-
-    def _report_amount(
-        self, amount: list[float], currency: list[str], date: list[datetime.date]
-    ) -> list[float]:
-        reporting_currency = self.reporting_currency
-        if not (len(amount) == len(currency) == len(date)):
-            raise ValueError("Vectors 'amount', 'currency', and 'date' must have the same length.")
-        result = [
-            self.round_to_precision(
-                a * self.price(t, date=d, currency=reporting_currency)[1],
-                reporting_currency, date=d)
-            for a, t, d in zip(amount, currency, date)]
         return result

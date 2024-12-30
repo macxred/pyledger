@@ -881,6 +881,34 @@ class LedgerEngine(ABC):
             ]
         return result
 
+    def report_amount(
+        self, amount: list[float], currency: list[str], date: list[datetime.date]
+    ) -> list[float]:
+        """Converts a list of amounts in various currencies to the reporting currency.
+
+        Args:
+            amount (list[float]): List of amounts in the respective currencies.
+            currency (list[str]): List of currency codes corresponding to the amounts.
+            date (list[datetime.date]): List of dates for the currency conversion.
+
+        Returns:
+            list[float]: List of amounts converted to the reporting currency, rounded
+                to the appropriate precision.
+
+        Raises:
+            ValueError: If the lengths of `amount`, `currency`, and `date` are not equal.
+        """
+
+        reporting_currency = self.reporting_currency
+        if not (len(amount) == len(currency) == len(date)):
+            raise ValueError("Vectors 'amount', 'currency', and 'date' must have the same length.")
+        result = [
+            self.round_to_precision(
+                a * self.price(t, date=d, currency=reporting_currency)[1],
+                reporting_currency, date=d)
+            for a, t, d in zip(amount, currency, date)]
+        return result
+
     # ----------------------------------------------------------------------
     # Price
 
