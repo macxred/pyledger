@@ -702,6 +702,7 @@ class LedgerEngine(ABC):
         Returns:
             pd.DataFrame: DataFrame with sanitized ledger entries.
         """
+        df = enforce_schema(df, LEDGER_SCHEMA, keep_extra_columns=True)
 
         # Identify rows where one transaction (i.e., same 'id') spans multiple dates
         grouped = df.groupby("id")
@@ -755,16 +756,22 @@ class LedgerEngine(ABC):
         # and relies on sanitized data, serving as a centralized validation point.
         def invalid_asset_reference(ticker: pd.Series, date: pd.Series) -> pd.Series:
             """Validate specified column values for asset references."""
-            def is_valid(ticker, date):
+            def is_invalid(ticker, date):
                 try:
                     self.precision(ticker=ticker, date=date)
                     return False
                 except ValueError:
                     return True
-            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
-        invalid_tickers_mask = invalid_asset_reference(df["currency"], df["date"])
-        if invalid_tickers_mask.any():
-            invalid_ids = df.loc[invalid_tickers_mask, "id"].unique().tolist()
+
+            mask = pd.Series(
+                [is_invalid(ticker=t, date=d) for t, d in zip(ticker, date)],
+                index=df.index
+            )
+            return mask
+
+        invalid_assets_mask = invalid_asset_reference(df["currency"], df["date"])
+        if invalid_assets_mask.any():
+            invalid_ids = df.loc[invalid_assets_mask, "id"].unique().tolist()
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} ledger entries with invalid currency: "
                 f"{first_elements_as_str(invalid_ids)}"
@@ -772,43 +779,58 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Validate transaction currency
-        def validate_transaction_currency(row) -> bool:
+        def invalid_transaction_currency() -> pd.Series:
             """Validate that the transaction currency matches the account or contra currency."""
-            if row["amount"] == 0:
-                return True
-            if pd.notna(row["account"]) & pd.isna(row["contra"]):
-                account_currency = self.account_currency(row["account"])
-                if row["currency"] == account_currency:
-                    return True
-            if pd.notna(row["contra"]) & pd.isna(row["account"]):
-                contra_currency = self.account_currency(row["contra"])
-                if row["currency"] == contra_currency:
-                    return True
-            return True
-        invalid_currency_mask = ~df.apply(validate_transaction_currency, axis=1)
+            def is_invalid(row):
+                if row["amount"] == 0:
+                    return False
+                if pd.notna(row["account"]) and pd.isna(row["contra"]):
+                    account_currency = self.account_currency(row["account"])
+                    if not row["currency"] == account_currency:
+                        return True
+                if pd.notna(row["contra"]) and pd.isna(row["account"]):
+                    contra_currency = self.account_currency(row["contra"])
+                    if not row["currency"] == contra_currency:
+                        return True
+                return False
+
+            mask = pd.Series(
+                [is_invalid(row) for _, row in df.iterrows()],
+                index=df.index
+            )
+            return mask
+
+        invalid_currency_mask = invalid_transaction_currency()
         if invalid_currency_mask.any():
             invalid_ids = df.loc[invalid_currency_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with mismatched "
-                f"transaction currency: {first_elements_as_str(invalid_ids)}"
+                f"Discarding {len(invalid_ids)} ledger entries with mismatched transaction "
+                f"currency: {first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
 
         # Validate price reference
-        def validate_prices(
+        def invalid_prices(
             ticker: pd.Series, date: pd.Series, report_amount: pd.Series
         ) -> pd.Series:
             """Validate specified column values for asset references."""
-            def is_valid(ticker, date):
+            def is_invalid(ticker, date, report_amount):
                 if ticker == self.reporting_currency or pd.notna(report_amount):
-                    return True
+                    return False
                 try:
                     self.price(ticker=ticker, date=date, currency=self.reporting_currency)
                     return False
                 except ValueError:
                     return True
-            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
-        invalid_prices_mask = validate_prices(df["account"], df["date"])
+
+            mask = pd.Series(
+                [is_invalid(ticker=t, date=d, report_amount=a)
+                 for t, d, a in zip(ticker, date, report_amount)],
+                index=df.index
+            )
+            return mask
+
+        invalid_prices_mask = invalid_prices(df["currency"], df["date"], df["report_amount"])
         if invalid_prices_mask.any():
             invalid_ids = df.loc[invalid_prices_mask, "id"].unique().tolist()
             self._logger.warning(
@@ -818,31 +840,31 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Validate balancing amounts
-        def validate_balancing_amounts(group: pd.DataFrame) -> bool:
-            """Validate that the sum of amounts balances to zero per currency for each group."""
-            def compute_effective_amount(row):
-                """Compute the effective amount for each row."""
-                if not pd.isna(row["account"]) and not pd.isna(row["contra"]):
-                    return 0  # Account and contra cancel each other out
-                if not pd.isna(row["account"]):
-                    return row["amount"]  # Positive for account
-                if not pd.isna(row["contra"]):
-                    return -row["amount"]  # Negative for contra
-                return 0  # Default fallback for invalid rows
-            group["effective_amount"] = group.apply(compute_effective_amount, axis=1)
-            net_amounts = group.groupby("currency")["effective_amount"].sum()
-            return (net_amounts.round(2) == 0).all()
-        grouped = df.groupby("id")
-        invalid_balance_ids = [
-            group_id for group_id, group in grouped
-            if not validate_balancing_amounts(group)
-        ]
-        if invalid_balance_ids:
-            self._logger.warning(
-                f"Discarding {len(invalid_balance_ids)} ledger entries where "
-                f"amounts do not balance to zero: {first_elements_as_str(invalid_balance_ids)}"
-            )
-            df = df.query("id not in @invalid_balance_ids")
+        # def validate_balancing_amounts(group: pd.DataFrame) -> bool:
+        #     """Validate that the sum of amounts balances to zero per currency for each group."""
+        #     def compute_effective_amount(row):
+        #         """Compute the effective amount for each row."""
+        #         if not pd.isna(row["account"]) and not pd.isna(row["contra"]):
+        #             return 0  # Account and contra cancel each other out
+        #         if not pd.isna(row["account"]):
+        #             return row["amount"]  # Positive for account
+        #         if not pd.isna(row["contra"]):
+        #             return -row["amount"]  # Negative for contra
+        #         return 0  # Default fallback for invalid rows
+        #     group["effective_amount"] = group.apply(compute_effective_amount, axis=1)
+        #     net_amounts = group.groupby("currency")["effective_amount"].sum()
+        #     return (net_amounts.round(2) == 0).all()
+        # grouped = df.groupby("id")
+        # invalid_balance_ids = [
+        #     group_id for group_id, group in grouped
+        #     if not validate_balancing_amounts(group)
+        # ]
+        # if invalid_balance_ids:
+        #     self._logger.warning(
+        #         f"Discarding {len(invalid_balance_ids)} ledger entries where "
+        #         f"amounts do not balance to zero: {first_elements_as_str(invalid_balance_ids)}"
+        #     )
+        #     df = df.query("id not in @invalid_balance_ids")
 
         return df.reset_index(drop=True)
 
