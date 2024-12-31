@@ -839,32 +839,31 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
+        # Insert missing reporting currency amounts
+        index = df["report_amount"].isna()
+        df.loc[index, "report_amount"] = self.report_amount(
+            amount=df.loc[index, "amount"],
+            currency=df.loc[index, "currency"],
+            date=df.loc[index, "date"]
+        )
+
         # Validate balancing amounts
-        # def validate_balancing_amounts(group: pd.DataFrame) -> bool:
-        #     """Validate that the sum of amounts balances to zero per currency for each group."""
-        #     def compute_effective_amount(row):
-        #         """Compute the effective amount for each row."""
-        #         if not pd.isna(row["account"]) and not pd.isna(row["contra"]):
-        #             return 0  # Account and contra cancel each other out
-        #         if not pd.isna(row["account"]):
-        #             return row["amount"]  # Positive for account
-        #         if not pd.isna(row["contra"]):
-        #             return -row["amount"]  # Negative for contra
-        #         return 0  # Default fallback for invalid rows
-        #     group["effective_amount"] = group.apply(compute_effective_amount, axis=1)
-        #     net_amounts = group.groupby("currency")["effective_amount"].sum()
-        #     return (net_amounts.round(2) == 0).all()
-        # grouped = df.groupby("id")
-        # invalid_balance_ids = [
-        #     group_id for group_id, group in grouped
-        #     if not validate_balancing_amounts(group)
-        # ]
-        # if invalid_balance_ids:
-        #     self._logger.warning(
-        #         f"Discarding {len(invalid_balance_ids)} ledger entries where "
-        #         f"amounts do not balance to zero: {first_elements_as_str(invalid_balance_ids)}"
-        #     )
-        #     df = df.query("id not in @invalid_balance_ids")
+        def invalid_amounts() -> pd.Series:
+            """Identify rows with invalid balancing amounts."""
+            effective_amounts = df["report_amount"].copy()
+            effective_amounts.loc[df["contra"].notna()] *= -1
+            effective_amounts.loc[df["account"].notna() & df["contra"].notna()] = 0
+            net_amounts = effective_amounts.groupby(df["id"]).transform("sum")
+            return ~net_amounts.eq(0)
+
+        invalid_amounts_mask = invalid_amounts()
+        if invalid_amounts_mask.any():
+            invalid_ids = df.loc[invalid_amounts_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries where "
+                f"amounts do not balance to zero: {first_elements_as_str(invalid_ids)}"
+            )
+            df = df[~df["id"].isin(invalid_ids)]
 
         return df.reset_index(drop=True)
 

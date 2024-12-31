@@ -261,6 +261,8 @@ def test_sanitize_ledger(engine, capture_logs):
     ACCOUNT_CSV = """
         group,          account, currency,   tax_code,   description
         Assets,            1000,      USD,           , VALID_CURR
+        Assets,            1100,      JPY,           , VALID_CURR
+        Assets,            1200,      CHF,           , VALID_CURR
         Liabilities,       2000,      USD,           , NO_TAX_CODE
         Revenue,           3000,      USD,           , INVALID_TAX_CODE
     """
@@ -288,9 +290,9 @@ def test_sanitize_ledger(engine, capture_logs):
          1,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Invalid date,
          1,  2024-01-02,    1000,       ,      USD,   800000.00,              ,         , Invalid date,
          2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
-         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
+         2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,         , Valid,
          3,  2024-01-01,    1000,       ,      USD,   800000.00,              ,  Invalid, Invalid tax code,
-         4,  2024-01-01,    1000,       ,      USD,   800000.00,              ,    VALID, Valid tax code,
+         4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,    VALID, Valid tax code,
          5,  2024-01-01,        ,       ,      USD,   800000.00,              ,         , No account or contra,
          6,  2024-01-01,    1111,       ,      USD,   800000.00,              ,         , Invalid account reference,
          7,  2024-01-01,    2222,       ,      USD,   800000.00,              ,         , Invalid contra reference,
@@ -301,16 +303,46 @@ def test_sanitize_ledger(engine, capture_logs):
          12, 2024-01-01,    1000,       ,      CHF,           1,              ,         , Currencies mismatch invalid,
          13, 2024-01-01,    1000,   2000,      CHF,           1,              ,         , Currencies mismatch valid with both account,
          14, 2021-01-01,    1000,       ,      USD,   800000.00,              ,         , No price reference,
-
+         15, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Not balanced amount,
+         16, 2024-01-01,        ,   1000,      USD,   800000.00,              ,         , Not balanced amount,
+         17, 2024-01-01,        ,   1000,      USD,   800000.00,              ,         , Not balanced amount,
+         17, 2024-01-01,        ,   1000,      USD,   800000.00,              ,         , Not balanced amount,
+         18, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Not balanced amount,
+         18, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Not balanced amount,
+         19, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Not balanced amount,
+         19, 2024-01-01,        ,   1000,      USD,   100000.00,              ,         , Not balanced amount,
+         20, 2024-01-01,        ,   1000,      USD,   800000.00,              ,         , Not balanced amount,
+         20, 2024-01-01,    1200,       ,      CHF,   100000.00,              ,         , Not balanced amount,
+         21, 2024-01-01,        ,   1000,      USD,   400000.00,              ,         , Balanced amount,
+         21, 2024-01-01,    1000,       ,      USD,   200000.00,              ,         , Balanced amount,
+         21, 2024-01-01,    1000,       ,      USD,   200000.00,              ,         , Balanced amount,
+         22, 2024-01-01,        ,   1000,      USD,   400000.00,              ,         , Not balanced amount,
+         22, 2024-01-01,    1000,       ,      USD,   200000.00,              ,         , Not balanced amount,
+         22, 2024-01-01,    1000,       ,      USD,   100000.00,              ,         , Not balanced amount,
+         23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,    10000.00,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,     8560.00,              ,         , Balanced amount,
+         24, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,         , Not balanced amount,
+         24, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,         , Not balanced amount,
+         24, 2024-01-01,    1000,       ,      USD,     1000.00,              ,         , Not balanced amount,
+         24, 2024-01-01,        ,   1000,      USD,     8560.00,              ,         , Not balanced amount,
     """
     EXPECTED_LEDGER_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, tax_code, description, document
-         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
-         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
-         4,  2024-01-01,    1000,       ,      USD,   800000.00,              ,    VALID, Valid tax code,
-         9,  2024-01-01,    1000,       ,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
-         10, 2024-01-01,        ,   1000,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
-         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,         , Currencies mismatch valid with both account,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,     800000.00,         , Valid,
+         2,  2024-01-01,        ,   1000,      USD,   800000.00,     800000.00,         , Valid,
+         4,  2024-01-01,    1000,   2000,      USD,   800000.00,     800000.00,    VALID, Valid tax code,
+         9,  2024-01-01,    1000,       ,      CHF,           0,             0,         , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,             0,         , Currencies mismatch valid with amount 0,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,          0.01,         , Currencies mismatch valid with both account,
+         21, 2024-01-01,        ,   1000,      USD,   400000.00,     400000.00,         , Balanced amount,
+         21, 2024-01-01,    1000,       ,      USD,   200000.00,     200000.00,         , Balanced amount,
+         21, 2024-01-01,    1000,       ,      USD,   200000.00,     200000.00,         , Balanced amount,
+         23, 2024-01-01,        ,   1100,      JPY,   400000.00,       2840.00,         , Balanced amount,
+         23, 2024-01-01,    1200,       ,      CHF,   200000.00,       1400.00,         , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,    10000.00,      10000.00,         , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,     8560.00,       8560.00,         , Balanced amount,
     """
     prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
     assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
