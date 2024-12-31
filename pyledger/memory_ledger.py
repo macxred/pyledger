@@ -4,7 +4,7 @@ from .standalone_ledger import StandaloneLedger
 from .storage_entity import DataFrameEntity, LedgerDataFrameEntity
 from .constants import (
     ASSETS_SCHEMA,
-    COST_CENTER_SCHEMA,
+    PROFIT_CENTER_SCHEMA,
     PRICE_SCHEMA,
     LEDGER_SCHEMA,
     ACCOUNT_SCHEMA,
@@ -46,7 +46,7 @@ class MemoryLedger(StandaloneLedger):
             prepare_for_mirroring=self.sanitize_ledger,
             on_change=self.serialized_ledger.cache_clear
         )
-        self._cost_centers = DataFrameEntity(COST_CENTER_SCHEMA)
+        self._profit_centers = DataFrameEntity(PROFIT_CENTER_SCHEMA)
 
     # ----------------------------------------------------------------------
     # Currency

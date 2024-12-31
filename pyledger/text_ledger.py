@@ -9,7 +9,7 @@ from .standalone_ledger import StandaloneLedger
 from .constants import (
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
-    COST_CENTER_SCHEMA,
+    PROFIT_CENTER_SCHEMA,
     DEFAULT_SETTINGS,
     LEDGER_SCHEMA,
     PRICE_SCHEMA,
@@ -88,8 +88,8 @@ class TextLedger(StandaloneLedger):
             prepare_for_mirroring=self.sanitize_ledger,
             on_change=self.serialized_ledger.cache_clear,
         )
-        self._cost_centers = CSVAccountingEntity(
-            schema=COST_CENTER_SCHEMA, path=self.root / "cost_center.csv"
+        self._profit_centers = CSVAccountingEntity(
+            schema=PROFIT_CENTER_SCHEMA, path=self.root / "profit_center.csv"
         )
 
     # ----------------------------------------------------------------------

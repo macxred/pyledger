@@ -40,47 +40,47 @@ ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
 LEDGER_CSV = """
-    id,       date, account, contra, currency,      amount, report_amount, tax_code, cost_center, description, document
-     1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         ,            , Opening balance, 2023/financials/balance_sheet.pdf
-     1,           ,    1010,       ,      EUR,      120.00,        132.82,         ,            , Opening balance, 2023/financials/balance_sheet.pdf
-     1,           ,    1020,       ,      JPY, 42000000.00,     298200.00,         ,            , Opening balance, 2023/financials/balance_sheet.pdf
-     1,           ,        ,   3000,      USD,  1098332.82,              ,         ,            , Opening balance, 2023/financials/balance_sheet.pdf
-     2, 2024-01-24,    1000,   4000,      USD,     1200.00,              ,  OUT_STD,            , Sell cakes, 2024/receivables/2024-01-24.pdf
-     3, 2024-04-12,        ,   1000,      USD,    21288.24,              ,         ,            , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
-     3,           ,    1010,       ,      EUR,    20000.00,      21288.24,         ,            , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
-     4, 2024-05-25,    1010,   5000,      EUR,     -800.00,              ,   IN_STD,            , Purchase goods, 2024/payables/2024-05-25.pdf
-     5, 2024-05-05,    1000,   5000,      USD,     -555.55,              ,   IN_STD,            , Purchase with tax, 2024/payables/2024-05-05.pdf
-     6, 2024-05-06,    1000,   5000,      USD,     -666.66,              ,   IN_RED,            , Purchase at reduced tax, 2024/payables/2024-05-06.pdf
-     7, 2024-05-07,    1000,   5000,      USD,     -777.77,              ,   EXEMPT,            , Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
-     8, 2024-05-08,    1000,       ,      USD,     -999.99,              ,         ,            , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
-     8,           ,        ,   5000,      USD,     -555.55,              ,   IN_STD,            , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
-     8,           ,        ,   5000,      USD,     -444.44,              ,   EXEMPT,            , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
-     9, 2024-07-01,    1010,       ,      EUR,     1500.00,              ,         ,            , Sale at mixed VAT rate, /invoices/invoice_002.pdf
-     9,           ,    4001,       ,      EUR,    -1000.00,              ,  OUT_STD,            , Sale at mixed VAT rate, /invoices/invoice_002.pdf
-     9,           ,        ,   4001,      EUR,      500.00,              ,  OUT_RED,            , Sale at mixed VAT rate, /invoices/invoice_002.pdf
-    10, 2024-07-04,    1020,       ,      JPY, 12345678.00,      76386.36,         ,            , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
-    10,           ,    1010,       ,      EUR,   -70791.78,     -76386.36,         ,            , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
-    11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         ,            , Payment from customer, 2024/banking/USD_2024-Q2.pdf
-    12, 2024-08-07,    1000,   2000,      USD,     -200.00,              ,         ,            , Payment to supplier,
-    13, 2024-08-08,    2000,   1000,      USD,     1000.00,              ,         ,            , Correction of previous entry,
-    14, 2024-08-08,    1010,   2010,      EUR,        0.00,              ,         ,            , Zero amount transaction,
-    15, 2024-05-24,    1000,       ,      USD,      100.00,              ,         ,            , Collective transaction with zero amount,
-    15,           ,    1000,       ,      USD,     -100.00,              ,         ,            , Collective transaction with zero amount,
-    15,           ,    1000,       ,      USD,        0.00,              ,         ,            , Collective transaction with zero amount,
-    16, 2024-05-24,    1000,   1005,      USD,      100.00,              ,         ,            , Collective transaction - leg with debit and credit account,
-    16,           ,    1010,       ,      EUR,       20.00,         20.50,         ,            , Collective transaction - leg with credit account,
-    16,           ,        ,   1015,      EUR,       20.00,         20.50,         ,            , Collective transaction - leg with debit account,
-    17, 2024-09-09,    1010,   7050,      EUR,        0.00,         -5.55,         ,            , Manual Foreign currency adjustment
-    18, 2024-09-10,    1020,       ,      JPY,        0.00,          5.55,         ,            , Manual Foreign currency adjustment
-    18,           ,        ,   8050,      USD,        5.55,              ,         ,            , Manual Foreign currency adjustment
-    19, 2024-12-01,    1000,   3000,      EUR, 10000000.00,              ,         ,            , Capital Increase,
-    20, 2024-12-02,    1010,   2010,      EUR, 90000000.00,   91111111.10,         ,            , Value 90 Mio USD @1.0123456789 (10 decimal places),
-    21, 2024-12-03,    2010,   1010,      EUR, 90000000.00,   91111111.10,         ,            , Revert previous entry,
-    22, 2024-12-04,        ,   1000,      USD,  9500000.00,              ,         ,            , Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places),
-    22, 2024-12-04,    1010,       ,      EUR,  9978888.88,    9500000.00,         ,            , Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places),
-    23, 2024-12-05,        ,   1000,      USD,   200000.00,              ,         ,            , Convert USD to EUR and CHF,
-    23,           ,    1010,       ,      EUR,    97750.00,     100000.00,         ,            , Convert USD to EUR and CHF,
-    23,           ,    1025,       ,      CHF, 14285714.29,     100000.00,         ,            , Convert USD to EUR and CHF,
+    id,       date, account, contra, currency,      amount, report_amount, tax_code, profit_center, description, document
+     1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,    1010,       ,      EUR,      120.00,        132.82,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,    1020,       ,      JPY, 42000000.00,     298200.00,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
+     1,           ,        ,   3000,      USD,  1098332.82,              ,         ,              , Opening balance, 2023/financials/balance_sheet.pdf
+     2, 2024-01-24,    1000,   4000,      USD,     1200.00,              ,  OUT_STD,              , Sell cakes, 2024/receivables/2024-01-24.pdf
+     3, 2024-04-12,        ,   1000,      USD,    21288.24,              ,         ,              , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+     3,           ,    1010,       ,      EUR,    20000.00,      21288.24,         ,              , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+     4, 2024-05-25,    1010,   5000,      EUR,     -800.00,              ,   IN_STD,              , Purchase goods, 2024/payables/2024-05-25.pdf
+     5, 2024-05-05,    1000,   5000,      USD,     -555.55,              ,   IN_STD,              , Purchase with tax, 2024/payables/2024-05-05.pdf
+     6, 2024-05-06,    1000,   5000,      USD,     -666.66,              ,   IN_RED,              , Purchase at reduced tax, 2024/payables/2024-05-06.pdf
+     7, 2024-05-07,    1000,   5000,      USD,     -777.77,              ,   EXEMPT,              , Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+     8, 2024-05-08,    1000,       ,      USD,     -999.99,              ,         ,              , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+     8,           ,        ,   5000,      USD,     -555.55,              ,   IN_STD,              , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+     8,           ,        ,   5000,      USD,     -444.44,              ,   EXEMPT,              , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+     9, 2024-07-01,    1010,       ,      EUR,     1500.00,              ,         ,              , Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,    4001,       ,      EUR,    -1000.00,              ,  OUT_STD,              , Sale at mixed VAT rate, /invoices/invoice_002.pdf
+     9,           ,        ,   4001,      EUR,      500.00,              ,  OUT_RED,              , Sale at mixed VAT rate, /invoices/invoice_002.pdf
+    10, 2024-07-04,    1020,       ,      JPY, 12345678.00,      76386.36,         ,              , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+    10,           ,    1010,       ,      EUR,   -70791.78,     -76386.36,         ,              , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+    11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         ,              , Payment from customer, 2024/banking/USD_2024-Q2.pdf
+    12, 2024-08-07,    1000,   2000,      USD,     -200.00,              ,         ,              , Payment to supplier,
+    13, 2024-08-08,    2000,   1000,      USD,     1000.00,              ,         ,              , Correction of previous entry,
+    14, 2024-08-08,    1010,   2010,      EUR,        0.00,              ,         ,              , Zero amount transaction,
+    15, 2024-05-24,    1000,       ,      USD,      100.00,              ,         ,              , Collective transaction with zero amount,
+    15,           ,    1000,       ,      USD,     -100.00,              ,         ,              , Collective transaction with zero amount,
+    15,           ,    1000,       ,      USD,        0.00,              ,         ,              , Collective transaction with zero amount,
+    16, 2024-05-24,    1000,   1005,      USD,      100.00,              ,         ,              , Collective transaction - leg with debit and credit account,
+    16,           ,    1010,       ,      EUR,       20.00,         20.50,         ,              , Collective transaction - leg with credit account,
+    16,           ,        ,   1015,      EUR,       20.00,         20.50,         ,              , Collective transaction - leg with debit account,
+    17, 2024-09-09,    1010,   7050,      EUR,        0.00,         -5.55,         ,              , Manual Foreign currency adjustment
+    18, 2024-09-10,    1020,       ,      JPY,        0.00,          5.55,         ,              , Manual Foreign currency adjustment
+    18,           ,        ,   8050,      USD,        5.55,              ,         ,              , Manual Foreign currency adjustment
+    19, 2024-12-01,    1000,   3000,      EUR, 10000000.00,              ,         ,              , Capital Increase,
+    20, 2024-12-02,    1010,   2010,      EUR, 90000000.00,   91111111.10,         ,              , Value 90 Mio USD @1.0123456789 (10 decimal places),
+    21, 2024-12-03,    2010,   1010,      EUR, 90000000.00,   91111111.10,         ,              , Revert previous entry,
+    22, 2024-12-04,        ,   1000,      USD,  9500000.00,              ,         ,              , Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places),
+    22, 2024-12-04,    1010,       ,      EUR,  9978888.88,    9500000.00,         ,              , Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places),
+    23, 2024-12-05,        ,   1000,      USD,   200000.00,              ,         ,              , Convert USD to EUR and CHF,
+    23,           ,    1010,       ,      EUR,    97750.00,     100000.00,         ,              , Convert USD to EUR and CHF,
+    23,           ,    1025,       ,      CHF, 14285714.29,     100000.00,         ,              , Convert USD to EUR and CHF,
 """
 LEDGER = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 # flake8: enable
@@ -127,15 +127,15 @@ REVALUATIONS_CSV = """
 """
 REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 
-COST_CENTERS_CSV = """
-    cost_center,
-           Shop,
-           Bank,
-         Bakery,
-     Restaurant,
-           Cafe,
+PROFIT_CENTERS_CSV = """
+    profit_center,
+             Shop,
+             Bank,
+           Bakery,
+       Restaurant,
+             Cafe,
 """
-COST_CENTERS = pd.read_csv(StringIO(COST_CENTERS_CSV), skipinitialspace=True)
+PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
@@ -170,5 +170,5 @@ class BaseTest(ABC):
     LEDGER_ENTRIES = engine.ledger.standardize(LEDGER)
     TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
-    COST_CENTERS = engine.cost_centers.standardize(COST_CENTERS)
+    PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
     EXPECTED_BALANCE = EXPECTED_BALANCE
