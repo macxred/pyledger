@@ -59,7 +59,7 @@ LEDGER_CSV = """
      9,           ,    4001,       ,      EUR,    -1000.00,              ,  OUT_STD, Sale at mixed VAT rate, /invoices/invoice_002.pdf
      9,           ,        ,   4001,      EUR,      500.00,              ,  OUT_RED, Sale at mixed VAT rate, /invoices/invoice_002.pdf
     10, 2024-07-04,    1020,       ,      JPY, 12345678.00,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
-    10,           ,    1010,       ,      EUR,    70791.78,      76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+    10,           ,    1010,       ,      EUR,   -70791.78,     -76386.36,         , Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
     11, 2024-08-06,    1000,   2000,      USD,      500.00,              ,         , Payment from customer, 2024/banking/USD_2024-Q2.pdf
     12, 2024-08-07,    1000,   2000,      USD,     -200.00,              ,         , Payment to supplier,
     13, 2024-08-08,    2000,   1000,      USD,     1000.00,              ,         , Correction of previous entry,
