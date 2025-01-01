@@ -1,5 +1,6 @@
 """Definition of abstract base class for testing price history operations."""
 
+from io import StringIO
 import pytest
 import pandas as pd
 from abc import abstractmethod
@@ -150,7 +151,7 @@ class BaseTestPriceHistory(BaseTest):
 
     @pytest.fixture()
     def engine_with_prices(self, engine):
-        engine.restore(settings=self.SETTINGS, price_history=self.PRICES)
+        engine.restore(settings=self.SETTINGS, price_history=self.PRICES, assets=self.ASSETS)
         return engine
 
     @pytest.mark.parametrize(
@@ -193,3 +194,49 @@ class BaseTestPriceHistory(BaseTest):
     ):
         with pytest.raises(expected_exception, match=match):
             engine_with_prices.price(ticker, date, currency)
+
+    def test_report_amount(self, engine_with_prices):
+        AMOUNTS_CSV = """
+            date,        currency,  amount,    expected_amount
+            2023-12-29,  EUR,       1000.00,   1106.80      # exact date match for EUR @ 1.1068
+            2024-01-24,  EUR,       1000.00,   1106.80      # backfills from 2023-12-29
+            2024-03-29,  JPY,       1000.00,   6.60         # exact date match for JPY @ 0.0066
+            2024-09-30,  JPY,       1000.00,   7.00         # exact date match for JPY @ 0.0070
+            2023-12-29,  CHF,       1000.00,   7.00         # exact date match for CHF @ 0.007
+            2024-01-24,  USD,       1000.00,   1000.00      # same currency as reporting (USD->USD)
+        """
+        AMOUNTS = pd.read_csv(StringIO(AMOUNTS_CSV), skipinitialspace=True, comment="#")
+        report_amounts = engine_with_prices.report_amount(
+            amount=AMOUNTS["amount"], currency=AMOUNTS["currency"], date=AMOUNTS["date"]
+        )
+        assert AMOUNTS["expected_amount"].to_list() == report_amounts, (
+            "Reporting amounts calculated incorrectly"
+        )
+
+    def test_report_amount_raise_error_with_no_assets_prices_definition(self, engine):
+        AMOUNTS_CSV = """
+            date,        currency,  amount,  expected_amount
+            2024-01-24,  AUD,       1000,    0.0  # missing price
+            2024-01-24,  AAA,       5000,    0.0  # unknown ticker
+        """
+        amounts_df = pd.read_csv(StringIO(AMOUNTS_CSV), skipinitialspace=True, comment="#")
+        for _, row in amounts_df.iterrows():
+            with pytest.raises(ValueError):
+                engine.report_amount(
+                    amount=[row["amount"]], currency=[row["currency"]], date=[row["date"]]
+                )
+
+    @pytest.mark.parametrize(
+        "amount, currency, date",
+        [
+            ([1000], ["USD", "USD"], ["2024-01-24", "2024-01-24"]),
+            ([1000, 2000], ["USD"], ["2024-01-24"]),
+            ([1000, 2000], ["USD", "EUR"], ["2024-01-24"]),
+        ]
+    )
+    def test_report_amount_raise_error_with_different_vectors_length(
+        self, engine, amount, currency, date
+    ):
+        error_message = "Vectors 'amount', 'currency', and 'date' must have the same length."
+        with pytest.raises(ValueError, match=error_message):
+            engine.report_amount(amount=amount, currency=currency, date=date)
