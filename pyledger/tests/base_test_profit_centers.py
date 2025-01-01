@@ -82,7 +82,7 @@ class BaseTestProfitCenters(BaseTest):
         engine.profit_centers.mirror(target, delete=True)
         assert_frame_equal(target, engine.profit_centers.list(), ignore_row_order=True)
 
-    def test_mirror_empty_assets(self, engine):
+    def test_mirror_empty_profit_centers(self, engine):
         engine.restore(profit_centers=self.PROFIT_CENTERS, settings=self.SETTINGS)
         assert not engine.profit_centers.list().empty
         engine.profit_centers.mirror(engine.profit_centers.standardize(None), delete=True)

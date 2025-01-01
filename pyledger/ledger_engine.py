@@ -238,13 +238,13 @@ class LedgerEngine(ABC):
             ledger (pd.DataFrame | None): Ledger entries of the restored system.
                 If `None`, ledger remains unchanged.
             assets (pd.DataFrame | None): Assets entries of the restored system.
-                If `None`, assets remains unchanged.
+                If `None`, assets remain unchanged.
             price_history (pd.DataFrame | None): Price history of the restored system.
                 If `None`, price history remains unchanged.
             revaluations (pd.DataFrame | None): Revaluations of the restored system.
-                If `None`, revaluations remains unchanged.
+                If `None`, revaluations remain unchanged.
             profit_centers (pd.DataFrame | None): Profit centers of the restored system.
-                If `None`, profit centers remains unchanged.
+                If `None`, profit centers remain unchanged.
         """
         if settings is not None:
             self.settings_modify(settings)
