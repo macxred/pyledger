@@ -54,6 +54,7 @@ LEDGER_SCHEMA_CSV = """
     amount,              Float64,              True,         False
     report_amount,       Float64,              False,        False
     tax_code,            string[python],       False,        False
+    profit_center,       string[python],       False,        False
     description,         string[python],       True,         False
     document,            string[python],       False,        False
 """
@@ -80,6 +81,12 @@ ASSETS_CSV = """
        SEK,      0.01,
        USD,      0.01,
 """
+
+PROFIT_CENTER_SCHEMA_CSV = """
+    column,         dtype,   mandatory,   id
+    profit_center,  string,        True,   True
+"""
+PROFIT_CENTER_SCHEMA = pd.read_csv(StringIO(PROFIT_CENTER_SCHEMA_CSV), skipinitialspace=True)
 
 DEFAULT_PRECISION = 0.01
 

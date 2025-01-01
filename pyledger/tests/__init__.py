@@ -11,3 +11,4 @@ from .base_test_dump_restore_clear import BaseTestDumpRestoreClear
 from .base_test import BaseTest
 from .base_test_price_history import BaseTestPriceHistory
 from .base_test_revaluation import BaseTestRevaluations
+from .base_test_profit_centers import BaseTestProfitCenters

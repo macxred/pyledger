@@ -22,6 +22,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             assets=self.ASSETS,
             price_history=self.PRICES,
             revaluations=self.REVALUATIONS,
+            profit_centers=self.PROFIT_CENTERS,
         )
         assert engine.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
@@ -39,6 +40,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             self.REVALUATIONS, engine.revaluations.list(), ignore_row_order=True, check_like=True
         )
         assert_frame_equal(self.ASSETS, engine.assets.list(), ignore_row_order=True)
+        assert_frame_equal(self.PROFIT_CENTERS, engine.profit_centers.list(), ignore_row_order=True)
         target = engine.txn_to_str(self.LEDGER_ENTRIES).values()
         actual = engine.txn_to_str(engine.ledger.list()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
@@ -52,6 +54,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         engine.assets.mirror(self.ASSETS)
         engine.price_history.mirror(self.PRICES)
         engine.revaluations.mirror(self.REVALUATIONS)
+        engine.profit_centers.mirror(self.PROFIT_CENTERS)
 
         # Dumping current state
         accounts = engine.accounts.list()
@@ -60,6 +63,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         assets = engine.assets.list()
         price_history = engine.price_history.list()
         revaluations = engine.revaluations.list()
+        profit_centers = engine.profit_centers.list()
         engine.dump_to_zip(tmp_path / "ledger.zip")
 
         # Remove or alter data
@@ -84,6 +88,9 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert_frame_equal(
             accounts, engine.accounts.list(), ignore_row_order=True, ignore_index=True
         )
+        assert_frame_equal(
+            profit_centers, engine.profit_centers.list(), ignore_row_order=True, ignore_index=True
+        )
         assert sorted(engine.txn_to_str(ledger_entries).values()) == \
                sorted(engine.txn_to_str(engine.ledger.list()).values())
 
@@ -96,6 +103,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             assets=self.ASSETS,
             price_history=self.PRICES,
             revaluations=self.REVALUATIONS,
+            profit_centers=self.PROFIT_CENTERS,
         )
         engine.clear()
         assert engine.ledger.list().empty, "Ledger was not cleared"
@@ -104,3 +112,4 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert engine.accounts.list().empty, "Accounts was not cleared"
         assert engine.price_history.list().empty, "Price history was not cleared"
         assert engine.revaluations.list().empty, "Revaluations was not cleared"
+        assert engine.profit_centers.list().empty, "Profit centers was not cleared"
