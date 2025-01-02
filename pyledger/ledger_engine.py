@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 import datetime
-from decimal import Decimal
 import logging
 import math
 import zipfile
@@ -870,15 +869,15 @@ class LedgerEngine(ABC):
         effective_amounts = effective_amounts.mask(
             df["contra"].notna() & df["account"].isna(), -effective_amounts
         )
-        effective_amounts = effective_amounts.apply(lambda x: Decimal(str(x)))
-        invalid_amounts_mask = ~effective_amounts.groupby(df["id"]).sum().eq(0)
+        grouped_amounts = effective_amounts.groupby(df["id"]).sum()
+        invalid_amounts_mask = grouped_amounts.abs() > 1e-10
         if invalid_amounts_mask.any():
             invalid_ids = invalid_amounts_mask[invalid_amounts_mask].index.unique().tolist()
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} ledger entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(invalid_ids)}"
             )
-            df = df[~df["id"].isin(invalid_ids)]
+            df = df.query("id not in @invalid_ids")
 
         return df.reset_index(drop=True)
 
