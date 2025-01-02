@@ -815,6 +815,31 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
+        # Validate none-missing ledger profit center if any exists in the system
+        profit_centers = self.profit_centers.list()
+        if not profit_centers.empty:
+            invalid_profit_center_mask = df["profit_center"].isna()
+            if invalid_profit_center_mask.any():
+                invalid_ids = df.loc[invalid_profit_center_mask, "id"].unique().tolist()
+                self._logger.warning(
+                    f"Discarding {len(invalid_ids)} ledger entries with missing profit center: "
+                    f"{first_elements_as_str(invalid_ids)}"
+                )
+                df = df.query("id not in @invalid_ids")
+
+        # Validate profit center reference
+        profit_centers_set = set(profit_centers["profit_center"])
+        invalid_profit_center_mask = (
+            df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers_set)
+        )
+        if invalid_profit_center_mask.any():
+            invalid_ids = df.loc[invalid_profit_center_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} ledger entries with invalid profit center "
+                f"reference: {first_elements_as_str(invalid_ids)}"
+            )
+            df = df.query("id not in @invalid_ids")
+
         # Validate balancing amounts
         effective_amounts = df["report_amount"].copy()
         index = effective_amounts.isna()
