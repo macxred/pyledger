@@ -608,14 +608,14 @@ class LedgerEngine(ABC):
         else:
             filter = ledger["account"] == account
         if end is not None:
-            filter = filter & (ledger["date"] <= end)
+            filter = filter & (ledger["date"] <= pd.to_datetime(end))
         df = ledger.loc[filter, :]
         df = df.sort_values("date")
         df["balance"] = df["amount"].cumsum()
         df["report_balance"] = df["report_amount"].cumsum()
         cols = [col for col in LEDGER_SCHEMA["column"] if col in df.columns]
         if start is not None:
-            df = df.loc[df["date"] >= start, :]
+            df = df.loc[df["date"] >= pd.to_datetime(start), :]
         df = df.reset_index(drop=True)
         return df[cols]
 
