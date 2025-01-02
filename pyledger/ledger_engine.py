@@ -616,8 +616,7 @@ class LedgerEngine(ABC):
         cols = [col for col in LEDGER_SCHEMA["column"] if col in df.columns]
         if start is not None:
             df = df.loc[df["date"] >= pd.to_datetime(start), :]
-        df = df.reset_index(drop=True)
-        return df[cols]
+        return df.reset_index(drop=True)
 
     def account_range(self, range: int | str) -> dict:
         """Determine the account range for a given input.
