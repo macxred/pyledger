@@ -702,6 +702,7 @@ class LedgerEngine(ABC):
         Returns:
             pd.DataFrame: DataFrame with sanitized ledger entries.
         """
+        # Enforce schema
         df = enforce_schema(df, LEDGER_SCHEMA, keep_extra_columns=True)
 
         # Identify rows where one transaction (i.e., same 'id') spans multiple dates
@@ -718,7 +719,9 @@ class LedgerEngine(ABC):
         accounts, tax_codes = self.sanitized_accounts_tax_codes()
 
         # Validate tax codes reference
-        invalid_tax_code_mask = ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
+        invalid_tax_code_mask = (
+            ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
+        )
         if invalid_tax_code_mask.any():
             invalid_ids = df.loc[invalid_tax_code_mask, "id"].unique().tolist()
             self._logger.warning(
@@ -751,25 +754,14 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Validate assets reference
+        def invalid_asset_reference(row):
+            try:
+                self.precision(ticker=row["currency"], date=row["date"])
+                return False
+            except ValueError:
+                return True
 
-        # The `precision` method validates the existence of a valid asset definition
-        # and relies on sanitized data, serving as a centralized validation point.
-        def invalid_asset_reference(ticker: pd.Series, date: pd.Series) -> pd.Series:
-            """Validate specified column values for asset references."""
-            def is_invalid(ticker, date):
-                try:
-                    self.precision(ticker=ticker, date=date)
-                    return False
-                except ValueError:
-                    return True
-
-            mask = pd.Series(
-                [is_invalid(ticker=t, date=d) for t, d in zip(ticker, date)],
-                index=df.index
-            )
-            return mask
-
-        invalid_assets_mask = invalid_asset_reference(df["currency"], df["date"])
+        invalid_assets_mask = df.apply(invalid_asset_reference, axis=1)
         if invalid_assets_mask.any():
             invalid_ids = df.loc[invalid_assets_mask, "id"].unique().tolist()
             self._logger.warning(
@@ -779,28 +771,20 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Validate transaction currency
-        def invalid_transaction_currency() -> pd.Series:
-            """Validate that the transaction currency matches the account or contra currency."""
-            def is_invalid(row):
-                if row["amount"] == 0:
-                    return False
-                if pd.notna(row["account"]) and pd.isna(row["contra"]):
-                    account_currency = self.account_currency(row["account"])
-                    if not row["currency"] == account_currency:
-                        return True
-                if pd.notna(row["contra"]) and pd.isna(row["account"]):
-                    contra_currency = self.account_currency(row["contra"])
-                    if not row["currency"] == contra_currency:
-                        return True
+        def invalid_transaction_currency(row):
+            if row["amount"] == 0:
                 return False
+            if pd.notna(row["account"]) and pd.isna(row["contra"]):
+                account_currency = self.account_currency(row["account"])
+                if row["currency"] != account_currency:
+                    return True
+            if pd.notna(row["contra"]) and pd.isna(row["account"]):
+                contra_currency = self.account_currency(row["contra"])
+                if row["currency"] != contra_currency:
+                    return True
+            return False
 
-            mask = pd.Series(
-                [is_invalid(row) for _, row in df.iterrows()],
-                index=df.index
-            )
-            return mask
-
-        invalid_currency_mask = invalid_transaction_currency()
+        invalid_currency_mask = df.apply(invalid_transaction_currency, axis=1)
         if invalid_currency_mask.any():
             invalid_ids = df.loc[invalid_currency_mask, "id"].unique().tolist()
             self._logger.warning(
@@ -810,27 +794,18 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Validate price reference
-        def invalid_prices(
-            ticker: pd.Series, date: pd.Series, report_amount: pd.Series
-        ) -> pd.Series:
-            """Validate specified column values for asset references."""
-            def is_invalid(ticker, date, report_amount):
-                if ticker == self.reporting_currency or pd.notna(report_amount):
-                    return False
-                try:
-                    self.price(ticker=ticker, date=date, currency=self.reporting_currency)
-                    return False
-                except ValueError:
-                    return True
+        def invalid_prices(row):
+            if row["currency"] == self.reporting_currency or pd.notna(row["report_amount"]):
+                return False
+            try:
+                self.price(
+                    ticker=row["currency"], date=row["date"], currency=self.reporting_currency
+                )
+                return False
+            except ValueError:
+                return True
 
-            mask = pd.Series(
-                [is_invalid(ticker=t, date=d, report_amount=a)
-                 for t, d, a in zip(ticker, date, report_amount)],
-                index=df.index
-            )
-            return mask
-
-        invalid_prices_mask = invalid_prices(df["currency"], df["date"], df["report_amount"])
+        invalid_prices_mask = df.apply(invalid_prices, axis=1)
         if invalid_prices_mask.any():
             invalid_ids = df.loc[invalid_prices_mask, "id"].unique().tolist()
             self._logger.warning(
@@ -839,24 +814,21 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-        # Insert missing reporting currency amounts
-        index = df["report_amount"].isna()
-        df.loc[index, "report_amount"] = self.report_amount(
+
+        # Validate balancing amounts
+        effective_amounts = df["report_amount"].copy()
+        index = effective_amounts.isna()
+
+        # Perform this only if amount if not 0 because then will be -0
+        effective_amounts.loc[index] = self.report_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
         )
-
-        # Validate balancing amounts
-        def invalid_amounts() -> pd.Series:
-            """Identify rows with invalid balancing amounts."""
-            effective_amounts = df["report_amount"].copy()
-            effective_amounts.loc[df["contra"].notna()] *= -1
-            effective_amounts.loc[df["account"].notna() & df["contra"].notna()] = 0
-            net_amounts = effective_amounts.groupby(df["id"]).transform("sum")
-            return ~net_amounts.eq(0)
-
-        invalid_amounts_mask = invalid_amounts()
+        effective_amounts.loc[df["contra"].notna()] *= -1
+        effective_amounts.loc[df["account"].notna() & df["contra"].notna()] = 0
+        net_amounts = effective_amounts.groupby(df["id"]).transform("sum")
+        invalid_amounts_mask = net_amounts.ne(0) | net_amounts.ne(-0)
         if invalid_amounts_mask.any():
             invalid_ids = df.loc[invalid_amounts_mask, "id"].unique().tolist()
             self._logger.warning(
