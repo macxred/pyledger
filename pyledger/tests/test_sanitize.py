@@ -7,6 +7,8 @@ import pytest
 from pyledger import MemoryLedger
 from consistent_df import assert_frame_equal
 
+from pyledger.tests.base_test_ledger import BaseTestLedger
+
 
 @pytest.fixture
 def capture_logs():
@@ -313,9 +315,9 @@ def test_sanitize_ledger(engine, capture_logs):
          19, 2024-01-01,        ,   1000,      USD,   100000.00,              ,         , Not balanced amount,
          20, 2024-01-01,        ,   1000,      USD,   800000.00,              ,         , Not balanced amount,
          20, 2024-01-01,    1200,       ,      CHF,   100000.00,              ,         , Not balanced amount,
-         21, 2024-01-01,        ,   1000,      USD,   400000.00,              ,         , Balanced amount,
-         21, 2024-01-01,    1000,       ,      USD,   200000.00,              ,         , Balanced amount,
-         21, 2024-01-01,    1000,       ,      USD,   200000.00,              ,         , Balanced amount,
+         21, 2024-01-01,    1000,       ,      USD,     -999.99,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -555.55,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,         , Balanced amount,
          22, 2024-01-01,        ,   1000,      USD,   400000.00,              ,         , Not balanced amount,
          22, 2024-01-01,    1000,       ,      USD,   200000.00,              ,         , Not balanced amount,
          22, 2024-01-01,    1000,       ,      USD,   100000.00,              ,         , Not balanced amount,
@@ -330,19 +332,19 @@ def test_sanitize_ledger(engine, capture_logs):
     """
     EXPECTED_LEDGER_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, tax_code, description, document
-         2,  2024-01-01,    1000,       ,      USD,   800000.00,     800000.00,         , Valid,
-         2,  2024-01-01,        ,   1000,      USD,   800000.00,     800000.00,         , Valid,
-         4,  2024-01-01,    1000,   2000,      USD,   800000.00,     800000.00,    VALID, Valid tax code,
-         9,  2024-01-01,    1000,       ,      CHF,           0,             0,         , Currencies mismatch valid with amount 0,
-         10, 2024-01-01,        ,   1000,      CHF,           0,             0,         , Currencies mismatch valid with amount 0,
-         13, 2024-01-01,    1000,   2000,      CHF,           1,          0.01,         , Currencies mismatch valid with both account,
-         21, 2024-01-01,        ,   1000,      USD,   400000.00,     400000.00,         , Balanced amount,
-         21, 2024-01-01,    1000,       ,      USD,   200000.00,     200000.00,         , Balanced amount,
-         21, 2024-01-01,    1000,       ,      USD,   200000.00,     200000.00,         , Balanced amount,
-         23, 2024-01-01,        ,   1100,      JPY,   400000.00,       2840.00,         , Balanced amount,
-         23, 2024-01-01,    1200,       ,      CHF,   200000.00,       1400.00,         , Balanced amount,
-         23, 2024-01-01,    1000,       ,      USD,    10000.00,      10000.00,         , Balanced amount,
-         23, 2024-01-01,        ,   1000,      USD,     8560.00,       8560.00,         , Balanced amount,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,         , Valid,
+         2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,         , Valid,
+         4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,    VALID, Valid tax code,
+         9,  2024-01-01,    1000,       ,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,              ,         , Currencies mismatch valid with amount 0,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,         , Currencies mismatch valid with both account,
+         21, 2024-01-01,    1000,       ,      USD,     -999.99,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -555.55,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,    10000.00,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,     8560.00,              ,         , Balanced amount,
     """
     prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
     assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
@@ -353,7 +355,7 @@ def test_sanitize_ledger(engine, capture_logs):
     engine.restore(accounts=accounts_df, tax_codes=tax_df, price_history=prices, assets=assets)
 
     expected_ledger_df = engine.ledger.standardize(expected_ledger)
-    sanitized = engine.sanitize_ledger(ledger)
+    sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
     assert_frame_equal(expected_ledger_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) > 0

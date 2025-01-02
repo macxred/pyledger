@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 import datetime
+from decimal import Decimal
 import logging
 import math
 import zipfile
@@ -814,23 +815,22 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-
         # Validate balancing amounts
         effective_amounts = df["report_amount"].copy()
         index = effective_amounts.isna()
-
-        # Perform this only if amount if not 0 because then will be -0
         effective_amounts.loc[index] = self.report_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
         )
-        effective_amounts.loc[df["contra"].notna()] *= -1
-        effective_amounts.loc[df["account"].notna() & df["contra"].notna()] = 0
-        net_amounts = effective_amounts.groupby(df["id"]).transform("sum")
-        invalid_amounts_mask = net_amounts.ne(0) | net_amounts.ne(-0)
+        effective_amounts = effective_amounts.mask(df["contra"].notna() & df["account"].notna(), 0)
+        effective_amounts = effective_amounts.mask(
+            df["contra"].notna() & df["account"].isna(), -effective_amounts
+        )
+        effective_amounts = effective_amounts.apply(lambda x: Decimal(str(x)))
+        invalid_amounts_mask = ~effective_amounts.groupby(df["id"]).sum().eq(0)
         if invalid_amounts_mask.any():
-            invalid_ids = df.loc[invalid_amounts_mask, "id"].unique().tolist()
+            invalid_ids = invalid_amounts_mask[invalid_amounts_mask].index.unique().tolist()
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} ledger entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(invalid_ids)}"
