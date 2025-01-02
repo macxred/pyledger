@@ -14,11 +14,15 @@ class BaseTestDumpRestoreClear(BaseTest):
         pass
 
     def test_restore(self, engine):
+        LEDGER_ENTRIES = self.LEDGER_ENTRIES.copy()
+        default_profit_center = self.PROFIT_CENTERS.iloc[0]["profit_center"]
+        LEDGER_ENTRIES["profit_center"] = \
+            LEDGER_ENTRIES["profit_center"].fillna(default_profit_center)
         engine.restore(
             settings=self.SETTINGS,
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
-            ledger=self.LEDGER_ENTRIES,
+            ledger=LEDGER_ENTRIES,
             assets=self.ASSETS,
             price_history=self.PRICES,
             revaluations=self.REVALUATIONS,
@@ -41,16 +45,20 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assert_frame_equal(self.ASSETS, engine.assets.list(), ignore_row_order=True)
         assert_frame_equal(self.PROFIT_CENTERS, engine.profit_centers.list(), ignore_row_order=True)
-        target = engine.txn_to_str(self.LEDGER_ENTRIES).values()
+        target = engine.txn_to_str(LEDGER_ENTRIES).values()
         actual = engine.txn_to_str(engine.ledger.list()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
 
     def test_dump_and_restore_zip(self, engine, tmp_path):
         # Populate with test data
+        LEDGER_ENTRIES = self.LEDGER_ENTRIES.copy()
+        default_profit_center = self.PROFIT_CENTERS.iloc[0]["profit_center"]
+        LEDGER_ENTRIES["profit_center"] = \
+            LEDGER_ENTRIES["profit_center"].fillna(default_profit_center)
         engine.reporting_currency = self.SETTINGS["REPORTING_CURRENCY"]
         engine.accounts.mirror(self.ACCOUNTS)
         engine.tax_codes.mirror(self.TAX_CODES)
-        engine.ledger.mirror(self.LEDGER_ENTRIES)
+        engine.ledger.mirror(LEDGER_ENTRIES)
         engine.assets.mirror(self.ASSETS)
         engine.price_history.mirror(self.PRICES)
         engine.revaluations.mirror(self.REVALUATIONS)
