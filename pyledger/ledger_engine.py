@@ -693,16 +693,34 @@ class LedgerEngine(ABC):
         return self.serialize_ledger(self.ledger.list())
 
     def sanitize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discards inconsistent ledger entries.
+        """
+        Discard incoherent ledger data.
 
-        Logs a warning for each discarded entry with reason for dropping.
+        This method applies a series of validations to ensure ledger entries are coherent
+        and discards any entries failing those validations. Specifically, it discards
+        entries that:
+
+        1. Have the same 'id' but span multiple dates.
+        2. Reference invalid tax codes.
+        3. Have neither 'account' nor 'contra' specified.
+        4. Reference invalid accounts or contras.
+        5. Reference currencies that are unknown or unsupported.
+        6. Mismatch the currency expected by the referenced account or contra.
+        7. Lack a valid price reference (when 'report_amount' is missing and the entry is in a
+        non-reporting currency).
+        8. Omit a profit center when profit centers exist in the system.
+        9. Reference an invalid profit center.
+        10. Transactions that amount don't balance to zero.
+
+        A warning is logged for each discarded entry, specifying the reason for dropping it.
 
         Args:
             df (pd.DataFrame): Ledger data as a DataFrame.
 
         Returns:
-            pd.DataFrame: DataFrame with sanitized ledger entries.
+            pd.DataFrame: Sanitized ledger DataFrame containing only valid entries.
         """
+
         # Enforce schema
         df = enforce_schema(df, LEDGER_SCHEMA, keep_extra_columns=True)
 
