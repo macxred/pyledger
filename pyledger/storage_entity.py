@@ -520,6 +520,11 @@ class MultiCSVEntity(CSVAccountingEntity):
     Paths relative to the root directory are specified in a `__path__` column.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "__path__" in self._schema["column"]:
+            raise ValueError("MultiCSVEntity does not support schemas with a '__path__' column.")
+
     def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
         """Reads data from CSV files in the root directory.
 
