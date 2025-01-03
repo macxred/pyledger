@@ -207,8 +207,8 @@ class StandaloneLedger(LedgerEngine):
             date (datetime.date, optional): The date up to which the balance is computed.
                                             Defaults to None.
             profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                            calculated only from ledger entries assigned to one
-                                            of the profit centers in the filter.
+                                              calculated only from ledger entries assigned to one
+                                              of the profit centers in the filter.
 
         Returns:
             dict: Dictionary containing the balance of the account in various currencies.
@@ -220,7 +220,9 @@ class StandaloneLedger(LedgerEngine):
             valid_profit_centers = set(self.profit_centers.list()["profit_center"])
             invalid_profit_centers = set(profit_centers) - valid_profit_centers
             if invalid_profit_centers:
-                raise ValueError(f"Profit centers: {', '.join(invalid_profit_centers)} do not exist.")
+                raise ValueError(
+                    f"Profit centers: {', '.join(invalid_profit_centers)} do not exist."
+                )
             rows = rows & (ledger["profit_center"].isin(profit_centers))
         if date is not None:
             rows = rows & (ledger["date"] <= pd.Timestamp(date))
