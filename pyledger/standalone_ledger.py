@@ -107,9 +107,12 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Accounts
 
-    def _single_account_balance(self, account: int, date: datetime.date = None) -> dict:
-        return self._balance_from_serialized_ledger(self.serialized_ledger(),
-                                                    account=account, date=date)
+    def _single_account_balance(
+        self, account: int, date: datetime.date = None, profit_centers: list[str] | str = None
+    ) -> dict:
+        return self._balance_from_serialized_ledger(
+            self.serialized_ledger(), account=account, date=date, profit_centers=profit_centers
+        )
 
     # ----------------------------------------------------------------------
     # Ledger
@@ -192,10 +195,10 @@ class StandaloneLedger(LedgerEngine):
 
         return self.ledger.standardize(pd.DataFrame(result))
 
-    def _balance_from_serialized_ledger(self,
-                                        ledger: pd.DataFrame,
-                                        account: int,
-                                        date: datetime.date = None) -> dict:
+    def _balance_from_serialized_ledger(
+        self, ledger: pd.DataFrame, account: int, date: datetime.date = None,
+        profit_centers: list[str] | str = None
+    ) -> dict:
         """Compute balance from serialized ledger.
 
         Args:
@@ -203,11 +206,24 @@ class StandaloneLedger(LedgerEngine):
             account (int): The account number.
             date (datetime.date, optional): The date up to which the balance is computed.
                                             Defaults to None.
+            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
+                                              calculated only from ledger entries assigned to one
+                                              of the profit centers in the filter.
 
         Returns:
             dict: Dictionary containing the balance of the account in various currencies.
         """
         rows = ledger["account"] == int(account)
+        if profit_centers is not None:
+            if isinstance(profit_centers, str):
+                profit_centers = [profit_centers]
+            valid_profit_centers = set(self.profit_centers.list()["profit_center"])
+            invalid_profit_centers = set(profit_centers) - valid_profit_centers
+            if invalid_profit_centers:
+                raise ValueError(
+                    f"Profit centers: {', '.join(invalid_profit_centers)} do not exist."
+                )
+            rows = rows & (ledger["profit_center"].isin(profit_centers))
         if date is not None:
             rows = rows & (ledger["date"] <= pd.Timestamp(date))
         cols = ["amount", "report_amount", "currency"]
