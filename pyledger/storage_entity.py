@@ -343,16 +343,21 @@ class StandaloneAccountingEntity(AccountingEntity):
             data (pd.DataFrame): The updated DataFrame to store.
         """
 
-    def add(self, data: pd.DataFrame):
+    def _prepare_addition(self, data: pd.DataFrame):
         current = self.list()
         incoming = self.standardize(pd.DataFrame(data))
         overlap = pd.merge(current, incoming, on=self._id_columns, how='inner')
         if not overlap.empty:
             raise ValueError("Unique identifiers already exist.")
-        self._store(pd.concat([current, incoming], ignore_index=True))
+        combined = pd.concat([current, incoming], ignore_index=True)
+        return incoming, combined
+
+    def add(self, data: pd.DataFrame):
+        incoming, combined = self._prepare_addition(data)
+        self._store(combined)
         return incoming[self._id_columns].iloc[0].to_dict()
 
-    def modify(self, data: pd.DataFrame):
+    def _prepare_modification(self, data: pd.DataFrame):
         current = self.list()
         data = pd.DataFrame(data)
         cols = set(self._schema["column"]).intersection(data.columns)
@@ -376,17 +381,26 @@ class StandaloneAccountingEntity(AccountingEntity):
             updated = merged.loc[mask, incoming_col].astype(merged[current_col].dtype)
             merged.loc[mask, current_col] = updated
         new = merged.drop(columns=["_merge", *incoming_cols])
+        return incoming, new
+
+    def modify(self, data: pd.DataFrame):
+        _, new = self._prepare_modification(data)
         self._store(new)
 
-    def delete(self, id: pd.DataFrame, allow_missing: bool = False):
+    def _prepare_deletion(self, id: pd.DataFrame, allow_missing: bool = False):
         current = self.list()
         incoming = enforce_schema(pd.DataFrame(id), self._schema.query("id"))
         if not allow_missing:
             missing = pd.merge(incoming, current, on=self._id_columns, how='left', indicator=True)
             if not missing[missing['_merge'] != 'both'].empty:
                 raise ValueError("Some ids are not present in the data.")
-        new = current.merge(incoming, on=self._id_columns, how='left', indicator=True)
-        new = new[new['_merge'] == 'left_only'].drop(columns=['_merge'])
+        merged = current.merge(incoming, on=self._id_columns, how='left', indicator=True)
+        new = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+        drop = merged[merged['_merge'] == 'both'].drop(columns=['_merge'])
+        return drop, new
+
+    def delete(self, id: pd.DataFrame, allow_missing: bool = False):
+        _, new = self._prepare_deletion(id, allow_missing=allow_missing)
         self._store(new)
 
 
@@ -499,7 +513,86 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         write_fixed_width_csv(df, file=path, n=n_fixed)
 
 
-class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
+class MultiCSVEntity(CSVAccountingEntity):
+    """
+    Stores tabular data in multiple CSV files within a root directory.
+
+    Paths relative to the root directory are specified in a `__path__` column.
+    """
+
+    def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+        """Reads data from CSV files in the root directory.
+
+        Iterates through all CSV files in the root directory, reading each file
+        into a DataFrame and ensuring the data conforms to the entity's schema.
+        Files that cannot be processed are skipped with a warning. The Data
+        from all valid files is then combined into a single DataFrame.
+
+        Returns:
+            pd.DataFrame: DataFrame adhering to the entity's column schema.
+                          Relative paths to the root directory are stored in an
+                          additional `__path__` column.
+        """
+        if not self._path.exists():
+            return self.standardize(None).assign(__path__=pd.Series(dtype=pd.StringDtype()))
+        if not self._path.is_dir():
+            raise NotADirectoryError(f"Root folder is not a directory: {self._path}")
+
+        result = []
+        for file in self._path.rglob("*.csv"):
+            relative_path = str(file.relative_to(self._path))
+            try:
+                df = pd.read_csv(file, skipinitialspace=True)
+                # TODO: Remove the following line once legacy systems are migrated.
+                df = df.rename(columns=self._column_shortcuts)
+                df = self.standardize(df, drop_extra_columns=drop_extra_columns)
+                if not df.empty:
+                    df["__path__"] = relative_path
+                result.append(df)
+            except Exception as e:
+                self._logger.warning(f"Skipping {relative_path}: {e}")
+
+        if result:
+            result = pd.concat(result, ignore_index=True)
+            result = enforce_schema(result, self._schema,
+                                    sort_columns=True, keep_extra_columns=not drop_extra_columns)
+        else:
+            result = self.standardize(None).assign(__path__=pd.Series(dtype=pd.StringDtype()))
+
+        return self.standardize(result, drop_extra_columns=drop_extra_columns)
+
+    def add(self, data: pd.DataFrame, path: str = "default.csv") -> list[str]:
+        """Add new entries.
+
+        Args:
+            data (pd.DataFrame): DataFrame containing new entries to add,
+                                compatible with the entity's DataFrame schema.
+            path (str, optional): The file path where the data will be stored.
+
+        Returns:
+            pd.DataFrame: A list containing the unique identifiers of the added data.
+        """
+        incoming = pd.DataFrame(data).assign(__path__=path)
+        combined, incoming = self._prepare_addition(incoming)
+        full_path = self._path / path
+        Path(full_path).parent.mkdir(parents=True, exist_ok=True)
+        self._store(combined.query("path == @path"), full_path)
+        return incoming[self._id_columns].to_dict()
+
+    def modify(self, data: pd.DataFrame):
+        incoming, new = self._prepare_modification(data)
+        paths_to_update = incoming["__path__"].unique()
+        for path in paths_to_update:
+            self._store(new.query("path == @path"), self._path / path)
+
+    def delete(self, id: pd.DataFrame, allow_missing: bool = False):
+        drop, new = self._prepare_deletion(id, allow_missing=allow_missing)
+        paths_to_update = drop["__path__"].unique()
+        for path in paths_to_update:
+            self._store(new.query("path == @path"), self._path / path)
+
+
+class CSVLedgerEntity(LedgerEntity, MultiCSVEntity):
     """
     Stores ledger entries in multiple CSV files, with files determined by the
     ID portion of the entries up to the first colon ':'.
@@ -546,34 +639,11 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
         Returns:
             pd.DataFrame: DataFrame adhering to the entity's column schema.
         """
-
-        if not self._path.exists():
-            return self.standardize(None)
-        if not self._path.is_dir():
-            raise NotADirectoryError(f"Root folder is not a directory: {self._path}")
-
-        ledger = []
-        for file in self._path.rglob("*.csv"):
-            relative_path = str(file.relative_to(self._path))
-            try:
-                df = pd.read_csv(file, skipinitialspace=True)
-                # TODO: Remove the following line once legacy systems are migrated.
-                df = df.rename(columns=self._column_shortcuts)
-                df = self.standardize(df, drop_extra_columns=drop_extra_columns)
-                if not df.empty:
-                    df["id"] = relative_path + ":" + df["id"]
-                ledger.append(df)
-            except Exception as e:
-                self._logger.warning(f"Skipping {relative_path}: {e}")
-
-        if ledger:
-            result = pd.concat(ledger, ignore_index=True)
-            result = enforce_schema(result, self._schema,
-                                    sort_columns=True, keep_extra_columns=not drop_extra_columns)
-        else:
-            result = None
-
-        return self.standardize(result, drop_extra_columns=drop_extra_columns)
+        df = super()._read_data(drop_extra_columns=False)
+        if not df.empty:
+            df["id"] = df["__path__"] + ":" + df["id"]
+        df = df.drop(columns="__path__")
+        return self.standardize(df, drop_extra_columns=drop_extra_columns)
 
     def write_directory(self, df: pd.DataFrame | None = None):
         """Save ledger entries to multiple CSV files in the ledger directory.
