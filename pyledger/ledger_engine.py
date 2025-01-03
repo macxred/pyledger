@@ -452,15 +452,16 @@ class LedgerEngine(ABC):
             date (datetime.date, optional): Date for which to retrieve the balance.
                                             Defaults to None.
             profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                            calculated only from ledger entries assigned to one
-                                            of the profit centers in the filter.
+                                              calculated only from ledger entries assigned to one
+                                              of the profit centers in the filter.
 
         Returns:
             dict: Dictionary containing the balance of the account in various currencies.
         """
 
     def _account_balance_list(
-        self, accounts: list[int], date: datetime.date = None, profit_centers: list[str] | str = None
+        self, accounts: list[int], date: datetime.date = None,
+        profit_centers: list[str] | str = None
     ) -> dict:
         result = {}
         for account in accounts:
@@ -505,8 +506,8 @@ class LedgerEngine(ABC):
             date (datetime.date, optional): The date as of which the account
                                             balance is calculated. Defaults to None.
             profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                            calculated only from ledger entries assigned to one
-                                            of the profit centers in the filter.
+                                              calculated only from ledger entries assigned to one
+                                              of the profit centers in the filter.
 
         Returns:
             dict: Dictionary containing the balance of the account(s) in various currencies.
@@ -578,8 +579,8 @@ class LedgerEngine(ABC):
             period (datetime.date, optional): The date as of which the account balance
                                               is calculated. Defaults to None.
             profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                            calculated only from ledger entries assigned to one
-                                            of the profit centers in the filter.
+                                              calculated only from ledger entries assigned to one
+                                              of the profit centers in the filter.
 
         Returns:
             pd.DataFrame: DataFrame containing the transaction and balance
@@ -635,8 +636,8 @@ class LedgerEngine(ABC):
             start (datetime.date, optional): Start date for the history. Defaults to None.
             end (datetime.date, optional): End date for the history. Defaults to None.
             profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                            calculated only from ledger entries assigned to one
-                                            of the profit centers in the filter.
+                                              calculated only from ledger entries assigned to one
+                                              of the profit centers in the filter.
 
         Returns:
             pd.DataFrame: DataFrame containing the transaction history of the account(s).
@@ -654,7 +655,9 @@ class LedgerEngine(ABC):
             valid_profit_centers = set(self.profit_centers.list()["profit_center"])
             invalid_profit_centers = set(profit_centers) - valid_profit_centers
             if invalid_profit_centers:
-                raise ValueError(f"Profit centers: {', '.join(invalid_profit_centers)} do not exist.")
+                raise ValueError(
+                    f"Profit centers: {', '.join(invalid_profit_centers)} do not exist."
+                )
             filter = filter & (ledger["profit_center"].isin(profit_centers))
         df = ledger.loc[filter, :]
         df = df.sort_values("date")
