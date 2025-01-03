@@ -591,7 +591,7 @@ class CSVLedgerEntity(LedgerEntity, CSVAccountingEntity):
             df = self.list()
 
         df = self.standardize(df).copy()
-        df["__csv_path__"] = self._csv_path(df["id"])
+        df["__path__"] = self._csv_path(df["id"])
         save_files(df, root=self._path, func=self._write_file)
         self.list.cache_clear()
         self._on_change()
