@@ -37,4 +37,9 @@ from .tests import (
     BaseTestPriceHistory,
     BaseTestRevaluations,
 )
-from .storage_entity import AccountingEntity, CSVAccountingEntity, LedgerEntity
+from .storage_entity import (
+    AccountingEntity,
+    CSVAccountingEntity,
+    MultiCSVEntity,
+    LedgerEntity,
+)

@@ -103,36 +103,36 @@ def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv):
     """Save DataFrame entries to multiple files within a root folder.
 
     Saves a DataFrame to multiple files in the specified `root` folder, with
-    file paths within the root folder determined by the `__csv_path__` column.
+    file paths within the root folder determined by the `__path__` column.
     Any existing files in the root directory that are not referenced in the
-    `__csv_path__` column are deleted.
+    `__path__` column are deleted.
 
     Args:
-        df (pd.DataFrame): DataFrame to save, with a `__csv_path__` column.
+        df (pd.DataFrame): DataFrame to save, with a `__path__` column.
         root (Path | str): Root directory where the files will be stored.
         func (callable): Function to save each DataFrame group to a file.
                          Defaults to `write_fixed_width_csv`.
 
     Raises:
-        ValueError: If the DataFrame does not contain a '__csv_path__' column.
+        ValueError: If the DataFrame does not contain a '__path__' column.
     """
-    if "__csv_path__" not in df.columns:
-        raise ValueError("The DataFrame must contain a '__csv_path__' column.")
+    if "__path__" not in df.columns:
+        raise ValueError("The DataFrame must contain a '__path__' column.")
 
     root = Path(root).expanduser()
     root.mkdir(parents=True, exist_ok=True)
 
     # Delete unreferenced files
     current_files = set(root.rglob("*.csv"))
-    referenced_files = set(root / path for path in df["__csv_path__"].unique())
+    referenced_files = set(root / path for path in df["__path__"].unique())
     for file in current_files - referenced_files:
         file.unlink()
 
     # Save DataFrame entries to their respective files
-    for path, group in df.groupby("__csv_path__"):
+    for path, group in df.groupby("__path__"):
         full_path = root / path
         full_path.parent.mkdir(parents=True, exist_ok=True)
-        func(group.drop(columns="__csv_path__"), full_path)
+        func(group.drop(columns="__path__"), full_path)
 
 
 def first_elements_as_str(x: List[Any], n: int = 5) -> str:
