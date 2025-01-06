@@ -695,35 +695,33 @@ class LedgerEngine(ABC):
         """
         Discard incoherent ledger data.
 
-        This method applies a series of validations to ensure ledger entries are coherent
-        and discards any entries failing those validations. Specifically, it discards
-        entries that:
-
-        1. Have the same 'id' but span multiple dates.
-        2. Reference invalid tax codes.
+        This method discards ledger transactions - entries in the ledger data
+        frame with the same 'id' - that:
+        1. Do not balance to zero.
+        2. Span multiple dates.
         3. Have neither 'account' nor 'contra' specified.
-        4. Reference invalid accounts or contras.
-        5. Reference currencies that are unknown or unsupported.
-        6. Mismatch the currency expected by the referenced account or contra.
-        7. Lack a valid price reference (when 'report_amount' is missing and the entry is in a
-        non-reporting currency).
-        8. Omit a profit center when profit centers exist in the system.
-        9. Reference an invalid profit center.
-        10. Transactions that amount don't balance to zero.
+        4. Omit a profit center when profit centers exist in the system.
+        5. Reference an invalid currency, account, contra account, or profit
+           center.
+        6. Mismatch the currency of a referenced account or contra account.
+        7. Lack a valid price reference when 'report_amount' is missing and
+           the entry is in a non-reporting currency.
 
-        A warning is logged for each discarded entry, specifying the reason for dropping it.
+        Also, undefined tax code references are removed from ledger entries.
+
+        A warning specifying the reason is logged for each discarded entry.
 
         Args:
-            df (pd.DataFrame): Ledger data as a DataFrame.
+            df (pd.DataFrame): Ledger data to sanitize.
 
         Returns:
-            pd.DataFrame: Sanitized ledger DataFrame containing only valid entries.
+            pd.DataFrame: Sanitized ledger data containing only valid entries.
         """
 
         # Enforce schema
         df = enforce_schema(df, LEDGER_SCHEMA, keep_extra_columns=True)
 
-        # Identify rows where one transaction (i.e., same 'id') spans multiple dates
+        # Drop transactions spanning multiple dates
         grouped = df.groupby("id")
         invalid_mask = grouped["date"].transform("nunique") > 1
         if invalid_mask.any():
@@ -736,7 +734,7 @@ class LedgerEngine(ABC):
 
         accounts, tax_codes = self.sanitized_accounts_tax_codes()
 
-        # Validate tax codes reference
+        # Drop invalidate tax codes references
         invalid_tax_code_mask = (
             ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
         )
@@ -758,7 +756,7 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-        # Validate account reference
+        # Drop transactions with invalid account reference
         accounts_set = set(accounts["account"])
         invalid_account_mask = ~df["account"].isna() & ~df["account"].isin(accounts_set)
         invalid_contra_mask = ~df["contra"].isna() & ~df["contra"].isin(accounts_set)
@@ -771,14 +769,13 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-        # Validate assets reference
+        # Drop transactions with invalid assets reference
         def invalid_asset_reference(row):
             try:
                 self.precision(ticker=row["currency"], date=row["date"])
                 return False
             except ValueError:
                 return True
-
         invalid_assets_mask = df.apply(invalid_asset_reference, axis=1)
         if invalid_assets_mask.any():
             invalid_ids = df.loc[invalid_assets_mask, "id"].unique().tolist()
@@ -788,7 +785,7 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-        # Validate transaction currency
+        # Drop transactions with invalid transaction currency
         def invalid_transaction_currency(row):
             if row["amount"] == 0:
                 return False
@@ -801,7 +798,6 @@ class LedgerEngine(ABC):
                 if row["currency"] != contra_currency:
                     return True
             return False
-
         invalid_currency_mask = df.apply(invalid_transaction_currency, axis=1)
         if invalid_currency_mask.any():
             invalid_ids = df.loc[invalid_currency_mask, "id"].unique().tolist()
@@ -811,7 +807,7 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-        # Validate price reference
+        # Drop transactions with missing price reference
         def invalid_prices(row):
             if row["currency"] == self.reporting_currency or pd.notna(row["report_amount"]):
                 return False
@@ -822,7 +818,6 @@ class LedgerEngine(ABC):
                 return False
             except ValueError:
                 return True
-
         invalid_prices_mask = df.apply(invalid_prices, axis=1)
         if invalid_prices_mask.any():
             invalid_ids = df.loc[invalid_prices_mask, "id"].unique().tolist()
@@ -832,7 +827,7 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-        # Validate none-missing ledger profit center if any exists in the system
+        # If profit centers are used, drop transactions without profit center
         profit_centers = self.profit_centers.list()
         if not profit_centers.empty:
             invalid_profit_center_mask = df["profit_center"].isna()
@@ -844,7 +839,7 @@ class LedgerEngine(ABC):
                 )
                 df = df.query("id not in @invalid_ids")
 
-        # Validate profit center reference
+        # Drop transactions with invalid profit center
         profit_centers_set = set(profit_centers["profit_center"])
         invalid_profit_center_mask = (
             df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers_set)
@@ -857,7 +852,7 @@ class LedgerEngine(ABC):
             )
             df = df.query("id not in @invalid_ids")
 
-        # Validate balancing amounts
+        # Drop unbalanced transactions
         effective_amounts = df["report_amount"].copy()
         index = effective_amounts.isna()
         effective_amounts.loc[index] = self.report_amount(
