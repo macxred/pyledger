@@ -741,10 +741,10 @@ class LedgerEngine(ABC):
         if invalid_tax_code_mask.any():
             invalid_ids = df.loc[invalid_tax_code_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with invalid tax codes: "
-                f"{first_elements_as_str(invalid_ids)}"
+                f"Setting 'tax_code' to 'NA' for {len(invalid_ids)} ledger entries "
+                f"with invalid tax codes: {first_elements_as_str(invalid_ids)}"
             )
-            df = df.query("id not in @invalid_ids")
+            df.loc[invalid_tax_code_mask, "tax_code"] = pd.NA
 
         # Validate that at least one of 'account' or 'contra' is specified
         missing_account_mask = df["account"].isna() & df["contra"].isna()

@@ -295,7 +295,7 @@ def test_sanitize_ledger(engine, capture_logs):
          1,  2024-01-02,    1000,       ,      USD,   800000.00,              ,              ,          , Invalid date,
          2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Valid,
          2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,          , Valid,
-         3,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,   Invalid, Invalid tax code,
+         3,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,   Invalid, Invalid tax code set to NA,
          4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,     VALID, Valid tax code,
          5,  2024-01-01,        ,       ,      USD,   800000.00,              ,              ,          , No account or contra,
          6,  2024-01-01,    1111,       ,      USD,   800000.00,              ,              ,          , Invalid account reference,
@@ -339,6 +339,7 @@ def test_sanitize_ledger(engine, capture_logs):
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
          2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,         , Valid,
          2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,         , Valid,
+         3,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,         , Invalid tax code set to NA,
          4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,    VALID, Valid tax code,
          9,  2024-01-01,    1000,       ,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
          10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
