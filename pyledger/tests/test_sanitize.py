@@ -255,3 +255,134 @@ def test_sanitized_accounts_tax_codes(engine, capture_logs):
     assert_frame_equal(expected_tax_df, final_tax_codes_df)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) > 0
+
+
+def test_sanitize_ledger(engine, capture_logs):
+    ACCOUNT_CSV = """
+        group,          account, currency,   tax_code,   description
+        Assets,            1000,      USD,           , VALID_CURR
+        Assets,            1100,      JPY,           , VALID_CURR
+        Assets,            1200,      CHF,           , VALID_CURR
+        Liabilities,       2000,      USD,           , NO_TAX_CODE
+        Revenue,           3000,      USD,           , INVALID_TAX_CODE
+    """
+    TAX_CSV = """
+        id,            account, rate,  is_inclusive,    description,      contra
+        EXEMPT,               , 0.00,          True,    Exempt from VAT,
+        VALID,            1000, 0.05,          True,    Valid tax code,
+    """
+    ASSETS_CSV = """
+        ticker, increment,      date
+        EUR,        0.01, 2022-01-01
+        JPY,        1.00, 2022-01-02
+        USD,        0.01, 2022-01-01
+        CHF,        0.01, 2022-01-01
+    """
+    PRICES_CSV = """
+        date,       ticker,  price, currency
+        2023-12-28,    EUR, 1.1068, USD
+        2023-12-29,    JPY, 0.0071, USD
+        2023-12-29,    CHF,  0.007, USD
+    """
+    PROFIT_CENTERS_CSV = """
+        profit_center,
+                Shop,
+    """
+    # flake8: noqa: E501
+    LEDGER_CSV = """
+        id,        date, account, contra, currency,      amount, report_amount, profit_center,  tax_code, description, document
+         1,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Invalid date,
+         1,  2024-01-02,    1000,       ,      USD,   800000.00,              ,              ,          , Invalid date,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Valid,
+         2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,          , Valid,
+         3,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,   Invalid, Invalid tax code set to NA,
+         4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,     VALID, Valid tax code,
+         5,  2024-01-01,        ,       ,      USD,   800000.00,              ,              ,          , No account or contra,
+         6,  2024-01-01,    1111,       ,      USD,   800000.00,              ,              ,          , Invalid account reference,
+         7,  2024-01-01,    2222,       ,      USD,   800000.00,              ,              ,          , Invalid contra reference,
+         8,  2024-01-01,    1000,       ,      AAA,   800000.00,              ,              ,          , Invalid currency,
+         9,  2024-01-01,    1000,       ,      CHF,           0,              ,              ,          , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,          , Currencies mismatch valid with amount 0,
+         11, 2024-01-01,        ,   1000,      CHF,           1,              ,              ,          , Currencies mismatch invalid,
+         12, 2024-01-01,    1000,       ,      CHF,           1,              ,              ,          , Currencies mismatch invalid,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,          , Currencies mismatch valid with both account,
+         14, 2021-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , No price reference,
+         15, 2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         16, 2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         17, 2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         17, 2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         18, 2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         18, 2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         19, 2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         19, 2024-01-01,        ,   1000,      USD,   100000.00,              ,              ,          , Not balanced amount,
+         20, 2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,          , Not balanced amount,
+         20, 2024-01-01,    1200,       ,      CHF,   100000.00,              ,              ,          , Not balanced amount,
+         21, 2024-01-01,    1000,       ,      USD,     -999.99,              ,              ,          , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -555.55,              ,              ,          , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,              ,          , Balanced amount,
+         22, 2024-01-01,        ,   1000,      USD,   400000.00,              ,              ,          , Not balanced amount,
+         22, 2024-01-01,    1000,       ,      USD,   200000.00,              ,              ,          , Not balanced amount,
+         22, 2024-01-01,    1000,       ,      USD,   100000.00,              ,              ,          , Not balanced amount,
+         23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,          , Balanced amount,
+         23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,          , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,    10000.00,              ,              ,          , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,     8560.00,              ,              ,          , Balanced amount,
+         24, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,          , Not balanced amount,
+         24, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,          , Not balanced amount,
+         24, 2024-01-01,    1000,       ,      USD,     1000.00,              ,              ,          , Not balanced amount,
+         24, 2024-01-01,        ,   1000,      USD,     8560.00,              ,              ,          , Not balanced amount,
+         25, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,          Shop,          , Valid profit center,
+         26, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,       INVALID,          , Invalid profit center,
+
+    """
+    EXPECTED_LEDGER_CSV = """
+        id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,         , Valid,
+         2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,         , Valid,
+         3,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,         , Invalid tax code set to NA,
+         4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,    VALID, Valid tax code,
+         9,  2024-01-01,    1000,       ,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,         , Currencies mismatch valid with both account,
+         21, 2024-01-01,    1000,       ,      USD,     -999.99,              ,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -555.55,              ,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,         , Balanced amount,
+         23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,         , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,    10000.00,              ,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,     8560.00,              ,              ,         , Balanced amount,
+    """
+    EXPECTED_LEDGER_WITH_PROFIT_CENTERS_CSV = """
+        id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
+         25, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,          Shop,         , Valid profit center,
+    """
+    prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
+    assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
+    tax_df = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    accounts_df = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    expected_ledger = pd.read_csv(StringIO(EXPECTED_LEDGER_CSV), skipinitialspace=True)
+    expected_ledger_with_profit_centers = pd.read_csv(
+        StringIO(EXPECTED_LEDGER_WITH_PROFIT_CENTERS_CSV), skipinitialspace=True
+    )
+    ledger = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
+    engine.restore(accounts=accounts_df, tax_codes=tax_df, price_history=prices, assets=assets)
+
+    # Sanitize ledger entries without profit centers
+    expected_ledger_df = engine.ledger.standardize(expected_ledger)
+    sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
+    assert_frame_equal(expected_ledger_df, sanitized)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) == 8, "Expected strict number of captured logs"
+
+    # Clear captured logs
+    capture_logs.seek(0)
+    capture_logs.truncate(0)
+
+    # Sanitize ledger entries with profit centers
+    PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
+    engine.restore(profit_centers=PROFIT_CENTERS)
+    expected_ledger_df = engine.ledger.standardize(expected_ledger_with_profit_centers)
+    sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
+    assert_frame_equal(expected_ledger_df, sanitized)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) == 8, "Expected strict number of captured logs"
