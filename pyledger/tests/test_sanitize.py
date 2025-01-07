@@ -372,8 +372,11 @@ def test_sanitize_ledger(engine, capture_logs):
     sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
     assert_frame_equal(expected_ledger_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) > 0
-    log_messages = []
+    assert len(log_messages) == 8, "Expected strict number of captured logs"
+
+    # Clear captured logs
+    capture_logs.seek(0)
+    capture_logs.truncate(0)
 
     # Sanitize ledger entries with profit centers
     PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
@@ -382,4 +385,4 @@ def test_sanitize_ledger(engine, capture_logs):
     sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
     assert_frame_equal(expected_ledger_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) > 0
+    assert len(log_messages) == 8, "Expected strict number of captured logs"
