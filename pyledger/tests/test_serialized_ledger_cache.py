@@ -24,6 +24,7 @@ def engine():
         accounts=BaseTest.ACCOUNTS,
         ledger=BaseTest.LEDGER_ENTRIES,
         price_history=BaseTest.PRICES,
+        profit_centers=BaseTest.PROFIT_CENTERS
     )
     return engine
 

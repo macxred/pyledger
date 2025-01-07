@@ -157,13 +157,31 @@ class BaseTestAccounts(BaseTest):
         restored_engine.restore(
             accounts=self.ACCOUNTS, settings=self.SETTINGS, tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES, assets=self.ASSETS, price_history=self.PRICES,
-            revaluations=self.REVALUATIONS
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
+        # Test account balance with specified profit centers
         for _, row in self.EXPECTED_BALANCE.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
             account = row['account']
             expected = row['balance']
-            actual = restored_engine.account_balance(date=date, account=row['account'])
+            profit_centers = row["profit_center"]
+            actual = restored_engine.account_balance(
+                date=date, account=account, profit_centers=profit_centers
+            )
+            assert expected == actual, (
+                f"Account balance for {account} on {date} with "
+                f"{profit_centers} profit centers of {actual} differs from {expected}."
+            )
+
+        # Test account balance without specified profit centers
+        LEDGER_ENTRIES = self.LEDGER_ENTRIES.copy().assign(profit_center=pd.NA)
+        restored_engine.restore(profit_centers=[], ledger=LEDGER_ENTRIES)
+        EXPECTED_BALANCE_NO_PROFIT_CENTERS = self.EXPECTED_BALANCE.query("profit_center.isna()")
+        for _, row in EXPECTED_BALANCE_NO_PROFIT_CENTERS.iterrows():
+            date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
+            account = row['account']
+            expected = row['balance']
+            actual = restored_engine.account_balance(date=date, account=account)
             assert expected == actual, (
                 f"Account balance for {account} on {date} of {actual} differs from {expected}."
             )
