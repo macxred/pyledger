@@ -160,8 +160,7 @@ class BaseTestAccounts(BaseTest):
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
         # Test account balance with specified profit centers
-        EXPECTED_BALANCE_WITH_PROFIT_CENTERS = self.EXPECTED_BALANCE.query("profit_center.notna()")
-        for _, row in EXPECTED_BALANCE_WITH_PROFIT_CENTERS.iterrows():
+        for _, row in self.EXPECTED_BALANCE.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
             account = row['account']
             expected = row['balance']
