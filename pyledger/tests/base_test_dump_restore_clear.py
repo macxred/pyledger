@@ -14,6 +14,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         pass
 
     def test_restore(self, engine):
+        # TODO: Remove once the test data in self.LEDGER_ENTRIES is extended with profit centres
         LEDGER_ENTRIES = self.LEDGER_ENTRIES.copy()
         default_profit_center = self.PROFIT_CENTERS.iloc[0]["profit_center"]
         LEDGER_ENTRIES["profit_center"] = \
@@ -51,6 +52,7 @@ class BaseTestDumpRestoreClear(BaseTest):
 
     def test_dump_and_restore_zip(self, engine, tmp_path):
         # Populate with test data
+        # TODO: Remove once the test data in self.LEDGER_ENTRIES is extended with profit centres
         LEDGER_ENTRIES = self.LEDGER_ENTRIES.copy()
         default_profit_center = self.PROFIT_CENTERS.iloc[0]["profit_center"]
         LEDGER_ENTRIES["profit_center"] = \
