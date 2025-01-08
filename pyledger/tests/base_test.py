@@ -128,12 +128,12 @@ REVALUATIONS_CSV = """
 REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 
 PROFIT_CENTERS_CSV = """
-    profit_center,
-             Shop,
-          General,
-           Bakery,
-       Restaurant,
-             Cafe,
+    profit_center
+             Shop
+          General
+           Bakery
+       Restaurant
+             Cafe
 """
 PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
 
