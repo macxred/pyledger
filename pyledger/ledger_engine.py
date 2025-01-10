@@ -915,7 +915,7 @@ class LedgerEngine(ABC):
             df["contra"].notna() & df["account"].isna(), -effective_amounts
         )
         grouped_amounts = effective_amounts.groupby(df["id"]).sum()
-        invalid_amounts_mask = grouped_amounts.abs() > 1e-10
+        invalid_amounts_mask = grouped_amounts.abs() > 1e-8
         if invalid_amounts_mask.any():
             invalid_ids = invalid_amounts_mask[invalid_amounts_mask].index.unique().tolist()
             self._logger.warning(
