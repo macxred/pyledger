@@ -566,35 +566,52 @@ class MultiCSVEntity(CSVAccountingEntity):
 
         return self.standardize(result, drop_extra_columns=drop_extra_columns)
 
-    def add(self, data: pd.DataFrame, path: str = "default.csv") -> list[str]:
+    def add(self, data: pd.DataFrame, default_path: str = "default.csv") -> list[str]:
         """Add new entries.
 
         Args:
             data (pd.DataFrame): DataFrame containing new entries to add,
                                 compatible with the entity's DataFrame schema.
-            path (str, optional): The file path where the data will be stored.
+            default_path (str, optional): The file where data with missing (NA)
+                                          `__path__` will be stored.
 
         Returns:
             pd.DataFrame: A list containing the unique identifiers of the added data.
         """
-        incoming = pd.DataFrame(data).assign(__path__=path)
-        combined, incoming = self._prepare_addition(incoming)
-        full_path = self._path / path
-        Path(full_path).parent.mkdir(parents=True, exist_ok=True)
-        self._store(combined.query("path == @path"), full_path)
+        incoming = pd.DataFrame(data)
+        if "__path__" in incoming.columns:
+            incoming["__path__"] = incoming["__path__"].astype(pd.StringDtype())
+            incoming["__path__"] = incoming["__path__"].fillna(default_path)
+        elif len(incoming) > 0:
+            incoming["__path__"] = default_path
+            incoming["__path__"] = incoming["__path__"].astype(pd.StringDtype())
+        else:
+            incoming["__path__"] = pd.Series(dtype=pd.StringDtype)
+        incoming, combined = self._prepare_addition(incoming)
+        paths_to_update = incoming["__path__"].unique()
+        for path in paths_to_update:
+            full_path = self._path / path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
+            df = combined.query("__path__ == @path")
+            df = df.drop(columns="__path__")
+            self._store(df, full_path)
         return incoming[self._id_columns].to_dict()
 
     def modify(self, data: pd.DataFrame):
         incoming, new = self._prepare_modification(data)
         paths_to_update = incoming["__path__"].unique()
         for path in paths_to_update:
-            self._store(new.query("path == @path"), self._path / path)
+            df = new.query("__path__ == @path")
+            df = df.drop(columns="__path__")
+            self._store(df, self._path / path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
         drop, new = self._prepare_deletion(id, allow_missing=allow_missing)
         paths_to_update = drop["__path__"].unique()
         for path in paths_to_update:
-            self._store(new.query("path == @path"), self._path / path)
+            df = new.query("__path__ == @path")
+            df = df.drop(columns="__path__")
+            self._store(df, self._path / path)
 
 
 class CSVLedgerEntity(LedgerEntity, MultiCSVEntity):
