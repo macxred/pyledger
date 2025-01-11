@@ -448,16 +448,16 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
     """Stores tabular accounting data in a fixed-width CSV file."""
 
     def __init__(
-        self, path: Path, column_shortcuts: dict = {}, *args, **kwargs
+        self, path: Path | str, column_shortcuts: dict = {}, *args, **kwargs
     ):
         """Initialize the CSVAccountingEntity.
 
         Args:
-            file_path (Path): Path to the CSV file.
+            file_path (Path | str): Path to the CSV file.
             column_shortcuts (dict, optional): Mapping of column old names to new names.
         """
         super().__init__(*args, **kwargs)
-        self._path = path
+        self._path = Path(path).expanduser()
         # TODO: remove once the old system is migrated
         self._column_shortcuts = column_shortcuts
 
@@ -465,7 +465,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
     def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
         return self._read_data(drop_extra_columns=drop_extra_columns)
 
-    def _store(self, data: pd.DataFrame, path: Path = None):
+    def _store(self, data: pd.DataFrame, path: Path | str = None):
         """
         Store the DataFrame to a CSV file. If the DataFrame is empty, the CSV file is deleted.
 
@@ -476,6 +476,8 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         """
         if path is None:
             path = self._path
+        else:
+            path = Path(path).expanduser()
 
         if data.empty:
             path.unlink(missing_ok=True)
@@ -498,7 +500,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
             data = None
         return self.standardize(data, drop_extra_columns=drop_extra_columns)
 
-    def _write_file(self, df: pd.DataFrame, path: Path):
+    def _write_file(self, df: pd.DataFrame, path: Path | str):
         """Save data to a fixed-width CSV file.
 
         This method stores data in a fixed-width CSV format.
