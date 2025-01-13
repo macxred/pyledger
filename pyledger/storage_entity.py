@@ -377,14 +377,16 @@ class StandaloneAccountingEntity(AccountingEntity):
         incoming_cols = merged.columns[merged.columns.str.endswith("_incoming")]
         current_cols = incoming_cols.str.replace("_incoming$", "", regex=True)
         mask = merged["_merge"] == "both"
+        replaced = merged.loc[mask, ~merged.columns.str.endswith("_incoming")]
+        replaced = replaced.drop(columns=["_merge"])
         for current_col, incoming_col in zip(current_cols, incoming_cols):
             updated = merged.loc[mask, incoming_col].astype(merged[current_col].dtype)
             merged.loc[mask, current_col] = updated
         new = merged.drop(columns=["_merge", *incoming_cols])
-        return incoming, new
+        return incoming, replaced, new
 
     def modify(self, data: pd.DataFrame):
-        _, new = self._prepare_modification(data)
+        _, _, new = self._prepare_modification(data)
         self._store(new)
 
     def _prepare_deletion(self, id: pd.DataFrame, allow_missing: bool = False):
@@ -600,12 +602,14 @@ class MultiCSVEntity(CSVAccountingEntity):
         return incoming[self._id_columns].to_dict()
 
     def modify(self, data: pd.DataFrame):
-        incoming, new = self._prepare_modification(data)
-        paths_to_update = incoming["__path__"].unique()
+        incoming, replaced, new = self._prepare_modification(data)
+        paths_to_update = set(incoming["__path__"]).union(set(replaced["__path__"]))
         for path in paths_to_update:
+            full_path = self._path / path
+            full_path.parent.mkdir(parents=True, exist_ok=True)
             df = new.query("__path__ == @path")
             df = df.drop(columns="__path__")
-            self._store(df, self._path / path)
+            self._store(df, full_path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
         drop, new = self._prepare_deletion(id, allow_missing=allow_missing)
