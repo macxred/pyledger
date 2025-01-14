@@ -524,8 +524,14 @@ class MultiCSVEntity(CSVAccountingEntity):
     Paths relative to the root directory are specified in a `__path__` column.
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(
+        self,
+        write_file: Callable[[pd.DataFrame, Path], None] = None,
+        *args,
+        **kwargs
+    ):
         super().__init__(*args, **kwargs)
+        self._write_file = write_file
         if "__path__" in self._schema["column"]:
             raise ValueError("MultiCSVEntity does not support schemas with a '__path__' column.")
 
@@ -629,15 +635,6 @@ class CSVLedgerEntity(LedgerEntity, MultiCSVEntity):
     reading each file. These IDs are non-persistent and may change if a file's
     entries are modified. See `_read_data` for details.
     """
-
-    def __init__(
-        self,
-        write_file: Callable[[pd.DataFrame, Path], None] = None,
-        *args,
-        **kwargs
-    ):
-        super().__init__(*args, **kwargs)
-        self._write_file = write_file
 
     def _csv_path(self, id: pd.Series) -> pd.Series:
         """Extract storage path from ledger id."""
