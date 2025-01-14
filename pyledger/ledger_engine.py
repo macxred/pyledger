@@ -1163,7 +1163,7 @@ class LedgerEngine(ABC):
         return (currency, prc.iloc[-1].item())
 
     @property
-    @timed_cache(15)
+    @timed_cache(120)
     def _prices_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
         """Organizes price data by ticker and currency for quick access.
 
@@ -1213,7 +1213,7 @@ class LedgerEngine(ABC):
         return df
 
     @property
-    @timed_cache(15)
+    @timed_cache(120)
     def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
         """Organize assets by ticker for quick access.
 

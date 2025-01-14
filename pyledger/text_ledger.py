@@ -96,7 +96,7 @@ class TextLedger(StandaloneLedger):
     # Settings
 
     @property
-    @timed_cache(15)
+    @timed_cache(120)
     def settings(self):
         return self.read_settings_file(self.root / "settings.yml").copy()
 

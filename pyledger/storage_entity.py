@@ -463,7 +463,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         # TODO: remove once the old system is migrated
         self._column_shortcuts = column_shortcuts
 
-    @timed_cache(15)
+    @timed_cache(120)
     def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
         return self._read_data(drop_extra_columns=drop_extra_columns)
 

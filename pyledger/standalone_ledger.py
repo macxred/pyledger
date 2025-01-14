@@ -117,7 +117,7 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Ledger
 
-    @timed_cache(15)
+    @timed_cache(120)
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with all ledger transactions in long format.
 
