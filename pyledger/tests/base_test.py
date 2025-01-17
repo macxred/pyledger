@@ -27,7 +27,7 @@ ACCOUNT_CSV = """
     Assets,                         1025,      CHF,         , Cash in Bank CHF
     Assets,                         1300,      USD,         , VAT Recoverable (Input VAT)
     Liabilities,                    2000,      USD,         , Accounts Payable USD
-    Liabilities,                    2010,      USD,         , Accounts Payable EUR
+    Liabilities,                    2010,      EUR,         , Accounts Payable EUR
     Liabilities,                    2200,      USD,         , VAT Payable (Output VAT)
     Equity,                         3000,      USD,         , Owner's Equity
     Revenue,                        4000,      USD,  OUT_STD, Sales Revenue - USD
@@ -73,7 +73,7 @@ LEDGER_CSV = """
     17, 2024-09-09,    1010,   7050,      EUR,        0.00,         -5.55,         ,    Restaurant, Manual Foreign currency adjustment
     18, 2024-09-10,    1020,       ,      JPY,        0.00,          5.55,         ,    Restaurant, Manual Foreign currency adjustment
     18,           ,        ,   8050,      USD,        5.55,              ,         ,    Restaurant, Manual Foreign currency adjustment
-    19, 2024-12-01,    1000,   3000,      EUR, 10000000.00,              ,         ,       General, Capital Increase,
+    19, 2024-12-01,    1000,   3000,      USD, 10000000.00,              ,         ,       General, Capital Increase,
     20, 2024-12-02,    1010,   2010,      EUR, 90000000.00,   91111111.10,         ,          Shop, Value 90 Mio USD @1.0123456789 (10 decimal places),
     21, 2024-12-03,    2010,   1010,      EUR, 90000000.00,   91111111.10,         ,          Shop, Revert previous entry,
     22, 2024-12-04,        ,   1000,      USD,  9500000.00,              ,         ,          Shop, Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places),

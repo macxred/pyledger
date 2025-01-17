@@ -839,11 +839,11 @@ class LedgerEngine(ABC):
         def invalid_transaction_currency(row):
             if row["amount"] == 0:
                 return False
-            if pd.notna(row["account"]) and pd.isna(row["contra"]):
+            if pd.notna(row["account"]):
                 account_currency = self.account_currency(row["account"])
                 if row["currency"] != account_currency:
                     return True
-            if pd.notna(row["contra"]) and pd.isna(row["account"]):
+            if pd.notna(row["contra"]):
                 contra_currency = self.account_currency(row["contra"])
                 if row["currency"] != contra_currency:
                     return True
