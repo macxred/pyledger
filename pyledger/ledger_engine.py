@@ -753,7 +753,9 @@ class LedgerEngine(ABC):
         4. Omit a profit center when profit centers exist in the system.
         5. Reference an invalid currency, account, contra account, or profit
            center.
-        6. Mismatch the currency of a referenced account or contra account.
+        6. Do not match the currency of a referenced account or contra account,
+           and the account or contra account is not denominated in
+           reporting currency.
         7. Lack a valid price reference when 'report_amount' is missing and
            the entry is in a non-reporting currency.
 
@@ -841,11 +843,13 @@ class LedgerEngine(ABC):
                 return False
             if pd.notna(row["account"]):
                 account_currency = self.account_currency(row["account"])
-                if row["currency"] != account_currency:
+                if ((account_currency != self.reporting_currency)
+                        and (row["currency"] != account_currency)):
                     return True
             if pd.notna(row["contra"]):
                 contra_currency = self.account_currency(row["contra"])
-                if row["currency"] != contra_currency:
+                if ((contra_currency != self.reporting_currency)
+                        and (row["currency"] != contra_currency)):
                     return True
             return False
         invalid_currency_mask = df.apply(invalid_transaction_currency, axis=1)

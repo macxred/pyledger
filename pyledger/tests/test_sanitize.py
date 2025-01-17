@@ -305,7 +305,7 @@ def test_sanitize_ledger(engine, capture_logs):
          10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,          , Currencies mismatch valid with amount 0,
          11, 2024-01-01,        ,   1000,      CHF,           1,              ,              ,          , Currencies mismatch invalid,
          12, 2024-01-01,    1000,       ,      CHF,           1,              ,              ,          , Currencies mismatch invalid,
-         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,          , Currencies mismatch,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,          , Currencies mismatch on account in reporting currency,
          14, 2021-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , No price reference,
          15, 2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Not balanced amount,
          16, 2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,          , Not balanced amount,
@@ -343,6 +343,7 @@ def test_sanitize_ledger(engine, capture_logs):
          4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,    VALID, Valid tax code,
          9,  2024-01-01,    1000,       ,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
          10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,         , Currencies mismatch on account in reporting currency,
          21, 2024-01-01,    1000,       ,      USD,     -999.99,              ,              ,         , Balanced amount,
          21, 2024-01-01,        ,   2000,      USD,     -555.55,              ,              ,         , Balanced amount,
          21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,              ,         , Balanced amount,
@@ -371,7 +372,7 @@ def test_sanitize_ledger(engine, capture_logs):
     sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
     assert_frame_equal(expected_ledger_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 8, "Expected strict number of captured logs"
+    assert len(log_messages) == 7, "Expected strict number of captured logs"
 
     # Clear captured logs
     capture_logs.seek(0)
@@ -384,4 +385,4 @@ def test_sanitize_ledger(engine, capture_logs):
     sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
     assert_frame_equal(expected_ledger_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 8, "Expected strict number of captured logs"
+    assert len(log_messages) == 7, "Expected strict number of captured logs"
