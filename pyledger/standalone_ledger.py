@@ -234,8 +234,8 @@ class StandaloneLedger(LedgerEngine):
                 result[currency] = 0.0
         else:
             sub = ledger.loc[rows, cols]
-            reporting_amount = sub["report_amount"].sum()
+            report_amount = sub["report_amount"].sum()
             amount = sub.groupby("currency").agg({"amount": "sum"})
             amount = {currency: amount for currency, amount in zip(amount.index, amount["amount"])}
-            result = {"reporting_currency": reporting_amount} | amount
+            result = {"reporting_currency": report_amount} | amount
         return result
