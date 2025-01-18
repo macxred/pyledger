@@ -165,8 +165,8 @@ EXPECTED_BALANCE_CSV = """
     2024-01-24,      2200,  "General, Shop, Bakery", "{reporting_currency: 0.0, USD: 0.0}"
     2024-03-31, 1000:1999,  "General, Shop, Bakery", "{reporting_currency: 1099532.82, USD: 801200.0, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-03-31, 1000:1999,             "Restaurant", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-12-31, 1000:9999,             "Restaurant", "{reporting_currency: 0.0, USD: -5.55, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-12-31, 1000:9999,    "General, Restaurant", "{reporting_currency: 0.0, USD: -498338.37, EUR: 27078.22, JPY: 54345678.0, CHF: 14285714.3}"
+    2024-12-31, 1000:9999,             "Restaurant", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-12-31, 1000:9999,    "General, Restaurant", "{reporting_currency: 0.0, USD: -498332.82, EUR: 27078.22, JPY: 54345678.0, CHF: 14285714.3}"
 """
 EXPECTED_BALANCE = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), skipinitialspace=True)
 EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]

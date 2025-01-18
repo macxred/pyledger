@@ -235,7 +235,16 @@ class StandaloneLedger(LedgerEngine):
         else:
             sub = ledger.loc[rows, cols]
             report_amount = sub["report_amount"].sum()
-            amount = sub.groupby("currency").agg({"amount": "sum"})
-            amount = {currency: amount for currency, amount in zip(amount.index, amount["amount"])}
+            account_currency = self.account_currency(account)
+            if pd.isna(account_currency):
+                amount = sub.groupby("currency").agg({"amount": "sum"})
+                amount = {currency: amount
+                          for currency, amount in zip(amount.index, amount["amount"])}
+            elif account_currency == self.reporting_currency:
+                amount = {self.reporting_currency: report_amount}
+            elif not all(sub["currency"] == account_currency):
+                raise ValueError(f"Unexpected currencies in transactions for account {account}.")
+            else:
+                amount = {account_currency: sub["amount"].sum()}
             result = {"reporting_currency": report_amount} | amount
         return result
