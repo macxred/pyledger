@@ -82,7 +82,7 @@ class TextLedger(StandaloneLedger):
         )
         self._ledger = CSVLedgerEntity(
             schema=LEDGER_SCHEMA,
-            path=self.root / "ledger",
+            path=self.root / "journal",
             write_file=self.write_ledger_file,
             column_shortcuts=LEDGER_COLUMN_SHORTCUTS,
             prepare_for_mirroring=self.sanitize_ledger,
