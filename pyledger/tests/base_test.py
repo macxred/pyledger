@@ -183,7 +183,7 @@ EXPECTED_BALANCE["profit_center"] = EXPECTED_BALANCE["profit_center"].apply(pars
 
 class BaseTest(ABC):
     engine = MemoryLedger()
-    SETTINGS = {"REPORTING_CURRENCY": "USD"}
+    CONFIGURATION = {"REPORTING_CURRENCY": "USD"}
     ASSETS = engine.assets.standardize(ASSETS)
     ACCOUNTS = engine.accounts.standardize(ACCOUNTS)
     PRICES = engine.price_history.standardize(PRICES)

@@ -17,13 +17,13 @@ class BaseTestAccounts(BaseTest):
 
     @pytest.fixture()
     def restored_engine(self, engine):
-        """Accounting engine populated with tax codes, accounts, and settings"""
+        """Accounting engine populated with tax codes, accounts, and configuration"""
         tax_accounts = pd.concat([
             self.TAX_CODES["account"], self.TAX_CODES["contra"]
         ]).dropna().unique()
         tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
         engine.restore(accounts=tax_accounts, tax_codes=self.TAX_CODES,
-                       settings=self.SETTINGS, assets=self.ASSETS)
+                       configuration=self.CONFIGURATION, assets=self.ASSETS)
         return engine
 
     def test_account_accessor_mutators(self, restored_engine, ignore_row_order=False):
@@ -145,7 +145,8 @@ class BaseTestAccounts(BaseTest):
 
     def test_mirror_empty_accounts(self, restored_engine):
         restored_engine.restore(
-            accounts=self.ACCOUNTS.assign(tax_code=pd.NA), settings=self.SETTINGS, tax_codes=[]
+            accounts=self.ACCOUNTS.assign(tax_code=pd.NA),
+            configuration=self.CONFIGURATION, tax_codes=[]
         )
         assert not restored_engine.accounts.list().empty, "Accounts were not populated"
         restored_engine.accounts.mirror(restored_engine.accounts.standardize(None), delete=True)
@@ -155,7 +156,7 @@ class BaseTestAccounts(BaseTest):
 
     def test_account_balance(self, restored_engine):
         restored_engine.restore(
-            accounts=self.ACCOUNTS, settings=self.SETTINGS, tax_codes=self.TAX_CODES,
+            accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES, assets=self.ASSETS, price_history=self.PRICES,
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )

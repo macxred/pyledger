@@ -20,7 +20,7 @@
 │   ├── topic.csv        # Ledger entries for specific topics or projects
 │   └── ...              # Additional ledger files or folders
 ├── accounts.csv         # Account chart
-├── settings.yml         # Configurations (e.g., reporting currency)
+├── configuration.yml    # Configuration (e.g., reporting currency)
 
 ++ Optional ++
 
@@ -82,12 +82,12 @@ LEDGER_CSV = """
 """
 LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
 
-SETTINGS = {"reporting_currency": "USD"}
+CONFIGURATION = {"reporting_currency": "USD"}
 
 # Initialize TextLedger and populate with sample data
 engine = TextLedger("demo-accounting-system")
 engine.restore(
-    settings=SETTINGS,
+    configuration=CONFIGURATION,
     tax_codes=TAX_CODES,
     accounts=ACCOUNT_CHART,
     ledger=LEDGER_ENTRIES)

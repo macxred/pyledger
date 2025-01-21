@@ -15,7 +15,7 @@ class BaseTestDumpRestoreClear(BaseTest):
 
     def test_restore(self, engine):
         engine.restore(
-            settings=self.SETTINGS,
+            configuration=self.CONFIGURATION,
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,
@@ -24,7 +24,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             revaluations=self.REVALUATIONS,
             profit_centers=self.PROFIT_CENTERS,
         )
-        assert engine.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
+        assert engine.reporting_currency == self.CONFIGURATION["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
         )
         assert_frame_equal(
@@ -47,7 +47,7 @@ class BaseTestDumpRestoreClear(BaseTest):
 
     def test_dump_and_restore_zip(self, engine, tmp_path):
         # Populate with test data
-        engine.reporting_currency = self.SETTINGS["REPORTING_CURRENCY"]
+        engine.reporting_currency = self.CONFIGURATION["REPORTING_CURRENCY"]
         engine.accounts.mirror(self.ACCOUNTS)
         engine.tax_codes.mirror(self.TAX_CODES)
         engine.ledger.mirror(self.LEDGER_ENTRIES)
@@ -72,7 +72,7 @@ class BaseTestDumpRestoreClear(BaseTest):
 
         # Restore dumped state
         engine.restore_from_zip(tmp_path / "ledger.zip")
-        assert engine.reporting_currency == self.SETTINGS["REPORTING_CURRENCY"], (
+        assert engine.reporting_currency == self.CONFIGURATION["REPORTING_CURRENCY"], (
             "Reporting currency was not restored"
         )
         assert_frame_equal(assets, engine.assets.list(), ignore_row_order=True, ignore_index=True)
@@ -96,7 +96,7 @@ class BaseTestDumpRestoreClear(BaseTest):
 
     def test_clear(self, engine):
         engine.restore(
-            settings=self.SETTINGS,
+            configuration=self.CONFIGURATION,
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
             ledger=self.LEDGER_ENTRIES,

@@ -10,7 +10,7 @@ from .constants import (
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
     PROFIT_CENTER_SCHEMA,
-    DEFAULT_SETTINGS,
+    DEFAULT_CONFIGURATION,
     LEDGER_SCHEMA,
     PRICE_SCHEMA,
     REVALUATION_SCHEMA,
@@ -51,7 +51,7 @@ class TextLedger(StandaloneLedger):
 
     To enhance readability, tabular data, such as the account chart and general
     ledger entries, is stored in a fixed-width CSV format, with entries padded
-    with spaces for consistent column widths. Configuration settings, including
+    with spaces for consistent column widths. Configuration including
     the reporting currency, are stored in YAML format.
     """
 
@@ -93,48 +93,48 @@ class TextLedger(StandaloneLedger):
         )
 
     # ----------------------------------------------------------------------
-    # Settings
+    # Configuration
 
     @property
     @timed_cache(120)
-    def settings(self):
-        return self.read_settings_file(self.root / "settings.yml").copy()
+    def configuration(self):
+        return self.read_configuration_file(self.root / "configuration.yml").copy()
 
-    @settings.setter
-    def settings(self, settings: dict):
-        """Save settings to a YAML file.
+    @configuration.setter
+    def configuration(self, configuration: dict):
+        """Save configuration to a YAML file.
 
-        This method stores accounting settings such as the reporting currency
-        to `<root>/settings.yml`. The YAML format is ideal for version control
+        This method stores accounting configuration such as the reporting currency
+        to `<root>/configuration.yml`. The YAML format is ideal for version control
         and human readability.
 
         Args:
-            settings (dict): A dictionary containing the system settings to be saved.
+            configuration (dict): A dictionary containing the system configuration to be saved.
         """
-        with open(self.root / "settings.yml", "w") as f:
-            yaml.dump(self.standardize_settings(settings), f, default_flow_style=False)
-        self.__class__.settings.fget.cache_clear()
+        with open(self.root / "configuration.yml", "w") as f:
+            yaml.dump(self.standardize_configuration(configuration), f, default_flow_style=False)
+        self.__class__.configuration.fget.cache_clear()
 
-    def read_settings_file(self, file: Path) -> dict:
-        """Read settings from the specified file.
+    def read_configuration_file(self, file: Path) -> dict:
+        """Read configuration from the specified file.
 
-        This method returns standardized accounting settings, including the reporting currency.
-        If the specified settings file does not exist, DEFAULT_SETTINGS are returned.
+        This method returns standardized accounting configuration, including the reporting currency.
+        If the specified configuration file does not exist, DEFAULT_CONFIGURATION are returned.
         The system thus continues running even if the <root> directory is empty, which is useful
         for testing and demonstration purposes.
 
         Args:
-            file (Path): The path to the settings file.
+            file (Path): The path to the configuration file.
 
         Returns:
-            dict: Standardized system settings.
+            dict: Standardized system configuration.
         """
         if file.exists():
             with open(file, "r") as f:
                 result = yaml.safe_load(f)
         else:
-            self._logger.warning("Settings file missing, reverting to default settings.")
-            result = self.standardize_settings(DEFAULT_SETTINGS)
+            self._logger.warning("configuration file missing, reverting to default configuration.")
+            result = self.standardize_configuration(DEFAULT_CONFIGURATION)
 
         return result
 
@@ -195,8 +195,8 @@ class TextLedger(StandaloneLedger):
 
     @property
     def reporting_currency(self):
-        return self.settings["reporting_currency"]
+        return self.configuration["reporting_currency"]
 
     @reporting_currency.setter
     def reporting_currency(self, currency):
-        self.settings = self.settings | {"reporting_currency": currency}
+        self.configuration = self.configuration | {"reporting_currency": currency}

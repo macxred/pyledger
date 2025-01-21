@@ -15,7 +15,7 @@ class BaseTestProfitCenters(BaseTest):
         pass
 
     def test_profit_center_accessor_mutators(self, engine, ignore_row_order=False):
-        engine.restore(settings=self.SETTINGS)
+        engine.restore(configuration=self.CONFIGURATION)
 
         # Add profit center one by one and with multiple rows
         profit_centers = self.PROFIT_CENTERS.sample(frac=1).reset_index(drop=True)
@@ -62,7 +62,7 @@ class BaseTestProfitCenters(BaseTest):
         engine.profit_centers.delete([{"profit_center": "Bank"}], allow_missing=True)
 
     def test_mirror_profit_centers(self, engine):
-        engine.restore(settings=self.SETTINGS)
+        engine.restore(configuration=self.CONFIGURATION)
         target = pd.concat([self.PROFIT_CENTERS, engine.profit_centers.list()], ignore_index=True)
         original_target = target.copy()
         engine.profit_centers.mirror(target, delete=False)
@@ -83,7 +83,7 @@ class BaseTestProfitCenters(BaseTest):
         assert_frame_equal(target, engine.profit_centers.list(), ignore_row_order=True)
 
     def test_mirror_empty_profit_centers(self, engine):
-        engine.restore(profit_centers=self.PROFIT_CENTERS, settings=self.SETTINGS)
+        engine.restore(profit_centers=self.PROFIT_CENTERS, configuration=self.CONFIGURATION)
         assert not engine.profit_centers.list().empty
         engine.profit_centers.mirror(engine.profit_centers.standardize(None), delete=True)
         assert engine.profit_centers.list().empty

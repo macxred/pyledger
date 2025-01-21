@@ -16,13 +16,13 @@ class BaseTestTaxCodes(BaseTest):
 
     @pytest.fixture()
     def restored_engine(self, engine):
-        """Accounting engine populated with accounts, tax codes, and settings"""
+        """Accounting engine populated with accounts, tax codes, and configuration"""
         tax_accounts = pd.concat([
             self.TAX_CODES["account"], self.TAX_CODES["contra"]
         ]).dropna().unique()
         tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
         engine.restore(accounts=tax_accounts, tax_codes=[],
-                       settings=self.SETTINGS, assets=self.ASSETS)
+                       configuration=self.CONFIGURATION, assets=self.ASSETS)
         return engine
 
     def test_tax_codes_accessor_mutators(self, restored_engine, ignore_row_order=False):
@@ -142,7 +142,9 @@ class BaseTestTaxCodes(BaseTest):
             self.TAX_CODES["account"], self.TAX_CODES["contra"]
         ]).dropna().unique()
         tax_accounts = self.ACCOUNTS.query("`account` in @tax_accounts")
-        engine.restore(tax_codes=self.TAX_CODES, accounts=tax_accounts, settings=self.SETTINGS)
+        engine.restore(
+            tax_codes=self.TAX_CODES, accounts=tax_accounts, configuration=self.CONFIGURATION
+        )
         assert not engine.tax_codes.list().empty, "Tax codes were not populated"
         engine.tax_codes.mirror(engine.tax_codes.standardize(None), delete=True)
         assert engine.tax_codes.list().empty, "Mirroring empty df should erase all tax codes"

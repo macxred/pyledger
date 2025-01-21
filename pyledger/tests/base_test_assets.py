@@ -16,7 +16,7 @@ class BaseTestAssets(BaseTest):
         pass
 
     def test_asset_accessor_mutators(self, engine, ignore_row_order=False):
-        engine.restore(settings=self.SETTINGS)
+        engine.restore(configuration=self.CONFIGURATION)
 
         # Add assets one by one and with multiple rows
         assets = self.ASSETS.sample(frac=1).reset_index(drop=True)
@@ -99,7 +99,7 @@ class BaseTestAssets(BaseTest):
         }], allow_missing=True)
 
     def test_mirror_assets(self, engine):
-        engine.restore(settings=self.SETTINGS)
+        engine.restore(configuration=self.CONFIGURATION)
         target = pd.concat([self.ASSETS, engine.assets.list()], ignore_index=True)
         original_target = target.copy()
         engine.assets.mirror(target, delete=False)
@@ -125,14 +125,14 @@ class BaseTestAssets(BaseTest):
         assert_frame_equal(target, engine.assets.list(), ignore_row_order=True)
 
     def test_mirror_empty_assets(self, engine):
-        engine.restore(assets=self.ASSETS, settings=self.SETTINGS)
+        engine.restore(assets=self.ASSETS, configuration=self.CONFIGURATION)
         assert not engine.assets.list().empty
         engine.assets.mirror(engine.assets.standardize(None), delete=True)
         assert engine.assets.list().empty
 
     @pytest.fixture()
     def engine_with_assets(self, engine):
-        engine.restore(settings=self.SETTINGS, assets=self.ASSETS)
+        engine.restore(configuration=self.CONFIGURATION, assets=self.ASSETS)
         return engine
 
     @pytest.mark.parametrize(
