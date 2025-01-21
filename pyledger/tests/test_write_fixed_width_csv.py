@@ -29,7 +29,7 @@ def test_multiple_columns_mixed_values():
     })
     output = write_fixed_width_csv(df)
     expected_output = ('Col1, LongerCol2, Col3\n'
-                       '   1,          a, \n'
+                       '   1,          a,\n'
                        '   2,         bb, 5.5\n'
                        '   3,        ccc, 6.0\n')
     assert output == expected_output, "Failed on multiple columns with mixed values"
@@ -58,7 +58,7 @@ def test_non_string_data_types():
     df = pd.DataFrame({'A': [1, 2], 'B': [True, False], 'C': [None, 'Text']})
     output = write_fixed_width_csv(df)
     expected_output = ('A,     B, C\n'
-                       '1,  True, \n'
+                       '1,  True,\n'
                        '2, False, Text\n')
     assert output == expected_output, "Failed on non-string data types"
 
@@ -66,7 +66,7 @@ def test_non_string_data_types():
 def test_empty_strings():
     df = pd.DataFrame({'A': ['', ''], 'B': ['', '']})
     output = write_fixed_width_csv(df)
-    expected_output = 'A, B\n , \n , \n'
+    expected_output = 'A, B\n ,\n ,\n'
     assert output == expected_output, "Failed on empty strings"
 
 
