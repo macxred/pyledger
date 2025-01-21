@@ -17,7 +17,7 @@ class BaseTestPriceHistory(BaseTest):
         pass
 
     def test_price_accessor_mutators(self, engine, ignore_row_order=False):
-        engine.restore(settings=self.SETTINGS)
+        engine.restore(configuration=self.CONFIGURATION)
 
         # Add prices one by one and with multiple rows
         price_history = self.PRICES.sample(frac=1).reset_index(drop=True)
@@ -112,7 +112,7 @@ class BaseTestPriceHistory(BaseTest):
         }], allow_missing=True)
 
     def test_mirror_prices(self, engine):
-        engine.restore(settings=self.SETTINGS)
+        engine.restore(configuration=self.CONFIGURATION)
         target = pd.concat([self.PRICES, engine.price_history.list()], ignore_index=True)
         original_target = target.copy()
         engine.price_history.mirror(target, delete=False)
@@ -144,14 +144,16 @@ class BaseTestPriceHistory(BaseTest):
         )
 
     def test_mirror_empty_prices(self, engine):
-        engine.restore(price_history=self.PRICES, settings=self.SETTINGS)
+        engine.restore(price_history=self.PRICES, configuration=self.CONFIGURATION)
         assert not engine.price_history.list().empty
         engine.price_history.mirror(engine.price_history.standardize(None), delete=True)
         assert engine.price_history.list().empty
 
     @pytest.fixture()
     def engine_with_prices(self, engine):
-        engine.restore(settings=self.SETTINGS, price_history=self.PRICES, assets=self.ASSETS)
+        engine.restore(
+            configuration=self.CONFIGURATION, price_history=self.PRICES, assets=self.ASSETS
+        )
         return engine
 
     @pytest.mark.parametrize(

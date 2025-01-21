@@ -16,7 +16,7 @@ class BaseTestRevaluations(BaseTest):
         pass
 
     def test_revaluations_accessor_mutators(self, engine, ignore_row_order=False):
-        engine.restore(settings=self.SETTINGS, accounts=self.ACCOUNTS)
+        engine.restore(configuration=self.CONFIGURATION, accounts=self.ACCOUNTS)
 
         # Add revaluations one by one and with multiple rows
         revaluations = self.REVALUATIONS.sample(frac=1).reset_index(drop=True)
@@ -109,7 +109,7 @@ class BaseTestRevaluations(BaseTest):
         }], allow_missing=True)
 
     def test_mirror_revaluations(self, engine):
-        engine.restore(settings=self.SETTINGS)
+        engine.restore(configuration=self.CONFIGURATION)
         target = pd.concat([self.REVALUATIONS, engine.revaluations.list()], ignore_index=True)
         original_target = target.copy()
         engine.revaluations.mirror(target, delete=False)
@@ -141,7 +141,7 @@ class BaseTestRevaluations(BaseTest):
         )
 
     def test_mirror_empty_revaluations(self, engine):
-        engine.restore(revaluations=self.REVALUATIONS, settings=self.SETTINGS)
+        engine.restore(revaluations=self.REVALUATIONS, configuration=self.CONFIGURATION)
         assert not engine.revaluations.list().empty
         engine.revaluations.mirror(engine.revaluations.standardize(None), delete=True)
         assert engine.revaluations.list().empty

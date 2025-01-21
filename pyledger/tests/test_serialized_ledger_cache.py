@@ -19,7 +19,7 @@ def muted_logger():
 def engine():
     engine = MemoryLedger()
     engine.restore(
-        settings=BaseTest.SETTINGS,
+        configuration=BaseTest.CONFIGURATION,
         tax_codes=BaseTest.TAX_CODES,
         accounts=BaseTest.ACCOUNTS,
         ledger=BaseTest.LEDGER_ENTRIES,
