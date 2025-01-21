@@ -29,7 +29,7 @@ def test_multiple_columns_mixed_values():
     })
     output = write_fixed_width_csv(df)
     expected_output = ('Col1, LongerCol2, Col3\n'
-                       '   1,          a, \n'
+                       '   1,          a,\n'
                        '   2,         bb, 5.5\n'
                        '   3,        ccc, 6.0\n')
     assert output == expected_output, "Failed on multiple columns with mixed values"
@@ -58,7 +58,7 @@ def test_non_string_data_types():
     df = pd.DataFrame({'A': [1, 2], 'B': [True, False], 'C': [None, 'Text']})
     output = write_fixed_width_csv(df)
     expected_output = ('A,     B, C\n'
-                       '1,  True, \n'
+                       '1,  True,\n'
                        '2, False, Text\n')
     assert output == expected_output, "Failed on non-string data types"
 
@@ -66,7 +66,7 @@ def test_non_string_data_types():
 def test_empty_strings():
     df = pd.DataFrame({'A': ['', ''], 'B': ['', '']})
     output = write_fixed_width_csv(df)
-    expected_output = 'A, B\n , \n , \n'
+    expected_output = 'A, B\n ,\n ,\n'
     assert output == expected_output, "Failed on empty strings"
 
 
@@ -183,3 +183,17 @@ def test_machine_readability_with_none():
     df_read = pd.read_csv(StringIO(output), skipinitialspace=True)
     df_read = df_read.astype(object).where(pd.notna(df_read), np.nan)
     pd.testing.assert_frame_equal(df, df_read, check_dtype=False)
+
+
+def test_csv_lines_have_no_trailing_whitespace():
+    df = pd.DataFrame({
+        'Col1': [1, None, 3, None, 5],
+        'Col2': ['a ', 'b', None, 'd ', None],
+        'Col3': [1.5, 2.5, None, 4.5, 5.5],
+        'Col4': [None, 'text ', None, 'another ', None]
+    })
+
+    df = df.astype(object).where(pd.notna(df), np.nan)
+    output = write_fixed_width_csv(df)
+    for line in output.split('\n'):
+        assert not line.endswith(' '), f"Line has trailing whitespace: {line}"

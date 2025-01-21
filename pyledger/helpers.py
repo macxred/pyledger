@@ -91,6 +91,10 @@ def write_fixed_width_csv(
             col_str = sep[1:] + col_str
             colname = sep[1:] + colname
 
+        # Remove trailing spaces
+        if i == len(df.columns) - 1:
+            col_str = col_str.str.rstrip()
+
         result[colname] = col_str
 
     result = pd.DataFrame(result)
