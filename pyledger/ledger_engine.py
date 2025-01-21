@@ -76,51 +76,6 @@ class LedgerEngine(ABC):
         return self._profit_centers
 
     # ----------------------------------------------------------------------
-    # Settings
-
-    @staticmethod
-    def standardize_settings(settings: dict) -> dict:
-        """Validates and standardizes the 'settings' dictionary. Ensures it
-        contains items 'reporting_currency' and 'precision'.
-
-        Example:
-            settings = {
-                'reporting_currency': 'USD',
-                'precision': {
-                    'CAD': 0.01, 'CHF': 0.01, 'EUR': 0.01,
-                    'GBP': 0.01, 'HKD': 0.01, 'USD': 0.01
-                }
-            }
-            LedgerEngine.standardize_settings(settings)
-
-        Args:
-            settings (dict): The settings dictionary to be standardized.
-
-        Returns:
-            dict: The standardized settings dictionary.
-
-        Raises:
-            ValueError: If 'settings' is not a dictionary, or if 'reporting_currency'
-                        is missing/not a string, or if 'precision' is missing/not a
-                        dictionary, or if any key/value in 'precision' is of invalid
-                        type.
-
-        Note:
-            Modifies 'precision' to include the 'reporting_currency' key.
-        """
-        if not isinstance(settings, dict):
-            raise ValueError("'settings' must be a dict.")
-
-        # Check for 'reporting_currency'
-        if (
-            "reporting_currency" not in settings
-            or not isinstance(settings["reporting_currency"], str)
-        ):
-            raise ValueError("Missing/invalid 'reporting_currency' in settings.")
-
-        return settings
-
-    # ----------------------------------------------------------------------
     # File Operations
 
     def export_account_sheets(self, file: str, root: str = None) -> None:
@@ -158,14 +113,14 @@ class LedgerEngine(ABC):
 
         Save all data and settings of an accounting system into a ZIP archive.
         Each component of the ledger system (accounts, tax_codes, ledger entries,
-        settings, etc.) is stored as an individual file inside the ZIP archive
+        configuration, etc.) is stored as an individual file inside the ZIP archive
         for modular restoration and analysis.
 
         Args:
             archive_path (str): The file path of the ZIP archive.
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
-            archive.writestr('settings.json', json.dumps(self.settings_list()))
+            archive.writestr('configuration.json', json.dumps(self.configuration_list()))
             archive.writestr('ledger.csv', self.ledger.list().to_csv(index=False))
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
@@ -185,7 +140,7 @@ class LedgerEngine(ABC):
             archive_path (str): The file path of the ZIP archive to restore.
         """
         required_files = {
-            'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'settings.json', 'assets.csv',
+            'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'configuration.json', 'assets.csv',
             'price_history.csv', 'revaluations.csv', 'profit_centers.csv'
         }
 
@@ -197,7 +152,7 @@ class LedgerEngine(ABC):
                     f"Missing required files in the archive: {', '.join(missing_files)}"
                 )
 
-            settings = json.loads(archive.open('settings.json').read().decode('utf-8'))
+            configuration = json.loads(archive.open('configuration.json').read().decode('utf-8'))
             ledger = pd.read_csv(archive.open('ledger.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
@@ -206,7 +161,7 @@ class LedgerEngine(ABC):
             revaluations = pd.read_csv(archive.open('revaluations.csv'))
             profit_centers = pd.read_csv(archive.open('profit_centers.csv'))
             self.restore(
-                settings=settings,
+                configuration=configuration,
                 ledger=ledger,
                 tax_codes=tax_codes,
                 accounts=accounts,
@@ -218,7 +173,7 @@ class LedgerEngine(ABC):
 
     def restore(
         self,
-        settings: dict | None = None,
+        configuration: dict | None = None,
         tax_codes: pd.DataFrame | None = None,
         accounts: pd.DataFrame | None = None,
         ledger: pd.DataFrame | None = None,
@@ -230,7 +185,8 @@ class LedgerEngine(ABC):
         """Replaces the entire ledger system with data provided as arguments.
 
         Args:
-            settings (dict | None): System settings. If `None`, settings remains unchanged.
+            configuration (dict | None): System configuration.
+                If `None`, configuration remains unchanged.
             tax_codes (pd.DataFrame | None): Tax codes of the restored ledger system.
                 If `None`, tax codes remain unchanged.
             accounts (pd.DataFrame | None): Accounts of the restored ledger system.
@@ -246,8 +202,8 @@ class LedgerEngine(ABC):
             profit_centers (pd.DataFrame | None): Profit centers of the restored system.
                 If `None`, profit centers remain unchanged.
         """
-        if settings is not None:
-            self.settings_modify(settings)
+        if configuration is not None:
+            self.configuration_modify(configuration)
         if assets is not None:
             self.assets.mirror(assets, delete=True)
         if price_history is not None:
@@ -278,16 +234,58 @@ class LedgerEngine(ABC):
         self.profit_centers.mirror(None, delete=True)
 
     # ----------------------------------------------------------------------
-    # Settings
+    # Configuration
 
-    def settings_list(self) -> dict:
-        """Return a dict with all settings."""
+    @staticmethod
+    def standardize_configuration(configuration: dict) -> dict:
+        """Validates and standardizes the 'configuration' dictionary. Ensures it
+        contains items 'reporting_currency' and 'precision'.
+
+        Example:
+            configuration = {
+                'reporting_currency': 'USD',
+                'precision': {
+                    'CAD': 0.01, 'CHF': 0.01, 'EUR': 0.01,
+                    'GBP': 0.01, 'HKD': 0.01, 'USD': 0.01
+                }
+            }
+            LedgerEngine.standardize_configuration(configuration)
+
+        Args:
+            configuration (dict): The configuration dictionary to be standardized.
+
+        Returns:
+            dict: The standardized configuration dictionary.
+
+        Raises:
+            ValueError: If 'configuration' is not a dictionary, or if 'reporting_currency'
+                        is missing/not a string, or if 'precision' is missing/not a
+                        dictionary, or if any key/value in 'precision' is of invalid
+                        type.
+
+        Note:
+            Modifies 'precision' to include the 'reporting_currency' key.
+        """
+        if not isinstance(configuration, dict):
+            raise ValueError("'configuration' must be a dict.")
+
+        # Check for 'reporting_currency'
+        if (
+            "reporting_currency" not in configuration
+            or not isinstance(configuration["reporting_currency"], str)
+        ):
+            raise ValueError("Missing/invalid 'reporting_currency' in configuration.")
+
+        return configuration
+
+    def configuration_list(self) -> dict:
+        """Return a dict with the configuration."""
         return {"REPORTING_CURRENCY": self.reporting_currency}
 
-    def settings_modify(self, settings: dict = {}):
-        """Modify provided settings."""
-        if "REPORTING_CURRENCY" in settings:
-            self.reporting_currency = settings["REPORTING_CURRENCY"]
+    def configuration_modify(self, configuration: dict = {}):
+        """Modify provided configuration."""
+        if "REPORTING_CURRENCY" in configuration:
+            self.reporting_currency = configuration["REPORTING_CURRENCY"]
 
     # ----------------------------------------------------------------------
     # Tax rates

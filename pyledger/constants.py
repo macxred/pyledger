@@ -94,4 +94,4 @@ DEFAULT_ASSETS = enforce_schema(
     pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True), ASSETS_SCHEMA
 )
 
-DEFAULT_SETTINGS = {"reporting_currency": "USD"}
+DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
