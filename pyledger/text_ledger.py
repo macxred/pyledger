@@ -80,7 +80,7 @@ class TextLedger(StandaloneLedger):
             schema=PRICE_SCHEMA, path=self.root / "settings/price_history.csv"
         )
         self._revaluations = CSVAccountingEntity(
-            schema=REVALUATION_SCHEMA, path=self.root / "settings/evaluations.csv"
+            schema=REVALUATION_SCHEMA, path=self.root / "settings/revaluations.csv"
         )
         self._ledger = CSVLedgerEntity(
             schema=LEDGER_SCHEMA,
@@ -91,7 +91,7 @@ class TextLedger(StandaloneLedger):
             on_change=self.serialized_ledger.cache_clear,
         )
         self._profit_centers = CSVAccountingEntity(
-            schema=PROFIT_CENTER_SCHEMA, path=self.root / "settings/profit_center.csv"
+            schema=PROFIT_CENTER_SCHEMA, path=self.root / "settings/profit_centers.csv"
         )
 
     # ----------------------------------------------------------------------

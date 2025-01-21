@@ -16,8 +16,8 @@
 
 ```
 /system-root-path/
-├── ledger/                # Contains ledger entries; can have subdirectories
-│   ├── topic.csv          # Ledger entries for specific topics or projects
+├── journal/               # Contains journal entries; can have subdirectories
+│   ├── topic.csv          # Journal entries for specific topics or projects
 │   └── ...                # Additional ledger files or folders
 ├── account_chart.csv      # Chart of accounts
 ++ Optional ++
