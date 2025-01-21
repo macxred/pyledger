@@ -16,20 +16,19 @@
 
 ```
 /system-root-path/
-├── ledger/              # Contains ledger entries; can have subdirectories
-│   ├── topic.csv        # Ledger entries for specific topics or projects
-│   └── ...              # Additional ledger files or folders
-├── accounts.csv         # Account chart
-├── configuration.yml    # Configuration (e.g., reporting currency)
-
+├── journal/               # Contains journal entries; can have subdirectories
+│   ├── topic.csv          # Journal entries for specific topics or projects
+│   └── ...                # Additional ledger files or folders
+├── account_chart.csv      # Chart of accounts
 ++ Optional ++
-
-├── tax_codes.csv        # Tax code definitions
-├── assets.csv           # Definitions of currencies, securities, assets
-├── price/               # Contains exchange rates and asset prices
-│   ├── topic.csv        # Price history for specific assets
-│   └── ...              # Additional price files or folders
-└── revaluations.csv     # Defines when and which accounts need revaluation
+├── settings/              # Configuration files
+│   ├── configuration.yml  # Overall accounting configuration (e.g., reporting currency)
+│   ├── assets.csv         # Definitions of currencies, securities, assets, and display precision
+│   ├── price_history.csv  # Historical prices and exchange rates
+│   ├── tax_codes.csv      # Tax code definitions
+│   ├── revaluations.csv   # Defines FX adjustments and revaluations
+│   ├── profit_centres.csv # Profit centres used in the ledger
+│   └── ...                # Additional settings files
 ```
 
 ## Example Usage

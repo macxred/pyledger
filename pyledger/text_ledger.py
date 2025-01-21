@@ -61,35 +61,37 @@ class TextLedger(StandaloneLedger):
         """
         super().__init__()
         self.root = Path(root).expanduser()
+        settings_dir = self.root / "settings"
+        settings_dir.mkdir(parents=True, exist_ok=True)
         self._assets = CSVAccountingEntity(
-            schema=ASSETS_SCHEMA, path=self.root / "assets.csv"
+            schema=ASSETS_SCHEMA, path=self.root / "settings/assets.csv"
         )
         self._accounts = CSVAccountingEntity(
-            schema=ACCOUNT_SCHEMA, path=self.root / "accounts.csv",
+            schema=ACCOUNT_SCHEMA, path=self.root / "account_chart.csv",
             column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS,
             on_change=self.serialized_ledger.cache_clear
         )
         self._tax_codes = CSVAccountingEntity(
-            schema=TAX_CODE_SCHEMA, path=self.root / "tax_codes.csv",
+            schema=TAX_CODE_SCHEMA, path=self.root / "settings/tax_codes.csv",
             column_shortcuts=TAX_CODE_COLUMN_SHORTCUTS,
             on_change=self.serialized_ledger.cache_clear
         )
         self._price_history = CSVAccountingEntity(
-            schema=PRICE_SCHEMA, path=self.root / "price_history.csv"
+            schema=PRICE_SCHEMA, path=self.root / "settings/price_history.csv"
         )
         self._revaluations = CSVAccountingEntity(
-            schema=REVALUATION_SCHEMA, path=self.root / "revaluations.csv"
+            schema=REVALUATION_SCHEMA, path=self.root / "settings/revaluations.csv"
         )
         self._ledger = CSVLedgerEntity(
             schema=LEDGER_SCHEMA,
-            path=self.root / "ledger",
+            path=self.root / "journal",
             write_file=self.write_ledger_file,
             column_shortcuts=LEDGER_COLUMN_SHORTCUTS,
             prepare_for_mirroring=self.sanitize_ledger,
             on_change=self.serialized_ledger.cache_clear,
         )
         self._profit_centers = CSVAccountingEntity(
-            schema=PROFIT_CENTER_SCHEMA, path=self.root / "profit_center.csv"
+            schema=PROFIT_CENTER_SCHEMA, path=self.root / "settings/profit_centers.csv"
         )
 
     # ----------------------------------------------------------------------
@@ -98,20 +100,20 @@ class TextLedger(StandaloneLedger):
     @property
     @timed_cache(120)
     def configuration(self):
-        return self.read_configuration_file(self.root / "configuration.yml").copy()
+        return self.read_configuration_file(self.root / "settings/configuration.yml").copy()
 
     @configuration.setter
     def configuration(self, configuration: dict):
         """Save configuration to a YAML file.
 
         This method stores accounting configuration such as the reporting currency
-        to `<root>/configuration.yml`. The YAML format is ideal for version control
+        to `<root>/settings/configuration.yml`. The YAML format is ideal for version control
         and human readability.
 
         Args:
             configuration (dict): A dictionary containing the system configuration to be saved.
         """
-        with open(self.root / "configuration.yml", "w") as f:
+        with open(self.root / "settings/configuration.yml", "w") as f:
             yaml.dump(self.standardize_configuration(configuration), f, default_flow_style=False)
         self.__class__.configuration.fget.cache_clear()
 
