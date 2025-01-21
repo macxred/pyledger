@@ -188,13 +188,12 @@ def test_machine_readability_with_none():
 def test_csv_lines_have_no_trailing_whitespace():
     df = pd.DataFrame({
         'Col1': [1, None, 3, None, 5],
-        'Col2': ['a ', 'b', None, 'd ', None],  # Include trailing spaces
+        'Col2': ['a ', 'b', None, 'd ', None],
         'Col3': [1.5, 2.5, None, 4.5, 5.5],
-        'Col4': [None, 'text ', None, 'another ', None]  # Include trailing spaces
+        'Col4': [None, 'text ', None, 'another ', None]
     })
 
     df = df.astype(object).where(pd.notna(df), np.nan)
     output = write_fixed_width_csv(df)
     for line in output.split('\n'):
-        if line:  # Ignore empty lines (e.g., the final newline)
-            assert not line.endswith(' '), f"Line has trailing whitespace: {line}"
+        assert not line.endswith(' '), f"Line has trailing whitespace: {line}"
