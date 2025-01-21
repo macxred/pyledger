@@ -65,7 +65,7 @@ class TextLedger(StandaloneLedger):
             schema=ASSETS_SCHEMA, path=self.root / "assets.csv"
         )
         self._accounts = CSVAccountingEntity(
-            schema=ACCOUNT_SCHEMA, path=self.root / "accounts.csv",
+            schema=ACCOUNT_SCHEMA, path=self.root / "account_chart.csv",
             column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS,
             on_change=self.serialized_ledger.cache_clear
         )
