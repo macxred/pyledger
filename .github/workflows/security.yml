@@ -1,10 +1,11 @@
 # ---------------------------------------------------------------------------------
 # Security Check Workflow
 #
-# This workflow runs Bandit to perform a security scan on the codebase in various scenarios:
-# - On every push and pull request.
-# - Nightly at 04:00 UTC.
-# - Manually via workflow dispatch.
+# This workflow runs Bandit to perform a security scan on the codebase.
+# It is triggered:
+# - on every push and pull request,
+# - nightly at 04:00 UTC,
+# - manually via workflow dispatch.
 # ---------------------------------------------------------------------------------
 
 name: Security Check

@@ -1,10 +1,12 @@
 # ---------------------------------------------------------------------------------
-# Unit/Integration Test Workflow
+# Unit/Integration Tests
 #
-# This workflow runs unit and integration tests on the codebase in various scenarios:
-# - On every push and pull request.
-# - Scheduled daily at 3:40 AM UTC.
-# - Manually via workflow dispatch.
+# This workflow runs unit and integration tests.
+#
+# It is triggered:
+# - on every push and pull request,
+# - nightly at 04:00 UTC,
+# - manually via workflow dispatch.
 # ---------------------------------------------------------------------------------
 
 name: Unit/Integration Tests

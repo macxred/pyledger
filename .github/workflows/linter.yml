@@ -1,10 +1,12 @@
 # ---------------------------------------------------------------------------------
-# Lint Workflow
+# Linter
 #
-# This workflow runs Flake8 and Lints the codebase in various scenarios:
-# - On every push and pull request.
-# - Nightly at 04:00 UTC.
-# - Manually via workflow dispatch.
+# This workflow runs Flake8 to lint the codebase.
+#
+# It is triggered:
+# - on every push and pull request,
+# - nightly at 04:00 UTC,
+# - manually via workflow dispatch.
 # ---------------------------------------------------------------------------------
 
 name: Lint
