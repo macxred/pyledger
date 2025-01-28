@@ -918,8 +918,23 @@ class LedgerEngine(ABC):
         )
         grouped_amounts = effective_amounts.groupby(df["id"]).sum()
         invalid_amounts_mask = grouped_amounts.abs() > 1e-8
-        if invalid_amounts_mask.any():
-            invalid_ids = invalid_amounts_mask[invalid_amounts_mask].index.unique().tolist()
+
+        amount = df["amount"].copy()
+        amount = amount.mask(df["contra"].notna() & df["account"].notna(), 0)
+        amount = amount.mask(df["contra"].notna() & df["account"].isna(), -amount)
+        grouped = df.groupby("id")
+        valid_currency_amount_mask = (
+            (grouped["currency"].nunique() == 1)
+            & (grouped["currency"].first() != self.reporting_currency)
+            & (grouped["report_amount"].apply(lambda g: g.isna().all()))
+            & (grouped.apply(lambda g: amount.loc[g.index].sum(), include_groups=False) == 0)
+        )
+
+        invalid_ids = list(
+            set(invalid_amounts_mask[invalid_amounts_mask].index)
+            - set(valid_currency_amount_mask[valid_currency_amount_mask].index)
+        )
+        if invalid_ids:
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} ledger entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(invalid_ids)}"
