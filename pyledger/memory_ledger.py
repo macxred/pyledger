@@ -1,12 +1,12 @@
 """This module implements the MemoryLedger class."""
 
 from .standalone_ledger import StandaloneLedger
-from .storage_entity import DataFrameEntity, LedgerDataFrameEntity
+from .storage_entity import DataFrameEntity, JournalDataFrameEntity
 from .constants import (
     ASSETS_SCHEMA,
     PROFIT_CENTER_SCHEMA,
     PRICE_SCHEMA,
-    LEDGER_SCHEMA,
+    JOURNAL_SCHEMA,
     ACCOUNT_SCHEMA,
     TAX_CODE_SCHEMA,
     REVALUATION_SCHEMA,
@@ -41,9 +41,9 @@ class MemoryLedger(StandaloneLedger):
         )
         self._price_history = DataFrameEntity(PRICE_SCHEMA)
         self._revaluations = DataFrameEntity(REVALUATION_SCHEMA)
-        self._ledger = LedgerDataFrameEntity(
-            LEDGER_SCHEMA,
-            prepare_for_mirroring=self.sanitize_ledger,
+        self._journal = JournalDataFrameEntity(
+            JOURNAL_SCHEMA,
+            prepare_for_mirroring=self.sanitize_journal,
             on_change=self.serialized_ledger.cache_clear
         )
         self._profit_centers = DataFrameEntity(PROFIT_CENTER_SCHEMA)

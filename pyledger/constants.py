@@ -44,7 +44,7 @@ PRICE_SCHEMA_CSV = """
 """
 PRICE_SCHEMA = pd.read_csv(StringIO(PRICE_SCHEMA_CSV), skipinitialspace=True)
 
-LEDGER_SCHEMA_CSV = """
+JOURNAL_SCHEMA_CSV = """
     column,              dtype,                mandatory,       id
     id,                  string[python],       False,         True
     date,                datetime64[ns],       True,         False
@@ -58,7 +58,7 @@ LEDGER_SCHEMA_CSV = """
     description,         string[python],       True,         False
     document,            string[python],       False,        False
 """
-LEDGER_SCHEMA = pd.read_csv(StringIO(LEDGER_SCHEMA_CSV), skipinitialspace=True)
+JOURNAL_SCHEMA = pd.read_csv(StringIO(JOURNAL_SCHEMA_CSV), skipinitialspace=True)
 
 ASSETS_SCHEMA_CSV = """
     column,              dtype,                mandatory,       id

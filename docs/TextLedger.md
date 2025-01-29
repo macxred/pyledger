@@ -68,7 +68,7 @@ ACCOUNT_CHART_CSV = """
 """
 ACCOUNT_CHART = pd.read_csv(StringIO(ACCOUNT_CHART_CSV), skipinitialspace=True)
 
-LEDGER_CSV = """
+JOURNAL_CSV = """
           date, account, contra, currency,   amount, tax_code, description
     2023-01-01,    1000,   3000,      USD, 10000.00,         , Owner Investment
     2023-01-05,    1000,   5000,      USD, -5000.00,   IN_STD, Purchase of Equipment
@@ -79,7 +79,7 @@ LEDGER_CSV = """
     2023-01-30,    1000,   4000,      USD,  2400.00,  OUT_STD, Sale of Goods
     2023-02-01,    1000,   7000,      USD,  -800.00,         , Rent Expense
 """
-LEDGER_ENTRIES = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
+JOURNAL_ENTRIES = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
 
 CONFIGURATION = {"reporting_currency": "USD"}
 
@@ -89,12 +89,12 @@ engine.restore(
     configuration=CONFIGURATION,
     tax_codes=TAX_CODES,
     accounts=ACCOUNT_CHART,
-    ledger=LEDGER_ENTRIES)
+    journal=JOURNAL_ENTRIES)
 ```
 
-### 2. Managing Ledger Entries
+### 2. Managing Journal Entries
 
-You can efficiently manage ledger entries by adding, modifying, and deleting entries as needed.
+You can efficiently manage journal entries by adding, modifying, and deleting entries as needed.
 
 1. **Add**: Record a new transaction:
 
@@ -104,26 +104,26 @@ You can efficiently manage ledger entries by adding, modifying, and deleting ent
     2023-01-18,    1000,   8000,      USD,    100.00,        , Interest Income
     """
     NEW_ENTRY = pd.read_csv(StringIO(NEW_ENTRY_CSV), skipinitialspace=True)
-    engine.ledger.add(NEW_ENTRY)
+    engine.journal.add(NEW_ENTRY)
     ```
 
 2. **Modify**: Adjust an existing entry, such as updating the amount for the sale of goods on `2023-01-10` from `$3,600.00` to `$4,000.00`.
 
     ```python
     # Modify the amount for the sale of goods on 2023-01-10
-    entries = engine.ledger.list()
+    entries = engine.journal.list()
     to_modify = entries.query("date == '2023-01-10'")
     to_modify['amount'] = 4000.00
-    engine.ledger.modify(to_modify)
+    engine.journal.modify(to_modify)
     ```
 
 3. **Delete**: Remove an erroneous entry, such as the purchase of inventory on `2023-01-25`.
 
     ```python
     # Delete the purchase of inventory on 2023-01-25
-    entries = engine.ledger.list()
+    entries = engine.journal.list()
     id_to_delete = entries.query("date == '2023-01-25'")['id']
-    engine.ledger.delete({'id': id_to_delete})
+    engine.journal.delete({'id': id_to_delete})
     ```
 
 These operations result in clean Git diffs, making it easier to track and review changes:

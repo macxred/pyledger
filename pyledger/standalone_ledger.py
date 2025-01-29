@@ -7,7 +7,7 @@ import datetime
 import numpy as np
 import pandas as pd
 from .decorators import timed_cache
-from .constants import LEDGER_SCHEMA
+from .constants import JOURNAL_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -31,7 +31,7 @@ class StandaloneLedger(LedgerEngine):
         each tax account.
 
         Args:
-            df (pd.DataFrame): A pandas DataFrame containing ledger entries.
+            df (pd.DataFrame): A pandas DataFrame containing journal entries.
 
         Returns:
             pd.DataFrame: A new DataFrame with tax journal entries.
@@ -100,7 +100,7 @@ class StandaloneLedger(LedgerEngine):
                         "contra": tax["contra"],
                         "amount": -1 * amount
                     })
-        result = enforce_schema(pd.DataFrame(tax_journal_entries), LEDGER_SCHEMA)
+        result = enforce_schema(pd.DataFrame(tax_journal_entries), JOURNAL_SCHEMA)
 
         return result
 
@@ -115,7 +115,7 @@ class StandaloneLedger(LedgerEngine):
         )
 
     # ----------------------------------------------------------------------
-    # Ledger
+    # Journal
 
     @timed_cache(120)
     def serialized_ledger(self) -> pd.DataFrame:
@@ -124,15 +124,15 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        return self.serialize_ledger(self.complete_ledger(self.ledger.list()))
+        return self.serialize_ledger(self.complete_ledger(self.journal.list()))
 
-    def complete_ledger(self, ledger=None) -> pd.DataFrame:
-        # Ledger definition
-        df = self.ledger.standardize(ledger)
-        df = self.sanitize_ledger(df)
+    def complete_ledger(self, journal=None) -> pd.DataFrame:
+        # Journal definition
+        df = self.journal.standardize(journal)
+        df = self.sanitize_journal(df)
         df = df.sort_values(["date", "id"])
 
-        # Add ledger entries for tax
+        # Add journal entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
         # Insert missing reporting currency amounts
@@ -143,18 +143,20 @@ class StandaloneLedger(LedgerEngine):
             date=df.loc[index, "date"]
         )
 
-        # Add ledger entries for (currency or other) revaluations
+        # Add journal entries for (currency or other) revaluations
         revaluations = self.sanitize_revaluations(self.revaluations.list())
-        revalue = self.revaluation_entries(ledger=df, revaluations=revaluations)
+        revalue = self.revaluation_entries(journal=df, revaluations=revaluations)
         return pd.concat([df, revalue], ignore_index=True)
 
-    def revaluation_entries(self, ledger: pd.DataFrame, revaluations: pd.DataFrame) -> pd.DataFrame:
-        """Compute ledger entries for (currency or other) revaluations"""
+    def revaluation_entries(
+        self, journal: pd.DataFrame, revaluations: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Compute journal entries for (currency or other) revaluations"""
         result = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            revalue = self.ledger.standardize(pd.DataFrame(result))
-            df = self.serialize_ledger(pd.concat([ledger, revalue]))
+            revalue = self.journal.standardize(pd.DataFrame(result))
+            df = self.serialize_ledger(pd.concat([journal, revalue]))
             date = row["date"]
             accounts = self.account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
@@ -193,7 +195,7 @@ class StandaloneLedger(LedgerEngine):
                             "description": row["description"]
                         })
 
-        return self.ledger.standardize(pd.DataFrame(result))
+        return self.journal.standardize(pd.DataFrame(result))
 
     def _balance_from_serialized_ledger(
         self, ledger: pd.DataFrame, account: int, date: datetime.date = None,
@@ -202,7 +204,7 @@ class StandaloneLedger(LedgerEngine):
         """Compute balance from serialized ledger.
 
         Args:
-            ledger (DataFrame): General ledger in long format following LEDGER_SCHEMA.
+            ledger (DataFrame): General ledger in long format following JOURNAL_SCHEMA.
             account (int): The account number.
             date (datetime.date, optional): The date up to which the balance is computed.
                                             Defaults to None.
