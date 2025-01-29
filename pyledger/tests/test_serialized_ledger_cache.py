@@ -22,7 +22,7 @@ def engine():
         configuration=BaseTest.CONFIGURATION,
         tax_codes=BaseTest.TAX_CODES,
         accounts=BaseTest.ACCOUNTS,
-        ledger=BaseTest.LEDGER_ENTRIES,
+        journal=BaseTest.JOURNAL_ENTRIES,
         price_history=BaseTest.PRICES,
         profit_centers=BaseTest.PROFIT_CENTERS
     )
@@ -33,7 +33,7 @@ def test_serialized_ledger_cache(engine):
     serialized_ledger = engine.serialized_ledger()
 
     # Direct manipulation of the private DataFrame should NOT affect the cached data.
-    engine._ledger._df = engine._ledger._df.query("id in ['2', '3', '4', '5']")
+    engine._journal._df = engine._journal._df.query("id in ['2', '3', '4', '5']")
     assert serialized_ledger.equals(engine.serialized_ledger()), "serialized_ledger was not cached"
 
     # Manually clearing the cache should now reflect the changes.
@@ -43,7 +43,7 @@ def test_serialized_ledger_cache(engine):
 
 def test_tax_code_mutators_invalidate_serialized_ledger(engine, muted_logger):
     # Identify a tax code that is in use.
-    used_tax_code = engine.ledger.list()['tax_code'].dropna().iloc[0]  # noqa: F841
+    used_tax_code = engine.journal.list()['tax_code'].dropna().iloc[0]  # noqa: F841
     tax_code = engine.tax_codes.list().query("id == @used_tax_code")
 
     # Using mutator methods (delete, add, modify) should invalidate the cache.
@@ -62,7 +62,7 @@ def test_tax_code_mutators_invalidate_serialized_ledger(engine, muted_logger):
 
 def test_account_mutators_invalidate_serialized_ledger(engine, muted_logger):
     # Identify an account that is in use.
-    used_account = engine.ledger.list()['account'].dropna().iloc[0]  # noqa: F841
+    used_account = engine.journal.list()['account'].dropna().iloc[0]  # noqa: F841
     account = engine.accounts.list().query("account == @used_account")
 
     # Using account mutator methods (delete, add) should invalidate the cache.
@@ -76,17 +76,17 @@ def test_account_mutators_invalidate_serialized_ledger(engine, muted_logger):
 
 
 def test_ledger_mutators_invalidate_serialized_ledger(engine):
-    ledger = engine.ledger.list().query("id == '1'")
+    journal = engine.journal.list().query("id == '1'")
 
-    # Using ledger mutator methods (delete, add, modify) should invalidate the cache.
+    # Using journal mutator methods (delete, add, modify) should invalidate the cache.
     serialized_ledger = engine.serialized_ledger()
-    engine.ledger.delete(ledger)
+    engine.journal.delete(journal)
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
     serialized_ledger = engine.serialized_ledger()
-    engine.ledger.add(ledger)
+    engine.journal.add(journal)
     assert not serialized_ledger.equals(engine.serialized_ledger())
 
     serialized_ledger = engine.serialized_ledger()
-    engine.ledger.modify(ledger.assign(description="test description"))
+    engine.journal.modify(journal.assign(description="test description"))
     assert not serialized_ledger.equals(engine.serialized_ledger())

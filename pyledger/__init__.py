@@ -31,7 +31,7 @@ from .decorators import timed_cache
 from .tests import (
     BaseTestTaxCodes,
     BaseTestAccounts,
-    BaseTestLedger,
+    BaseTestJournal,
     BaseTestDumpRestoreClear,
     BaseTestAssets,
     BaseTestPriceHistory,
@@ -41,5 +41,5 @@ from .storage_entity import (
     AccountingEntity,
     CSVAccountingEntity,
     MultiCSVEntity,
-    LedgerEntity,
+    JournalEntity,
 )
