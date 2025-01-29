@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 from pyledger import TextLedger
 from consistent_df import assert_frame_equal
-from .base_test_ledger import BaseTestJournal
+from .base_test_journal import BaseTestJournal
 
 
 class TestLedger(BaseTestJournal):

@@ -1,7 +1,7 @@
 """Test suite for journal operations."""
 
 import pytest
-from .base_test_ledger import BaseTestJournal
+from .base_test_journal import BaseTestJournal
 from pyledger import MemoryLedger
 
 
