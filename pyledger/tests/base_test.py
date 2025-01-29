@@ -39,7 +39,7 @@ ACCOUNT_CSV = """
 ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
-LEDGER_CSV = """
+JOURNAL_CSV = """
     id,       date, account, contra, currency,      amount, report_amount, tax_code, profit_center, description, document
      1, 2024-01-01,    1000,       ,      USD,   800000.00,              ,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
      1,           ,    1010,       ,      EUR,      120.00,        132.82,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
@@ -82,7 +82,7 @@ LEDGER_CSV = """
     23,           ,    1010,       ,      EUR,    97750.00,     100000.00,         ,       General, Convert USD to EUR and CHF,
     23,           ,    1025,       ,      CHF, 14285714.29,     100000.00,         ,       General, Convert USD to EUR and CHF,
 """
-LEDGER = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
+JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
 # flake8: enable
 
 ASSETS_CSV = """
@@ -187,7 +187,7 @@ class BaseTest(ABC):
     ASSETS = engine.assets.standardize(ASSETS)
     ACCOUNTS = engine.accounts.standardize(ACCOUNTS)
     PRICES = engine.price_history.standardize(PRICES)
-    LEDGER_ENTRIES = engine.ledger.standardize(LEDGER)
+    JOURNAL_ENTRIES = engine.journal.standardize(JOURNAL)
     TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)

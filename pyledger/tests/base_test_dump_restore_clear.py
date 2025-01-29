@@ -18,7 +18,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             configuration=self.CONFIGURATION,
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
-            ledger=self.LEDGER_ENTRIES,
+            journal=self.JOURNAL_ENTRIES,
             assets=self.ASSETS,
             price_history=self.PRICES,
             revaluations=self.REVALUATIONS,
@@ -41,16 +41,16 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assert_frame_equal(self.ASSETS, engine.assets.list(), ignore_row_order=True)
         assert_frame_equal(self.PROFIT_CENTERS, engine.profit_centers.list(), ignore_row_order=True)
-        target = engine.txn_to_str(self.LEDGER_ENTRIES).values()
-        actual = engine.txn_to_str(engine.ledger.list()).values()
-        assert sorted(target) == sorted(actual), "Targeted and actual ledger differ"
+        target = engine.txn_to_str(self.JOURNAL_ENTRIES).values()
+        actual = engine.txn_to_str(engine.journal.list()).values()
+        assert sorted(target) == sorted(actual), "Targeted and actual journal differ"
 
     def test_dump_and_restore_zip(self, engine, tmp_path):
         # Populate with test data
         engine.reporting_currency = self.CONFIGURATION["REPORTING_CURRENCY"]
         engine.accounts.mirror(self.ACCOUNTS)
         engine.tax_codes.mirror(self.TAX_CODES)
-        engine.ledger.mirror(self.LEDGER_ENTRIES)
+        engine.journal.mirror(self.JOURNAL_ENTRIES)
         engine.assets.mirror(self.ASSETS)
         engine.price_history.mirror(self.PRICES)
         engine.revaluations.mirror(self.REVALUATIONS)
@@ -59,7 +59,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         # Dumping current state
         accounts = engine.accounts.list()
         tax_codes = engine.tax_codes.list()
-        ledger_entries = engine.ledger.list()
+        journal_entries = engine.journal.list()
         assets = engine.assets.list()
         price_history = engine.price_history.list()
         revaluations = engine.revaluations.list()
@@ -91,22 +91,22 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert_frame_equal(
             profit_centers, engine.profit_centers.list(), ignore_row_order=True, ignore_index=True
         )
-        assert sorted(engine.txn_to_str(ledger_entries).values()) == \
-               sorted(engine.txn_to_str(engine.ledger.list()).values())
+        assert sorted(engine.txn_to_str(journal_entries).values()) == \
+               sorted(engine.txn_to_str(engine.journal.list()).values())
 
     def test_clear(self, engine):
         engine.restore(
             configuration=self.CONFIGURATION,
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
-            ledger=self.LEDGER_ENTRIES,
+            journal=self.JOURNAL_ENTRIES,
             assets=self.ASSETS,
             price_history=self.PRICES,
             revaluations=self.REVALUATIONS,
             profit_centers=self.PROFIT_CENTERS,
         )
         engine.clear()
-        assert engine.ledger.list().empty, "Ledger was not cleared"
+        assert engine.journal.list().empty, "Journal was not cleared"
         assert engine.tax_codes.list().empty, "Tax codes were not cleared"
         assert engine.assets.list().empty, "Assets was not cleared"
         assert engine.accounts.list().empty, "Accounts was not cleared"
