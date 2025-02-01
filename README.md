@@ -85,10 +85,10 @@ import datetime
 from pyledger import TestLedger
 
 # Instantiate a ledger engine pre-populated with hard-coded data
-ledger = TestLedger()
+engine = TestLedger()
 
 # Get accounts
-ledger.accounts.list()
+engine.accounts.list()
 ##         currency tax_code                                        description
 ## account
 ## 1000         CHF      NaN                                       Cash on hand
@@ -99,14 +99,14 @@ ledger.accounts.list()
 ## [..snip..]
 
 # Post transactions to the general ledger
-ledger.journal.add({
+engine.journal.add({
     'date': datetime.date.today(),
     'account': 1020,
     'contra': 6000,
     'currency': 'CHF',
     "description": "First Test Transaction",
     'amount': -100})
-ledger.journal.add({
+engine.journal.add({
     'date': datetime.date.today(),
     'account': 1020,
     'contra': 4000,
@@ -115,11 +115,11 @@ ledger.journal.add({
     'amount': 200})
 
 # Retrieve account balance
-ledger.account_balance(1020)
+engine.account_balance(1020)
 ## {'reporting_currency': 100.0, 'CHF': 100.0}
 
 # Retrieve an account's transaction history
-ledger.account_history(1020)
+engine.account_history(1020)
 ##   id        date  account  contra  currency  amount  balance  report_amount  report_balance  tax_code              description  document
 ## 0  1  2024-04-12     1020    6000       CHF  -100.0   -100.0         -100.0          -100.0      <NA>   First Test Transaction      <NA>
 ## 1  2  2024-04-12     1020    4000       CHF   200.0    100.0          200.0           100.0      <NA>  Second Test Transaction      <NA>
