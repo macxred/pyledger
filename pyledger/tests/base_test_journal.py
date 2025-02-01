@@ -31,7 +31,7 @@ class BaseTestJournal(BaseTest):
         engine = restored_engine
 
         # Add journal entries one by one and with multiple rows
-        expected = self.JOURNAL_ENTRIES.copy()
+        expected = self.JOURNAL.copy()
         txn_ids = expected["id"].unique()
         for id in txn_ids[:10]:
             engine.journal.add(expected.query(f"id == '{id}'"))
@@ -67,7 +67,7 @@ class BaseTestJournal(BaseTest):
         # Replace an individual transaction by a collective transaction
         current = engine.journal.list()
         single_txn_id = current[~current["id"].duplicated(keep=False)].iloc[0]["id"]
-        collective_txn = self.JOURNAL_ENTRIES.query("id == '8'").copy()
+        collective_txn = self.JOURNAL.query("id == '8'").copy()
         collective_txn.loc[:, "id"] = single_txn_id
         single_txn_index = current[current["id"] == single_txn_id].index[0]
         rows_before = current.loc[:single_txn_index - 1]
@@ -83,7 +83,7 @@ class BaseTestJournal(BaseTest):
         current = engine.journal.list()
         collective_txn_id = current[current["id"].duplicated(keep=False)].iloc[0]["id"]
         collective_txn_indices = current[current["id"] == collective_txn_id].index
-        single_txn = self.JOURNAL_ENTRIES.query("id == '2'").copy()
+        single_txn = self.JOURNAL.query("id == '2'").copy()
         single_txn.loc[:, "id"] = collective_txn_id
         rows_before = current.loc[:collective_txn_indices[0] - 1]
         rows_after = current.loc[collective_txn_indices[-1] + 1:]
@@ -118,7 +118,7 @@ class BaseTestJournal(BaseTest):
         self, restored_engine, error_class=ValueError,
         error_message="identifiers already exist."
     ):
-        target = self.JOURNAL_ENTRIES.query("id == '1'").copy()
+        target = self.JOURNAL.query("id == '1'").copy()
         restored_engine.journal.add(target)
         with pytest.raises(error_class, match=error_message):
             restored_engine.journal.add(target)
@@ -126,7 +126,7 @@ class BaseTestJournal(BaseTest):
     def test_modify_non_existed_raises_error(
         self, restored_engine, error_class=ValueError, error_message="not present in the data."
     ):
-        target = self.JOURNAL_ENTRIES.query("id == '2'").copy()
+        target = self.JOURNAL.query("id == '2'").copy()
         target["id"] = 999999
         with pytest.raises(error_class, match=error_message):
             restored_engine.journal.modify(target)
@@ -143,7 +143,7 @@ class BaseTestJournal(BaseTest):
         engine = restored_engine
 
         # Mirror with one single and one collective transaction
-        target = self.JOURNAL_ENTRIES.query("id in ['8', '2']")
+        target = self.JOURNAL.query("id in ['8', '2']")
         engine.journal.mirror(target=target, delete=True)
         expected = engine.journal.standardize(target)
         mirrored = engine.journal.list()
@@ -153,10 +153,10 @@ class BaseTestJournal(BaseTest):
         # Mirror with duplicate transactions and delete=False
         target = pd.concat(
             [
-                self.JOURNAL_ENTRIES.query("id == '8'").assign(id='4'),
-                self.JOURNAL_ENTRIES.query("id == '8'").assign(id='5'),
-                self.JOURNAL_ENTRIES.query("id == '2'").assign(id='6'),
-                self.JOURNAL_ENTRIES.query("id == '2'").assign(id='7'),
+                self.JOURNAL.query("id == '8'").assign(id='4'),
+                self.JOURNAL.query("id == '8'").assign(id='5'),
+                self.JOURNAL.query("id == '2'").assign(id='6'),
+                self.JOURNAL.query("id == '2'").assign(id='7'),
             ]
         )
         engine.journal.mirror(target=target, delete=False)
@@ -167,7 +167,7 @@ class BaseTestJournal(BaseTest):
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror with complex transactions and delete=False
-        target = self.JOURNAL_ENTRIES.query("id in ['15', '16', '17', '22']")
+        target = self.JOURNAL.query("id in ['15', '16', '17', '22']")
         engine.journal.mirror(target=target, delete=False)
         expected = engine.journal.standardize(target)
         expected = engine.sanitize_journal(expected)
@@ -177,14 +177,14 @@ class BaseTestJournal(BaseTest):
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror existing transactions with delete=False has no impact
-        target = self.JOURNAL_ENTRIES.query("id in ['8', '2']")
+        target = self.JOURNAL.query("id in ['8', '2']")
         engine.journal.mirror(target=target, delete=False)
         mirrored = engine.journal.list()
         assert sorted(engine.txn_to_str(mirrored).values()) == \
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror with delete=True
-        target = self.JOURNAL_ENTRIES.query("id in ['8', '2']")
+        target = self.JOURNAL.query("id in ['8', '2']")
         engine.journal.mirror(target=target, delete=True)
         mirrored = engine.journal.list()
         expected = engine.journal.standardize(target)

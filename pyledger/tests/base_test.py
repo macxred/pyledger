@@ -187,7 +187,7 @@ class BaseTest(ABC):
     ASSETS = engine.assets.standardize(ASSETS)
     ACCOUNTS = engine.accounts.standardize(ACCOUNTS)
     PRICES = engine.price_history.standardize(PRICES)
-    JOURNAL_ENTRIES = engine.journal.standardize(JOURNAL)
+    JOURNAL = engine.journal.standardize(JOURNAL)
     TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)

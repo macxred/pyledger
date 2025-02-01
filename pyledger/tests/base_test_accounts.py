@@ -157,7 +157,7 @@ class BaseTestAccounts(BaseTest):
     def test_account_balance(self, restored_engine):
         restored_engine.restore(
             accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
-            journal=self.JOURNAL_ENTRIES, assets=self.ASSETS, price_history=self.PRICES,
+            journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
         # Test account balance with specified profit centers
@@ -175,8 +175,8 @@ class BaseTestAccounts(BaseTest):
             )
 
         # Test account balance without specified profit centers
-        JOURNAL_ENTRIES = self.JOURNAL_ENTRIES.copy().assign(profit_center=pd.NA)
-        restored_engine.restore(profit_centers=[], journal=JOURNAL_ENTRIES)
+        JOURNAL = self.JOURNAL.copy().assign(profit_center=pd.NA)
+        restored_engine.restore(profit_centers=[], journal=JOURNAL)
         EXPECTED_BALANCE_NO_PROFIT_CENTERS = self.EXPECTED_BALANCE.query("profit_center.isna()")
         for _, row in EXPECTED_BALANCE_NO_PROFIT_CENTERS.iterrows():
             date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
