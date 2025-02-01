@@ -257,7 +257,7 @@ def test_sanitized_accounts_tax_codes(engine, capture_logs):
     assert len(log_messages) > 0
 
 
-def test_sanitize_ledger(engine, capture_logs):
+def test_sanitize_journal(engine, capture_logs):
     ACCOUNT_CSV = """
         group,          account, currency,   tax_code,   description
         Assets,            1000,      USD,           , VALID_CURR
@@ -289,7 +289,7 @@ def test_sanitize_ledger(engine, capture_logs):
                 Shop,
     """
     # flake8: noqa: E501
-    LEDGER_CSV = """
+    JOURNAL_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center,  tax_code, description, document
          1,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Invalid date,
          1,  2024-01-02,    1000,       ,      USD,   800000.00,              ,              ,          , Invalid date,
@@ -335,7 +335,7 @@ def test_sanitize_ledger(engine, capture_logs):
          26, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,       INVALID,          , Invalid profit center,
 
     """
-    EXPECTED_LEDGER_CSV = """
+    EXPECTED_JOURNAL_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
          2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,         , Valid,
          2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,         , Valid,
@@ -352,7 +352,7 @@ def test_sanitize_ledger(engine, capture_logs):
          23, 2024-01-01,    1000,       ,      USD,    10000.00,              ,              ,         , Balanced amount,
          23, 2024-01-01,        ,   1000,      USD,     8560.00,              ,              ,         , Balanced amount,
     """
-    EXPECTED_LEDGER_WITH_PROFIT_CENTERS_CSV = """
+    EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
          25, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,          Shop,         , Valid profit center,
     """
@@ -360,17 +360,17 @@ def test_sanitize_ledger(engine, capture_logs):
     assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
     tax_df = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
     accounts_df = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
-    expected_ledger = pd.read_csv(StringIO(EXPECTED_LEDGER_CSV), skipinitialspace=True)
-    expected_ledger_with_profit_centers = pd.read_csv(
-        StringIO(EXPECTED_LEDGER_WITH_PROFIT_CENTERS_CSV), skipinitialspace=True
+    expected_journal = pd.read_csv(StringIO(EXPECTED_JOURNAL_CSV), skipinitialspace=True)
+    expected_journal_with_profit_centers = pd.read_csv(
+        StringIO(EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV), skipinitialspace=True
     )
-    ledger = pd.read_csv(StringIO(LEDGER_CSV), skipinitialspace=True)
+    journal = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
     engine.restore(accounts=accounts_df, tax_codes=tax_df, price_history=prices, assets=assets)
 
-    # Sanitize ledger entries without profit centers
-    expected_ledger_df = engine.ledger.standardize(expected_ledger)
-    sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
-    assert_frame_equal(expected_ledger_df, sanitized)
+    # Sanitize journal entries without profit centers
+    expected_journal_df = engine.journal.standardize(expected_journal)
+    sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
+    assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) == 7, "Expected strict number of captured logs"
 
@@ -378,11 +378,11 @@ def test_sanitize_ledger(engine, capture_logs):
     capture_logs.seek(0)
     capture_logs.truncate(0)
 
-    # Sanitize ledger entries with profit centers
+    # Sanitize journal entries with profit centers
     PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
     engine.restore(profit_centers=PROFIT_CENTERS)
-    expected_ledger_df = engine.ledger.standardize(expected_ledger_with_profit_centers)
-    sanitized = engine.sanitize_ledger(engine.ledger.standardize(ledger))
-    assert_frame_equal(expected_ledger_df, sanitized)
+    expected_journal_df = engine.journal.standardize(expected_journal_with_profit_centers)
+    sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
+    assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) == 7, "Expected strict number of captured logs"

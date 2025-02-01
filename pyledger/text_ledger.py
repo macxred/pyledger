@@ -11,18 +11,18 @@ from .constants import (
     ASSETS_SCHEMA,
     PROFIT_CENTER_SCHEMA,
     DEFAULT_CONFIGURATION,
-    LEDGER_SCHEMA,
+    JOURNAL_SCHEMA,
     PRICE_SCHEMA,
     REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA
 )
 from .helpers import write_fixed_width_csv
 from consistent_df import enforce_schema
-from .storage_entity import CSVAccountingEntity, CSVLedgerEntity
+from .storage_entity import CSVAccountingEntity, CSVJournalEntity
 
 
 # TODO: remove once old systems are migrated
-LEDGER_COLUMN_SHORTCUTS = {
+JOURNAL_COLUMN_SHORTCUTS = {
     "cur": "currency",
     "vat": "tax_code",
     "base_amount": "report_amount",
@@ -50,7 +50,7 @@ class TextLedger(StandaloneLedger):
     only necessary files and preserving row order whenever possible.
 
     To enhance readability, tabular data, such as the account chart and general
-    ledger entries, is stored in a fixed-width CSV format, with entries padded
+    journal entries, is stored in a fixed-width CSV format, with entries padded
     with spaces for consistent column widths. Configuration including
     the reporting currency, are stored in YAML format.
     """
@@ -82,12 +82,12 @@ class TextLedger(StandaloneLedger):
         self._revaluations = CSVAccountingEntity(
             schema=REVALUATION_SCHEMA, path=self.root / "settings/revaluations.csv"
         )
-        self._ledger = CSVLedgerEntity(
-            schema=LEDGER_SCHEMA,
+        self._journal = CSVJournalEntity(
+            schema=JOURNAL_SCHEMA,
             path=self.root / "journal",
-            write_file=self.write_ledger_file,
-            column_shortcuts=LEDGER_COLUMN_SHORTCUTS,
-            prepare_for_mirroring=self.sanitize_ledger,
+            write_file=self.write_journal_file,
+            column_shortcuts=JOURNAL_COLUMN_SHORTCUTS,
+            prepare_for_mirroring=self.sanitize_journal,
             on_change=self.serialized_ledger.cache_clear,
         )
         self._profit_centers = CSVAccountingEntity(
@@ -141,12 +141,12 @@ class TextLedger(StandaloneLedger):
         return result
 
     # ----------------------------------------------------------------------
-    # Ledger
+    # Journal
 
-    def write_ledger_file(self, df: pd.DataFrame, file: str) -> pd.DataFrame:
-        """Save ledger entries to a fixed-width CSV file.
+    def write_journal_file(self, df: pd.DataFrame, file: str) -> pd.DataFrame:
+        """Save journal entries to a fixed-width CSV file.
 
-        This method stores ledger entries in a fixed-width CSV format, ideal
+        This method stores journal entries in a fixed-width CSV format, ideal
         for version control systems like Git. Entries are padded with spaces
         to maintain a consistent column width for improved readability.
 
@@ -156,16 +156,16 @@ class TextLedger(StandaloneLedger):
         row with a date.
 
         Args:
-            df (pd.DataFrame): The ledger entries to save.
+            df (pd.DataFrame): The journal entries to save.
             file (str): Path of the CSV file to write.
 
         Returns:
             pd.DataFrame: The formatted DataFrame saved to the file.
         """
-        df = enforce_schema(df, LEDGER_SCHEMA, sort_columns=True, keep_extra_columns=True)
+        df = enforce_schema(df, JOURNAL_SCHEMA, sort_columns=True, keep_extra_columns=True)
 
         # Record date only on the first row of collective transactions
-        df = df.iloc[self.ledger._id_from_path(df["id"]).argsort(kind="mergesort")]
+        df = df.iloc[self.journal._id_from_path(df["id"]).argsort(kind="mergesort")]
         df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
 
         # Apply the smallest precision
@@ -182,11 +182,11 @@ class TextLedger(StandaloneLedger):
 
         # Drop columns that are all NA and not required by the schema
         na_columns = df.columns[df.isna().all()]
-        mandatory_columns = LEDGER_SCHEMA["column"][LEDGER_SCHEMA["mandatory"]]
+        mandatory_columns = JOURNAL_SCHEMA["column"][JOURNAL_SCHEMA["mandatory"]]
         df = df.drop(columns=set(na_columns).difference(mandatory_columns) | {"id"})
 
         # Write a CSV with fixed-width in all columns but the last two in the schema
-        n_fixed = LEDGER_SCHEMA["column"].head(-2).isin(df.columns).sum()
+        n_fixed = JOURNAL_SCHEMA["column"].head(-2).isin(df.columns).sum()
         Path(file).expanduser().parent.mkdir(parents=True, exist_ok=True)
         write_fixed_width_csv(df, file=file, n=n_fixed)
 

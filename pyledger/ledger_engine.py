@@ -17,7 +17,7 @@ from .decorators import timed_cache
 from .constants import (
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
-    LEDGER_SCHEMA,
+    JOURNAL_SCHEMA,
     PRICE_SCHEMA,
     REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA,
@@ -56,8 +56,8 @@ class LedgerEngine(ABC):
         return self._assets
 
     @property
-    def ledger(self) -> AccountingEntity:
-        return self._ledger
+    def journal(self) -> AccountingEntity:
+        return self._journal
 
     @property
     def revaluations(self) -> AccountingEntity:
@@ -112,7 +112,7 @@ class LedgerEngine(ABC):
         """Dump entire ledger system into a ZIP archive.
 
         Save all data and settings of an accounting system into a ZIP archive.
-        Each component of the ledger system (accounts, tax_codes, ledger entries,
+        Each component of the ledger system (accounts, tax_codes, journal entries,
         configuration, etc.) is stored as an individual file inside the ZIP archive
         for modular restoration and analysis.
 
@@ -121,7 +121,7 @@ class LedgerEngine(ABC):
         """
         with zipfile.ZipFile(archive_path, 'w') as archive:
             archive.writestr('configuration.json', json.dumps(self.configuration_list()))
-            archive.writestr('ledger.csv', self.ledger.list().to_csv(index=False))
+            archive.writestr('journal.csv', self.journal.list().to_csv(index=False))
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
@@ -133,14 +133,14 @@ class LedgerEngine(ABC):
         """Restore ledger system from a ZIP archive.
 
         Restores a dumped ledger system from a ZIP archive.
-        Extracts the accounts, tax codes, ledger entries, reporting currency, etc.,
+        Extracts the accounts, tax codes, journal entries, reporting currency, etc.,
         from the ZIP archive and passes the extracted data to the `restore` method.
 
         Args:
             archive_path (str): The file path of the ZIP archive to restore.
         """
         required_files = {
-            'ledger.csv', 'tax_codes.csv', 'accounts.csv', 'configuration.json', 'assets.csv',
+            'journal.csv', 'tax_codes.csv', 'accounts.csv', 'configuration.json', 'assets.csv',
             'price_history.csv', 'revaluations.csv', 'profit_centers.csv'
         }
 
@@ -153,7 +153,7 @@ class LedgerEngine(ABC):
                 )
 
             configuration = json.loads(archive.open('configuration.json').read().decode('utf-8'))
-            ledger = pd.read_csv(archive.open('ledger.csv'))
+            journal = pd.read_csv(archive.open('journal.csv'))
             accounts = pd.read_csv(archive.open('accounts.csv'))
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
             assets = pd.read_csv(archive.open('assets.csv'))
@@ -162,7 +162,7 @@ class LedgerEngine(ABC):
             profit_centers = pd.read_csv(archive.open('profit_centers.csv'))
             self.restore(
                 configuration=configuration,
-                ledger=ledger,
+                journal=journal,
                 tax_codes=tax_codes,
                 accounts=accounts,
                 assets=assets,
@@ -176,7 +176,7 @@ class LedgerEngine(ABC):
         configuration: dict | None = None,
         tax_codes: pd.DataFrame | None = None,
         accounts: pd.DataFrame | None = None,
-        ledger: pd.DataFrame | None = None,
+        journal: pd.DataFrame | None = None,
         assets: pd.DataFrame | None = None,
         price_history: pd.DataFrame | None = None,
         revaluations: pd.DataFrame | None = None,
@@ -191,8 +191,8 @@ class LedgerEngine(ABC):
                 If `None`, tax codes remain unchanged.
             accounts (pd.DataFrame | None): Accounts of the restored ledger system.
                 If `None`, accounts remain unchanged.
-            ledger (pd.DataFrame | None): Ledger entries of the restored system.
-                If `None`, ledger remains unchanged.
+            journal (pd.DataFrame | None): Journal entries of the restored system.
+                If `None`, journal remains unchanged.
             assets (pd.DataFrame | None): Assets entries of the restored system.
                 If `None`, assets remain unchanged.
             price_history (pd.DataFrame | None): Price history of the restored system.
@@ -216,16 +216,16 @@ class LedgerEngine(ABC):
             self.accounts.mirror(accounts, delete=True)
         if profit_centers is not None:
             self.profit_centers.mirror(profit_centers, delete=True)
-        if ledger is not None:
-            self.ledger.mirror(ledger, delete=True)
+        if journal is not None:
+            self.journal.mirror(journal, delete=True)
 
     def clear(self):
         """Clear all data from the ledger system.
 
-        This method removes all entries from the ledger, tax codes, accounts, etc.
+        This method removes all entries from the journal, tax codes, accounts, etc.
         restoring the system to a pristine state.
         """
-        self.ledger.mirror(None, delete=True)
+        self.journal.mirror(None, delete=True)
         self.tax_codes.mirror(None, delete=True)
         self.accounts.mirror(None, delete=True)
         self.assets.mirror(None, delete=True)
@@ -449,8 +449,8 @@ class LedgerEngine(ABC):
             account (int): Account number.
             date (datetime.date, optional): Date for which to retrieve the balance.
                                             Defaults to None.
-            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                              calculated only from ledger entries assigned to one
+            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
+                                              calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
 
         Returns:
@@ -503,8 +503,8 @@ class LedgerEngine(ABC):
             accounts 1020:1025.
             date (datetime.date, optional): The date as of which the account
                                             balance is calculated. Defaults to None.
-            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                              calculated only from ledger entries assigned to one
+            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
+                                              calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
 
         Returns:
@@ -576,8 +576,8 @@ class LedgerEngine(ABC):
             accounts 1020:1025.
             period (datetime.date, optional): The date as of which the account balance
                                               is calculated. Defaults to None.
-            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                              calculated only from ledger entries assigned to one
+            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
+                                              calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
 
         Returns:
@@ -633,8 +633,8 @@ class LedgerEngine(ABC):
             account (int, list[int]): The account or list of accounts to fetch the history for.
             start (datetime.date, optional): Start date for the history. Defaults to None.
             end (datetime.date, optional): End date for the history. Defaults to None.
-            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                              calculated only from ledger entries assigned to one
+            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
+                                              calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
 
         Returns:
@@ -722,7 +722,7 @@ class LedgerEngine(ABC):
         return {"add": add, "subtract": subtract}
 
     # ----------------------------------------------------------------------
-    # Ledger
+    # Journal
 
     def serialized_ledger(self) -> pd.DataFrame:
         """Retrieves a DataFrame with a long representation of all ledger transactions.
@@ -737,13 +737,13 @@ class LedgerEngine(ABC):
                          `amount` (float), `report_amount` (float or None),
                          `tax_code` (str), and `document` (str).
         """
-        return self.serialize_ledger(self.ledger.list())
+        return self.serialize_ledger(self.journal.list())
 
-    def sanitize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
+    def sanitize_journal(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Discard incoherent ledger data.
+        Discard incoherent journal data.
 
-        This method discards ledger transactions - entries in the ledger data
+        This method discards ledger transactions - entries in the journal data
         frame with the same 'id' - that:
         1. Do not balance to zero.
         2. Span multiple dates.
@@ -757,19 +757,19 @@ class LedgerEngine(ABC):
         7. Lack a valid price reference when 'report_amount' is missing and
            the entry is in a non-reporting currency.
 
-        Also, undefined tax code references are removed from ledger entries.
+        Also, undefined tax code references are removed from journal entries.
 
         A warning specifying the reason is logged for each discarded entry.
 
         Args:
-            df (pd.DataFrame): Ledger data to sanitize.
+            df (pd.DataFrame): Journal data to sanitize.
 
         Returns:
-            pd.DataFrame: Sanitized ledger data containing only valid entries.
+            pd.DataFrame: Sanitized journal data containing only valid entries.
         """
 
         # Enforce schema
-        df = enforce_schema(df, LEDGER_SCHEMA, keep_extra_columns=True)
+        df = enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
 
         # Drop transactions spanning multiple dates
         grouped = df.groupby("id")
@@ -777,7 +777,7 @@ class LedgerEngine(ABC):
         if invalid_mask.any():
             invalid_ids = df.loc[invalid_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries where a single 'id' "
+                f"Discarding {len(invalid_ids)} journal entries where a single 'id' "
                 f"has more than one 'date': {first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -791,7 +791,7 @@ class LedgerEngine(ABC):
         if invalid_tax_code_mask.any():
             invalid_ids = df.loc[invalid_tax_code_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Setting 'tax_code' to 'NA' for {len(invalid_ids)} ledger entries "
+                f"Setting 'tax_code' to 'NA' for {len(invalid_ids)} journal entries "
                 f"with invalid tax codes: {first_elements_as_str(invalid_ids)}"
             )
             df.loc[invalid_tax_code_mask, "tax_code"] = pd.NA
@@ -801,7 +801,7 @@ class LedgerEngine(ABC):
         if missing_account_mask.any():
             invalid_ids = df.loc[missing_account_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with neither 'account' "
+                f"Discarding {len(invalid_ids)} journal entries with neither 'account' "
                 f"nor 'contra' specified: {first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -814,7 +814,7 @@ class LedgerEngine(ABC):
         if invalid_accounts_mask.any():
             invalid_ids = df.loc[invalid_accounts_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with invalid account "
+                f"Discarding {len(invalid_ids)} journal entries with invalid account "
                 f"or contra references: {first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -830,7 +830,7 @@ class LedgerEngine(ABC):
         if invalid_assets_mask.any():
             invalid_ids = df.loc[invalid_assets_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with invalid currency: "
+                f"Discarding {len(invalid_ids)} journal entries with invalid currency: "
                 f"{first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -854,7 +854,7 @@ class LedgerEngine(ABC):
         if invalid_currency_mask.any():
             invalid_ids = df.loc[invalid_currency_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with mismatched transaction "
+                f"Discarding {len(invalid_ids)} journal entries with mismatched transaction "
                 f"currency: {first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -874,7 +874,7 @@ class LedgerEngine(ABC):
         if invalid_prices_mask.any():
             invalid_ids = df.loc[invalid_prices_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with invalid price: "
+                f"Discarding {len(invalid_ids)} journal entries with invalid price: "
                 f"{first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -886,7 +886,7 @@ class LedgerEngine(ABC):
             if invalid_profit_center_mask.any():
                 invalid_ids = df.loc[invalid_profit_center_mask, "id"].unique().tolist()
                 self._logger.warning(
-                    f"Discarding {len(invalid_ids)} ledger entries with missing profit center: "
+                    f"Discarding {len(invalid_ids)} journal entries with missing profit center: "
                     f"{first_elements_as_str(invalid_ids)}"
                 )
                 df = df.query("id not in @invalid_ids")
@@ -899,7 +899,7 @@ class LedgerEngine(ABC):
         if invalid_profit_center_mask.any():
             invalid_ids = df.loc[invalid_profit_center_mask, "id"].unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries with invalid profit center "
+                f"Discarding {len(invalid_ids)} journal entries with invalid profit center "
                 f"reference: {first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -921,7 +921,7 @@ class LedgerEngine(ABC):
         if invalid_amounts_mask.any():
             invalid_ids = invalid_amounts_mask[invalid_amounts_mask].index.unique().tolist()
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} ledger entries where "
+                f"Discarding {len(invalid_ids)} journal entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(invalid_ids)}"
             )
             df = df.query("id not in @invalid_ids")
@@ -942,7 +942,7 @@ class LedgerEngine(ABC):
             pd.DataFrame: Serialized DataFrame in long format.
         """
         # Create separate DataFrames for credit and debit accounts
-        credit = df[LEDGER_SCHEMA["column"]]
+        credit = df[JOURNAL_SCHEMA["column"]]
         debit = credit.copy()
         debit["amount"] *= -1.0
         debit["report_amount"] *= -1.0
@@ -953,22 +953,22 @@ class LedgerEngine(ABC):
             credit.loc[credit["account"].notna()],
             debit.loc[debit["account"].notna()]
         ])
-        return result[LEDGER_SCHEMA["column"]]
+        return result[JOURNAL_SCHEMA["column"]]
 
     def txn_to_str(self, df: pd.DataFrame) -> Dict[str, str]:
-        """Create a consistent, unique representation of ledger transactions.
+        """Create a consistent, unique representation of journal entries.
 
         Converts transactions into a dict of CSV-like string representation.
         The result can be used to compare transactions.
 
         Args:
-            df (pd.DataFrame): DataFrame containing ledger transactions.
+            df (pd.DataFrame): DataFrame containing journal entries.
 
         Returns:
-            Dict[str, str]: A dictionary where keys are ledger 'id's and values are
+            Dict[str, str]: A dictionary where keys are journal 'id's and values are
             unique string representations of the transactions.
         """
-        df = self.ledger.standardize(df)
+        df = self.journal.standardize(df)
         df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
         if df['id'].duplicated().any():
             raise ValueError("Some collective transaction(s) have non-unique date.")

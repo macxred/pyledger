@@ -99,14 +99,14 @@ ledger.accounts.list()
 ## [..snip..]
 
 # Post transactions to the general ledger
-ledger.ledger.add({
+ledger.journal.add({
     'date': datetime.date.today(),
     'account': 1020,
     'contra': 6000,
     'currency': 'CHF',
     "description": "First Test Transaction",
     'amount': -100})
-ledger.ledger.add({
+ledger.journal.add({
     'date': datetime.date.today(),
     'account': 1020,
     'contra': 4000,

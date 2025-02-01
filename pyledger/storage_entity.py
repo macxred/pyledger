@@ -13,7 +13,7 @@ from .helpers import save_files, write_fixed_width_csv
 class AccountingEntity(ABC):
     """
     Abstract base class representing accounting entities stored in tabular form
-    (e.g., general ledger, accounts, tax codes). Defines the standard interface
+    (e.g., journal, accounts, tax codes). Defines the standard interface
     that all accounting entities must implement.
     Accessors and mutators receive or return pandas DataFrames consistent with
     the entity's specific column schema.
@@ -196,10 +196,10 @@ class AccountingEntity(ABC):
         }
 
 
-class LedgerEntity(AccountingEntity):
+class JournalEntity(AccountingEntity):
     """
-    Specialized AccountingEntity for general ledger entries, with custom
-    `standardize` and `mirror` methods tailored to ledger-specific needs.
+    Specialized AccountingEntity for journal entries, with custom
+    `standardize` and `mirror` methods tailored to journal-specific needs.
     """
 
     def __init__(self, *args, **kwargs):
@@ -207,9 +207,9 @@ class LedgerEntity(AccountingEntity):
 
     def standardize(self, data: pd.DataFrame, drop_extra_columns: bool = False) -> pd.DataFrame:
         """
-        Standardize ledger data to conform to the entity's schema.
+        Standardize journal data to conform to the entity's schema.
 
-        Performs additional processing specific to ledger entries, including:
+        Performs additional processing specific to journal entries, including:
         - Adds 'id' column if missing, assigning IDs based on consecutive non-null dates.
         - Fills missing 'date' values by forward and backward filling within 'id' groups.
 
@@ -239,29 +239,29 @@ class LedgerEntity(AccountingEntity):
 
     def mirror(self, target: pd.DataFrame, delete: bool = False) -> Dict[str, int]:
         """
-        Synchronize the current ledger data with the target ledger data.
+        Synchronize the current journal data with the target journal data.
 
-        Custom implementation for ledger entries that accounts for
+        Custom implementation for journal entries that accounts for
         transactions spanning multiple rows.
 
         Args:
-            target (pd.DataFrame): DataFrame representing the desired target ledger state.
-            delete (bool, optional): If True, deletes current ledger entries not present in target.
+            target (pd.DataFrame): DataFrame representing the desired target journal state.
+            delete (bool, optional): If True, deletes current journal entries not present in target.
 
         Returns:
             Dict[str, int]: Summary statistics of the mirroring process containing:
-                - 'initial' (int): Number of ledger entries before synchronization.
-                - 'target' (int): Number of ledger entries in the target DataFrame.
-                - 'added' (int): Number of ledger entries added.
-                - 'deleted' (int): Number of ledger entries deleted.
-                - 'updated' (int): Number of ledger entries updated (always 0 for ledger entries).
+                - 'initial' (int): Number of journal entries before synchronization.
+                - 'target' (int): Number of journal entries in the target DataFrame.
+                - 'added' (int): Number of journal entries added.
+                - 'deleted' (int): Number of journal entries deleted.
+                - 'updated' (int): Number of journal entries updated (always 0 for journal entries).
 
         Notes:
             - IDs are not preserved during the mirroring process.
             - Deletions may alter existing IDs.
         """
 
-        def nest_ledger(df: pd.DataFrame) -> pd.DataFrame:
+        def nest_journal(df: pd.DataFrame) -> pd.DataFrame:
             """Nest to create one row per transaction, add unique string identifier."""
             nest_by = [col for col in df.columns if col not in ["id", "date"]]
             df = nest(df, columns=nest_by, key="txn")
@@ -271,9 +271,9 @@ class LedgerEntity(AccountingEntity):
             ]
             return df
 
-        current = nest_ledger(self.list())
+        current = nest_journal(self.list())
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
-        incoming = nest_ledger(incoming)
+        incoming = nest_journal(incoming)
         if incoming["id"].duplicated().any():
             raise ValueError("Non-unique dates in `target` transactions.")
 
@@ -313,7 +313,7 @@ class LedgerEntity(AccountingEntity):
                         self.add(txn)
                     except Exception as e:
                         raise Exception(
-                            f"Error while adding ledger entry {id}: {e}"
+                            f"Error while adding journal entry {id}: {e}"
                         ) from e
 
         return {
@@ -423,20 +423,20 @@ class DataFrameEntity(StandaloneAccountingEntity):
         self._on_change()
 
 
-class LedgerDataFrameEntity(LedgerEntity, DataFrameEntity):
+class JournalDataFrameEntity(JournalEntity, DataFrameEntity):
     """
-    Ledger entity that stores ledger entries as a DataFrame in memory.
+    Journal entity that stores journal entries as a DataFrame in memory.
     """
 
     def modify(self, data: pd.DataFrame) -> None:
         """
-        Modify existing ledger entries.
+        Modify existing journal entries.
 
         Overrides the base implementation because DataFrameEntity.modify does
         not support duplicate IDs.
 
         Args:
-            data (pd.DataFrame): DataFrame containing ledger entries to modify. Must contain all
+            data (pd.DataFrame): DataFrame containing journal entries to modify. Must contain all
                                  ID columns defined in the schema; other columns are optional.
 
         Raises:
@@ -626,33 +626,33 @@ class MultiCSVEntity(CSVAccountingEntity):
             self._store(df, self._path / path)
 
 
-class CSVLedgerEntity(LedgerEntity, MultiCSVEntity):
+class CSVJournalEntity(JournalEntity, MultiCSVEntity):
     """
-    Stores ledger entries in multiple CSV files, with files determined by the
+    Stores journal entries in multiple CSV files, with files determined by the
     ID portion of the entries up to the first colon ':'.
 
-    IDs are not stored in ledger files but are dynamically generated when
+    IDs are not stored in journal files but are dynamically generated when
     reading each file. These IDs are non-persistent and may change if a file's
     entries are modified. See `_read_data` for details.
     """
 
     def _csv_path(self, id: pd.Series) -> pd.Series:
-        """Extract storage path from ledger id."""
+        """Extract storage path from journal id."""
         return id.str.replace(":[^:]+$", "", regex=True)
 
     def _id_from_path(self, id: pd.Series) -> pd.Series:
-        """Extract numeric portion of ledger id."""
+        """Extract numeric portion of journal id."""
         return id.str.replace("^.*:", "", regex=True).astype(int)
 
     def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
-        """Reads ledger entries from CSV files in the root directory.
+        """Reads journal entries from CSV files in the root directory.
 
         Iterates through all CSV files in the root directory, reading each file
         into a DataFrame and ensuring the data conforms to the entity's schema.
         Files that cannot be processed are skipped with a warning. The Data
         from all valid files is then combined into a single DataFrame.
 
-        IDs are not stored in ledger files but are dynamically generated when
+        IDs are not stored in journal files but are dynamically generated when
         reading each file. The `id` is constructed by combining the relative
         path to the root directory with the row's position, separated by a
         colon (`{path}:{position}`). These IDs are non-persistent and may
@@ -671,16 +671,16 @@ class CSVLedgerEntity(LedgerEntity, MultiCSVEntity):
         return self.standardize(df, drop_extra_columns=drop_extra_columns)
 
     def write_directory(self, df: pd.DataFrame | None = None):
-        """Save ledger entries to multiple CSV files in the ledger directory.
+        """Save journal entries to multiple CSV files in the journal directory.
 
-        Saves ledger entries to several fixed-width CSV files, formatted by
-        `_write_file`. The storage location within the `<root>/ledger`
+        Saves journal entries to several fixed-width CSV files, formatted by
+        `_write_file`. The storage location within the `<root>/journal`
         directory is determined by the portion of the ID up to the last
         colon (':').
 
         Args:
-            df (pd.DataFrame, optional): The ledger DataFrame to save.
-                If not provided, defaults to the current ledger data.
+            df (pd.DataFrame, optional): The journal DataFrame to save.
+                If not provided, defaults to the current journal data.
         """
         if df is None:
             df = self.list()
@@ -694,7 +694,7 @@ class CSVLedgerEntity(LedgerEntity, MultiCSVEntity):
     def add(self, data: pd.DataFrame, path: str = "default.csv") -> list[str]:
         """Add new entries.
 
-        IDs in the input `data` are not conserved. IDs are not stored in ledger
+        IDs in the input `data` are not conserved. IDs are not stored in journal
         files but are dynamically generated when reading each file.
 
         Args:
@@ -724,13 +724,13 @@ class CSVLedgerEntity(LedgerEntity, MultiCSVEntity):
 
     def modify(self, data: pd.DataFrame):
         """
-        Modify existing ledger entries.
+        Modify existing journal entries.
 
-        Overrides the base implementation because `LedgerDataFrameEntity.modify`
+        Overrides the base implementation because `JournalDataFrameEntity.modify`
         does not preserve the order of rows within the file.
 
         Args:
-            data (pd.DataFrame): DataFrame containing ledger entries to modify. Must contain all
+            data (pd.DataFrame): DataFrame containing journal entries to modify. Must contain all
                 required columns as defined in the schema; other columns are optional.
 
         Raises:
