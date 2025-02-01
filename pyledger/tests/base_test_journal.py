@@ -193,4 +193,4 @@ class BaseTestJournal(BaseTest):
 
         # Mirror an empty target state
         engine.journal.mirror(target=pd.DataFrame({}), delete=True)
-        assert engine.journal.list().empty, "Mirroring empty DF should erase all journal"
+        assert engine.journal.list().empty, "Mirroring empty DF should erase all journal entries"
