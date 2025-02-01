@@ -637,11 +637,11 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
     """
 
     def _csv_path(self, id: pd.Series) -> pd.Series:
-        """Extract storage path from journal entry id."""
+        """Extract storage path from journal id."""
         return id.str.replace(":[^:]+$", "", regex=True)
 
     def _id_from_path(self, id: pd.Series) -> pd.Series:
-        """Extract numeric portion of journal entry id."""
+        """Extract numeric portion of journal id."""
         return id.str.replace("^.*:", "", regex=True).astype(int)
 
     def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:

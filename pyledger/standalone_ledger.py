@@ -132,7 +132,7 @@ class StandaloneLedger(LedgerEngine):
         df = self.sanitize_journal(df)
         df = df.sort_values(["date", "id"])
 
-        # Add journal entries for tax
+        # Add ledger entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
         # Insert missing reporting currency amounts
@@ -143,20 +143,20 @@ class StandaloneLedger(LedgerEngine):
             date=df.loc[index, "date"]
         )
 
-        # Add journal entries for (currency or other) revaluations
+        # Add ledger entries for (currency or other) revaluations
         revaluations = self.sanitize_revaluations(self.revaluations.list())
-        revalue = self.revaluation_entries(journal=df, revaluations=revaluations)
+        revalue = self.revaluation_entries(ledger=df, revaluations=revaluations)
         return pd.concat([df, revalue], ignore_index=True)
 
     def revaluation_entries(
-        self, journal: pd.DataFrame, revaluations: pd.DataFrame
+        self, ledger: pd.DataFrame, revaluations: pd.DataFrame
     ) -> pd.DataFrame:
-        """Compute journal entries for (currency or other) revaluations"""
+        """Compute ledger entries for (currency or other) revaluations"""
         result = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
             revalue = self.journal.standardize(pd.DataFrame(result))
-            df = self.serialize_ledger(pd.concat([journal, revalue]))
+            df = self.serialize_ledger(pd.concat([ledger, revalue]))
             date = row["date"]
             accounts = self.account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])

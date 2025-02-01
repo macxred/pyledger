@@ -966,7 +966,7 @@ class LedgerEngine(ABC):
 
         Returns:
             Dict[str, str]: A dictionary where keys are journal 'id's and values are
-            unique string representations of the journal entries.
+            unique string representations of the transactions.
         """
         df = self.journal.standardize(df)
         df = nest(df, columns=[col for col in df.columns if col not in ["id", "date"]], key="txn")
