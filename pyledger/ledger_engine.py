@@ -6,7 +6,7 @@ import logging
 import math
 import zipfile
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Dict, List
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
@@ -535,6 +535,93 @@ class LedgerEngine(ABC):
             return result
         result = {k: _standardize_currency(k, v) for k, v in result.items()}
         return result
+
+    def account_balances(
+        self,
+        accounts: str | dict | None,
+        period: str | datetime.date | None = None,
+        profit_centers: list[str] | str | None = None,
+        aggregate: int | None = None
+    ) -> pd.DataFrame:
+        """
+        Query balances of multiple accounts.
+
+        Compute the balance of multiple accounts in one call,
+        returning separate balance for each account.
+
+        Args:
+            accounts (str, dict): The account(s) to be evaluated.
+            period (datetime.date, optional): The date or date range for which account balances
+                                            are calculated. Defaults to None.
+            profit_centers (list[str], str, optional): If not None, the result is calculated only
+                           from ledger entries assigned to the specified profit centers.
+            aggregate (int, optional): If provided, group accounts up to a specified hierarchy
+                      level in their group paths and sum the report_balance in each group.
+
+        Returns:
+            pd.DataFrame: A data frame with ... schema,
+                          providing aggregated or detailed account balances.
+        """
+        # Gather account list
+        result = self.accounts.list()[["group", "description", "account", "currency"]]
+        if accounts is not None:
+            account_dict = self.account_range(accounts)
+            account_list = list(set(account_dict["add"]) - set(account_dict["subtract"]))
+            result = result.loc[result["account"].isin(account_list)]
+
+        # Look up account balance
+        start, end = parse_date_span(period)
+        def _balance_lookup(account, currency):
+            # TODO: Adapt "_single_account_balance" to accept start and end
+            balance = self._single_account_balance(account, end, profit_centers=profit_centers)
+            return balance.get(currency, 0), balance.get("reporting_currency", 0)
+        balances = [_balance_lookup(account, currency)
+                    for account, currency in zip(result["account"], result["currency"])]
+        result[["balance", "report_balance"]] = pd.DataFrame(balances, index=result.index)
+
+        # Aggregate by group paths
+        if aggregate is not None:
+            def _prune_path(group, account_description, n):
+                if pd.isna(group):
+                    return (group, account_description)
+                if group.startswith("/"):
+                    if len(PurePosixPath(group).parts) <= n+1:
+                        return (group, account_description)
+                    else:
+                        path = PurePosixPath(group)
+                        return (str(path.parents[-(n + 1)]) if n > 0 else pd.NA, path.parts[n+1])
+                else:
+                    if len(PurePosixPath(group).parts) <= n:
+                        return (group, account_description)
+                    else:
+                        path = PurePosixPath(group)
+                        return (str(path.parents[-(n + 1)]) if n > 0 else pd.NA, path.parts[n])
+
+            # Ad hoc test:
+            # x = 'Aktiven/Anlagevermögen/Finanzanlagen/Darlehen'
+            # assert _prune_path(x, "bla", 0) == (pd.NA, "Aktiven")
+            # assert _prune_path(x, "bla", 1) == ("Aktiven", "Anlagevermögen")
+            # assert _prune_path(x, "bla", 2) == ("Aktiven/Anlagevermögen", "Finanzanlagen")
+            # assert _prune_path(x, "bla", 3) == ("Aktiven/Anlagevermögen/Finanzanlagen", "Darlehen")
+            # assert _prune_path(x, "bla", 4) == (x, "bla")
+            # assert _prune_path(x, "bla", 42) == (x, "bla")
+            # x = '/Aktiven/Anlagevermögen/Finanzanlagen/Darlehen'
+            # assert _prune_path(x, "bla", 0) == (pd.NA, "Aktiven")
+            # assert _prune_path(x, "bla", 1) == ("/Aktiven", "Anlagevermögen")
+            # assert _prune_path(x, "bla", 2) == ("/Aktiven/Anlagevermögen", "Finanzanlagen")
+            # assert _prune_path(x, "bla", 3) == ("/Aktiven/Anlagevermögen/Finanzanlagen", "Darlehen")
+            # assert _prune_path(x, "bla", 4) == (x, "bla")
+            # assert _prune_path(x, "bla", 42) == (x, "bla")
+
+            new_groups = [_prune_path(group, text, n=aggregate)
+                    for group, text in zip(result["group"], result["description"])]
+            breakpoint()
+            result[["group", "description"]] = pd.DataFrame(new_groups, index=result.index)
+            result = result.groupby(["group", "description"], dropna=False, sort=False)
+            result = result["report_balance"].sum().reset_index()
+
+        return result
+
 
     def account_history(
         self,
