@@ -41,25 +41,25 @@ EXPECTED = {
     )
 }
 
-JOURNAL_ENTRIES = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
+JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
 
 
 def test_txn_to_str():
     engine = MemoryLedger()
-    result = engine.txn_to_str(JOURNAL_ENTRIES)
+    result = engine.txn_to_str(JOURNAL)
     assert result == EXPECTED, "Transactions were not converted correctly."
 
 
 def test_txn_to_str_empty_df():
     engine = MemoryLedger()
-    df = pd.DataFrame(columns=JOURNAL_ENTRIES.columns)
+    df = pd.DataFrame(columns=JOURNAL.columns)
     result = engine.txn_to_str(df)
     assert result == {}, "Empty DataFrame did not return an empty dict."
 
 
 def test_txn_to_str_non_unique_dates():
     engine = MemoryLedger()
-    df = JOURNAL_ENTRIES[JOURNAL_ENTRIES["id"].isin(['1', '4'])]
+    df = JOURNAL[JOURNAL["id"].isin(['1', '4'])]
     df.loc[df["id"] == '4', "id"] = '1'
     with pytest.raises(ValueError):
         engine.txn_to_str(df)
@@ -67,7 +67,7 @@ def test_txn_to_str_non_unique_dates():
 
 def test_txn_to_str_variations_of_same_transactions():
     engine = MemoryLedger()
-    df1 = JOURNAL_ENTRIES[JOURNAL_ENTRIES["id"] == 2]
+    df1 = JOURNAL[JOURNAL["id"] == 2]
     # Reverse the column order
     df2 = df1[df1.columns[::-1]]
     # Shuffle rows

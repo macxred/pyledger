@@ -22,7 +22,7 @@ def engine():
         configuration=BaseTest.CONFIGURATION,
         tax_codes=BaseTest.TAX_CODES,
         accounts=BaseTest.ACCOUNTS,
-        journal=BaseTest.JOURNAL_ENTRIES,
+        journal=BaseTest.JOURNAL,
         price_history=BaseTest.PRICES,
         profit_centers=BaseTest.PROFIT_CENTERS
     )

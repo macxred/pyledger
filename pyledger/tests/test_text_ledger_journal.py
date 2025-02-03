@@ -19,10 +19,10 @@ class TestLedger(BaseTestJournal):
 
     def test_write_journal_directory(self, engine):
         # Define journal entries with different nesting level
-        file_1 = self.JOURNAL_ENTRIES.copy()
+        file_1 = self.JOURNAL.copy()
         file_1["id"] = "level1/level2/file1.csv:" + file_1["id"]
         ids = [str(id) for id in range(11, 15)]
-        file_2 = self.JOURNAL_ENTRIES.query(f"id in {ids}")
+        file_2 = self.JOURNAL.query(f"id in {ids}")
         id = file_2["id"].astype(int)
         file_2["id"] = "file2.csv:" + (id - min(id) + 1).astype(str)
 
@@ -59,11 +59,11 @@ class TestLedger(BaseTestJournal):
 
     def test_extra_columns(self, engine):
         extra_cols = ["new_column", "second_new_column"]
-        entries = self.JOURNAL_ENTRIES.query("id in ['1', '2']").copy()
+        entries = self.JOURNAL.query("id in ['1', '2']").copy()
         ids = engine.journal.add(entries)  # noqa: F841
 
         # Add journal entries with a new column
-        expected = self.JOURNAL_ENTRIES.query("id in ['3', '4']").copy()
+        expected = self.JOURNAL.query("id in ['3', '4']").copy()
         expected[extra_cols[0]] = "test value"
         engine.journal.add(expected)
         current = engine.journal.list()

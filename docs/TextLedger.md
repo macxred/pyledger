@@ -79,7 +79,7 @@ JOURNAL_CSV = """
     2023-01-30,    1000,   4000,      USD,  2400.00,  OUT_STD, Sale of Goods
     2023-02-01,    1000,   7000,      USD,  -800.00,         , Rent Expense
 """
-JOURNAL_ENTRIES = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
+JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
 
 CONFIGURATION = {"reporting_currency": "USD"}
 
@@ -89,7 +89,7 @@ engine.restore(
     configuration=CONFIGURATION,
     tax_codes=TAX_CODES,
     accounts=ACCOUNT_CHART,
-    journal=JOURNAL_ENTRIES)
+    journal=JOURNAL)
 ```
 
 ### 2. Managing Journal Entries

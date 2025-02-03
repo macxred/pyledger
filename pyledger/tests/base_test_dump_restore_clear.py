@@ -18,7 +18,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             configuration=self.CONFIGURATION,
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
-            journal=self.JOURNAL_ENTRIES,
+            journal=self.JOURNAL,
             assets=self.ASSETS,
             price_history=self.PRICES,
             revaluations=self.REVALUATIONS,
@@ -41,7 +41,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assert_frame_equal(self.ASSETS, engine.assets.list(), ignore_row_order=True)
         assert_frame_equal(self.PROFIT_CENTERS, engine.profit_centers.list(), ignore_row_order=True)
-        target = engine.txn_to_str(self.JOURNAL_ENTRIES).values()
+        target = engine.txn_to_str(self.JOURNAL).values()
         actual = engine.txn_to_str(engine.journal.list()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual journal differ"
 
@@ -50,7 +50,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         engine.reporting_currency = self.CONFIGURATION["REPORTING_CURRENCY"]
         engine.accounts.mirror(self.ACCOUNTS)
         engine.tax_codes.mirror(self.TAX_CODES)
-        engine.journal.mirror(self.JOURNAL_ENTRIES)
+        engine.journal.mirror(self.JOURNAL)
         engine.assets.mirror(self.ASSETS)
         engine.price_history.mirror(self.PRICES)
         engine.revaluations.mirror(self.REVALUATIONS)
@@ -99,7 +99,7 @@ class BaseTestDumpRestoreClear(BaseTest):
             configuration=self.CONFIGURATION,
             accounts=self.ACCOUNTS,
             tax_codes=self.TAX_CODES,
-            journal=self.JOURNAL_ENTRIES,
+            journal=self.JOURNAL,
             assets=self.ASSETS,
             price_history=self.PRICES,
             revaluations=self.REVALUATIONS,
