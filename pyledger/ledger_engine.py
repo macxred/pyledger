@@ -905,13 +905,19 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Drop unbalanced transactions
-        effective_amounts = df["report_amount"].copy()
-        index = effective_amounts.isna()
-        effective_amounts.loc[index] = self.report_amount(
+        index = df["report_amount"].isna()
+        df.loc[index, "report_amount"] = self.report_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
         )
+        df["amount"] = df.apply(
+            lambda row: self.round_to_precision(row["amount"], row["currency"]), axis=1
+        )
+        df["report_amount"] = df["report_amount"].apply(
+            lambda x: self.round_to_precision(x, self.reporting_currency)
+        )
+        effective_amounts = df["report_amount"].copy()
         effective_amounts = effective_amounts.mask(df["contra"].notna() & df["account"].notna(), 0)
         effective_amounts = effective_amounts.mask(
             df["contra"].notna() & df["account"].isna(), -effective_amounts
