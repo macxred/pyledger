@@ -139,7 +139,7 @@ PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True
 
 # flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
-    date,         account,            profit_center, balance
+    period,       account,            profit_center, balance
     2023-12-31, 1000:9999,                         , "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2024-01-01, 1000:9999,                         , "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-01-01, 1000:1999,                         , "{reporting_currency: 1098332.82, USD:   800000.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
@@ -154,6 +154,9 @@ EXPECTED_BALANCE_CSV = """
     2024-03-31, 1000:1999,                         , "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-03-31,      7050,                         , "{reporting_currency:   21003.29, USD:    21003.29}"
     2024-03-31,      8050,                         , "{reporting_currency:       0.00, USD:        0.00}"
+    2024-Q4,    1000:1999,                         , "{reporting_currency: 11655605.63,USD: 300000.0, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
+    2024,       1000:1999,                         , "{reporting_currency: 12756779.54,USD: 1076572.64, EUR: 10026667.1, JPY: 54345678.0, CHF: 14285714.3}"
+    2024-08,    1000:1999,                         , "{reporting_currency: -700.0, USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2023-12-31, 1000:9999,                "General", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2023-12-31, 1000:9999,    "General, Shop, Cafe", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2024-01-01, 1000:9999,                "General", "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
