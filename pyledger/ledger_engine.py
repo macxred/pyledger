@@ -486,7 +486,7 @@ class LedgerEngine(ABC):
         return result
 
     def account_balance(
-        self, account: int | str | dict, date: datetime.date = None,
+        self, account: int | str | dict, period: datetime.date | str | int = None,
         profit_centers: list[str] | str = None
     ) -> dict:
         """Balance of a single account or a list of accounts.
@@ -501,8 +501,8 @@ class LedgerEngine(ABC):
             accounts is returned, or "1020:1025-1000", in which case the
             balance of account 1000 is deducted from the combined balance of
             accounts 1020:1025.
-            date (datetime.date, optional): The date as of which the account
-                                            balance is calculated. Defaults to None.
+            period (datetime.date, str, int, optional): The period as of which the account
+                                                        balance is calculated. Defaults to None.
             profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
                                               calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
@@ -510,7 +510,7 @@ class LedgerEngine(ABC):
         Returns:
             dict: Dictionary containing the balance of the account(s) in various currencies.
         """
-        start, end = parse_date_span(date)
+        start, end = parse_date_span(period)
         if start is None:
             # Account balance per a single point in time
             if represents_integer(account):
@@ -540,10 +540,12 @@ class LedgerEngine(ABC):
             # Account balance over a period
             at_start = self.account_balance(
                 account=account,
-                date=start - datetime.timedelta(days=1),
+                period=start - datetime.timedelta(days=1),
                 profit_centers=profit_centers
             )
-            at_end = self.account_balance(account=account, date=end, profit_centers=profit_centers)
+            at_end = self.account_balance(
+                account=account, period=end, profit_centers=profit_centers
+            )
             result = {
                 currency: at_end.get(currency, 0) - at_start.get(currency, 0)
                 for currency in (at_start | at_end).keys()
@@ -551,7 +553,7 @@ class LedgerEngine(ABC):
 
         # Type consistent return value Dict[str, float]
         def _standardize_currency(ticker: str, x: float) -> float:
-            result = float(self.round_to_precision(x, ticker=ticker, date=date))
+            result = float(self.round_to_precision(x, ticker=ticker, date=end))
             if result == -0.0:
                 result = 0.0
             return result
