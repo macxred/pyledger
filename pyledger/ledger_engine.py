@@ -548,7 +548,7 @@ class LedgerEngine(ABC):
 
     def account_history(
         self, account: int | str | dict, period: datetime.date = None,
-        profit_centers: list[str] | str = None
+        profit_centers: list[str] | str = None, drop: bool = False
     ) -> pd.DataFrame:
         """Transaction and balance history of an account or a list of accounts.
 
@@ -567,6 +567,8 @@ class LedgerEngine(ABC):
             profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
                                               calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
+            drop (bool, optional): If True, drops columns that do not provide meaningful
+                                   information in the given context. Defaults to False.
 
         Returns:
             pd.DataFrame: DataFrame containing the transaction and balance
@@ -578,6 +580,23 @@ class LedgerEngine(ABC):
         out = self._fetch_account_history(
             accounts, start=start, end=end, profit_centers=profit_centers
         )
+
+        if drop:
+            if single_account:
+                df = df.drop(columns=["account"])
+                accounts = self.accounts.list().query("account == @account")
+            else:
+                accounts = self.accounts.list().query("account in @accounts")
+            if (
+                accounts["currency"].nunique() == 1
+                and accounts["currency"].iloc[0] == self.reporting_currency
+            ):
+                df = df.drop(columns=["report_amount", "report_balance"])
+            optional = ACCOUNT_SCHEMA.query("mandatory == False")["column"].tolist()
+            optional_existing = df.columns.intersection(optional)
+            if df.empty or df[optional_existing].isna().all().all():
+                df = df.drop(columns=optional_existing)
+
         return out
 
     def _fetch_account_history(
