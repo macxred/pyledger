@@ -337,6 +337,8 @@ def test_sanitize_journal(engine, capture_logs):
          24, 2024-01-01,        ,   1000,      USD,     8560.00,              ,              ,          , Not balanced amount,
          25, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,          Shop,          , Valid profit center,
          26, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,       INVALID,          , Invalid profit center,
+         # Transactions with a single non-reporting currency that are balanced in their own currency
+         # but imbalanced in the reporting currency due to rounding errors should pass the sanitization process.
          27, 2024-12-31,        ,   1200,      CHF,     1999.99,              ,              ,          , Balanced amount,
          27, 2024-12-31,    1300,       ,      CHF,     1000.99,              ,              ,          , Balanced amount,
          27, 2024-12-31,    1400,       ,      CHF,      999.00,              ,              ,          , Balanced amount,
@@ -379,6 +381,10 @@ def test_sanitize_journal(engine, capture_logs):
     expected_journal_with_profit_centers = pd.read_csv(
         StringIO(EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV), skipinitialspace=True
     )
+    # Read the CSV while ignoring commented lines
+    journal_lines = JOURNAL_CSV.strip().split("\n")
+    journal_lines = [line for line in journal_lines if not line.strip().startswith("#")]
+    JOURNAL_CSV = "\n".join(journal_lines)
     journal = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
     engine.restore(accounts=accounts_df, tax_codes=tax_df, price_history=prices, assets=assets)
 
