@@ -577,27 +577,22 @@ class LedgerEngine(ABC):
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
         accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
-        out = self._fetch_account_history(
+        df = self._fetch_account_history(
             accounts, start=start, end=end, profit_centers=profit_centers
         )
 
         if drop:
-            if single_account:
+            if not df.empty and df['account'].nunique() == 1:
                 df = df.drop(columns=["account"])
-                accounts = self.accounts.list().query("account == @account")
-            else:
-                accounts = self.accounts.list().query("account in @accounts")
             if (
-                accounts["currency"].nunique() == 1
-                and accounts["currency"].iloc[0] == self.reporting_currency
+                df["currency"].nunique() == 1 and df["currency"].iloc[0] == self.reporting_currency
             ):
                 df = df.drop(columns=["report_amount", "report_balance"])
-            optional = ACCOUNT_SCHEMA.query("mandatory == False")["column"].tolist()
-            optional_existing = df.columns.intersection(optional)
-            if df.empty or df[optional_existing].isna().all().all():
-                df = df.drop(columns=optional_existing)
-
-        return out
+            mandatory = ACCOUNT_SCHEMA.query("mandatory == True")["column"].tolist()
+            remove = df.columns.difference(mandatory)
+            if df.empty or df[remove].isna().all().all():
+                df = df.drop(columns=remove)
+        return df
 
     def _fetch_account_history(
         self, account: int | list[int], start: datetime.date = None, end: datetime.date = None,
