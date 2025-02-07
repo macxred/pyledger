@@ -2,7 +2,6 @@
 
 import pytest
 import pandas as pd
-import datetime
 from abc import abstractmethod
 from consistent_df import assert_frame_equal
 from .base_test import BaseTest
@@ -162,15 +161,15 @@ class BaseTestAccounts(BaseTest):
         )
         # Test account balance with specified profit centers
         for _, row in self.EXPECTED_BALANCE.iterrows():
-            date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
+            period = row['period']
             account = row['account']
             expected = row['balance']
             profit_centers = row["profit_center"]
             actual = restored_engine.account_balance(
-                date=date, account=account, profit_centers=profit_centers
+                period=period, account=account, profit_centers=profit_centers
             )
             assert expected == actual, (
-                f"Account balance for {account} on {date} with "
+                f"Account balance for {account} on {period} with "
                 f"{profit_centers} profit centers of {actual} differs from {expected}."
             )
 
@@ -179,10 +178,10 @@ class BaseTestAccounts(BaseTest):
         restored_engine.restore(profit_centers=[], journal=JOURNAL)
         EXPECTED_BALANCE_NO_PROFIT_CENTERS = self.EXPECTED_BALANCE.query("profit_center.isna()")
         for _, row in EXPECTED_BALANCE_NO_PROFIT_CENTERS.iterrows():
-            date = datetime.datetime.strptime(row['date'], "%Y-%m-%d").date()
+            period = row['period']
             account = row['account']
             expected = row['balance']
-            actual = restored_engine.account_balance(date=date, account=account)
+            actual = restored_engine.account_balance(period=period, account=account)
             assert expected == actual, (
-                f"Account balance for {account} on {date} of {actual} differs from {expected}."
+                f"Account balance for {account} on {period} of {actual} differs from {expected}."
             )
