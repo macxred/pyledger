@@ -1032,60 +1032,62 @@ class LedgerEngine(ABC):
             return values.groupby(df["id"]).sum()
 
         tolerance = self.precision(self.reporting_currency) / 2
-        na_mask = df["report_amount"].isna() & ~df["id"].isin(invalid_ids)
+
+        # Identify transactions with a single non-reporting currency that are
+        # balanced in their own currency but imbalanced in the reporting currency
+        # (which was initially unspecified).
+        grouped = df.groupby("id").agg(
+            nunique_currency=("currency", "nunique"),
+            first_currency=("currency", "first"),
+            all_na_report_balance=("report_amount", lambda x: x.isna().all()),
+        )
+        auto_balance_ids = grouped.index[
+            (grouped["nunique_currency"] == 1)
+            & (grouped["first_currency"] != self.reporting_currency)
+            & (grouped["all_na_report_balance"])
+        ]
+        na_mask = df["report_amount"].isna()
         df.loc[na_mask, "report_amount"] = self.report_amount(
             amount=df.loc[na_mask, "amount"],
             currency=df.loc[na_mask, "currency"],
             date=df.loc[na_mask, "date"],
         )
-
-        # Identify transactions with a single non-reporting currency that are
-        # balanced in their own currency but imbalanced in the reporting currency
-        # (which was initially unspecified).
         amounts = compute_net_sum(df, "amount")
         report_amounts = compute_net_sum(df, "report_amount")
-        grouped_currency = df.groupby("id")["currency"].agg(["nunique", "first"])
-        imbalanced_mask = (
-            (grouped_currency["nunique"] == 1)
-            & (grouped_currency["first"] != self.reporting_currency)
-            & grouped_currency.index.isin(df.loc[na_mask, "id"].unique())
-            & (amounts.abs() == 0)
-            & (report_amounts.abs() > tolerance)
+        auto_balance_ids = (
+            set(auto_balance_ids)
+            .intersection(amounts.index[amounts.abs() == 0])
+            .intersection(report_amounts.index[report_amounts.abs() > tolerance])
         )
-        imbalanced_ids = imbalanced_mask[imbalanced_mask].index.to_list()
-        if imbalanced_ids:
-            for txn_id in imbalanced_ids:
-                txn_mask = df["id"] == txn_id
-                txn = df.loc[txn_mask].copy()
-                fx_rate = self.price(
-                    date=txn.iloc[0]["date"],
-                    ticker=txn.iloc[0]["currency"],
-                    currency=self.reporting_currency,
-                )[1]
-                unrounded_total = txn["amount"].sum() * fx_rate
-                increment = self.precision(self.reporting_currency)
-                unrounded_values = txn["amount"] * fx_rate
+        for txn_id in auto_balance_ids:
+            txn_mask = df["id"] == txn_id
+            txn = df.loc[txn_mask].copy()
+            fx_rate = self.price(
+                date=txn.iloc[0]["date"],
+                ticker=txn.iloc[0]["currency"],
+                currency=self.reporting_currency,
+            )[1]
+            increment = self.precision(self.reporting_currency)
+            unrounded_values = txn["amount"] * fx_rate
 
-                while True:
-                    current_report_sum = txn["report_amount"].sum()
-                    mismatch = current_report_sum - unrounded_total
-                    errors = txn["report_amount"] - unrounded_values
-                    # Exit the loop if the total mismatch is within tolerance.
-                    if abs(mismatch) <= tolerance:
-                        break
-                    # Reduce the row with the largest positive error.
-                    if mismatch > tolerance:
-                        idx_largest_err = errors.idxmax()
-                        txn.loc[idx_largest_err, "report_amount"] -= increment
-                    # Increase the row with the largest negative error.
-                    elif mismatch < -tolerance:
-                        idx_smallest_err = errors.idxmin()
-                        txn.loc[idx_smallest_err, "report_amount"] += increment
-                df.loc[txn_mask, "report_amount"] = txn["report_amount"]
+            while True:
+                errors = txn["report_amount"] - unrounded_values
+                # Exit the loop if the total mismatch is within tolerance.
+                if abs(errors.sum()) <= tolerance:
+                    break
+                # Reduce the row with the largest positive error.
+                if errors.sum() > tolerance:
+                    idx_largest_err = errors.idxmax()
+                    txn.loc[idx_largest_err, "report_amount"] -= increment
+                # Increase the row with the largest negative error.
+                elif errors.sum() < -tolerance:
+                    idx_smallest_err = errors.idxmin()
+                    txn.loc[idx_smallest_err, "report_amount"] += increment
+            df.loc[txn_mask, "report_amount"] = txn["report_amount"]
 
-        report_amounts = compute_net_sum(df, "report_amount")
-        unbalanced_ids = report_amounts[abs(report_amounts) > tolerance].index.to_list()
-        if invalid_ids:
+        invalid_balance = abs(compute_net_sum(df, "report_amount")) > tolerance
+        unbalanced_ids = report_amounts[invalid_balance].index.to_list()
+        if invalid_balance.any():
             self._logger.warning(
                 f"Discarding {len(unbalanced_ids)} journal entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(unbalanced_ids)}"
