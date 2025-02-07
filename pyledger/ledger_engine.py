@@ -1023,21 +1023,67 @@ class LedgerEngine(ABC):
 
     def _unbalanced_txns(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions whose total amounts do not balance to zero."""
-        index = df["report_amount"].isna() & ~df["id"].isin(invalid_ids)
-        df.loc[index, "report_amount"] = self.report_amount(
-            amount=df.loc[index, "amount"],
-            currency=df.loc[index, "currency"],
-            date=df.loc[index, "date"]
+        # Drop unbalanced transactions
+        tolerance = self.precision(self.reporting_currency) / 2
+        na_mask = df["report_amount"].isna() & ~df["id"].isin(invalid_ids)
+        df.loc[na_mask, "report_amount"] = self.report_amount(
+            amount=df.loc[na_mask, "amount"],
+            currency=df.loc[na_mask, "currency"],
+            date=df.loc[na_mask, "date"],
         )
-        effective_amounts = df["report_amount"].copy()
-        effective_amounts = effective_amounts.mask(df["contra"].notna() & df["account"].notna(), 0)
-        effective_amounts = effective_amounts.mask(
-            df["contra"].notna() & df["account"].isna(), -effective_amounts
-        )
-        grouped_amounts = effective_amounts.groupby(df["id"]).sum()
-        unbalanced_ids = set(grouped_amounts[grouped_amounts.abs() > 1e-8].index) - invalid_ids
 
-        if unbalanced_ids:
+        def compute_effective_amounts(data, column_name):
+            """Compute net (effective) sums per transaction"""
+            values = data[column_name].copy()
+            values = values.mask(data["contra"].notna() & data["account"].notna(), 0)
+            values = values.mask(data["contra"].notna() & data["account"].isna(), -values)
+            return values.groupby(data["id"]).sum()
+
+        # Correct transactions with a single non-reporting currency, originally balanced
+        # in 'amount' but imbalanced in 'report_amount' (which was initially missing).
+        amounts = compute_effective_amounts(df, "amount")
+        report_amounts = compute_effective_amounts(df, "report_amount")
+        grouped_currency = df.groupby("id")["currency"].agg(["nunique", "first"])
+        imbalanced_mask = (
+            (grouped_currency["nunique"] == 1)
+            & (grouped_currency["first"] != self.reporting_currency)
+            & grouped_currency.index.isin(df.loc[na_mask, "id"].unique())
+            & (amounts.abs() == 0)
+            & (report_amounts.abs() > tolerance)
+        )
+        imbalanced_ids = imbalanced_mask[imbalanced_mask].index.to_list()
+        if imbalanced_ids:
+            for txn_id in imbalanced_ids:
+                txn_mask = df["id"] == txn_id
+                txn = df.loc[txn_mask].copy()
+                fx_rate = self.price(
+                    date=txn.iloc[0]["date"], ticker=txn.iloc[0]["currency"],
+                    currency=self.reporting_currency,
+                )[1]
+                unrounded_total = txn["amount"].sum() * fx_rate
+                increment = self.precision(self.reporting_currency)
+                unrounded_values = txn["amount"] * fx_rate
+
+                while True:
+                    current_report_sum = txn["report_amount"].sum()
+                    mismatch = current_report_sum - unrounded_total
+                    errors = txn["report_amount"] - unrounded_values
+                    if abs(mismatch) <= tolerance:
+                        break
+                    # Total is too high; pick the row that is most 'over-rounded'
+                    if mismatch > tolerance:
+                        idx_largest_err = errors.idxmax()
+                        txn.loc[idx_largest_err, "report_amount"] -= increment
+                    # Total is too low; pick the row that is most 'under-rounded'
+                    elif mismatch < -tolerance:
+                        idx_smallest_err = errors.idxmin()
+                        txn.loc[idx_smallest_err, "report_amount"] += increment
+                df.loc[txn_mask, "report_amount"] = txn["report_amount"]
+
+        # Discard imbalanced transactions
+        report_amounts = compute_effective_amounts(df, "report_amount")
+        unbalanced_ids = set(report_amounts[report_amounts.abs() > 1e-8].index) - invalid_ids
+        if invalid_ids:
             self._logger.warning(
                 f"Discarding {len(unbalanced_ids)} journal entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(unbalanced_ids)}"

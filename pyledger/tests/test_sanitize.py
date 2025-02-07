@@ -385,6 +385,7 @@ def test_sanitize_journal(engine, capture_logs):
     # Sanitize journal entries without profit centers
     expected_journal_df = engine.journal.standardize(expected_journal)
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
+    breakpoint()
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) == 8, "Expected strict number of captured logs"
