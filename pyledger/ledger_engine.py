@@ -899,6 +899,13 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Drop unbalanced transactions
+        def compute_net_sum(df, column_name):
+            """Return net sums of a specified column for each transaction."""
+            values = df[column_name].copy()
+            values = values.mask(df["contra"].notna() & df["account"].notna(), 0)
+            values = values.mask(df["contra"].notna() & df["account"].isna(), -values)
+            return values.groupby(df["id"]).sum()
+
         tolerance = self.precision(self.reporting_currency) / 2
         na_mask = df["report_amount"].isna()
         df.loc[na_mask, "report_amount"] = self.report_amount(
@@ -907,17 +914,11 @@ class LedgerEngine(ABC):
             date=df.loc[na_mask, "date"],
         )
 
-        def compute_effective_amounts(data, column_name):
-            """Compute net (effective) sums per transaction"""
-            values = data[column_name].copy()
-            values = values.mask(data["contra"].notna() & data["account"].notna(), 0)
-            values = values.mask(data["contra"].notna() & data["account"].isna(), -values)
-            return values.groupby(data["id"]).sum()
-
-        # Correct transactions with a single non-reporting currency, originally balanced
-        # in 'amount' but imbalanced in 'report_amount' (which was initially missing).
-        amounts = compute_effective_amounts(df, "amount")
-        report_amounts = compute_effective_amounts(df, "report_amount")
+        # Identify transactions with a single non-reporting currency that are
+        # balanced in their own currency but imbalanced in the reporting currency
+        # (which was initially unspecified).
+        amounts = compute_net_sum(df, "amount")
+        report_amounts = compute_net_sum(df, "report_amount")
         grouped_currency = df.groupby("id")["currency"].agg(["nunique", "first"])
         imbalanced_mask = (
             (grouped_currency["nunique"] == 1)
@@ -932,7 +933,8 @@ class LedgerEngine(ABC):
                 txn_mask = df["id"] == txn_id
                 txn = df.loc[txn_mask].copy()
                 fx_rate = self.price(
-                    date=txn.iloc[0]["date"], ticker=txn.iloc[0]["currency"],
+                    date=txn.iloc[0]["date"],
+                    ticker=txn.iloc[0]["currency"],
                     currency=self.reporting_currency,
                 )[1]
                 unrounded_total = txn["amount"].sum() * fx_rate
@@ -943,20 +945,21 @@ class LedgerEngine(ABC):
                     current_report_sum = txn["report_amount"].sum()
                     mismatch = current_report_sum - unrounded_total
                     errors = txn["report_amount"] - unrounded_values
+                    # Exit the loop if the total mismatch is within tolerance.
                     if abs(mismatch) <= tolerance:
                         break
-                    # Total is too high; pick the row that is most 'over-rounded'
+                    # Reduce the row with the largest positive error.
                     if mismatch > tolerance:
                         idx_largest_err = errors.idxmax()
                         txn.loc[idx_largest_err, "report_amount"] -= increment
-                    # Total is too low; pick the row that is most 'under-rounded'
+                    # Increase the row with the largest negative error.
                     elif mismatch < -tolerance:
                         idx_smallest_err = errors.idxmin()
                         txn.loc[idx_smallest_err, "report_amount"] += increment
                 df.loc[txn_mask, "report_amount"] = txn["report_amount"]
 
-        # Discard imbalanced transactions
-        report_amounts = compute_effective_amounts(df, "report_amount")
+        report_amounts = compute_net_sum(df, "report_amount")
+        # TODO: Drop this line when implementing macxred/pyledger#126
         df.loc[na_mask, "report_amount"] = pd.NA
         invalid_ids = report_amounts[abs(report_amounts) > tolerance].index.to_list()
         if invalid_ids:
