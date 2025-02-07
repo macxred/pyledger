@@ -284,7 +284,7 @@ def test_sanitize_journal(engine, capture_logs):
         date,       ticker,  price, currency
         2023-12-28,    EUR, 1.1068, USD
         2023-12-29,    JPY, 0.0071, USD
-        2023-12-29,    CHF, 0.8846, USD
+        2023-12-29,    CHF, 1.1353, USD
     """
     PROFIT_CENTERS_CSV = """
         profit_center,
@@ -329,8 +329,8 @@ def test_sanitize_journal(engine, capture_logs):
          22, 2024-01-01,    1000,       ,      USD,   100000.00,              ,              ,          , Not balanced amount,
          23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,          , Balanced amount,
          23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,          , Balanced amount,
-         23, 2024-01-01,    1000,       ,      USD,   300000.00,              ,              ,          , Balanced amount,
-         23, 2024-01-01,        ,   1000,      USD,   474080.00,              ,              ,          , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,   217660.00,              ,              ,          , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,   441880.00,              ,              ,          , Balanced amount,
          24, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,          , Not balanced amount,
          24, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,          , Not balanced amount,
          24, 2024-01-01,    1000,       ,      USD,     1000.00,              ,              ,          , Not balanced amount,
@@ -360,8 +360,8 @@ def test_sanitize_journal(engine, capture_logs):
          21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,              ,         , Balanced amount,
          23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,         , Balanced amount,
          23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,    1000,       ,      USD,   300000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,        ,   1000,      USD,   474080.00,              ,              ,         , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,   217660.00,              ,              ,          , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,   441880.00,              ,              ,          , Balanced amount,
          27, 2024-12-31,        ,   1200,      CHF,     1999.99,              ,              ,         , Balanced amount,
          27, 2024-12-31,    1300,       ,      CHF,     1000.99,              ,              ,         , Balanced amount,
          27, 2024-12-31,    1400,       ,      CHF,      999.00,              ,              ,         , Balanced amount,
