@@ -1067,22 +1067,27 @@ class LedgerEngine(ABC):
                 ticker=txn.iloc[0]["currency"],
                 currency=self.reporting_currency,
             )[1]
-            increment = self.precision(self.reporting_currency)
+            # Adjust sign for 'amount' and 'report_amount' where only 'contra' is specified
+            contra_mask = txn["contra"].notna() & txn["account"].isna()
+            txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
             unrounded_values = txn["amount"] * fx_rate
+            increment = self.precision(self.reporting_currency)
 
             while True:
                 errors = txn["report_amount"] - unrounded_values
-                # Exit the loop if the total mismatch is within tolerance.
-                if abs(errors.sum()) <= tolerance:
+                # Exit if within tolerance
+                if abs(txn["report_amount"].sum()) <= tolerance:
                     break
-                # Reduce the row with the largest positive error.
-                if errors.sum() > tolerance:
+                # Reduce the row with the largest positive error
+                if txn["report_amount"].sum() > tolerance:
                     idx_largest_err = errors.idxmax()
                     txn.loc[idx_largest_err, "report_amount"] -= increment
-                # Increase the row with the largest negative error.
-                elif errors.sum() < -tolerance:
+                # Increase the row with the largest negative error
+                elif txn["report_amount"].sum() < -tolerance:
                     idx_smallest_err = errors.idxmin()
                     txn.loc[idx_smallest_err, "report_amount"] += increment
+            # Restore original sign where only 'contra' is specified
+            txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
             df.loc[txn_mask, "report_amount"] = txn["report_amount"]
 
         invalid_balance = abs(compute_net_sum(df, "report_amount")) > tolerance
