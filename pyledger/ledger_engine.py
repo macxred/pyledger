@@ -548,7 +548,7 @@ class LedgerEngine(ABC):
 
     def account_history(
         self, account: int | str | dict, period: datetime.date = None,
-        profit_centers: list[str] | str = None, drop: bool = False
+        profit_centers: list[str] | str = None, drop: bool = True
     ) -> pd.DataFrame:
         """Transaction and balance history of an account or a list of accounts.
 
@@ -590,10 +590,12 @@ class LedgerEngine(ABC):
         )
 
         if drop:
-            if not df.empty and df['account'].nunique() == 1:
+            if len(accounts) == 1:
                 df = df.drop(columns=["account"])
+            accounts_df = self.accounts.list().query("account in @accounts")
             if (
-                df["currency"].nunique() == 1 and df["currency"].iloc[0] == self.reporting_currency
+                accounts_df["currency"].nunique() == 1
+                and accounts_df["currency"].iloc[0] == self.reporting_currency
             ):
                 df = df.drop(columns=["report_amount", "report_balance"])
             mandatory = ACCOUNT_SCHEMA.query("mandatory == True")["column"].tolist()
