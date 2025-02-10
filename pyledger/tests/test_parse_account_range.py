@@ -17,6 +17,8 @@ def engine():
     [
         # Single account (int)
         (1000, {"add": [1000], "subtract": []}),
+        # Single account (float)
+        (1000.00, {"add": [1000], "subtract": []}),
         # List of accounts
         ([1000, 1020, 1025], {"add": [1000, 1020, 1025], "subtract": []}),
         # Dict format

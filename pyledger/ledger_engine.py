@@ -651,7 +651,8 @@ class LedgerEngine(ABC):
         add = []
         subtract = []
 
-        if isinstance(range, int):
+        if represents_integer(range):
+            range = int(range)
             if range not in self.accounts.list()["account"].values:
                 raise ValueError(f"No account matching '{range}'.")
             if range >= 0:
