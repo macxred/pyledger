@@ -554,21 +554,29 @@ class LedgerEngine(ABC):
 
         Args:
             account (int, str, dict): The account(s) to be evaluated. Can be a
-            sequence of accounts separated by a column, e.g. "1000:1999", in
-            which case the combined balance of all accounts within the
-            specified range is returned. Multiple accounts and/or account
-            sequences can be separated by a plus or minus sign,
-            e.g. "1000+1020:1025", in which case the combined balance of all
-            accounts is returned, or "1020:1025-1000", in which case the
-            balance of account 1000 is deducted from the combined balance of
-            accounts 1020:1025.
-            period (datetime.date, optional): The date as of which the account balance
-                                              is calculated. Defaults to None.
-            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
-                                              calculated only from journal entries assigned to one
-                                              of the profit centers in the filter.
-            drop (bool, optional): If True, drops columns that do not provide meaningful
-                                   information in the given context. Defaults to False.
+                a single account, e.g. 1020, a sequence of accounts separated
+                by a column, e.g. "1000:1999", in which case the combined
+                history of all accounts within that range is returned. Multiple
+                accounts and/or account sequences can be separated by a plus or
+                minus sign, e.g. "1000+1020:1025", in which case the combined
+                history of all accounts is returned, or "1020:1025-1000", in
+                which case the history of account 1000 is subtracted from the
+                combined history of accounts 1020:1025.
+            period (datetime.date, str, int, optional): The period for which or
+                date as of which the account balance is calculated. Periods can
+                be defined as string, e.g. "2024" (the year 2024), "2024-01"
+                (January 2024), "2024-Q1" (first quarter 2024), or as a tuple
+                with start and end date. Defaults to None.
+            profit_centers: (list[str], str): Filter for journal entries. If
+                not None, the result is calculated only from journal entries
+                assigned to one of the profit centers in the filter.
+            drop (bool, optional): If True, drops columns that do not provide
+                meaningful information in the given context:
+                - Columns that contain only NA values.
+                - The "account" column if the history is for a single account.
+                - The "report_amount" and "report_balance" columns if the history applies only
+                to accounts in the reporting currency.
+
 
         Returns:
             pd.DataFrame: DataFrame containing the transaction and balance
