@@ -961,7 +961,9 @@ class LedgerEngine(ABC):
             df.loc[txn_mask, "report_amount"] = txn["report_amount"]
 
         report_amounts = compute_net_sum(df, "report_amount")
-        # TODO: Drop this line when implementing macxred/pyledger#126
+        # TODO: This line is necessary to avoid unintended changes unrelated to the main
+        # focus of this PR. We agreed to fill 'report_amount' values in this method,
+        # but this should be done in a separate PR.
         df.loc[na_mask, "report_amount"] = pd.NA
         invalid_balance = abs(report_amounts) > tolerance
         if invalid_balance.any():
