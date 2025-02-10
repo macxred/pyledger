@@ -674,26 +674,35 @@ class LedgerEngine(ABC):
             df = df.loc[df["date"] >= pd.to_datetime(start), :]
         return df.reset_index(drop=True)
 
-    def account_range(self, range: int | str) -> dict:
+    def parse_account_range(self, range: int | str | dict | list) -> dict:
         """Determine the account range for a given input.
 
         Args:
-            range (int, str): The account range input.
+            range (int | str | dict | list): The account range input.
 
         Returns:
             dict: Dictionary with 'add' and 'subtract' lists of accounts.
         """
         add = []
         subtract = []
-        if represents_integer(range):
-            account = int(range)
-            if abs(account) in self.accounts.list()["account"].values:
-                if account >= 0:
-                    add = [account]
-                else:
-                    subtract = [abs(account)]
-        elif isinstance(range, float):
-            raise ValueError(f"`range` {range} is not an integer value.")
+
+        if isinstance(range, int):
+            if range not in self.accounts.list()["account"].values:
+                raise ValueError(f"No account matching '{range}'.")
+            if range >= 0:
+                add = [range]
+        elif isinstance(range, dict):
+            if not ("add" in range and "subtract" in range):
+                raise ValueError("Dict must have 'add' and 'subtract' keys.")
+            # Ensure values are lists
+            add = list(range.get("add", []))
+            subtract = list(range.get("subtract", []))
+            if not all(isinstance(i, int) for i in add + subtract):
+                raise ValueError("Both 'add' and 'subtract' must contain only integers.")
+        elif isinstance(range, list):
+            if not all(isinstance(i, int) for i in range):
+                raise ValueError("List elements must all be integers.")
+            add = range
         elif isinstance(range, str):
             is_addition = True
             for element in re.split(r"(-|\+)", range.strip()):
@@ -723,9 +732,9 @@ class LedgerEngine(ABC):
                         subtract += accounts
         else:
             raise ValueError(
-                f"Expecting int, float, or str `range`, not {type(range).__name__} {range}."
+                f"Expecting int, str, dict, or list for range, not {type(range).__name__}."
             )
-        if (len(add) == 0) and (len(subtract) == 0):
+        if not add and not subtract:
             raise ValueError(f"No account matching '{range}'.")
         return {"add": add, "subtract": subtract}
 
