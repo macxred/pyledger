@@ -518,30 +518,10 @@ class LedgerEngine(ABC):
         """
         start, end = parse_date_span(period)
         if start is None:
-            # Account balance per a single point in time
-            if represents_integer(account):
-                result = self._single_account_balance(
-                    account=abs(int(account)), date=end, profit_centers=profit_centers
-                )
-                if int(account) < 0:
-                    result = {key: -1.0 * val for key, val in result.items()}
-            elif (
-                isinstance(account, dict)
-                and ("add" in account.keys())
-                and ("subtract" in account.keys())
-            ):
-                result = self._account_balance_range(
-                    accounts=account, date=end, profit_centers=profit_centers
-                )
-            elif isinstance(account, str):
-                accounts = self.account_range(account)
-                result = self._account_balance_range(
-                    accounts=accounts, date=end, profit_centers=profit_centers
-                )
-            else:
-                raise ValueError(
-                    f"Account(s) '{account}' of type {type(account).__name__} not identifiable."
-                )
+            accounts = self.parse_account_range(account)
+            result = self._account_balance_range(
+                accounts=accounts, date=end, profit_centers=profit_centers
+            )
         else:
             # Account balance over a period
             at_start = self.account_balance(
@@ -593,42 +573,11 @@ class LedgerEngine(ABC):
                           history of the account(s).
         """
         start, end = parse_date_span(period)
-        # Account balance per a single point in time
-        if represents_integer(account):
-            account = int(account)
-            if account not in self.accounts.list()[["account"]].values:
-                raise ValueError(f"No account matching '{account}'.")
-            out = self._fetch_account_history(
-                account, start=start, end=end, profit_centers=profit_centers
-            )
-        elif (
-            isinstance(account, dict)
-            and ("add" in account.keys())
-            and ("subtract" in account.keys())
-        ):
-            accounts = list(set(account["add"]) - set(account["subtract"]))
-            out = self._fetch_account_history(
-                accounts, start=start, end=end, profit_centers=profit_centers
-            )
-        elif isinstance(account, str):
-            accounts = self.account_range(account)
-            accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
-            out = self._fetch_account_history(
-                accounts, start=start, end=end, profit_centers=profit_centers
-            )
-        elif isinstance(account, list):
-            not_integer = [i for i in account if not represents_integer(i)]
-            if any(not_integer):
-                raise ValueError(f"Non-integer list elements in `account`: {not_integer}.")
-            accounts = account = [int(i) for i in account]
-            out = self._fetch_account_history(
-                accounts, start=start, end=end, profit_centers=profit_centers
-            )
-        else:
-            raise ValueError(
-                f"Account(s) '{account}' of type {type(account).__name__} not identifiable."
-            )
-
+        accounts = self.parse_account_range(account)
+        accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
+        out = self._fetch_account_history(
+            accounts, start=start, end=end, profit_centers=profit_centers
+        )
         return out
 
     def _fetch_account_history(
@@ -1357,7 +1306,7 @@ class LedgerEngine(ABC):
             """
             valid_list = []
             for acc, d in zip(accounts, dates):
-                accounts_range = self.account_range(acc)
+                accounts_range = self.parse_account_range(acc)
                 accounts_set = set(accounts_range["add"]) - set(accounts_range["subtract"])
                 # Assume this row is valid until a missing price definition is found
                 all_valid = True
