@@ -623,14 +623,30 @@ class LedgerEngine(ABC):
             df = df.loc[df["date"] >= pd.to_datetime(start), :]
         return df.reset_index(drop=True)
 
-    def parse_account_range(self, range: int | str | dict | list) -> dict:
+    def parse_account_range(self, range: str | int | dict[str, list[int]] | list[int]) -> dict:
         """Determine the account range for a given input.
 
         Args:
-            range (int | str | dict | list): The account range input.
+            range (str | int | dict[str, list[int]] | list[int]): The account(s) to be evaluated.
+                - **str**: Can be a sequence of accounts formatted as follows:
+                    - A colon (`:`) defines a range, e.g., `"1000:1999"`, which includes all
+                    accounts within the specified range.
+                    - A plus (`+`) adds multiple accounts or ranges, e.g., `"1000+1020:1025"`,
+                    which includes `1000` and all accounts from `1020` to `1025`.
+                    - A minus (`-`) excludes accounts or ranges, e.g., `"1020:1025-1000"`,
+                    where `1000` is excluded from the selection.
+                - **int**: A single numeric account number.
+                - **dict[str, list[int]]**: A dictionary with `"add"` and `"subtract"` keys,
+                each containing a list of account numbers to be included or excluded.
+                - **list[int]**: A list of account numbers to be included in `"add"`.
 
         Returns:
-            dict: Dictionary with 'add' and 'subtract' lists of accounts.
+            dict: A dictionary with the following structure:
+                - "add" (list[int]): Accounts to be included.
+                - "subtract" (list[int]): Accounts to be excluded.
+
+        Raises:
+            ValueError: If the input format is invalid or no matching accounts are found.
         """
         add = []
         subtract = []
