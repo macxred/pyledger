@@ -360,14 +360,14 @@ def test_sanitize_journal(engine, capture_logs):
          21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,              ,         , Balanced amount,
          23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,         , Balanced amount,
          23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,    1000,       ,      USD,   217660.00,              ,              ,          , Balanced amount,
-         23, 2024-01-01,        ,   1000,      USD,   441880.00,              ,              ,          , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,   217660.00,              ,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,   441880.00,              ,              ,         , Balanced amount,
          27, 2024-12-31,        ,   1200,      CHF,     1999.99,              ,              ,         , Balanced amount,
          27, 2024-12-31,    1300,       ,      CHF,     1000.99,              ,              ,         , Balanced amount,
          27, 2024-12-31,    1400,       ,      CHF,      999.00,              ,              ,         , Balanced amount,
-         28, 2024-12-31,    1200,       ,      CHF,    -1999.99,              ,              ,          , Balanced amount,
-         28, 2024-12-31,        ,   1300,      CHF,    -1000.99,              ,              ,          , Balanced amount,
-         28, 2024-12-31,        ,   1400,      CHF,     -999.00,              ,              ,          , Balanced amount,
+         28, 2024-12-31,    1200,       ,      CHF,    -1999.99,              ,              ,         , Balanced amount,
+         28, 2024-12-31,        ,   1300,      CHF,    -1000.99,              ,              ,         , Balanced amount,
+         28, 2024-12-31,        ,   1400,      CHF,     -999.00,              ,              ,         , Balanced amount,
     """
     EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document

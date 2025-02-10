@@ -1032,7 +1032,6 @@ class LedgerEngine(ABC):
             return values.groupby(df["id"]).sum()
 
         tolerance = self.precision(self.reporting_currency) / 2
-
         # Identify transactions with a single non-reporting currency that are
         # balanced in their own currency but imbalanced in the reporting currency
         # (which was initially unspecified).
@@ -1072,7 +1071,6 @@ class LedgerEngine(ABC):
             txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
             unrounded_values = txn["amount"] * fx_rate
             increment = self.precision(self.reporting_currency)
-
             while True:
                 errors = txn["report_amount"] - unrounded_values
                 # Exit if within tolerance
