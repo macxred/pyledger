@@ -662,11 +662,12 @@ class LedgerEngine(ABC):
         subtract = []
 
         if represents_integer(range):
-            range = int(range)
-            if range not in self.accounts.list()["account"].values:
-                raise ValueError(f"No account matching '{range}'.")
-            if range >= 0:
-                add = [range]
+            account = int(range)
+            if abs(account) in self.accounts.list()["account"].values:
+                if account >= 0:
+                    add = [account]
+                else:
+                    subtract = [abs(account)]
         elif isinstance(range, dict):
             if not ("add" in range and "subtract" in range):
                 raise ValueError("Dict must have 'add' and 'subtract' keys.")

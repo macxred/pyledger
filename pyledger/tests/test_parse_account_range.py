@@ -7,6 +7,7 @@ from pyledger.tests.base_test import BaseTest
 
 @pytest.fixture
 def engine():
+    """Fixture to initialize and restore the ledger engine."""
     engine = MemoryLedger()
     engine.restore(accounts=BaseTest.ACCOUNTS, tax_codes=BaseTest.TAX_CODES)
     return engine
@@ -31,8 +32,20 @@ def engine():
         ("1000+1020:1025", {"add": [1000, 1020, 1025], "subtract": []}),
         # String: multiple accounts with +
         ("1000:1010+1020:1020", {"add": [1000, 1005, 1010, 1020], "subtract": []}),
-        # String: range with subtraction
-        ("1020:1025-1000", {"add": [1020, 1025], "subtract": [1000]}),
+        # Single negative account (int)
+        (-1020, {"add": [], "subtract": [1020]}),
+        # Single negative account (str)
+        ("-1020", {"add": [], "subtract": [1020]}),
+        # Subtracting range
+        ("-1020:1029", {"add": [], "subtract": [1020, 1025]}),
+        # Excluding 1010 from range
+        ("1000:1020-1010", {"add": [1000, 1005, 1010, 1015, 1020], "subtract": [1010]}),
+        # Single subtraction + addition
+        ("-1000+1020:1025", {"add": [1020, 1025], "subtract": [1000]}),
+        # Multiple direct subtractions
+        ("-1020-1025", {"add": [], "subtract": [1020, 1025]}),
+        # Complex mix
+        ("1000+1020:1025-1010:1020", {"add": [1000, 1020, 1025], "subtract": [1010, 1015, 1020]}),
     ]
 )
 def test_parse_account_range_valid_inputs(input_value, expected_output, engine):
