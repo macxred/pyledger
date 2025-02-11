@@ -626,7 +626,7 @@ class LedgerEngine(ABC):
     def parse_account_range(
         self, range: str | int | dict[str, list[int]] | list[int]
     ) -> dict:
-        """Determine the account range for a given input.
+        """Convert an account range into a standard format.
 
         Args:
             range (str | int | dict[str, list[int]] | list[int]): The account(s) to be evaluated.
@@ -652,8 +652,8 @@ class LedgerEngine(ABC):
         Returns:
             dict: A dictionary with the following structure:
                 - `"add"` (list[int]): Accounts to be included.
-                - `"subtract"` (list[int]): Accounts to be excluded or
-                for `account_balance`, subtracted.
+                - `"subtract"` (list[int]): Accounts to be excluded or,
+                  for `account_balance`, subtracted.
 
         Raises:
             ValueError: If the input format is invalid or no matching accounts are found.
