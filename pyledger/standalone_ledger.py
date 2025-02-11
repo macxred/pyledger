@@ -108,10 +108,12 @@ class StandaloneLedger(LedgerEngine):
     # Accounts
 
     def _single_account_balance(
-        self, account: int, date: datetime.date = None, profit_centers: list[str] | str = None
+        self, account: int, start: datetime.date = None, end: datetime.date = None,
+        profit_centers: list[str] | str = None
     ) -> dict:
         return self._balance_from_serialized_ledger(
-            self.serialized_ledger(), account=account, date=date, profit_centers=profit_centers
+            self.serialized_ledger(), account=account, start=start, end=end,
+            profit_centers=profit_centers
         )
 
     # ----------------------------------------------------------------------
@@ -164,7 +166,7 @@ class StandaloneLedger(LedgerEngine):
             for account in accounts:
                 currency = self.account_currency(account)
                 if currency != reporting_currency:
-                    balance = self._balance_from_serialized_ledger(df, account, date=date)
+                    balance = self._balance_from_serialized_ledger(df, account, end=date)
                     fx_rate = self.price(currency, date=date, currency=reporting_currency)
                     if fx_rate[0] != reporting_currency:
                         raise ValueError(
@@ -198,8 +200,8 @@ class StandaloneLedger(LedgerEngine):
         return self.journal.standardize(pd.DataFrame(result))
 
     def _balance_from_serialized_ledger(
-        self, ledger: pd.DataFrame, account: int, date: datetime.date = None,
-        profit_centers: list[str] | str = None
+        self, ledger: pd.DataFrame, account: int, start: datetime.date = None,
+        end: datetime.date = None, profit_centers: list[str] | str = None
     ) -> dict:
         """Compute balance from serialized ledger.
 
@@ -226,8 +228,10 @@ class StandaloneLedger(LedgerEngine):
                     f"Profit centers: {', '.join(invalid_profit_centers)} do not exist."
                 )
             rows = rows & (ledger["profit_center"].isin(profit_centers))
-        if date is not None:
-            rows = rows & (ledger["date"] <= pd.Timestamp(date))
+        if start is not None:
+            rows = rows & (ledger["date"] >= pd.Timestamp(start))
+        if end is not None:
+            rows = rows & (ledger["date"] <= pd.Timestamp(end))
         cols = ["amount", "report_amount", "currency"]
         if rows.sum() == 0:
             result = {"reporting_currency": 0.0}

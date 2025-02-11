@@ -467,7 +467,7 @@ class LedgerEngine(ABC):
         result = {}
         for account in accounts:
             account_balance = self._single_account_balance(
-                account, date=date, profit_centers=profit_centers
+                account, end=date, profit_centers=profit_centers
             )
             for currency, value in account_balance.items():
                 result[currency] = result.get(currency, 0) + value
@@ -582,8 +582,9 @@ class LedgerEngine(ABC):
         # Look up account balance
         start, end = parse_date_span(period)
         def _balance_lookup(account, currency):
-            # TODO: Adapt "_single_account_balance" to accept start and end
-            balance = self._single_account_balance(account, end, profit_centers=profit_centers)
+            balance = self._single_account_balance(
+                account, start=start, end=end, profit_centers=profit_centers
+            )
             return balance.get(currency, 0), balance.get("reporting_currency", 0)
         balances = [_balance_lookup(account, currency)
                     for account, currency in zip(result["account"], result["currency"])]
