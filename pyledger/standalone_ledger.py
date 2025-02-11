@@ -158,7 +158,7 @@ class StandaloneLedger(LedgerEngine):
             revalue = self.journal.standardize(pd.DataFrame(result))
             df = self.serialize_ledger(pd.concat([ledger, revalue]))
             date = row["date"]
-            accounts = self.account_range(row["account"])
+            accounts = self.parse_account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
 
             for account in accounts:

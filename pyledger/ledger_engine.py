@@ -518,30 +518,10 @@ class LedgerEngine(ABC):
         """
         start, end = parse_date_span(period)
         if start is None:
-            # Account balance per a single point in time
-            if represents_integer(account):
-                result = self._single_account_balance(
-                    account=abs(int(account)), date=end, profit_centers=profit_centers
-                )
-                if int(account) < 0:
-                    result = {key: -1.0 * val for key, val in result.items()}
-            elif (
-                isinstance(account, dict)
-                and ("add" in account.keys())
-                and ("subtract" in account.keys())
-            ):
-                result = self._account_balance_range(
-                    accounts=account, date=end, profit_centers=profit_centers
-                )
-            elif isinstance(account, str):
-                accounts = self.account_range(account)
-                result = self._account_balance_range(
-                    accounts=accounts, date=end, profit_centers=profit_centers
-                )
-            else:
-                raise ValueError(
-                    f"Account(s) '{account}' of type {type(account).__name__} not identifiable."
-                )
+            accounts = self.parse_account_range(account)
+            result = self._account_balance_range(
+                accounts=accounts, date=end, profit_centers=profit_centers
+            )
         else:
             # Account balance over a period
             at_start = self.account_balance(
@@ -593,42 +573,11 @@ class LedgerEngine(ABC):
                           history of the account(s).
         """
         start, end = parse_date_span(period)
-        # Account balance per a single point in time
-        if represents_integer(account):
-            account = int(account)
-            if account not in self.accounts.list()[["account"]].values:
-                raise ValueError(f"No account matching '{account}'.")
-            out = self._fetch_account_history(
-                account, start=start, end=end, profit_centers=profit_centers
-            )
-        elif (
-            isinstance(account, dict)
-            and ("add" in account.keys())
-            and ("subtract" in account.keys())
-        ):
-            accounts = list(set(account["add"]) - set(account["subtract"]))
-            out = self._fetch_account_history(
-                accounts, start=start, end=end, profit_centers=profit_centers
-            )
-        elif isinstance(account, str):
-            accounts = self.account_range(account)
-            accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
-            out = self._fetch_account_history(
-                accounts, start=start, end=end, profit_centers=profit_centers
-            )
-        elif isinstance(account, list):
-            not_integer = [i for i in account if not represents_integer(i)]
-            if any(not_integer):
-                raise ValueError(f"Non-integer list elements in `account`: {not_integer}.")
-            accounts = account = [int(i) for i in account]
-            out = self._fetch_account_history(
-                accounts, start=start, end=end, profit_centers=profit_centers
-            )
-        else:
-            raise ValueError(
-                f"Account(s) '{account}' of type {type(account).__name__} not identifiable."
-            )
-
+        accounts = self.parse_account_range(account)
+        accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
+        out = self._fetch_account_history(
+            accounts, start=start, end=end, profit_centers=profit_centers
+        )
         return out
 
     def _fetch_account_history(
@@ -674,17 +623,44 @@ class LedgerEngine(ABC):
             df = df.loc[df["date"] >= pd.to_datetime(start), :]
         return df.reset_index(drop=True)
 
-    def account_range(self, range: int | str) -> dict:
-        """Determine the account range for a given input.
+    def parse_account_range(
+        self, range: str | int | dict[str, list[int]] | list[int]
+    ) -> dict:
+        """Convert an account range into a standard format.
 
         Args:
-            range (int, str): The account range input.
+            range (str | int | dict[str, list[int]] | list[int]): The account(s) to be evaluated.
+                - **str**: Can be a sequence of accounts formatted as follows:
+                    - A colon (`:`) defines a range, e.g., `"1000:1999"`, which includes all
+                    accounts within the specified range.
+                    - A plus (`+`) adds multiple accounts or ranges, e.g., `"1000+1020:1025"`,
+                    which includes `1000` and all accounts from `1020` to `1025`.
+                    - A minus (`-`) excludes accounts or ranges, e.g., `"1020:1030-1022"`,
+                    where `1022` is excluded from the selection. In `account_balance`,
+                    the minus sign is used to subtract the balance of accounts or ranges,
+                    e.g., `"-2020:2030"` returns the balance of accounts `2020` to `2030`
+                    multiplied by `-1`, or `"1020:1030-2020:2030"` subtracts the balance
+                    of accounts `2020` to `2030` from the balance of accounts `1020` to `1030`.
+                - **int**: A single numeric account number to add (positive number)
+                    or subtract (negative number).
+                - **dict[str, list[int]]**: A dictionary with `"add"` and `"subtract"` keys,
+                    each containing a list of account numbers to be included or excluded.
+                    Same as the return value.
+                - **list[int]**: A list of account numbers to use, same as `"add"` key
+                    in the return value.
 
         Returns:
-            dict: Dictionary with 'add' and 'subtract' lists of accounts.
+            dict: A dictionary with the following structure:
+                - `"add"` (list[int]): Accounts to be included.
+                - `"subtract"` (list[int]): Accounts to be excluded or,
+                  for `account_balance`, subtracted.
+
+        Raises:
+            ValueError: If the input format is invalid or no matching accounts are found.
         """
         add = []
         subtract = []
+
         if represents_integer(range):
             account = int(range)
             if abs(account) in self.accounts.list()["account"].values:
@@ -692,8 +668,18 @@ class LedgerEngine(ABC):
                     add = [account]
                 else:
                     subtract = [abs(account)]
-        elif isinstance(range, float):
-            raise ValueError(f"`range` {range} is not an integer value.")
+        elif isinstance(range, dict):
+            if not ("add" in range and "subtract" in range):
+                raise ValueError("Dict must have 'add' and 'subtract' keys.")
+            # Ensure values are lists
+            add = list(range.get("add", []))
+            subtract = list(range.get("subtract", []))
+            if not all(isinstance(i, int) for i in add + subtract):
+                raise ValueError("Both 'add' and 'subtract' must contain only integers.")
+        elif isinstance(range, list):
+            if not all(isinstance(i, int) for i in range):
+                raise ValueError("List elements must all be integers.")
+            add = range
         elif isinstance(range, str):
             is_addition = True
             for element in re.split(r"(-|\+)", range.strip()):
@@ -723,9 +709,9 @@ class LedgerEngine(ABC):
                         subtract += accounts
         else:
             raise ValueError(
-                f"Expecting int, float, or str `range`, not {type(range).__name__} {range}."
+                f"Expecting int, str, dict, or list for range, not {type(range).__name__}."
             )
-        if (len(add) == 0) and (len(subtract) == 0):
+        if not add and not subtract:
             raise ValueError(f"No account matching '{range}'.")
         return {"add": add, "subtract": subtract}
 
@@ -1348,7 +1334,7 @@ class LedgerEngine(ABC):
             """
             valid_list = []
             for acc, d in zip(accounts, dates):
-                accounts_range = self.account_range(acc)
+                accounts_range = self.parse_account_range(acc)
                 accounts_set = set(accounts_range["add"]) - set(accounts_range["subtract"])
                 # Assume this row is valid until a missing price definition is found
                 all_valid = True
