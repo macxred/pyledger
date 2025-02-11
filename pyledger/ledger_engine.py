@@ -623,7 +623,9 @@ class LedgerEngine(ABC):
             df = df.loc[df["date"] >= pd.to_datetime(start), :]
         return df.reset_index(drop=True)
 
-    def parse_account_range(self, range: str | int | dict[str, list[int]] | list[int]) -> dict:
+    def parse_account_range(
+        self, range: str | int | dict[str, list[int]] | list[int]
+    ) -> dict:
         """Determine the account range for a given input.
 
         Args:
@@ -633,17 +635,25 @@ class LedgerEngine(ABC):
                     accounts within the specified range.
                     - A plus (`+`) adds multiple accounts or ranges, e.g., `"1000+1020:1025"`,
                     which includes `1000` and all accounts from `1020` to `1025`.
-                    - A minus (`-`) excludes accounts or ranges, e.g., `"1020:1025-1000"`,
-                    where `1000` is excluded from the selection.
-                - **int**: A single numeric account number.
+                    - A minus (`-`) excludes accounts or ranges, e.g., `"1020:1030-1022"`,
+                    where `1022` is excluded from the selection. In `account_balance`,
+                    the minus sign is used to subtract the balance of accounts or ranges,
+                    e.g., `"-2020:2030"` returns the balance of accounts `2020` to `2030`
+                    multiplied by `-1`, or `"1020:1030-2020:2030"` subtracts the balance
+                    of accounts `2020` to `2030` from the balance of accounts `1020` to `1030`.
+                - **int**: A single numeric account number to add (positive number)
+                    or subtract (negative number).
                 - **dict[str, list[int]]**: A dictionary with `"add"` and `"subtract"` keys,
-                each containing a list of account numbers to be included or excluded.
-                - **list[int]**: A list of account numbers to be included in `"add"`.
+                    each containing a list of account numbers to be included or excluded.
+                    Same as the return value.
+                - **list[int]**: A list of account numbers to use, same as `"add"` key
+                    in the return value.
 
         Returns:
             dict: A dictionary with the following structure:
-                - "add" (list[int]): Accounts to be included.
-                - "subtract" (list[int]): Accounts to be excluded.
+                - `"add"` (list[int]): Accounts to be included.
+                - `"subtract"` (list[int]): Accounts to be excluded or
+                for `account_balance`, subtracted.
 
         Raises:
             ValueError: If the input format is invalid or no matching accounts are found.
