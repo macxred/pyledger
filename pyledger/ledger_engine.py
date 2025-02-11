@@ -6,7 +6,7 @@ import logging
 import math
 import zipfile
 import json
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Dict, List
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
@@ -15,6 +15,7 @@ import openpyxl
 import pandas as pd
 from .decorators import timed_cache
 from .constants import (
+    ACCOUNT_BALANCE_SCHEMA,
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
     JOURNAL_SCHEMA,
@@ -556,9 +557,7 @@ class LedgerEngine(ABC):
         profit_centers: list[str] | str | None = None,
     ) -> pd.DataFrame:
         """
-        Query balances of multiple accounts.
-
-        Compute the balance of multiple accounts in one call,
+        Query balances of multiple accounts in one call,
         returning separate balance for each account.
 
         Args:
@@ -575,12 +574,13 @@ class LedgerEngine(ABC):
         # Gather account list
         result = self.accounts.list()[["group", "description", "account", "currency"]]
         if accounts is not None:
-            account_dict = self.account_range(accounts)
+            account_dict = self.parse_account_range(accounts)
             account_list = list(set(account_dict["add"]) - set(account_dict["subtract"]))
             result = result.loc[result["account"].isin(account_list)]
 
-        # Look up account balance
         start, end = parse_date_span(period)
+
+        # Look up account balance
         def _balance_lookup(account, currency):
             balance = self._single_account_balance(
                 account, start=start, end=end, profit_centers=profit_centers
@@ -589,6 +589,7 @@ class LedgerEngine(ABC):
         balances = [_balance_lookup(account, currency)
                     for account, currency in zip(result["account"], result["currency"])]
         result[["balance", "report_balance"]] = pd.DataFrame(balances, index=result.index)
+        result = enforce_schema(result, ACCOUNT_BALANCE_SCHEMA)
         return result
 
     def account_history(
