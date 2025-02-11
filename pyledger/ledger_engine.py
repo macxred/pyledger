@@ -541,7 +541,6 @@ class LedgerEngine(ABC):
         accounts: str | dict | None,
         period: str | datetime.date | None = None,
         profit_centers: list[str] | str | None = None,
-        aggregate: int | None = None
     ) -> pd.DataFrame:
         """
         Query balances of multiple accounts.
@@ -552,11 +551,9 @@ class LedgerEngine(ABC):
         Args:
             accounts (str, dict): The account(s) to be evaluated.
             period (datetime.date, optional): The date or date range for which account balances
-                                            are calculated. Defaults to None.
+                                              are calculated. Defaults to None.
             profit_centers (list[str], str, optional): If not None, the result is calculated only
                            from ledger entries assigned to the specified profit centers.
-            aggregate (int, optional): If provided, group accounts up to a specified hierarchy
-                      level in their group paths and sum the report_balance in each group.
 
         Returns:
             pd.DataFrame: A data frame with ... schema,
@@ -578,50 +575,7 @@ class LedgerEngine(ABC):
         balances = [_balance_lookup(account, currency)
                     for account, currency in zip(result["account"], result["currency"])]
         result[["balance", "report_balance"]] = pd.DataFrame(balances, index=result.index)
-
-        # Aggregate by group paths
-        if aggregate is not None:
-            def _prune_path(group, account_description, n):
-                if pd.isna(group):
-                    return (group, account_description)
-                if group.startswith("/"):
-                    if len(PurePosixPath(group).parts) <= n+1:
-                        return (group, account_description)
-                    else:
-                        path = PurePosixPath(group)
-                        return (str(path.parents[-(n + 1)]) if n > 0 else pd.NA, path.parts[n+1])
-                else:
-                    if len(PurePosixPath(group).parts) <= n:
-                        return (group, account_description)
-                    else:
-                        path = PurePosixPath(group)
-                        return (str(path.parents[-(n + 1)]) if n > 0 else pd.NA, path.parts[n])
-
-            # Ad hoc test:
-            # x = 'Aktiven/Anlagevermögen/Finanzanlagen/Darlehen'
-            # assert _prune_path(x, "bla", 0) == (pd.NA, "Aktiven")
-            # assert _prune_path(x, "bla", 1) == ("Aktiven", "Anlagevermögen")
-            # assert _prune_path(x, "bla", 2) == ("Aktiven/Anlagevermögen", "Finanzanlagen")
-            # assert _prune_path(x, "bla", 3) == ("Aktiven/Anlagevermögen/Finanzanlagen", "Darlehen")
-            # assert _prune_path(x, "bla", 4) == (x, "bla")
-            # assert _prune_path(x, "bla", 42) == (x, "bla")
-            # x = '/Aktiven/Anlagevermögen/Finanzanlagen/Darlehen'
-            # assert _prune_path(x, "bla", 0) == (pd.NA, "Aktiven")
-            # assert _prune_path(x, "bla", 1) == ("/Aktiven", "Anlagevermögen")
-            # assert _prune_path(x, "bla", 2) == ("/Aktiven/Anlagevermögen", "Finanzanlagen")
-            # assert _prune_path(x, "bla", 3) == ("/Aktiven/Anlagevermögen/Finanzanlagen", "Darlehen")
-            # assert _prune_path(x, "bla", 4) == (x, "bla")
-            # assert _prune_path(x, "bla", 42) == (x, "bla")
-
-            new_groups = [_prune_path(group, text, n=aggregate)
-                    for group, text in zip(result["group"], result["description"])]
-            breakpoint()
-            result[["group", "description"]] = pd.DataFrame(new_groups, index=result.index)
-            result = result.groupby(["group", "description"], dropna=False, sort=False)
-            result = result["report_balance"].sum().reset_index()
-
         return result
-
 
     def account_history(
         self,
