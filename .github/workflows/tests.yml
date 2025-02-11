@@ -35,7 +35,7 @@ jobs:
           python-version: "3.x"
 
       - name: Install dependencies
-        run: pip install coverage setuptools .
+        run: pip install pytest coverage setuptools .
 
       - name: Run tests with coverage
         run: coverage run -m pytest -W error
