@@ -9,7 +9,6 @@ setup(
         'pandas',
         'xlsxwriter',
         'openpyxl',
-        'pytest',
         'pyyaml',
         'consistent_df @ https://github.com/macxred/consistent_df/tarball/main'
     ],
@@ -22,11 +21,8 @@ setup(
     extras_require={
         "dev": [
             "flake8",
-            "flake8-import-order",
-            "flake8-docstrings",
-            "flake8-bugbear",
             "bandit",
-            "pytest-cov"
+            "pytest",
         ]
     }
 )
