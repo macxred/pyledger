@@ -547,40 +547,44 @@ class LedgerEngine(ABC):
         return result
 
     def account_history(
-        self, account: int | str | dict, period: datetime.date = None,
-        profit_centers: list[str] | str = None, drop: bool = True
+        self,
+        account: int | str | dict,
+        period: datetime.date = None,
+        profit_centers: list[str] | str = None,
+        drop: bool = True
     ) -> pd.DataFrame:
-        """Transaction and balance history of an account or a list of accounts.
+        """
+        Return the transaction history for the specified account(s).
+
+        Fetches all transactions in chronological order for a single account,
+        an account range (e.g., "1000:1999"), or multiple/ranges combined
+        (e.g., "1000+1020:1025" or "1020:1025-1000") within the given period.
+        The resulting DataFrame includes `balance` (transaction currency) and
+        `report_balance` (reporting currency).
 
         Args:
-            account (int, str, dict): The account(s) to be evaluated. Can be a
-                a single account, e.g. 1020, a sequence of accounts separated
-                by a column, e.g. "1000:1999", in which case the combined
-                history of all accounts within that range is returned. Multiple
-                accounts and/or account sequences can be separated by a plus or
-                minus sign, e.g. "1000+1020:1025", in which case the combined
-                history of all accounts is returned, or "1020:1025-1000", in
-                which case the history of account 1000 is subtracted from the
-                combined history of accounts 1020:1025.
-            period (datetime.date, str, int, optional): The period for which or
-                date as of which the account balance is calculated. Periods can
-                be defined as string, e.g. "2024" (the year 2024), "2024-01"
-                (January 2024), "2024-Q1" (first quarter 2024), or as a tuple
-                with start and end date. Defaults to None.
-            profit_centers: (list[str], str): Filter for journal entries. If
-                not None, the result is calculated only from journal entries
-                assigned to one of the profit centers in the filter.
-            drop (bool, optional): If True, drops columns that do not provide
-                meaningful information in the given context:
-                - Columns that contain only NA values.
-                - The "account" column if the history is for a single account.
-                - The "report_amount" and "report_balance" columns if the history applies only
-                to accounts in the reporting currency.
-
+            account (int | str | dict): Account(s) to retrieve. Accepts:
+                - Single account (e.g., 1020)
+                - Account range (e.g., "1000:1999")
+                - Combinations using "+" or "-" (e.g., "1000+1020:1025")
+                See `parse_account_range` for details.
+            period (datetime.date | str | int, optional): Period or date for the
+                transactions. Can be specified as a year ("2024"), month ("2024-01"),
+                quarter ("2024-Q1"), or start-end tuple. Defaults to None.
+                See `parse_date_span` for details.
+            profit_centers (list[str] | str, optional): Filter results by these
+                profit center(s). Defaults to None.
+            drop (bool, optional): If True, drops redundant information:
+                - Columns containing only NA values
+                - The "account" column if a single account is queried
+                - "report_amount" and "report_balance" if only reporting currency
+                accounts are queried
+                Defaults to True.
 
         Returns:
-            pd.DataFrame: DataFrame containing the transaction and balance
-                          history of the account(s).
+            pd.DataFrame: Transaction history in JOURNAL_SCHEMA with additional
+            `balance` and `report_balance` columns, potentially excluding
+            columns if `drop` is True.
         """
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
@@ -602,6 +606,7 @@ class LedgerEngine(ABC):
             remove = df.columns.difference(mandatory)
             if df.empty or df[remove].isna().all().all():
                 df = df.drop(columns=remove)
+
         return df
 
     def _fetch_account_history(
