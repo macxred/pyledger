@@ -57,6 +57,11 @@ class TestLedger(BaseTestJournal):
         expected_journal = engine.journal.standardize(None)
         assert_frame_equal(engine.journal.list(), expected_journal)
 
+    def test_write_empty_journal_file(self, engine):
+        """write_journal_file() should not raise an error when writing empty journal DataFrame"""
+        filename = engine.root / "empty.csv"
+        engine.write_journal_file(None, filename)
+
     def test_extra_columns(self, engine):
         extra_cols = ["new_column", "second_new_column"]
         entries = self.JOURNAL.query("id in ['1', '2']").copy()
