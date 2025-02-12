@@ -81,7 +81,10 @@ def write_fixed_width_csv(
     for i, colname in enumerate(df.columns):
         col = df[colname]
         col_str = pd.Series(np.where(col.isna(), na_rep, col.astype(str)))
-        max_length = max(col_str.str.len().max(), len(colname))
+        max_col_str = col_str.str.len().max()
+        if pd.isna(max_col_str):
+            max_col_str = 0
+        max_length = max(max_col_str, len(colname))
         if i < fixed_width_cols:
             col_str = col_str.str.rjust(max_length)
             colname = colname.rjust(max_length)
