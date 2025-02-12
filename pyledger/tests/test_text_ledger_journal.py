@@ -4,6 +4,8 @@ import pytest
 import pandas as pd
 from pyledger import TextLedger
 from consistent_df import assert_frame_equal
+
+from pyledger.constants import JOURNAL_SCHEMA
 from .base_test_journal import BaseTestJournal
 
 
@@ -58,9 +60,12 @@ class TestLedger(BaseTestJournal):
         assert_frame_equal(engine.journal.list(), expected_journal)
 
     def test_write_empty_journal_file(self, engine):
-        """write_journal_file() should not raise an error when writing empty journal DataFrame"""
+        """Ensure write_journal_file() saves mandatory columns for an empty DataFrame."""
         filename = engine.root / "empty.csv"
         engine.write_journal_file(None, filename)
+        df = pd.read_csv(filename)
+        mandatory = JOURNAL_SCHEMA["column"][JOURNAL_SCHEMA["mandatory"]].tolist()
+        assert df.columns.str.strip().tolist() == mandatory, "Missing mandatory columns"
 
     def test_extra_columns(self, engine):
         extra_cols = ["new_column", "second_new_column"]
