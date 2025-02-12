@@ -14,6 +14,16 @@ def test_empty_df():
     assert output == '\n', "Failed on empty DataFrame"
 
 
+def test_empty_df_with_column_names():
+    df = pd.DataFrame({
+        'Col1': [],
+        'LongerCol2': [],
+        'Col3': []
+    })
+    output = write_fixed_width_csv(df)
+    assert output == 'Col1, LongerCol2, Col3\n', "Failed on empty DataFrame with column names"
+
+
 def test_single_column_df():
     df = pd.DataFrame({'A': [1, 2, 3]})
     output = write_fixed_width_csv(df)
