@@ -164,21 +164,24 @@ class TextLedger(StandaloneLedger):
         """
         df = enforce_schema(df, JOURNAL_SCHEMA, sort_columns=True, keep_extra_columns=True)
 
-        # Record date only on the first row of collective transactions
-        df = df.iloc[self.journal._id_from_path(df["id"]).argsort(kind="mergesort")]
-        df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
+        if not df.empty:
+            # Record date only on the first row of collective transactions
+            df = df.iloc[self.journal._id_from_path(df["id"]).argsort(kind="mergesort")]
+            df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
 
-        # Apply the smallest precision
-        def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
-            """Formats a series to a specific decimal precision."""
-            decimal_places = -1 * math.floor(math.log10(precision))
-            return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
+            # Apply the smallest precision
+            def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
+                """Formats a series to a specific decimal precision."""
+                decimal_places = -1 * math.floor(math.log10(precision))
+                return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
 
-        increment = df.apply(lambda row: self.precision(row["currency"], row["date"]), axis=1).min()
-        df["amount"] = format_with_precision(df["amount"], increment)
-        df["report_amount"] = format_with_precision(
-            df["report_amount"], self.precision(self.reporting_currency)
-        )
+            increment = df.apply(
+                lambda row: self.precision(row["currency"], row["date"]), axis=1
+            ).min()
+            df["amount"] = format_with_precision(df["amount"], increment)
+            df["report_amount"] = format_with_precision(
+                df["report_amount"], self.precision(self.reporting_currency)
+            )
 
         # Drop columns that are all NA and not required by the schema
         na_columns = df.columns[df.isna().all()]
