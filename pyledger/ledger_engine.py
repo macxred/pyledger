@@ -603,9 +603,8 @@ class LedgerEngine(ABC):
             ):
                 df = df.drop(columns=["report_amount", "report_balance"])
             mandatory = ACCOUNT_SCHEMA.query("mandatory == True")["column"].tolist()
-            remove = df.columns.difference(mandatory)
-            if df.empty or df[remove].isna().all().all():
-                df = df.drop(columns=remove)
+            remove = [col for col in df.columns.difference(mandatory) if df[col].isna().all()]
+            df = df.drop(columns=remove)
 
         return df
 
