@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
+from datetime import datetime
 from .decorators import timed_cache
 from .helpers import save_files, write_fixed_width_csv
 
@@ -157,6 +158,10 @@ class AccountingEntity(ABC):
                 - 'deleted' (int): Number of entries deleted.
                 - 'updated' (int): Number of entries updated.
         """
+        def now():
+            return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+        print(f"    {now()} - supermirror init", flush=True)
         current = self.list()
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
         merged = current.merge(
@@ -165,16 +170,19 @@ class AccountingEntity(ABC):
         )
 
         # Handle deletions
+        print(f"    {now()} - supermirror delete", flush=True)
         if delete:
             to_delete = merged.loc[merged["_merge"] == "left_only", self._id_columns]
             self.delete(to_delete)
 
         # Handle additions
+        print(f"    {now()} - supermirror add", flush=True)
         to_add = merged.loc[merged["_merge"] == "right_only", incoming.columns]
         if len(to_add):
             self.add(to_add)
 
         # Handle updates
+        print(f"    {now()} - supermirror update", flush=True)
         current_cols = merged.columns[merged.columns.str.endswith("_current")]
         incoming_cols = current_cols.str.replace("_current$", "", regex=True)
         both_rows = merged[merged['_merge'] == 'both']
