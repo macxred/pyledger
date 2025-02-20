@@ -268,6 +268,8 @@ class JournalEntity(AccountingEntity):
             - IDs are not preserved during the mirroring process.
             - Deletions may alter existing IDs.
         """
+        def now():
+            return datetime.now().strftime("%H:%M:%S.%f")[:-3]
 
         def nest_journal(df: pd.DataFrame) -> pd.DataFrame:
             """Nest to create one row per transaction, add unique string identifier."""
@@ -281,6 +283,7 @@ class JournalEntity(AccountingEntity):
 
         print(f"    {now()} - mirror journal current", flush=True)
         current = nest_journal(self.list())
+
         print(f"    {now()} - mirror journal incoming", flush=True)
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
         incoming = nest_journal(incoming)
