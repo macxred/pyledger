@@ -279,7 +279,9 @@ class JournalEntity(AccountingEntity):
             ]
             return df
 
+        print(f"    {now()} - mirror journal current", flush=True)
         current = nest_journal(self.list())
+        print(f"    {now()} - mirror journal incoming", flush=True)
         incoming = self._prepare_for_mirroring(self.standardize(pd.DataFrame(target)))
         incoming = nest_journal(incoming)
         if incoming["id"].duplicated().any():
@@ -296,6 +298,7 @@ class JournalEntity(AccountingEntity):
         count["n_delete"] = (count["current"] - count["incoming"]).clip(lower=0).astype(int)
 
         # Handle deletions
+        print(f"    {now()} - mirror journal delete", flush=True)
         if delete and any(count["n_delete"] > 0):
             ids = [
                 id
@@ -308,6 +311,7 @@ class JournalEntity(AccountingEntity):
             self.delete({"id": ids})
 
         # Handle additions
+        print(f"    {now()} - mirror journal add", flush=True)
         for txn_str, n in zip(count["txn_str"], count["n_add"]):
             if n > 0:
                 txn = unnest(incoming.loc[incoming["txn_str"] == txn_str, :].head(1), "txn")
