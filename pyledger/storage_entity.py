@@ -306,16 +306,19 @@ class JournalEntity(AccountingEntity):
             ]
             self.delete({"id": ids})
 
-        # Handle additions
+        # Handle additions (FIXME: this is *slow*)
         print(f"    {now()} - mirror journal add", flush=True)
         for txn_str, n in zip(count["txn_str"], count["n_add"]):
             if n > 0:
+                print(f"              {now()} unnest", flush=True)
                 txn = unnest(incoming.loc[incoming["txn_str"] == txn_str, :].head(1), "txn")
+                print(f"              {now()} drop", flush=True)
                 txn.drop(columns="txn_str", inplace=True)
                 if txn["id"].dropna().nunique() > 0:
                     id = txn["id"].dropna().unique()[0]
                 else:
                     id = txn["description"].iat[0]
+                print(f"              {now()} add for range n: {n}", flush=True)
                 for _ in range(n):
                     try:
                         self.add(txn)
@@ -324,6 +327,7 @@ class JournalEntity(AccountingEntity):
                             f"Error while adding journal entry {id}: {e}"
                         ) from e
 
+        print(f"              {now()} return", flush=True)
         return {
             "initial": int(count["current"].sum()),
             "target": int(count["incoming"].sum()),
