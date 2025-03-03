@@ -176,6 +176,14 @@ class StandaloneLedger(LedgerEngine):
                     amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
                     id = f"revaluation:{date}:{account}"
                     if amount != 0:
+                        if pd.isna(row["credit"]) and pd.isna(row["debit"]):
+                            raise ValueError("No account specified in revaluation entry {id}")
+                        elif pd.isna(row["credit"]):
+                            revaluation_account = row["debit"]
+                        elif pd.isna(row["debit"]):
+                            revaluation_account = row["credit"]
+                        else:
+                            revaluation_account = row["credit"] if amount >= 0 else row["debit"]
                         result.append({
                             "id": id,
                             "date": date,
@@ -188,7 +196,7 @@ class StandaloneLedger(LedgerEngine):
                         result.append({
                             "id": id,
                             "date": date,
-                            "account": row["credit"] if amount > 0 else row["debit"],
+                            "account": revaluation_account,
                             "currency": reporting_currency,
                             "amount": -1 * amount,
                             "report_amount": -1 * amount,
