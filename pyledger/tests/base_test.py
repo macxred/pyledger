@@ -123,7 +123,7 @@ REVALUATIONS_CSV = """
     2024-03-31, 1000:2999,  7050,   8050, FX revaluations
     2024-06-30, 1000:2999,  7050,       , FX revaluations
     2024-09-30, 1000:2999,  7050,       , FX revaluations
-    2024-12-31, 1000:2999,  7050,       , FX revaluations
+    2024-12-31, 1000:2999,      ,   7050, FX revaluations
 """
 REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 
