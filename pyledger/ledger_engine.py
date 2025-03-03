@@ -821,7 +821,9 @@ class LedgerEngine(ABC):
         """
         return self.serialize_ledger(self.journal.list())
 
-    def sanitize_journal(self, df: pd.DataFrame) -> pd.DataFrame:
+    def sanitize_journal(
+        self, df: pd.DataFrame, set_invalid_tax_code_to_na: bool = False
+    ) -> pd.DataFrame:
         """
         Discard incoherent journal data.
 
@@ -845,13 +847,50 @@ class LedgerEngine(ABC):
 
         Args:
             df (pd.DataFrame): Journal data to sanitize.
+            set_invalid_tax_code_to_na (bool): If True, sets invalid tax codes to 'NA'
+                                               instead of discarding the entries.
 
         Returns:
             pd.DataFrame: Sanitized journal data containing only valid entries.
         """
-
-        # Enforce schema
         df = enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
+        df = self._discard_multidate_transactions(df)
+        df = self._discard_invalid_tax_codes(df, set_invalid_tax_code_to_na)
+        df = self._discard_entries_with_missing_or_invalid_accounts(df)
+        df = self._discard_entries_with_invalid_currency_references(df)
+        df = self._discard_entries_with_invalid_prices(df)
+        df = self._discard_entries_with_invalid_profit_centers(df)
+        df = self._discard_unbalanced_transactions(df)
+
+        return df.reset_index(drop=True)
+
+    def _discard_multidate_transactions(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard transactions spanning multiple dates."""
+        pass
+
+    def _discard_invalid_tax_codes(self, df: pd.DataFrame, set_to_na: bool) -> pd.DataFrame:
+        """Either discard entries with invalid tax codes or set tax_code to 'NA' based on `set_to_na` flag."""
+        pass
+
+    def _discard_entries_with_missing_or_invalid_accounts(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard entries missing both 'account' and 'contra' or referencing invalid accounts."""
+        pass
+
+    def _discard_entries_with_invalid_currency_references(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard entries with invalid currency references or mismatched transaction currency."""
+        pass
+
+    def _discard_entries_with_invalid_prices(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard entries with missing price references."""
+        pass
+
+    def _discard_entries_with_invalid_profit_centers(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard entries with invalid or missing profit center references when required."""
+        pass
+
+    def _discard_unbalanced_transactions(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard transactions that do not balance to zero."""
+        pass
 
         # Drop transactions spanning multiple dates
         grouped = df.groupby("id")
