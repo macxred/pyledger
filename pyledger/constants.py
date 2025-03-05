@@ -110,6 +110,23 @@ AGGREGATED_BALANCE_SCHEMA = pd.read_csv(
     StringIO(AGGREGATED_BALANCE_SCHEMA_CSV), skipinitialspace=True
 )
 
+ACCOUNT_HISTORY_SCHEMA_CSV = """
+    column,              dtype,                mandatory,       id
+    date,                datetime64[ns],       False,        False
+    account,             Int64,                False,        False
+    contra,              Int64,                False,        False
+    currency,            string[python],       False,        False
+    amount,              Float64,              False,        False
+    balance,             Float64,              False,        False
+    report_amount,       Float64,              False,        False
+    report_balance,      Float64,              False,        False
+    tax_code,            string[python],       False,        False
+    profit_center,       string[python],       False,        False
+    description,         string[python],       False,        False
+    document,            string[python],       False,        False
+"""
+ACCOUNT_HISTORY_SCHEMA = pd.read_csv(StringIO(ACCOUNT_HISTORY_SCHEMA_CSV), skipinitialspace=True)
+
 DEFAULT_PRECISION = 0.01
 
 DEFAULT_ASSETS = enforce_schema(
