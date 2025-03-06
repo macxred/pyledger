@@ -5,6 +5,9 @@ import pandas as pd
 from abc import abstractmethod
 from consistent_df import assert_frame_equal
 from .base_test import BaseTest
+from io import StringIO
+from consistent_df import enforce_schema
+from pyledger.constants import ACCOUNT_HISTORY_SCHEMA
 
 
 class BaseTestAccounts(BaseTest):
@@ -185,3 +188,41 @@ class BaseTestAccounts(BaseTest):
             assert expected == actual, (
                 f"Account balance for {account} on {period} of {actual} differs from {expected}."
             )
+
+    def test_account_history(self, restored_engine):
+        restored_engine.restore(
+            accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
+            journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
+        )
+
+        # Test account history with specified profit centers
+        mandatory = ACCOUNT_HISTORY_SCHEMA.query("mandatory == True")["column"].tolist()
+        for case in [case for case in self.EXPECTED_HISTORY if case["profit_centers"] is not None]:
+            profit_centers = [item.strip() for item in case["profit_centers"].split(",")]
+            df = restored_engine.account_history(
+                account=case["account"], period=case["period"],
+                profit_centers=profit_centers, drop=case["drop"]
+            )
+            expected = pd.read_csv(StringIO(case["account_history"]), skipinitialspace=True)
+            expected = enforce_schema(expected, schema=ACCOUNT_HISTORY_SCHEMA)
+            remove = [
+                col for col in expected.columns.difference(mandatory) if expected[col].isna().all()
+            ]
+            expected = expected.drop(columns=remove)
+            assert_frame_equal(df, expected, check_like=True, ignore_columns=["id"])
+
+        # Test account history without specified profit centers
+        JOURNAL = self.JOURNAL.copy().assign(profit_center=pd.NA)
+        restored_engine.restore(profit_centers=[], journal=JOURNAL)
+        for case in [case for case in self.EXPECTED_HISTORY if case["profit_centers"] is None]:
+            df = restored_engine.account_history(
+                account=case["account"], period=case["period"], drop=case["drop"]
+            )
+            expected = pd.read_csv(StringIO(case["account_history"]), skipinitialspace=True)
+            expected = enforce_schema(expected, schema=ACCOUNT_HISTORY_SCHEMA)
+            remove = [
+                col for col in expected.columns.difference(mandatory) if expected[col].isna().all()
+            ]
+            expected = expected.drop(columns=remove)
+            assert_frame_equal(df, expected, check_like=True, ignore_columns=["id"])
