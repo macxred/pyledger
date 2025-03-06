@@ -176,6 +176,79 @@ EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
                                .str.replace(r'(\w+):', r'"\1":', regex=True)
                                .apply(json.loads))
 
+EXPECTED_HISTORY = [{
+        "period": "2024-04-13", "account": "1000", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, contra, currency,      amount,     balance, tax_code, description, document
+            2024-01-01,       ,      USD,   800000.00,   800000.00,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-24,   4000,      USD,     1200.00,   801200.00,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-04-12,       ,      USD,   -21288.24,   779911.76,         , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf"""
+    }, {
+        "period": "2024-12-31", "account": "2200", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, contra, currency,  amount, balance, tax_code, description, document
+            2024-01-24,   4000,      USD, -200.00, -200.00,  OUT_STD, TAX: Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-07-01,   4001,      EUR, -166.67, -366.67,  OUT_STD, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf
+            2024-07-01,   4001,      EUR,  -23.81, -390.48,  OUT_RED, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf"""
+    }, {
+        "period": "2024-03-31", "account": "1000:1999", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, account, contra, currency,      amount,     balance, report_amount, report_balance, tax_code, description, document
+            2024-01-01,    1000,       ,      USD,   800000.00,   800000.00,     800000.00,      800000.00,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1010,       ,      EUR,      120.00,   800120.00,        132.82,      800132.82,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1020,       ,      JPY, 42000000.00, 42800120.00,     298200.00,     1098332.82,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-24,    1000,   4000,      USD,     1200.00, 42801320.00,       1200.00,     1099532.82,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-03-31,    1010,       ,      EUR,        0.00, 42801320.00,         -3.29,     1099529.53,         , FX revaluations,
+            2024-03-31,    1020,       ,      JPY,        0.00, 42801320.00,     -21000.00,     1078529.53,         , FX revaluations,"""
+    }, {
+        "period": "2024", "account": "1020", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, currency,       amount,     balance, report_amount, report_balance, description, document
+            2024-01-01,      JPY,  42000000.00, 42000000.00,     298200.00,      298200.00, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-03-31,      JPY,         0.00, 42000000.00,     -21000.00,      277200.00, FX revaluations,
+            2024-06-30,      JPY,         0.00, 42000000.00,     -16800.00,      260400.00, FX revaluations,
+            2024-07-04,      JPY,  12345678.00, 54345678.00,      76386.36,      336786.36, Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+            2024-09-10,      JPY,         0.00, 54345678.00,          5.55,      336791.91, Manual Foreign currency adjustment,
+            2024-09-30,      JPY,         0.00, 54345678.00,      43627.84,      380419.75, FX revaluations,"""
+    }, {
+        "period": "2024-Q4", "account": "1000", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, contra, currency,      amount, balance, description
+            2024-12-01,   3000,      USD, 10000000.00, 10776311.79, Capital Increase
+            2024-12-04,       ,      USD, -9500000.00, 1276311.79, Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places)
+            2024-12-05,       ,      USD,  -200000.00, 1076311.79, Convert USD to EUR and CHF"""
+    }, {
+        "period": "2024-08", "account": "1000", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, contra, currency,   amount,   balance, description, document
+            2024-08-06,   2000,      USD,   500.00, 777511.79, Payment from customer, 2024/banking/USD_2024-Q2.pdf
+            2024-08-07,   2000,      USD,  -200.00, 777311.79, Payment to supplier,
+            2024-08-08,   2000,      USD, -1000.00, 776311.79, Correction of previous entry,"""
+    }, {
+        "period": "2024-12-31", "account": "1000", "profit_centers": "General", "drop": True, "account_history":
+            """
+                  date, contra, currency,      amount,     balance, profit_center, description, document
+            2024-01-01,       ,      USD,   800000.00,   800000.00,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-08-06,   2000,      USD,      500.00,   800500.00,       General, Payment from customer, 2024/banking/USD_2024-Q2.pdf
+            2024-08-07,   2000,      USD,     -200.00,   800300.00,       General, Payment to supplier,
+            2024-08-08,   2000,      USD,    -1000.00,   799300.00,       General, Correction of previous entry,
+            2024-12-01,   3000,      USD, 10000000.00, 10799300.00,       General, Capital Increase,
+            2024-12-05,       ,      USD,  -200000.00, 10599300.00,       General, Convert USD to EUR and CHF,"""
+    }, {
+        "period": "2024-05-30", "account": "1000:1020", "profit_centers": "General, Shop, Bakery", "drop": True, "account_history":
+            """
+                  date, account, contra, currency,       amount,      balance, report_amount, report_balance, tax_code, profit_center, description, document
+            2024-01-01,    1000,       ,      USD,    800000.00,    800000.00,     800000.00,      800000.00,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1010,       ,      EUR,       120.00,    800120.00,        132.82,      800132.82,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1020,       ,      JPY,  42000000.00,  42800120.00,     298200.00,     1098332.82,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-24,    1000,   4000,      USD,      1200.00,  42801320.00,       1200.00,     1099532.82,  OUT_STD,        Bakery, Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-04-12,    1010,       ,      EUR,     20000.00,  42821320.00,      21288.24,     1120821.06,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+            2024-04-12,    1000,       ,      USD,    -21288.24,  42800031.76,     -21288.24,     1099532.82,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+            2024-05-07,    1000,   5000,      USD,      -777.77,  42799253.99,       -777.77,     1098755.05,   EXEMPT,        Bakery, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+            2024-05-08,    1000,       ,      USD,      -999.99,  42798254.00,       -999.99,     1097755.06,         ,        Bakery, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf"""
+    }
+]
+
 def parse_profit_center(value):
     """Function to split values by commas and convert to list"""
     if pd.isna(value) or value.strip() == "":
@@ -195,3 +268,4 @@ class BaseTest(ABC):
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
     EXPECTED_BALANCE = EXPECTED_BALANCE
+    EXPECTED_HISTORY = EXPECTED_HISTORY
