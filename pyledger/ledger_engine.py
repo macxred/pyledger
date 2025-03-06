@@ -461,26 +461,28 @@ class LedgerEngine(ABC):
         """
 
     def _account_balance_list(
-        self, accounts: list[int], date: datetime.date = None,
-        profit_centers: list[str] | str = None
+        self, accounts: list[int], profit_centers: list[str] | str = None,
+        start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
         result = {}
         for account in accounts:
             account_balance = self._single_account_balance(
-                account, date=date, profit_centers=profit_centers
+                account, start=start, end=end, profit_centers=profit_centers
             )
             for currency, value in account_balance.items():
                 result[currency] = result.get(currency, 0) + value
         return result
 
     def _account_balance_range(
-        self, accounts: dict[str, list[int]],
-        date: datetime.date = None, profit_centers: list[str] | str = None
+        self, accounts: dict[str, list[int]], profit_centers: list[str] | str = None,
+        start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
         result = {}
-        add = self._account_balance_list(accounts["add"], date=date, profit_centers=profit_centers)
+        add = self._account_balance_list(
+            accounts["add"], start=start, end=end, profit_centers=profit_centers
+        )
         subtract = self._account_balance_list(
-            accounts["subtract"], date=date, profit_centers=profit_centers
+            accounts["subtract"], start=start, end=end, profit_centers=profit_centers
         )
         for currency, value in add.items():
             result[currency] = result.get(currency, 0) + value
@@ -520,25 +522,10 @@ class LedgerEngine(ABC):
                 balance amounts in each currency.
         """
         start, end = parse_date_span(period)
-        if start is None:
-            accounts = self.parse_account_range(account)
-            result = self._account_balance_range(
-                accounts=accounts, date=end, profit_centers=profit_centers
-            )
-        else:
-            # Account balance over a period
-            at_start = self.account_balance(
-                account=account,
-                period=start - datetime.timedelta(days=1),
-                profit_centers=profit_centers
-            )
-            at_end = self.account_balance(
-                account=account, period=end, profit_centers=profit_centers
-            )
-            result = {
-                currency: at_end.get(currency, 0) - at_start.get(currency, 0)
-                for currency in (at_start | at_end).keys()
-            }
+        accounts = self.parse_account_range(account)
+        result = self._account_balance_range(
+            accounts=accounts, start=start, end=end, profit_centers=profit_centers
+        )
 
         # Type consistent return value Dict[str, float]
         def _standardize_currency(ticker: str, x: float) -> float:
