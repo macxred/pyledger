@@ -441,14 +441,17 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def _single_account_balance(
-        self, account: int, date: datetime.date = None, profit_centers: list[str] | str = None
+        self, account: int, profit_centers: list[str] | str = None,
+        start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
-        """Retrieve the balance of a single account up to a specified date.
+        """Retrieve the balance of a single account within a date range.
 
         Args:
             account (int): Account number.
-            date (datetime.date, optional): Date for which to retrieve the balance.
-                                            Defaults to None.
+            start (datetime.date, optional): Start date for the balance calculation.
+                                             Defaults to None.
+            end (datetime.date, optional): End date for the balance calculation.
+                                           Defaults to None.
             profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
                                               calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
