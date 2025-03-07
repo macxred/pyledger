@@ -569,8 +569,9 @@ class LedgerEngine(ABC):
 
         # Look up account balance
         def _balance_lookup(account, currency):
-            # TODO: Adapt "_single_account_balance" to accept start and end
-            balance = self._single_account_balance(account, end, profit_centers=profit_centers)
+            balance = self._single_account_balance(
+                account, start=start, end=end, profit_centers=profit_centers
+            )
             return balance.get(currency, 0), balance.get("reporting_currency", 0)
         balances = [_balance_lookup(account, currency)
                     for account, currency in zip(result["account"], result["currency"])]
