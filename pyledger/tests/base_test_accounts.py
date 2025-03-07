@@ -3,7 +3,8 @@
 import pytest
 import pandas as pd
 from abc import abstractmethod
-from consistent_df import assert_frame_equal
+from consistent_df import assert_frame_equal, enforce_schema
+from pyledger.constants import ACCOUNT_BALANCE_SCHEMA
 from .base_test import BaseTest
 
 
@@ -185,3 +186,37 @@ class BaseTestAccounts(BaseTest):
             assert expected == actual, (
                 f"Account balance for {account} on {period} of {actual} differs from {expected}."
             )
+
+    def test_account_balances(self, restored_engine):
+        restored_engine.restore(
+            accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
+            journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
+        )
+
+        df = self.EXPECTED_BALANCES.copy()
+        cols = ["period", "accounts", "profit_center"]
+        df[cols] = df[cols].ffill()
+        cases = df.drop_duplicates(subset=cols).sort_values("period")
+
+        # Test account balances with specified profit centers
+        cases_with_profit_centers = cases.query("profit_center.notna()")[cols]
+        for period, accounts, profit_centers in cases_with_profit_centers.itertuples(index=False):
+            expected = df.query(
+                "period == @period and accounts == @accounts and profit_center == @profit_centers"
+            ).drop(columns=cols)
+            expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
+            profit_centers = [pc.strip() for pc in profit_centers.split(",")]
+            actual = restored_engine.account_balances(period=period, accounts=accounts,
+                                                      profit_centers=profit_centers)
+            assert_frame_equal(expected, actual, ignore_index=True, ignore_row_order=True)
+
+        # Test account balances without specified profit centers
+        cases_without_profit_centers = cases.query("profit_center.isna()")[cols]
+        for period, accounts, _ in cases_without_profit_centers.itertuples(index=False):
+            expected = df.query(
+                "period == @period and accounts == @accounts and profit_center.isna()"
+            ).drop(columns=cols)
+            expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
+            actual = restored_engine.account_balances(period=period, accounts=accounts)
+            assert_frame_equal(expected, actual, ignore_index=True, ignore_row_order=True)
