@@ -88,6 +88,17 @@ PROFIT_CENTER_SCHEMA_CSV = """
 """
 PROFIT_CENTER_SCHEMA = pd.read_csv(StringIO(PROFIT_CENTER_SCHEMA_CSV), skipinitialspace=True)
 
+ACCOUNT_BALANCE_SCHEMA_CSV = """
+    column,             dtype,                mandatory,       id
+    account,            int,                  True,          True
+    currency,           string[python],       True,         False
+    description,        string[python],       True,         False
+    group,              string[python],       True,         False
+    balance,            Float64,              True,         False
+    report_balance,     Float64,              True,         False
+"""
+ACCOUNT_BALANCE_SCHEMA = pd.read_csv(StringIO(ACCOUNT_BALANCE_SCHEMA_CSV), skipinitialspace=True)
+
 DEFAULT_PRECISION = 0.01
 
 DEFAULT_ASSETS = enforce_schema(
