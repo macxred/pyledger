@@ -917,21 +917,78 @@ class LedgerEngine(ABC):
             df = df.query("id not in @invalid_ids")
 
         # Drop unbalanced transactions
-        effective_amounts = df["report_amount"].copy()
-        index = effective_amounts.isna()
-        effective_amounts.loc[index] = self.report_amount(
-            amount=df.loc[index, "amount"],
-            currency=df.loc[index, "currency"],
-            date=df.loc[index, "date"]
+        def compute_net_sum(df, column_name):
+            """Return net sums of a specified column for each transaction."""
+            values = df[column_name].copy()
+            values = values.mask(df["contra"].notna() & df["account"].notna(), 0)
+            values = values.mask(df["contra"].notna() & df["account"].isna(), -values)
+            return values.groupby(df["id"]).sum()
+
+        tolerance = self.precision(self.reporting_currency) / 2
+        # Identify transactions with a single non-reporting currency that are
+        # balanced in their own currency but imbalanced in the reporting currency
+        # (which was initially unspecified).
+        grouped = df.groupby("id").agg(
+            nunique_currency=("currency", "nunique"),
+            first_currency=("currency", "first"),
+            all_na_report_balance=("report_amount", lambda x: x.isna().all()),
         )
-        effective_amounts = effective_amounts.mask(df["contra"].notna() & df["account"].notna(), 0)
-        effective_amounts = effective_amounts.mask(
-            df["contra"].notna() & df["account"].isna(), -effective_amounts
+        auto_balance_ids = grouped.index[
+            (grouped["nunique_currency"] == 1)
+            & (grouped["first_currency"] != self.reporting_currency)
+            & (grouped["all_na_report_balance"])
+        ]
+        na_mask = df["report_amount"].isna()
+        df.loc[na_mask, "report_amount"] = self.report_amount(
+            amount=df.loc[na_mask, "amount"],
+            currency=df.loc[na_mask, "currency"],
+            date=df.loc[na_mask, "date"],
         )
-        grouped_amounts = effective_amounts.groupby(df["id"]).sum()
-        invalid_amounts_mask = grouped_amounts.abs() > 1e-8
-        if invalid_amounts_mask.any():
-            invalid_ids = invalid_amounts_mask[invalid_amounts_mask].index.unique().tolist()
+        amounts = compute_net_sum(df, "amount")
+        report_amounts = compute_net_sum(df, "report_amount")
+        auto_balance_ids = (
+            set(auto_balance_ids)
+            .intersection(amounts.index[amounts.abs() == 0])
+            .intersection(report_amounts.index[report_amounts.abs() > tolerance])
+        )
+        for txn_id in auto_balance_ids:
+            txn_mask = df["id"] == txn_id
+            txn = df.loc[txn_mask].copy()
+            fx_rate = self.price(
+                date=txn.iloc[0]["date"],
+                ticker=txn.iloc[0]["currency"],
+                currency=self.reporting_currency,
+            )[1]
+            # Adjust sign for 'amount' and 'report_amount' where only 'contra' is specified
+            contra_mask = txn["contra"].notna() & txn["account"].isna()
+            txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
+            unrounded_values = txn["amount"] * fx_rate
+            increment = self.precision(self.reporting_currency)
+            while True:
+                errors = txn["report_amount"] - unrounded_values
+                # Exit if within tolerance
+                if abs(txn["report_amount"].sum()) <= tolerance:
+                    break
+                # Reduce the row with the largest positive error
+                if txn["report_amount"].sum() > tolerance:
+                    idx_largest_err = errors.idxmax()
+                    txn.loc[idx_largest_err, "report_amount"] -= increment
+                # Increase the row with the largest negative error
+                elif txn["report_amount"].sum() < -tolerance:
+                    idx_smallest_err = errors.idxmin()
+                    txn.loc[idx_smallest_err, "report_amount"] += increment
+            # Restore original sign where only 'contra' is specified
+            txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
+            df.loc[txn_mask, "report_amount"] = txn["report_amount"]
+
+        report_amounts = compute_net_sum(df, "report_amount")
+        # TODO: This line is necessary to avoid unintended changes unrelated to the main
+        # focus of this PR. We agreed to fill 'report_amount' values in this method,
+        # but this should be done in a separate PR.
+        df.loc[na_mask, "report_amount"] = pd.NA
+        invalid_balance = abs(report_amounts) > tolerance
+        if invalid_balance.any():
+            invalid_ids = report_amounts[invalid_balance].index.to_list()
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} journal entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(invalid_ids)}"
