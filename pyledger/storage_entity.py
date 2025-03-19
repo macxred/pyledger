@@ -319,8 +319,8 @@ class JournalEntity(AccountingEntity):
         return {
             "initial": int(count["current"].sum()),
             "target": int(count["incoming"].sum()),
-            "added": count["n_add"].sum(),
-            "deleted": count["n_delete"].sum() if delete else 0,
+            "added": int(count["n_add"].sum()),
+            "deleted": int(count["n_delete"].sum()) if delete else 0,
             "updated": 0
         }
 
