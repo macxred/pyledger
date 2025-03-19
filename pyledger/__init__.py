@@ -43,3 +43,4 @@ from .storage_entity import (
     MultiCSVEntity,
     JournalEntity,
 )
+from .log_collector import LogCollector
