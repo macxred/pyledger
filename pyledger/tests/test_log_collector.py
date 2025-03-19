@@ -98,3 +98,22 @@ def test_log_collector_with_console_output(caplog):
     assert "This warning should also be collected" in collector.logs
     assert "This should be collected and printed" in caplog.text
     assert "This warning should also be collected" in caplog.text
+
+
+def test_log_collector_adds_console_handler_if_no_handlers(monkeypatch):
+    logger_name = "test_logger_no_handlers"
+    logger = logging.getLogger(logger_name)
+    logger.handlers.clear()
+    logger.propagate = False
+    logger.setLevel(logging.DEBUG)
+    assert not logger.hasHandlers(), "Logger should start without handlers"
+
+    # Prevent log messages from appearing in the terminal while still allowing capture
+    monkeypatch.setattr(logging.StreamHandler, "emit", lambda self, record: None)
+
+    collector = LogCollector(channel=logger_name, level=logging.DEBUG, keep_console_output=True)
+    assert any(isinstance(handler, logging.StreamHandler) for handler in logger.handlers), (
+        "LogCollector should have added a StreamHandler"
+    )
+    logger.debug("This should be collected and printed")
+    assert "This should be collected and printed" in collector.logs
