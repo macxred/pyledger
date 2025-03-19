@@ -10,94 +10,84 @@ from pyledger import LogCollector
     [
         (
             logging.INFO,
-            [
-                ("debug", "This should NOT be collected"),
-                ("info", "This should be collected"),
-                ("warning", "Warning message"),
-            ],
+            [("debug", "This should NOT be collected"), ("info", "This should be collected"),
+             ("warning", "Warning message")],
             ["This should be collected", "Warning message"],
         ),
         (
             logging.WARNING,
-            [
-                ("info", "This should NOT be collected"),
-                ("warning", "This should be collected"),
-                ("error", "Error message"),
-            ],
+            [("info", "This should NOT be collected"), ("warning", "This should be collected"),
+             ("error", "Error message")],
             ["This should be collected", "Error message"],
         ),
         (
             logging.ERROR,
-            [
-                ("debug", "Debug message"),
-                ("info", "Info message"),
-                ("warning", "Warning message"),
-            ],
+            [("debug", "Debug message"), ("info", "Info message"), ("warning", "Warning message")],
             [],
         ),
     ],
 )
 def test_log_collector_respects_logging_levels(log_level, messages, expected_logs):
-    logger_name = "test_logger"
-    logger = logging.getLogger(logger_name)
+    logger = logging.getLogger("test_logger")
     logger.setLevel(logging.DEBUG)
-    collector = LogCollector(channel=logger_name, level=log_level)
+    collector = LogCollector(logger.name, log_level)
 
-    for level, message in messages:
-        getattr(logger, level)(message)
+    for level, msg in messages:
+        getattr(logger, level)(msg)
 
     assert collector.logs == expected_logs
 
 
 @pytest.mark.parametrize(
-    "level1, level2, expected_logs1, expected_logs2",
+    "level1, level2, messages, expected_logs1, expected_logs2",
     [
         (
             logging.INFO,
             logging.WARNING,
+            [
+                ("debug", "Debug message"), ("info", "Info message"),
+                ("warning", "Warning message"), ("error", "Error message")
+            ],
             ["Info message", "Warning message", "Error message"],
             ["Warning message", "Error message"],
         ),
         (
             logging.DEBUG,
             logging.ERROR,
+            [
+                ("debug", "Debug message"), ("info", "Info message"),
+                ("warning", "Warning message"), ("error", "Error message")
+            ],
             ["Debug message", "Info message", "Warning message", "Error message"],
             ["Error message"],
         ),
     ],
 )
-def test_log_collector_handles_multiple_instances(level1, level2, expected_logs1, expected_logs2):
-    logger_name = "test_logger_multi"
-    logger = logging.getLogger(logger_name)
+def test_log_collector_handles_multiple_instances(
+    level1, level2, messages, expected_logs1, expected_logs2
+):
+    logger = logging.getLogger("test_logger_multi")
     logger.setLevel(logging.DEBUG)
+    collector1, collector2 = LogCollector(logger.name, level1), LogCollector(logger.name, level2)
 
-    collector1 = LogCollector(channel=logger_name, level=level1)
-    collector2 = LogCollector(channel=logger_name, level=level2)
-
-    logger.debug("Debug message")
-    logger.info("Info message")
-    logger.warning("Warning message")
-    logger.error("Error message")
+    for level, msg in messages:
+        getattr(logger, level)(msg)
 
     assert collector1.logs == expected_logs1
     assert collector2.logs == expected_logs2
 
 
 def test_log_collector_with_console_output(caplog):
-    logger_name = "test_logger_console"
-    logger = logging.getLogger(logger_name)
+    logger = logging.getLogger("test_logger_console")
     logger.setLevel(logging.DEBUG)
-
-    collector = LogCollector(channel=logger_name, level=logging.INFO, keep_console_output=True)
-
+    collector = LogCollector(channel=logger.name, level=logging.INFO, keep_console_output=True)
     with caplog.at_level(logging.INFO):
-        logger.info("This should be collected and printed")
-        logger.warning("This warning should also be collected")
+        logger.info("Collected and printed")
+        logger.warning("Warning also collected")
 
-    assert "This should be collected and printed" in collector.logs
-    assert "This warning should also be collected" in collector.logs
-    assert "This should be collected and printed" in caplog.text
-    assert "This warning should also be collected" in caplog.text
+    assert collector.logs == ["Collected and printed", "Warning also collected"]
+    assert "Collected and printed" in caplog.text
+    assert "Warning also collected" in caplog.text
 
 
 def test_log_collector_adds_console_handler_if_no_handlers(monkeypatch):
