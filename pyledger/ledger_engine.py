@@ -821,76 +821,205 @@ class LedgerEngine(ABC):
         """
         return self.serialize_ledger(self.journal.list())
 
-    def sanitize_journal(
-        self, df: pd.DataFrame, set_invalid_tax_code_to_na: bool = False
-    ) -> pd.DataFrame:
-        """
-        Discard incoherent journal data.
-
-        This method discards ledger transactions - entries in the journal data
-        frame with the same 'id' - that:
-        1. Do not balance to zero.
-        2. Span multiple dates.
-        3. Have neither 'account' nor 'contra' specified.
-        4. Omit a profit center when profit centers exist in the system.
-        5. Reference an invalid currency, account, contra account, or profit
-           center.
-        6. Do not match the currency of a referenced account or contra account,
-           and the account or contra account is not denominated in
-           reporting currency.
-        7. Lack a valid price reference when 'report_amount' is missing and
-           the entry is in a non-reporting currency.
-
-        Also, undefined tax code references are removed from journal entries.
-
-        A warning specifying the reason is logged for each discarded entry.
-
-        Args:
-            df (pd.DataFrame): Journal data to sanitize.
-            set_invalid_tax_code_to_na (bool): If True, sets invalid tax codes to 'NA'
-                                               instead of discarding the entries.
-
-        Returns:
-            pd.DataFrame: Sanitized journal data containing only valid entries.
-        """
+    def sanitize_journal(self, df: pd.DataFrame) -> pd.DataFrame:
         df = enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
-        df = self._discard_multidate_transactions(df)
-        df = self._discard_invalid_tax_codes(df, set_invalid_tax_code_to_na)
-        df = self._discard_entries_with_missing_or_invalid_accounts(df)
-        df = self._discard_entries_with_invalid_currency_references(df)
-        df = self._discard_entries_with_invalid_prices(df)
-        df = self._discard_entries_with_invalid_profit_centers(df)
-        df = self._discard_unbalanced_transactions(df)
 
-        return df.reset_index(drop=True)
+        invalid_txns_mask = np.zeros(len(df), dtype=bool)
 
-    def _discard_multidate_transactions(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard transactions spanning multiple dates."""
-        pass
+        invalid_txns_mask = self.invalid_multidate_txns(df, invalid_txns_mask)
+        self.invalid_tax_codes(df)
+        invalid_txns_mask = self.invalid_accounts(df, invalid_txns_mask)
+        invalid_txns_mask = self.invalid_assets(df, invalid_txns_mask)
+        invalid_txns_mask = self.invalid_currency(df, invalid_txns_mask)
+        invalid_txns_mask = self.invalid_prices(df, invalid_txns_mask)
+        invalid_txns_mask = self.invalid_profit_centers(df, invalid_txns_mask)
+        invalid_txns_mask = self.invalid_unbalanced_txns(df, invalid_txns_mask)
 
-    def _discard_invalid_tax_codes(self, df: pd.DataFrame, set_to_na: bool) -> pd.DataFrame:
-        """Either discard entries with invalid tax codes or set tax_code to 'NA' based on `set_to_na` flag."""
-        pass
+        return df.loc[~invalid_txns_mask].reset_index(drop=True)
 
-    def _discard_entries_with_missing_or_invalid_accounts(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard entries missing both 'account' and 'contra' or referencing invalid accounts."""
-        pass
 
-    def _discard_entries_with_invalid_currency_references(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard entries with invalid currency references or mismatched transaction currency."""
-        pass
+    def invalid_multidate_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        grouped = df.groupby("id")["date"].transform("nunique") > 1
+        new_invalid_mask = grouped & ~invalid_txns_mask
+        if new_invalid_mask.any():
+            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries where a single 'id' "
+                f"has more than one 'date': {first_elements_as_str(invalid_ids)}"
+            )
+        return invalid_txns_mask | grouped
 
-    def _discard_entries_with_invalid_prices(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard entries with missing price references."""
-        pass
 
-    def _discard_entries_with_invalid_profit_centers(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard entries with invalid or missing profit center references when required."""
-        pass
+    def invalid_tax_codes(self, df: pd.DataFrame) -> None:
+        _, tax_codes = self.sanitized_accounts_tax_codes()
+        invalid_tax_code_mask = (
+            ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
+        )
+        if invalid_tax_code_mask.any():
+            invalid_ids = df.loc[invalid_tax_code_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Setting 'tax_code' to 'NA' for {len(invalid_ids)} journal entries "
+                f"with invalid tax codes: {first_elements_as_str(invalid_ids)}"
+            )
+            df.loc[invalid_tax_code_mask, "tax_code"] = pd.NA
 
-    def _discard_unbalanced_transactions(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard transactions that do not balance to zero."""
-        pass
+
+    def invalid_accounts(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        accounts, _ = self.sanitized_accounts_tax_codes()
+        accounts_set = set(accounts["account"])
+
+        missing_account_mask = df["account"].isna() & df["contra"].isna()
+        new_missing_mask = missing_account_mask & ~invalid_txns_mask
+        if new_missing_mask.any():
+            invalid_ids = df.loc[new_missing_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries with neither 'account' "
+                f"nor 'contra' specified: {first_elements_as_str(invalid_ids)}"
+            )
+            invalid_txns_mask |= missing_account_mask
+
+        invalid_account_mask = ~df["account"].isna() & ~df["account"].isin(accounts_set)
+        invalid_contra_mask = ~df["contra"].isna() & ~df["contra"].isin(accounts_set)
+        invalid_accounts_mask = invalid_account_mask | invalid_contra_mask
+        new_invalid_mask = invalid_accounts_mask & ~invalid_txns_mask
+        if new_invalid_mask.any():
+            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries with invalid account "
+                f"or contra references: {first_elements_as_str(invalid_ids)}"
+            )
+        return invalid_txns_mask | invalid_accounts_mask
+
+
+    def invalid_assets(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        def invalid_asset_reference(row):
+            if invalid_txns_mask[row.name]:
+                return True
+            try:
+                self.precision(ticker=row["currency"], date=row["date"])
+                return False
+            except ValueError:
+                return True
+
+        invalid_assets_mask = df.apply(invalid_asset_reference, axis=1)
+        new_invalid_mask = invalid_assets_mask & ~invalid_txns_mask
+        if new_invalid_mask.any():
+            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries with invalid currency: "
+                f"{first_elements_as_str(invalid_ids)}"
+            )
+        return invalid_txns_mask | invalid_assets_mask
+
+    def invalid_currency(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        def invalid_transaction_currency(row):
+            if invalid_txns_mask[row.name]:
+                return True
+            if row["amount"] == 0:
+                return False
+            if pd.notna(row["account"]):
+                account_currency = self.account_currency(row["account"])
+                if account_currency != self.reporting_currency and row["currency"] != account_currency:
+                    return True
+            if pd.notna(row["contra"]):
+                contra_currency = self.account_currency(row["contra"])
+                if contra_currency != self.reporting_currency and row["currency"] != contra_currency:
+                    return True
+            return False
+
+        invalid_currency_mask = df.apply(invalid_transaction_currency, axis=1)
+        new_invalid_mask = invalid_currency_mask & ~invalid_txns_mask
+        if new_invalid_mask.any():
+            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries with mismatched transaction "
+                f"currency: {first_elements_as_str(invalid_ids)}"
+            )
+        return invalid_txns_mask | invalid_currency_mask
+
+
+    def invalid_prices(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        def invalid_price(row):
+            if invalid_txns_mask[row.name]:
+                return True
+            if row["currency"] == self.reporting_currency or pd.notna(row["report_amount"]):
+                return False
+            try:
+                self.price(ticker=row["currency"], date=row["date"], currency=self.reporting_currency)
+                return False
+            except ValueError:
+                return True
+
+        invalid_prices_mask = df.apply(invalid_price, axis=1)
+        new_invalid_mask = invalid_prices_mask & ~invalid_txns_mask
+        if new_invalid_mask.any():
+            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries with invalid price: "
+                f"{first_elements_as_str(invalid_ids)}"
+            )
+        return invalid_txns_mask | invalid_prices_mask
+
+
+    def invalid_profit_centers(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        profit_centers = self.profit_centers.list()
+        if profit_centers.empty:
+            return invalid_txns_mask
+
+        # Drop transactions without profit center (when required)
+        missing_profit_center_mask = df["profit_center"].isna()
+        new_missing_mask = missing_profit_center_mask & ~invalid_txns_mask
+        if new_missing_mask.any():
+            invalid_ids = df.loc[new_missing_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries with missing profit center: "
+                f"{first_elements_as_str(invalid_ids)}"
+            )
+            invalid_txns_mask |= missing_profit_center_mask
+
+        # Drop transactions with invalid profit center values
+        profit_centers_set = set(profit_centers["profit_center"])
+        invalid_ref_mask = df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers_set)
+        new_invalid_ref_mask = invalid_ref_mask & ~invalid_txns_mask
+        if new_invalid_ref_mask.any():
+            invalid_ids = df.loc[new_invalid_ref_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries with invalid profit center "
+                f"reference: {first_elements_as_str(invalid_ids)}"
+            )
+
+        return invalid_txns_mask | invalid_ref_mask
+
+
+    def invalid_unbalanced_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        effective_amounts = df["report_amount"].copy()
+
+        index = effective_amounts.isna() & ~invalid_txns_mask
+        effective_amounts.loc[index] = self.report_amount(
+            amount=df.loc[index, "amount"],
+            currency=df.loc[index, "currency"],
+            date=df.loc[index, "date"]
+        )
+
+        effective_amounts = effective_amounts.mask(df["contra"].notna() & df["account"].notna(), 0)
+        effective_amounts = effective_amounts.mask(
+            df["contra"].notna() & df["account"].isna(), -effective_amounts
+        )
+
+        grouped_amounts = effective_amounts.groupby(df["id"]).sum()
+        invalid_amounts_mask = grouped_amounts.abs() > 1e-8
+        invalid_amounts_mask = df["id"].isin(grouped_amounts[invalid_amounts_mask].index)
+
+        new_invalid_mask = invalid_amounts_mask & ~invalid_txns_mask
+        if new_invalid_mask.any():
+            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid_ids)} journal entries where "
+                f"amounts do not balance to zero: {first_elements_as_str(invalid_ids)}"
+            )
+
+        return invalid_txns_mask | invalid_amounts_mask
+
 
         # Drop transactions spanning multiple dates
         grouped = df.groupby("id")
