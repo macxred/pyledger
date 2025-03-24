@@ -10,19 +10,23 @@ from pyledger import LogCollector
     [
         (
             logging.INFO,
-            [("debug", "This should NOT be collected"), ("info", "This should be collected"),
-             ("warning", "Warning message")],
+            [(logging.DEBUG, "This should NOT be collected"),
+             (logging.INFO, "This should be collected"),
+             (logging.WARNING, "Warning message")],
             ["This should be collected", "Warning message"],
         ),
         (
             logging.WARNING,
-            [("info", "This should NOT be collected"), ("warning", "This should be collected"),
-             ("error", "Error message")],
+            [(logging.INFO, "This should NOT be collected"),
+             (logging.WARNING, "This should be collected"),
+             (logging.ERROR, "Error message")],
             ["This should be collected", "Error message"],
         ),
         (
             logging.ERROR,
-            [("debug", "Debug message"), ("info", "Info message"), ("warning", "Warning message")],
+            [(logging.DEBUG, "Debug message"),
+             (logging.INFO, "Info message"),
+             (logging.WARNING, "Warning message")],
             [],
         ),
     ],
@@ -33,7 +37,7 @@ def test_log_collector_respects_logging_levels(log_level, messages, expected_log
     collector = LogCollector(logger.name, log_level)
 
     for level, msg in messages:
-        getattr(logger, level)(msg)
+        logger.log(level, msg)
 
     assert collector.logs == expected_logs
 
@@ -45,8 +49,10 @@ def test_log_collector_respects_logging_levels(log_level, messages, expected_log
             logging.INFO,
             logging.WARNING,
             [
-                ("debug", "Debug message"), ("info", "Info message"),
-                ("warning", "Warning message"), ("error", "Error message")
+                (logging.DEBUG, "Debug message"),
+                (logging.INFO, "Info message"),
+                (logging.WARNING, "Warning message"),
+                (logging.ERROR, "Error message")
             ],
             ["Info message", "Warning message", "Error message"],
             ["Warning message", "Error message"],
@@ -55,8 +61,10 @@ def test_log_collector_respects_logging_levels(log_level, messages, expected_log
             logging.DEBUG,
             logging.ERROR,
             [
-                ("debug", "Debug message"), ("info", "Info message"),
-                ("warning", "Warning message"), ("error", "Error message")
+                (logging.DEBUG, "Debug message"),
+                (logging.INFO, "Info message"),
+                (logging.WARNING, "Warning message"),
+                (logging.ERROR, "Error message")
             ],
             ["Debug message", "Info message", "Warning message", "Error message"],
             ["Error message"],
@@ -68,10 +76,11 @@ def test_log_collector_handles_multiple_instances(
 ):
     logger = logging.getLogger("test_logger_multi")
     logger.setLevel(logging.DEBUG)
-    collector1, collector2 = LogCollector(logger.name, level1), LogCollector(logger.name, level2)
+    collector1 = LogCollector(logger.name, level1)
+    collector2 = LogCollector(logger.name, level2)
 
     for level, msg in messages:
-        getattr(logger, level)(msg)
+        logger.log(level, msg)
 
     assert collector1.logs == expected_logs1
     assert collector2.logs == expected_logs2
