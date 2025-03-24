@@ -922,6 +922,9 @@ class LedgerEngine(ABC):
 
     def _invalid_assets(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
         """Find transactions with invalid assets reference."""
+        if df.empty:
+            return invalid_txns_mask
+
         def invalid_asset_reference(row):
             if invalid_txns_mask[row.name]:
                 return True
@@ -943,6 +946,9 @@ class LedgerEngine(ABC):
 
     def _invalid_currency(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
         """Find transactions with invalid currency."""
+        if df.empty:
+            return invalid_txns_mask
+
         def invalid_transaction_currency(row):
             if invalid_txns_mask[row.name]:
                 return True
@@ -972,6 +978,9 @@ class LedgerEngine(ABC):
 
     def _invalid_prices(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
         """Find transactions with missing price reference."""
+        if df.empty:
+            return invalid_txns_mask
+
         def invalid_price(row):
             if invalid_txns_mask[row.name]:
                 return True
