@@ -822,21 +822,50 @@ class LedgerEngine(ABC):
         return self.serialize_ledger(self.journal.list())
 
     def sanitize_journal(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Discard incoherent journal data.
+
+        This method discards ledger transactions - entries in the journal data
+        frame with the same 'id' - that:
+        1. Do not balance to zero.
+        2. Span multiple dates.
+        3. Have neither 'account' nor 'contra' specified.
+        4. Omit a profit center when profit centers exist in the system.
+        5. Reference an invalid currency, account, contra account, or profit
+           center.
+        6. Do not match the currency of a referenced account or contra account,
+           and the account or contra account is not denominated in
+           reporting currency.
+        7. Lack a valid price reference when 'report_amount' is missing and
+           the entry is in a non-reporting currency.
+
+        Also, undefined tax code references are removed from journal entries.
+
+        A warning specifying the reason is logged for each discarded entry.
+
+        Args:
+            df (pd.DataFrame): Journal data to sanitize.
+
+        Returns:
+            pd.DataFrame: Sanitized journal data containing only valid entries.
+        """
+
         df = enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
 
         invalid_txns_mask = np.zeros(len(df), dtype=bool)
-        invalid_txns_mask = self.invalid_multidate_txns(df, invalid_txns_mask)
-        self.invalid_tax_codes(df, invalid_txns_mask)
-        invalid_txns_mask = self.invalid_accounts(df, invalid_txns_mask)
-        invalid_txns_mask = self.invalid_assets(df, invalid_txns_mask)
-        invalid_txns_mask = self.invalid_currency(df, invalid_txns_mask)
-        invalid_txns_mask = self.invalid_prices(df, invalid_txns_mask)
-        invalid_txns_mask = self.invalid_profit_centers(df, invalid_txns_mask)
-        invalid_txns_mask = self.invalid_unbalanced_txns(df, invalid_txns_mask)
+        invalid_txns_mask = self._invalid_multidate_txns(df, invalid_txns_mask)
+        self._invalid_tax_codes(df, invalid_txns_mask)
+        invalid_txns_mask = self._invalid_accounts(df, invalid_txns_mask)
+        invalid_txns_mask = self._invalid_assets(df, invalid_txns_mask)
+        invalid_txns_mask = self._invalid_currency(df, invalid_txns_mask)
+        invalid_txns_mask = self._invalid_prices(df, invalid_txns_mask)
+        invalid_txns_mask = self._invalid_profit_centers(df, invalid_txns_mask)
+        invalid_txns_mask = self._unbalanced_txns(df, invalid_txns_mask)
 
-        return df.loc[~invalid_txns_mask].reset_index(drop=True)
+        return df.query("~@invalid_txns_mask").reset_index(drop=True)
 
-    def invalid_multidate_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_multidate_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        """Find transactions spanning multiple dates."""
         grouped = df.groupby("id")["date"].transform("nunique") > 1
         new_invalid_mask = grouped & ~invalid_txns_mask
         if new_invalid_mask.any():
@@ -847,7 +876,8 @@ class LedgerEngine(ABC):
             )
         return invalid_txns_mask | grouped
 
-    def invalid_tax_codes(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> None:
+    def _invalid_tax_codes(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> None:
+        """Set invalid transaction tax codes references to NA."""
         _, tax_codes = self.sanitized_accounts_tax_codes()
         raw_mask = ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
         invalid_tax_code_mask = raw_mask & ~invalid_txns_mask
@@ -861,7 +891,8 @@ class LedgerEngine(ABC):
 
         df.loc[raw_mask, "tax_code"] = pd.NA
 
-    def invalid_accounts(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_accounts(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        """Find transactions where both 'account' and 'contra' are missing or reference invalid."""
         accounts, _ = self.sanitized_accounts_tax_codes()
         accounts_set = set(accounts["account"])
 
@@ -889,7 +920,8 @@ class LedgerEngine(ABC):
 
         return invalid_txns_mask | missing_account_mask | invalid_accounts_mask
 
-    def invalid_assets(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_assets(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        """Find transactions with invalid assets reference."""
         def invalid_asset_reference(row):
             if invalid_txns_mask[row.name]:
                 return True
@@ -909,7 +941,8 @@ class LedgerEngine(ABC):
             )
         return invalid_txns_mask | invalid_assets_mask
 
-    def invalid_currency(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_currency(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        """Find transactions with invalid currency."""
         def invalid_transaction_currency(row):
             if invalid_txns_mask[row.name]:
                 return True
@@ -935,7 +968,8 @@ class LedgerEngine(ABC):
             )
         return invalid_txns_mask | invalid_currency_mask
 
-    def invalid_prices(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_prices(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        """Find transactions with missing price reference."""
         def invalid_price(row):
             if invalid_txns_mask[row.name]:
                 return True
@@ -957,12 +991,12 @@ class LedgerEngine(ABC):
             )
         return invalid_txns_mask | invalid_prices_mask
 
-    def invalid_profit_centers(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_profit_centers(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        """Find transactions with invalid profit center reference."""
         profit_centers = self.profit_centers.list()
         if profit_centers.empty:
             return invalid_txns_mask
 
-        # Drop transactions without profit center (when required)
         missing_profit_center_mask = df["profit_center"].isna()
         new_missing_mask = missing_profit_center_mask & ~invalid_txns_mask
         if new_missing_mask.any():
@@ -973,7 +1007,6 @@ class LedgerEngine(ABC):
             )
             invalid_txns_mask |= missing_profit_center_mask
 
-        # Drop transactions with invalid profit center values
         profit_centers_set = set(profit_centers["profit_center"])
         invalid_ref_mask = df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers_set)
         new_invalid_ref_mask = invalid_ref_mask & ~invalid_txns_mask
@@ -986,7 +1019,8 @@ class LedgerEngine(ABC):
 
         return invalid_txns_mask | invalid_ref_mask
 
-    def invalid_unbalanced_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _unbalanced_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+        """Find unbalanced transactions."""
         effective_amounts = df["report_amount"].copy()
 
         index = effective_amounts.isna() & ~invalid_txns_mask
