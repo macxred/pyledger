@@ -926,7 +926,7 @@ class LedgerEngine(ABC):
             return invalid_txns_mask
 
         def invalid_asset_reference(row):
-            if invalid_txns_mask[row.name]:
+            if invalid_txns_mask[row.name].any():
                 return True
             try:
                 self.precision(ticker=row["currency"], date=row["date"])
@@ -950,7 +950,7 @@ class LedgerEngine(ABC):
             return invalid_txns_mask
 
         def invalid_transaction_currency(row):
-            if invalid_txns_mask[row.name]:
+            if invalid_txns_mask[row.name].any():
                 return True
             if row["amount"] == 0:
                 return False
@@ -982,7 +982,7 @@ class LedgerEngine(ABC):
             return invalid_txns_mask
 
         def invalid_price(row):
-            if invalid_txns_mask[row.name]:
+            if invalid_txns_mask[row.name].any():
                 return True
             if row["currency"] == self.reporting_currency or pd.notna(row["report_amount"]):
                 return False
