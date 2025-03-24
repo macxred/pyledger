@@ -864,7 +864,9 @@ class LedgerEngine(ABC):
 
         return df.query("~@invalid_txns_mask").reset_index(drop=True)
 
-    def _invalid_multidate_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_multidate_txns(
+        self, df: pd.DataFrame, invalid_txns_mask: np.ndarray
+    ) -> np.ndarray:
         """Find transactions spanning multiple dates."""
         grouped = df.groupby("id")["date"].transform("nunique") > 1
         new_invalid_mask = grouped & ~invalid_txns_mask
@@ -881,14 +883,12 @@ class LedgerEngine(ABC):
         _, tax_codes = self.sanitized_accounts_tax_codes()
         raw_mask = ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
         invalid_tax_code_mask = raw_mask & ~invalid_txns_mask
-
         if invalid_tax_code_mask.any():
             invalid_ids = df.loc[invalid_tax_code_mask, "id"].unique().tolist()
             self._logger.warning(
                 f"Setting 'tax_code' to 'NA' for {len(invalid_ids)} journal entries "
                 f"with invalid tax codes: {first_elements_as_str(invalid_ids)}"
             )
-
         df.loc[raw_mask, "tax_code"] = pd.NA
 
     def _invalid_accounts(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
@@ -950,11 +950,13 @@ class LedgerEngine(ABC):
                 return False
             if pd.notna(row["account"]):
                 account_currency = self.account_currency(row["account"])
-                if account_currency != self.reporting_currency and row["currency"] != account_currency:
+                if ((account_currency != self.reporting_currency)
+                        and (row["currency"] != account_currency)):
                     return True
             if pd.notna(row["contra"]):
                 contra_currency = self.account_currency(row["contra"])
-                if contra_currency != self.reporting_currency and row["currency"] != contra_currency:
+                if ((contra_currency != self.reporting_currency)
+                        and (row["currency"] != contra_currency)):
                     return True
             return False
 
@@ -976,7 +978,9 @@ class LedgerEngine(ABC):
             if row["currency"] == self.reporting_currency or pd.notna(row["report_amount"]):
                 return False
             try:
-                self.price(ticker=row["currency"], date=row["date"], currency=self.reporting_currency)
+                self.price(
+                    ticker=row["currency"], date=row["date"], currency=self.reporting_currency
+                )
                 return False
             except ValueError:
                 return True
@@ -991,7 +995,9 @@ class LedgerEngine(ABC):
             )
         return invalid_txns_mask | invalid_prices_mask
 
-    def _invalid_profit_centers(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_profit_centers(
+        self, df: pd.DataFrame, invalid_txns_mask: np.ndarray
+    ) -> np.ndarray:
         """Find transactions with invalid profit center reference."""
         profit_centers = self.profit_centers.list()
         if profit_centers.empty:
@@ -1008,7 +1014,9 @@ class LedgerEngine(ABC):
             invalid_txns_mask |= missing_profit_center_mask
 
         profit_centers_set = set(profit_centers["profit_center"])
-        invalid_ref_mask = df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers_set)
+        invalid_ref_mask = (
+            df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers_set)
+        )
         new_invalid_ref_mask = invalid_ref_mask & ~invalid_txns_mask
         if new_invalid_ref_mask.any():
             invalid_ids = df.loc[new_invalid_ref_mask, "id"].unique().tolist()
@@ -1022,23 +1030,19 @@ class LedgerEngine(ABC):
     def _unbalanced_txns(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
         """Find unbalanced transactions."""
         effective_amounts = df["report_amount"].copy()
-
         index = effective_amounts.isna() & ~invalid_txns_mask
         effective_amounts.loc[index] = self.report_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
         )
-
         effective_amounts = effective_amounts.mask(df["contra"].notna() & df["account"].notna(), 0)
         effective_amounts = effective_amounts.mask(
             df["contra"].notna() & df["account"].isna(), -effective_amounts
         )
-
         grouped_amounts = effective_amounts.groupby(df["id"]).sum()
         invalid_amounts_mask = grouped_amounts.abs() > 1e-8
         invalid_amounts_mask = df["id"].isin(grouped_amounts[invalid_amounts_mask].index)
-
         new_invalid_mask = invalid_amounts_mask & ~invalid_txns_mask
         if new_invalid_mask.any():
             invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
