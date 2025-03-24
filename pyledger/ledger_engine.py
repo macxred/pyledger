@@ -922,9 +922,6 @@ class LedgerEngine(ABC):
 
     def _invalid_assets(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
         """Find transactions with invalid assets reference."""
-        if df.empty:
-            return invalid_txns_mask
-
         def invalid_asset_reference(row):
             if invalid_txns_mask[row.name].any():
                 return True
@@ -934,7 +931,7 @@ class LedgerEngine(ABC):
             except ValueError:
                 return True
 
-        invalid_assets_mask = df.apply(invalid_asset_reference, axis=1)
+        invalid_assets_mask = df.apply(invalid_asset_reference, axis=1, result_type='reduce')
         new_invalid_mask = invalid_assets_mask & ~invalid_txns_mask
         if new_invalid_mask.any():
             invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
@@ -946,9 +943,6 @@ class LedgerEngine(ABC):
 
     def _invalid_currency(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
         """Find transactions with invalid currency."""
-        if df.empty:
-            return invalid_txns_mask
-
         def invalid_transaction_currency(row):
             if invalid_txns_mask[row.name].any():
                 return True
@@ -966,7 +960,7 @@ class LedgerEngine(ABC):
                     return True
             return False
 
-        invalid_currency_mask = df.apply(invalid_transaction_currency, axis=1)
+        invalid_currency_mask = df.apply(invalid_transaction_currency, axis=1, result_type='reduce')
         new_invalid_mask = invalid_currency_mask & ~invalid_txns_mask
         if new_invalid_mask.any():
             invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
@@ -978,9 +972,6 @@ class LedgerEngine(ABC):
 
     def _invalid_prices(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
         """Find transactions with missing price reference."""
-        if df.empty:
-            return invalid_txns_mask
-
         def invalid_price(row):
             if invalid_txns_mask[row.name].any():
                 return True
@@ -994,7 +985,7 @@ class LedgerEngine(ABC):
             except ValueError:
                 return True
 
-        invalid_prices_mask = df.apply(invalid_price, axis=1)
+        invalid_prices_mask = df.apply(invalid_price, axis=1, result_type='reduce')
         new_invalid_mask = invalid_prices_mask & ~invalid_txns_mask
         if new_invalid_mask.any():
             invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
