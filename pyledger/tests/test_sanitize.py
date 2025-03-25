@@ -353,8 +353,6 @@ def test_sanitize_journal(engine, capture_logs):
          23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,         , Balanced amount,
          23, 2024-01-01,    1000,       ,      USD,    10000.00,              ,              ,         , Balanced amount,
          23, 2024-01-01,        ,   1000,      USD,     8560.00,              ,              ,         , Balanced amount,
-         25, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,          Shop,         , Valid profit center,
-         26, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,       INVALID,         , Invalid profit center,
     """
     EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
@@ -376,7 +374,7 @@ def test_sanitize_journal(engine, capture_logs):
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 7, "Expected strict number of captured logs"
+    assert len(log_messages) == 8, "Expected strict number of captured logs"
 
     # Clear captured logs
     capture_logs.seek(0)
@@ -389,4 +387,4 @@ def test_sanitize_journal(engine, capture_logs):
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 7, "Expected strict number of captured logs"
+    assert len(log_messages) == 6, "Expected strict number of captured logs"

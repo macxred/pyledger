@@ -994,30 +994,19 @@ class LedgerEngine(ABC):
 
     def _invalid_profit_centers(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
         """Mark transactions with missing or invalid profit center references."""
-        profit_centers = self.profit_centers.list()
-        if profit_centers.empty:
-            return invalid_txns_mask
-
-        # Transactions missing profit center
-        missing_mask = df["profit_center"].isna()
-        missing_ids = df.loc[missing_mask & ~invalid_txns_mask, "id"].unique()
-        if len(missing_ids) > 0:
+        profit_centers = set(self.profit_centers.list()["profit_center"])
+        if profit_centers:
+            invalid_mask = df["profit_center"].isna() | ~df["profit_center"].isin(profit_centers)
+        else:
+            invalid_mask = df["profit_center"].notna()
+        new_invalid_mask = invalid_mask & ~invalid_txns_mask
+        invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+        if new_invalid_mask.any():
             self._logger.warning(
-                f"Discarding {len(missing_ids)} journal entries with missing profit center: "
-                f"{first_elements_as_str(missing_ids)}"
+                f"Discarding {len(invalid_ids)} journal entries with missing or invalid "
+                f"profit center: {first_elements_as_str(invalid_ids)}"
             )
-
-        # Transactions with invalid profit center value
-        profit_centers = set(profit_centers["profit_center"])
-        invalid_ref_mask = df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers)
-        invalid_ids = df.loc[invalid_ref_mask & ~invalid_txns_mask & ~missing_mask, "id"].unique()
-        if len(invalid_ids) > 0:
-            self._logger.warning(
-                f"Discarding {len(invalid_ids)} journal entries with invalid profit center "
-                f"reference: {first_elements_as_str(invalid_ids)}"
-            )
-
-        return invalid_txns_mask | df["id"].isin(np.concatenate([missing_ids, invalid_ids]))
+        return invalid_txns_mask | df["id"].isin(invalid_ids)
 
     def _unbalanced_txns(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
         """Mark transactions whose total amounts do not balance to zero."""
