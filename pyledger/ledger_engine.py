@@ -1045,7 +1045,7 @@ class LedgerEngine(ABC):
             & (grouped["first_currency"] != self.reporting_currency)
             & (grouped["all_na_report_balance"])
         ]
-        na_mask = df["report_amount"].isna()
+        na_mask = df["report_amount"].isna() & ~invalid_txns_mask
         df.loc[na_mask, "report_amount"] = self.report_amount(
             amount=df.loc[na_mask, "amount"],
             currency=df.loc[na_mask, "currency"],
@@ -1088,9 +1088,10 @@ class LedgerEngine(ABC):
             txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
             df.loc[txn_mask, "report_amount"] = txn["report_amount"]
 
-        invalid_balance = abs(compute_net_sum(df, "report_amount")) > tolerance
+        report_amounts = compute_net_sum(df, "report_amount")
+        invalid_balance = abs(report_amounts) > tolerance
         unbalanced_ids = report_amounts[invalid_balance].index.to_list()
-        if invalid_balance.any():
+        if invalid_ids:
             self._logger.warning(
                 f"Discarding {len(unbalanced_ids)} journal entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(unbalanced_ids)}"
