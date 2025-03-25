@@ -890,39 +890,36 @@ class LedgerEngine(ABC):
         df.loc[raw_mask, "tax_code"] = pd.NA
 
     def _invalid_accounts(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
-        """Mark transactions as invalid if 'account' and 'contra'
-        are both missing or reference unknown accounts.
-        """
+        """Mark transactions where both 'account' and 'contra' are missing or reference invalid."""
         accounts, _ = self.sanitized_accounts_tax_codes()
         accounts_set = set(accounts["account"])
 
-        # Check for missing both account and contra
-        missing_account_mask = df["account"].isna() & df["contra"].isna()
-        new_missing_mask = missing_account_mask & ~invalid_txns_mask
-        if new_missing_mask.any():
-            invalid_ids = df.loc[new_missing_mask, "id"].unique().tolist()
+        # Transactions missing both 'account' and 'contra'
+        missing_mask = df["account"].isna() & df["contra"].isna()
+        missing_ids = df.loc[missing_mask & ~invalid_txns_mask, "id"].unique()
+        if len(missing_ids) > 0:
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} journal entries with neither 'account' "
-                f"nor 'contra' specified: {first_elements_as_str(invalid_ids)}"
+                f"Discarding {len(missing_ids)} journal entries with neither 'account' "
+                f"nor 'contra' specified: {first_elements_as_str(missing_ids)}"
             )
 
-        # Check for invalid account or contra references
+        # Transactions with invalid account or contra references
         invalid_account_mask = ~df["account"].isna() & ~df["account"].isin(accounts_set)
         invalid_contra_mask = ~df["contra"].isna() & ~df["contra"].isin(accounts_set)
-        invalid_accounts_mask = invalid_account_mask | invalid_contra_mask
-        new_invalid_mask = invalid_accounts_mask & ~invalid_txns_mask & ~missing_account_mask
-        if new_invalid_mask.any():
-            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+        ref_mask = invalid_account_mask | invalid_contra_mask
+        invalid_ref_ids = df.loc[ref_mask & ~invalid_txns_mask & ~missing_mask, "id"].unique()
+        if len(invalid_ref_ids) > 0:
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} journal entries with invalid account "
-                f"or contra references: {first_elements_as_str(invalid_ids)}"
+                f"Discarding {len(invalid_ref_ids)} journal entries with invalid account "
+                f"or contra references: {first_elements_as_str(invalid_ref_ids)}"
             )
 
-        return invalid_txns_mask | missing_account_mask | invalid_accounts_mask
+        invalid_mask = df["id"].isin(np.concatenate([missing_ids, invalid_ref_ids]))
+        return invalid_txns_mask | invalid_mask
 
     def _invalid_assets(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
         """Mark transactions with invalid asset references."""
-        def invalid_asset_reference(row):
+        def is_invalid(row):
             if invalid_txns_mask[row.name].any():
                 return True
             try:
@@ -931,19 +928,19 @@ class LedgerEngine(ABC):
             except ValueError:
                 return True
 
-        invalid_assets_mask = df.apply(invalid_asset_reference, axis=1, result_type='reduce')
-        new_invalid_mask = invalid_assets_mask & ~invalid_txns_mask
+        invalid_ids = df.loc[df.apply(is_invalid, axis=1, result_type="reduce"), "id"].unique()
+        invalid_mask = df["id"].isin(invalid_ids)
+        new_invalid_mask = invalid_mask & ~invalid_txns_mask
         if new_invalid_mask.any():
-            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} journal entries with invalid currency: "
                 f"{first_elements_as_str(invalid_ids)}"
             )
-        return invalid_txns_mask | invalid_assets_mask
+        return invalid_txns_mask | invalid_mask
 
-    def _invalid_currency(self, df: pd.DataFrame, invalid_txns_mask: np.ndarray) -> np.ndarray:
+    def _invalid_currency(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
         """Mark transactions with currency mismatched to account or contra account."""
-        def invalid_transaction_currency(row):
+        def is_invalid(row):
             if invalid_txns_mask[row.name].any():
                 return True
             if row["amount"] == 0:
@@ -960,15 +957,15 @@ class LedgerEngine(ABC):
                     return True
             return False
 
-        invalid_currency_mask = df.apply(invalid_transaction_currency, axis=1, result_type='reduce')
-        new_invalid_mask = invalid_currency_mask & ~invalid_txns_mask
+        invalid_ids = df.loc[df.apply(is_invalid, axis=1, result_type='reduce'), "id"].unique()
+        invalid_mask = df["id"].isin(invalid_ids)
+        new_invalid_mask = invalid_mask & ~invalid_txns_mask
         if new_invalid_mask.any():
-            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} journal entries with mismatched transaction "
                 f"currency: {first_elements_as_str(invalid_ids)}"
             )
-        return invalid_txns_mask | invalid_currency_mask
+        return invalid_txns_mask | invalid_mask
 
     def _invalid_prices(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
         """Mark transactions with missing price references."""
@@ -985,15 +982,15 @@ class LedgerEngine(ABC):
             except ValueError:
                 return True
 
-        invalid_prices_mask = df.apply(invalid_price, axis=1, result_type='reduce')
-        new_invalid_mask = invalid_prices_mask & ~invalid_txns_mask
+        invalid_ids = df.loc[df.apply(invalid_price, axis=1, result_type='reduce'), "id"].unique()
+        invalid_mask = df["id"].isin(invalid_ids)
+        new_invalid_mask = invalid_mask & ~invalid_txns_mask
         if new_invalid_mask.any():
-            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} journal entries with invalid price: "
                 f"{first_elements_as_str(invalid_ids)}"
             )
-        return invalid_txns_mask | invalid_prices_mask
+        return invalid_txns_mask | invalid_mask
 
     def _invalid_profit_centers(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
         """Mark transactions with missing or invalid profit center references."""
@@ -1001,29 +998,26 @@ class LedgerEngine(ABC):
         if profit_centers.empty:
             return invalid_txns_mask
 
-        missing_profit_center_mask = df["profit_center"].isna()
-        new_missing_mask = missing_profit_center_mask & ~invalid_txns_mask
-        if new_missing_mask.any():
-            invalid_ids = df.loc[new_missing_mask, "id"].unique().tolist()
+        # Transactions missing profit center
+        missing_mask = df["profit_center"].isna()
+        missing_ids = df.loc[missing_mask & ~invalid_txns_mask, "id"].unique()
+        if len(missing_ids) > 0:
             self._logger.warning(
-                f"Discarding {len(invalid_ids)} journal entries with missing profit center: "
-                f"{first_elements_as_str(invalid_ids)}"
+                f"Discarding {len(missing_ids)} journal entries with missing profit center: "
+                f"{first_elements_as_str(missing_ids)}"
             )
-            invalid_txns_mask |= missing_profit_center_mask
 
-        profit_centers_set = set(profit_centers["profit_center"])
-        invalid_ref_mask = (
-            df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers_set)
-        )
-        new_invalid_ref_mask = invalid_ref_mask & ~invalid_txns_mask
-        if new_invalid_ref_mask.any():
-            invalid_ids = df.loc[new_invalid_ref_mask, "id"].unique().tolist()
+        # Transactions with invalid profit center value
+        profit_centers = set(profit_centers["profit_center"])
+        invalid_ref_mask = df["profit_center"].notna() & ~df["profit_center"].isin(profit_centers)
+        invalid_ids = df.loc[invalid_ref_mask & ~invalid_txns_mask & ~missing_mask, "id"].unique()
+        if len(invalid_ids) > 0:
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} journal entries with invalid profit center "
                 f"reference: {first_elements_as_str(invalid_ids)}"
             )
 
-        return invalid_txns_mask | invalid_ref_mask
+        return invalid_txns_mask | df["id"].isin(np.concatenate([missing_ids, invalid_ids]))
 
     def _unbalanced_txns(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
         """Mark transactions whose total amounts do not balance to zero."""
