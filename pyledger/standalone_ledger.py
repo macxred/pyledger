@@ -86,7 +86,8 @@ class StandaloneLedger(LedgerEngine):
                     "document": row["document"],
                     "currency": row["currency"],
                     "report_amount": np.nan,
-                    "tax_code": row["tax_code"]
+                    "tax_code": row["tax_code"],
+                    "profit_center": row["profit_center"]
                 }
                 if pd.notna(tax["account"]):
                     tax_journal_entries.append(base_entry | {
