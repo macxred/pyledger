@@ -41,7 +41,7 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assert_frame_equal(self.ASSETS, engine.assets.list(), ignore_row_order=True)
         assert_frame_equal(self.PROFIT_CENTERS, engine.profit_centers.list(), ignore_row_order=True)
-        target = engine.txn_to_str(self.JOURNAL).values()
+        target = engine.txn_to_str(engine.sanitize_journal(self.JOURNAL)).values()
         actual = engine.txn_to_str(engine.journal.list()).values()
         assert sorted(target) == sorted(actual), "Targeted and actual journal differ"
 
