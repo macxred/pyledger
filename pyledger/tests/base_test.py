@@ -179,13 +179,10 @@ EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
 
 EXPECTED_BALANCES_CSV = """
     period,      accounts,            profit_center,  group,                 description, account, currency,     balance, report_balance
-    2023-12-31, 1000:1999,                         , Assets, VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank USD,    1000,      USD,        0.00, 0.00
+    2023-12-31, 1000:1015,                         , Assets,            Cash in Bank USD,    1000,      USD,        0.00, 0.00
               ,          ,                         , Assets,      Cash in other Bank USD,    1005,      USD,        0.00, 0.00
               ,          ,                         , Assets,            Cash in Bank EUR,    1010,      EUR,        0.00, 0.00
               ,          ,                         , Assets,      Cash in other Bank EUR,    1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank JPY,    1020,      JPY,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank CHF,    1025,      CHF,        0.00, 0.00
     2024-01-01, 1000:1999,                         , Assets, VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
               ,          ,                         , Assets,            Cash in Bank USD,    1000,      USD,    800000.0, 800000.0
               ,          ,                         , Assets,      Cash in other Bank USD,    1005,      USD,        0.00, 0.00
@@ -208,20 +205,16 @@ EXPECTED_BALANCES_CSV = """
               ,          ,                         , Assets,      Cash in other Bank EUR,    1015,      EUR,      -20.00, -22.34
               ,          ,                         , Assets,            Cash in Bank JPY,    1020,      JPY, 54345678.00, 380419.75
               ,          ,                         , Assets,            Cash in Bank CHF,    1025,      CHF, 14285714.29, 100000.00
-    2024-08,    1000:1999,                         , Assets, VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank USD,    1000,      USD,     -700.00, -700.00
+    2024-12,    1000:1025,                         , Assets,            Cash in Bank USD,    1000,      USD,   300000.00, 300000.00
+              ,          ,                         , Assets,      Cash in other Bank USD,    1005,      USD,        0.00, 0.00
+              ,          ,                         , Assets,            Cash in Bank EUR,    1010,      EUR, 10076638.88, 11255605.63
+              ,          ,                         , Assets,      Cash in other Bank EUR,    1015,      EUR,        0.00, 0.00
+              ,          ,                         , Assets,            Cash in Bank JPY,    1020,      JPY,        0.00, 0.00
+              ,          ,                         , Assets,            Cash in Bank CHF,    1025,      CHF, 14285714.29, 100000.00
+    2023-12-31, 1000:1015,                "General", Assets,            Cash in Bank USD,    1000,      USD,        0.00, 0.00
               ,          ,                         , Assets,      Cash in other Bank USD,    1005,      USD,        0.00, 0.00
               ,          ,                         , Assets,            Cash in Bank EUR,    1010,      EUR,        0.00, 0.00
               ,          ,                         , Assets,      Cash in other Bank EUR,    1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank JPY,    1020,      JPY,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank CHF,    1025,      CHF,        0.00, 0.00
-    2023-12-31, 1000:1999,                "General", Assets, VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank USD,    1000,      USD,        0.00, 0.00
-              ,          ,                         , Assets,      Cash in other Bank USD,    1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank EUR,    1010,      EUR,        0.00, 0.00
-              ,          ,                         , Assets,      Cash in other Bank EUR,    1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank JPY,    1020,      JPY,        0.00, 0.00
-              ,          ,                         , Assets,            Cash in Bank CHF,    1025,      CHF,        0.00, 0.00
     2024-01-01, 1000:1999,                "General", Assets, VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
               ,          ,                         , Assets,            Cash in Bank USD,    1000,      USD,   800000.00, 800000.00
               ,          ,                         , Assets,      Cash in other Bank USD,    1005,      USD,        0.00, 0.00
