@@ -556,7 +556,7 @@ class LedgerEngine(ABC):
 
         Returns:
             pd.DataFrame: A data frame with the LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA schema,
-                          providing aggregated or detailed account balances.
+                          providing detailed account balances.
         """
         # Gather account list
         result = self.accounts.list()[["group", "description", "account", "currency"]]
