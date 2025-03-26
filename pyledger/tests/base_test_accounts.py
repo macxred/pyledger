@@ -194,29 +194,30 @@ class BaseTestAccounts(BaseTest):
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
 
+        # Extract unique test cases
         df = self.EXPECTED_BALANCES.copy()
-        cols = ["period", "accounts", "profit_center"]
-        df[cols] = df[cols].ffill()
-        cases = df.drop_duplicates(subset=cols).sort_values("period")
+        argument_cols = ["period", "accounts", "profit_center"]
+        df[argument_cols] = df[argument_cols].ffill()
+        cases = df.drop_duplicates(subset=argument_cols).sort_values("period")
 
         # Test account balances with specified profit centers
-        cases_with_profit_centers = cases.query("profit_center.notna()")[cols]
+        cases_with_profit_centers = cases.query("profit_center.notna()")[argument_cols]
         for period, accounts, profit_centers in cases_with_profit_centers.itertuples(index=False):
             expected = df.query(
                 "period == @period and accounts == @accounts and profit_center == @profit_centers"
-            ).drop(columns=cols)
+            ).drop(columns=argument_cols)
             expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
             profit_centers = [pc.strip() for pc in profit_centers.split(",")]
             actual = restored_engine.account_balances(period=period, accounts=accounts,
                                                       profit_centers=profit_centers)
-            assert_frame_equal(expected, actual, ignore_index=True, ignore_row_order=True)
+            assert_frame_equal(expected, actual, ignore_index=True)
 
         # Test account balances without specified profit centers
-        cases_without_profit_centers = cases.query("profit_center.isna()")[cols]
+        cases_without_profit_centers = cases.query("profit_center.isna()")[argument_cols]
         for period, accounts, _ in cases_without_profit_centers.itertuples(index=False):
             expected = df.query(
                 "period == @period and accounts == @accounts and profit_center.isna()"
-            ).drop(columns=cols)
+            ).drop(columns=argument_cols)
             expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
             actual = restored_engine.account_balances(period=period, accounts=accounts)
-            assert_frame_equal(expected, actual, ignore_index=True, ignore_row_order=True)
+            assert_frame_equal(expected, actual, ignore_index=True)

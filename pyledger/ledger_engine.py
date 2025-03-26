@@ -576,7 +576,7 @@ class LedgerEngine(ABC):
         balances = [_balance_lookup(account, currency)
                     for account, currency in zip(result["account"], result["currency"])]
         result[["balance", "report_balance"]] = pd.DataFrame(balances, index=result.index)
-        result = enforce_schema(result, ACCOUNT_BALANCE_SCHEMA)
+        result = enforce_schema(result, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
         return result
 
     def account_history(
