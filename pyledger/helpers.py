@@ -3,7 +3,7 @@ writing fixed-width CSV files and checking if values can be represented as integ
 """
 
 from typing import Any, List
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import numpy as np
 import pandas as pd
 
@@ -163,3 +163,54 @@ def first_elements_as_str(x: List[Any], n: int = 5) -> str:
     if len(x) > n:
         result.append("...")
     return ", ".join(result)
+
+
+def prune_path(
+    group: str | List[str],
+    description: str | List[str],
+    n: int = 0
+) -> List[tuple[str, str]]:
+    """
+    Prune paths by trimming them to a specified depth. Uses the provided description or extracts a
+    path segment at the specified depth to use as the new description.
+
+    Parameters:
+        group (str | List[str]): POSIX-style path(s).
+        description (str | List[str]): Description(s) associated with each path.
+        n (int): Depth to trim the path.
+
+    Returns:
+        List[tuple[str, str]]: A list of (shortened path, updated description) pairs.
+
+    Raises:
+        TypeError: If `group` and `description` are not both strings or both lists.
+        ValueError: If `group` and `description` are lists of different lengths.
+    """
+
+    def _prune_single(g: str, d: str) -> tuple[str, str]:
+        if pd.isna(g):
+            return (g, d)
+        path = PurePosixPath(g)
+        if g.startswith("/"):
+            if len(path.parts) <= n + 1:
+                return (g, d)
+            parent = path.parents[-(n + 1)] if n > 0 else pd.NA
+            return (str(parent), path.parts[n + 1])
+        else:
+            if len(path.parts) <= n:
+                return (g, d)
+            parent = path.parents[-(n + 1)] if n > 0 else pd.NA
+            return (str(parent), path.parts[n])
+
+    if isinstance(group, str) and isinstance(description, str):
+        group_list = [group]
+        description_list = [description]
+    elif isinstance(group, list) and isinstance(description, list):
+        if len(group) != len(description):
+            raise ValueError("`group` and `description` must be lists of the same length.")
+        group_list = group
+        description_list = description
+    else:
+        raise TypeError("`group` and `description` must both be str or both be lists.")
+
+    return [_prune_single(g, d) for g, d in zip(group_list, description_list)]
