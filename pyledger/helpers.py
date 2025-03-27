@@ -3,7 +3,7 @@ writing fixed-width CSV files and checking if values can be represented as integ
 """
 
 from typing import Any, List
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import numpy as np
 import pandas as pd
 
@@ -163,3 +163,34 @@ def first_elements_as_str(x: List[Any], n: int = 5) -> str:
     if len(x) > n:
         result.append("...")
     return ", ".join(result)
+
+
+def prune_path(path: str, description: str, n: int = 0) -> tuple[str, str]:
+    """
+    Prune a POSIX-style path to a specified depth and update the description.
+
+    The path is shortened to include only the first `n` levels. If a segment exists
+    at level `n + 1`, it replaces the given description. If the path is too short
+    to extract that segment, the original description is retained. If `n` is zero,
+    the shortened path is returned as `pd.NA`.
+
+    Parameters:
+        path (str): POSIX-style path. A leading slash is added if missing.
+        description (str): Fallback description if the path is too short.
+        n (int): Number of leading segments to preserve in the path.
+
+    Returns:
+        tuple[str, str]: A tuple of (path, description).
+    """
+
+    if pd.isna(path):
+        return (path, description)
+
+    if not path.startswith("/"):
+        path = "/" + path
+
+    path = PurePosixPath(path)
+    if len(path.parts) <= n + 1:
+        return (str(path), description)
+    else:
+        return (str(path.parents[-(n + 1)]) if n > 0 else pd.NA, path.parts[n + 1])
