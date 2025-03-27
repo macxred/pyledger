@@ -243,33 +243,30 @@ class BaseTestAccounts(BaseTest):
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
 
-        # Test account history with specified profit centers
-        mandatory = ACCOUNT_HISTORY_SCHEMA.query("mandatory == True")["column"].tolist()
-        for case in [case for case in self.EXPECTED_HISTORY if case["profit_centers"] is not None]:
-            profit_centers = [item.strip() for item in case["profit_centers"].split(",")]
+        def format_expected_df(df_str: str) -> pd.DataFrame:
+            """Convert expected account history CSV string into a properly formatted DataFrame."""
+            df = pd.read_csv(StringIO(df_str), skipinitialspace=True)
+            df = enforce_schema(df, schema=ACCOUNT_HISTORY_SCHEMA)
+            mandatory_cols = ACCOUNT_HISTORY_SCHEMA.query("mandatory == True")["column"].tolist()
+            drop = [col for col in df.columns.difference(mandatory_cols) if df[col].isna().all()]
+            return df.drop(columns=drop)
+
+        # Test cases with profit centers
+        for case in filter(lambda c: c["profit_centers"] is not None, self.EXPECTED_HISTORY):
+            profit_centers = [pc.strip() for pc in case["profit_centers"].split(",")]
             df = restored_engine.account_history(
                 account=case["account"], period=case["period"],
                 profit_centers=profit_centers, drop=case["drop"]
             )
-            expected = pd.read_csv(StringIO(case["account_history"]), skipinitialspace=True)
-            expected = enforce_schema(expected, schema=ACCOUNT_HISTORY_SCHEMA)
-            remove = [
-                col for col in expected.columns.difference(mandatory) if expected[col].isna().all()
-            ]
-            expected = expected.drop(columns=remove)
-            assert_frame_equal(df, expected, check_like=True, ignore_columns=["id"])
+            expected_df = format_expected_df(case["account_history"])
+            assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])
 
-        # Test account history without specified profit centers
+        # Test cases without profit centers
         JOURNAL = self.JOURNAL.copy().assign(profit_center=pd.NA)
         restored_engine.restore(profit_centers=[], journal=JOURNAL)
-        for case in [case for case in self.EXPECTED_HISTORY if case["profit_centers"] is None]:
+        for case in filter(lambda c: c["profit_centers"] is None, self.EXPECTED_HISTORY):
             df = restored_engine.account_history(
                 account=case["account"], period=case["period"], drop=case["drop"]
             )
-            expected = pd.read_csv(StringIO(case["account_history"]), skipinitialspace=True)
-            expected = enforce_schema(expected, schema=ACCOUNT_HISTORY_SCHEMA)
-            remove = [
-                col for col in expected.columns.difference(mandatory) if expected[col].isna().all()
-            ]
-            expected = expected.drop(columns=remove)
-            assert_frame_equal(df, expected, check_like=True, ignore_columns=["id"])
+            expected_df = format_expected_df(case["account_history"])
+            assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])
