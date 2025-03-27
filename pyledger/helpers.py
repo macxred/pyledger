@@ -165,52 +165,32 @@ def first_elements_as_str(x: List[Any], n: int = 5) -> str:
     return ", ".join(result)
 
 
-def prune_path(
-    group: str | List[str],
-    description: str | List[str],
-    n: int = 0
-) -> List[tuple[str, str]]:
+def prune_path(path: str, description: str, n: int = 0) -> tuple[str, str]:
     """
-    Prune paths by trimming them to a specified depth. Uses the provided description or extracts a
-    path segment at the specified depth to use as the new description.
+    Prune a POSIX-style path to a specified depth and optionally update the description.
+
+    The path is shortened to include only the first `n` levels. If a segment exists
+    at level `n + 1`, it replaces the given description. If the path is too short
+    to extract that segment, the original description is retained. If `n` is zero,
+    the shortened path is returned as `pd.NA`.
 
     Parameters:
-        group (str | List[str]): POSIX-style path(s).
-        description (str | List[str]): Description(s) associated with each path.
-        n (int): Depth to trim the path.
+        path (str): POSIX-style path. A leading slash is added if missing.
+        description (str): Fallback description if the path is too short.
+        n (int): Number of leading segments to preserve in the path.
 
     Returns:
-        List[tuple[str, str]]: A list of (shortened path, updated description) pairs.
-
-    Raises:
-        TypeError: If `group` and `description` are not both strings or both lists.
-        ValueError: If `group` and `description` are lists of different lengths.
+        tuple[str, str]: A tuple of (path, description).
     """
 
-    def _prune_single(g: str, d: str) -> tuple[str, str]:
-        if pd.isna(g):
-            return (g, d)
-        path = PurePosixPath(g)
-        if g.startswith("/"):
-            if len(path.parts) <= n + 1:
-                return (g, d)
-            parent = path.parents[-(n + 1)] if n > 0 else pd.NA
-            return (str(parent), path.parts[n + 1])
-        else:
-            if len(path.parts) <= n:
-                return (g, d)
-            parent = path.parents[-(n + 1)] if n > 0 else pd.NA
-            return (str(parent), path.parts[n])
+    if pd.isna(path):
+        return (path, description)
 
-    if isinstance(group, str) and isinstance(description, str):
-        group_list = [group]
-        description_list = [description]
-    elif isinstance(group, list) and isinstance(description, list):
-        if len(group) != len(description):
-            raise ValueError("`group` and `description` must be lists of the same length.")
-        group_list = group
-        description_list = description
+    if not path.startswith("/"):
+        path = "/" + path
+
+    path = PurePosixPath(path)
+    if len(path.parts) <= n + 1:
+        return (str(path), description)
     else:
-        raise TypeError("`group` and `description` must both be str or both be lists.")
-
-    return [_prune_single(g, d) for g, d in zip(group_list, description_list)]
+        return (str(path.parents[-(n + 1)]) if n > 0 else pd.NA, path.parts[n + 1])
