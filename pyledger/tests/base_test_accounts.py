@@ -4,7 +4,7 @@ import pytest
 import pandas as pd
 from abc import abstractmethod
 from consistent_df import assert_frame_equal, enforce_schema
-from pyledger.constants import ACCOUNT_BALANCE_SCHEMA
+from pyledger.constants import ACCOUNT_BALANCE_SCHEMA, AGGREGATED_BALANCE_SCHEMA
 from .base_test import BaseTest
 
 
@@ -230,8 +230,6 @@ class BaseTestAccounts(BaseTest):
         )
 
         account_balances = restored_engine.account_balances(period="2024", accounts="1000:9999")
-        aggregated_balances = restored_engine.aggregate_account_balances(account_balances, n=2)
-        assert_frame_equal(
-            aggregated_balances, self.EXPECTED_AGGREGATED_BALANCES, ignore_index=True
-        )
-
+        actual = restored_engine.aggregate_account_balances(account_balances, n=2)
+        expected = enforce_schema(self.EXPECTED_AGGREGATED_BALANCES, AGGREGATED_BALANCE_SCHEMA)
+        assert_frame_equal(actual, expected, ignore_index=True)

@@ -99,6 +99,17 @@ ACCOUNT_BALANCE_SCHEMA_CSV = """
 """
 ACCOUNT_BALANCE_SCHEMA = pd.read_csv(StringIO(ACCOUNT_BALANCE_SCHEMA_CSV), skipinitialspace=True)
 
+
+AGGREGATED_BALANCE_SCHEMA_CSV = """
+    column,             dtype,                mandatory,       id
+    group,              string[python],       True,          True
+    description,        string[python],       True,          True
+    report_balance,     Float64,              True,         False
+"""
+AGGREGATED_BALANCE_SCHEMA = pd.read_csv(
+    StringIO(AGGREGATED_BALANCE_SCHEMA_CSV), skipinitialspace=True
+)
+
 DEFAULT_PRECISION = 0.01
 
 DEFAULT_ASSETS = enforce_schema(

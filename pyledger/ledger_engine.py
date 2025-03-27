@@ -23,6 +23,7 @@ from .constants import (
     REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
+    AGGREGATED_BALANCE_SCHEMA
 )
 from .storage_entity import AccountingEntity
 from . import excel
@@ -593,12 +594,13 @@ class LedgerEngine(ABC):
             n (int): Number of leading segments to preserve in the group path.
 
         Returns:
-            pd.DataFrame: Aggregated account balances by pruned group and updated description.
+            pd.DataFrame: Aggregated account balances with the
+                          LEDGER_ENGINE.AGGREGATED_BALANCE_SCHEMA schema.
         """
         groups = [prune_path(g, d, n=n) for g, d in zip(df["group"], df["description"])]
         df[["group", "description"]] = pd.DataFrame(groups, index=df.index)
         grouped = df.groupby(["group", "description"], dropna=False, sort=False)["report_balance"]
-        return grouped.sum().reset_index()
+        return enforce_schema(grouped.sum().reset_index(), AGGREGATED_BALANCE_SCHEMA)
 
     def account_history(
         self,
