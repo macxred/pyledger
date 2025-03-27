@@ -585,12 +585,16 @@ class LedgerEngine(ABC):
 
     def aggregate_account_balances(self, df: pd.DataFrame = None, n: int = 1) -> pd.DataFrame:
         """
-        Aggregates account balances by pruning the group path to a specified depth and
-        updating the description using the next segment in the path when available,
-        otherwise falling back to the original account description.
+        Aggregates account balances by account groups
+
+        Prunes the group path to a specified depth and updates the description
+        with the next segment in the path when available, otherwise falling
+        back to the original account description. Finally, sums the
+        report_balance of all within unique combinations of account group
+        and description.
 
         Parameters:
-            df (pd.DataFrame): A DataFrame with the LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA schema.
+            df (pd.DataFrame): A DataFrame in LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA.
             n (int): Number of leading segments to preserve in the group path.
 
         Returns:
