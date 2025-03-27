@@ -221,3 +221,17 @@ class BaseTestAccounts(BaseTest):
             expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
             actual = restored_engine.account_balances(period=period, accounts=accounts)
             assert_frame_equal(expected, actual, ignore_index=True)
+
+    def test_aggregate_account_balances(self, restored_engine):
+        restored_engine.restore(
+            accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
+            journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
+        )
+
+        account_balances = restored_engine.account_balances(period="2024", accounts="1000:9999")
+        aggregated_balances = restored_engine.aggregate_account_balances(account_balances, n=2)
+        assert_frame_equal(
+            aggregated_balances, self.EXPECTED_AGGREGATED_BALANCES, ignore_index=True
+        )
+

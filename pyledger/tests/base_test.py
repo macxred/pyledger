@@ -234,6 +234,26 @@ EXPECTED_BALANCES_CSV = """
 """
 EXPECTED_BALANCES = pd.read_csv(StringIO(EXPECTED_BALANCES_CSV), skipinitialspace=True)
 
+EXPECTED_AGGREGATED_BALANCES_CSV = """
+    group,                          description,                   report_balance
+    /Assets/Cash,                   Bank of America,               1076311.79
+    /Assets/Cash,                   Other Bank,                    -122.34
+    /Assets/Cash,                   Deutsche Bank,                 11199809.49
+    /Assets/Cash,                   Mitsubishi UFJ,                380419.75
+    /Assets/Cash,                   UBS,                           100000.00
+    /Assets/Tax Recoverable,        VAT Recoverable (Input VAT),   360.85
+    /Liabilities/Payables,          Accounts Payable USD,          700.00
+    /Liabilities/Payables,          Accounts Payable EUR,          0.00
+    /Liabilities/Tax Payable,       VAT Payable (Output VAT),      -403.97
+    /Equity,                        Owner's Equity,                -11098332.82
+    /Revenue/Sales,                 Sales Revenue - USD,           -1000.00
+    /Revenue/Sales,                 Sales Revenue - EUR,           -1402.23
+    /Expenses/Cost of Goods Sold,   Purchases,                     3502.64
+    /Expenses/Other,                Financial,                     -1659837.61
+    /Revenue/Other,                 Financial,                     -5.55
+"""
+EXPECTED_AGGREGATED_BALANCES = pd.read_csv(StringIO(EXPECTED_AGGREGATED_BALANCES_CSV), skipinitialspace=True)
+
 def parse_profit_center(value):
     """Function to split values by commas and convert to list"""
     if pd.isna(value) or value.strip() == "":
@@ -254,3 +274,4 @@ class BaseTest(ABC):
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
     EXPECTED_BALANCE = EXPECTED_BALANCE
     EXPECTED_BALANCES = EXPECTED_BALANCES
+    EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES
