@@ -15,6 +15,7 @@ import openpyxl
 import pandas as pd
 from .decorators import timed_cache
 from .constants import (
+    ACCOUNT_BALANCE_SCHEMA,
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
     JOURNAL_SCHEMA,
@@ -534,6 +535,51 @@ class LedgerEngine(ABC):
                 result = 0.0
             return result
         result = {k: _standardize_currency(k, v) for k, v in result.items()}
+        return result
+
+    def account_balances(
+        self,
+        accounts: str | int | dict[str, list[int]] | list[int] | None,
+        period: str | datetime.date | None = None,
+        profit_centers: list[str] | str | None = None,
+    ) -> pd.DataFrame:
+        """
+        Query balances of multiple accounts, returning a separate balance for each account.
+
+        Args:
+            accounts (str | int | dict[str, list[int]] | list[int] | None):
+                The range of accounts to be evaluated. See `parse_account_range()` for possible
+                formats. If None, the balance of all accounts is returned.
+            period (datetime.date | str | None):
+                The time period for which account balances are calculated. See `parse_date_span`
+                for possible values. If a single date, the balance up to that date is returned.
+                If None, the balance is calculated from all available accounting data.
+            profit_centers (list[str], str, optional): If not None, the result is calculated only
+                           from ledger entries assigned to the specified profit centers.
+
+        Returns:
+            pd.DataFrame: A data frame with LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA,
+                          providing account and reporting currency balances for each account.
+        """
+        # Gather account list
+        result = self.accounts.list()[["group", "description", "account", "currency"]]
+        if accounts is not None:
+            account_dict = self.parse_account_range(accounts)
+            account_list = list(set(account_dict["add"]) - set(account_dict["subtract"]))
+            result = result.loc[result["account"].isin(account_list)]
+
+        start, end = parse_date_span(period)
+
+        # Look up account balance
+        def _balance_lookup(account, currency):
+            balance = self._single_account_balance(
+                account, start=start, end=end, profit_centers=profit_centers
+            )
+            return balance.get(currency, 0), balance.get("reporting_currency", 0)
+        balances = [_balance_lookup(account, currency)
+                    for account, currency in zip(result["account"], result["currency"])]
+        result[["balance", "report_balance"]] = pd.DataFrame(balances, index=result.index)
+        result = enforce_schema(result, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
         return result
 
     def account_history(
