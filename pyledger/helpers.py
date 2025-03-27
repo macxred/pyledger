@@ -167,7 +167,7 @@ def first_elements_as_str(x: List[Any], n: int = 5) -> str:
 
 def prune_path(path: str, description: str, n: int = 0) -> tuple[str, str]:
     """
-    Prune a POSIX-style path to a specified depth and optionally update the description.
+    Prune a POSIX-style path to a specified depth and update the description.
 
     The path is shortened to include only the first `n` levels. If a segment exists
     at level `n + 1`, it replaces the given description. If the path is too short
