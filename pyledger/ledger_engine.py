@@ -26,7 +26,7 @@ from .constants import (
 )
 from .storage_entity import AccountingEntity
 from . import excel
-from .helpers import first_elements_as_str, represents_integer
+from .helpers import first_elements_as_str, prune_path, represents_integer
 from .time import parse_date_span
 
 
@@ -581,6 +581,24 @@ class LedgerEngine(ABC):
         result[["balance", "report_balance"]] = pd.DataFrame(balances, index=result.index)
         result = enforce_schema(result, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
         return result
+
+    def aggregate_account_balances(self, df: pd.DataFrame = None, n: int = 1) -> pd.DataFrame:
+        """
+        Aggregates account balances by pruning the group path to a specified depth and
+        updating the description using the next segment in the path when available,
+        otherwise falling back to the original account description.
+
+        Parameters:
+            df (pd.DataFrame): A DataFrame with the LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA schema.
+            n (int): Number of leading segments to preserve in the group path.
+
+        Returns:
+            pd.DataFrame: Aggregated account balances by pruned group and updated description.
+        """
+        groups = [prune_path(g, d, n=n) for g, d in zip(df["group"], df["description"])]
+        df[["group", "description"]] = pd.DataFrame(groups, index=df.index)
+        grouped = df.groupby(["group", "description"], dropna=False, sort=False)["report_balance"]
+        return grouped.sum().reset_index()
 
     def account_history(
         self,
