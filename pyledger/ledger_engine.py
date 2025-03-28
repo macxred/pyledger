@@ -408,7 +408,7 @@ class LedgerEngine(ABC):
         return df.reset_index(drop=True)
 
     def sanitized_accounts_tax_codes(self):
-        """Sanitization accounts and tax codes
+        """Sanitize accounts and tax codes
 
         Accounts and tax_codes are interdependent. This method validates both
         entities, navigating their mutual dependencies in a multi-step process:
@@ -1007,12 +1007,18 @@ class LedgerEngine(ABC):
             invalid_mask = df["profit_center"].notna()
         new_invalid_ids = set(df.loc[invalid_mask, "id"]) - invalid_ids
         if new_invalid_ids:
-            self._logger.warning(
-                f"Discarding {len(new_invalid_ids)} journal entries with missing or invalid "
-                f"profit center: {first_elements_as_str(new_invalid_ids)}"
-            )
+            if profit_centers:
+                self._logger.warning(
+                    f"Discarding {len(new_invalid_ids)} journal entries with missing or invalid "
+                    f"profit center: {first_elements_as_str(new_invalid_ids)}"
+                )
+            else:
+                self._logger.warning(
+                    f"Discarding {len(new_invalid_ids)} journal entries assigne to a "
+                    f"profit center, while no profit centers are defined: "
+                    f"{first_elements_as_str(new_invalid_ids)}"
+                )
             invalid_ids = invalid_ids.union(new_invalid_ids)
-
         return invalid_ids
 
     def _unbalanced_txns(self, df: pd.DataFrame, invalid_ids: set) -> set:
