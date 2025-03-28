@@ -339,24 +339,24 @@ def test_sanitize_journal(engine, capture_logs):
     """
     EXPECTED_JOURNAL_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
-         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,         , Valid,
-         2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,         , Valid,
-         3,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,         , Invalid tax code set to NA,
-         4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,    VALID, Valid tax code,
-         9,  2024-01-01,    1000,       ,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
-         10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
-         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,         , Currencies mismatch on account in reporting currency,
-         21, 2024-01-01,    1000,       ,      USD,     -999.99,              ,              ,         , Balanced amount,
-         21, 2024-01-01,        ,   2000,      USD,     -555.55,              ,              ,         , Balanced amount,
-         21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,              ,         , Balanced amount,
-         23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,    1000,       ,      USD,    10000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,        ,   1000,      USD,     8560.00,              ,              ,         , Balanced amount,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,     800000.00,              ,         , Valid,
+         2,  2024-01-01,        ,   1000,      USD,   800000.00,     800000.00,              ,         , Valid,
+         3,  2024-01-01,    1000,   2000,      USD,   800000.00,     800000.00,              ,         , Invalid tax code set to NA,
+         4,  2024-01-01,    1000,   2000,      USD,   800000.00,     800000.00,              ,    VALID, Valid tax code,
+         9,  2024-01-01,    1000,       ,      CHF,           0,             0,              ,         , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,             0,              ,         , Currencies mismatch valid with amount 0,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,          0.01,              ,         , Currencies mismatch on account in reporting currency,
+         21, 2024-01-01,    1000,       ,      USD,     -999.99,       -999.99,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -555.55,       -555.55,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -444.44,       -444.44,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1100,      JPY,   400000.00,       2840.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1200,       ,      CHF,   200000.00,       1400.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,    10000.00,      10000.00,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,     8560.00,       8560.00,              ,         , Balanced amount,
     """
     EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
-         25, 2024-01-01,    1000,   2000,      USD,   800000.00,              ,          Shop,         , Valid profit center,
+         25, 2024-01-01,    1000,   2000,      USD,   800000.00,     800000.00,          Shop,         , Valid profit center,
     """
     prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
     assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)

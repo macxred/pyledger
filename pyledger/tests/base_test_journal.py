@@ -143,7 +143,7 @@ class BaseTestJournal(BaseTest):
         engine = restored_engine
 
         # Mirror with one single and one collective transaction
-        target = self.JOURNAL.query("id in ['8', '2']")
+        target = engine.sanitize_journal(self.JOURNAL.query("id in ['8', '2']"))
         engine.journal.mirror(target=target, delete=True)
         expected = engine.journal.standardize(target)
         mirrored = engine.journal.list()
@@ -151,14 +151,14 @@ class BaseTestJournal(BaseTest):
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror with duplicate transactions and delete=False
-        target = pd.concat(
+        target = engine.sanitize_journal(pd.concat(
             [
                 self.JOURNAL.query("id == '8'").assign(id='4'),
                 self.JOURNAL.query("id == '8'").assign(id='5'),
                 self.JOURNAL.query("id == '2'").assign(id='6'),
                 self.JOURNAL.query("id == '2'").assign(id='7'),
             ]
-        )
+        ))
         engine.journal.mirror(target=target, delete=False)
         expected = engine.journal.standardize(target)
         mirrored = engine.journal.list()
@@ -167,7 +167,7 @@ class BaseTestJournal(BaseTest):
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror with complex transactions and delete=False
-        target = self.JOURNAL.query("id in ['15', '16', '17', '22']")
+        target = engine.sanitize_journal(self.JOURNAL.query("id in ['15', '16', '17', '22']"))
         engine.journal.mirror(target=target, delete=False)
         expected = engine.journal.standardize(target)
         expected = engine.sanitize_journal(expected)
@@ -177,14 +177,14 @@ class BaseTestJournal(BaseTest):
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror existing transactions with delete=False has no impact
-        target = self.JOURNAL.query("id in ['8', '2']")
+        target = engine.sanitize_journal(self.JOURNAL.query("id in ['8', '2']"))
         engine.journal.mirror(target=target, delete=False)
         mirrored = engine.journal.list()
         assert sorted(engine.txn_to_str(mirrored).values()) == \
                sorted(engine.txn_to_str(expected).values())
 
         # Mirror with delete=True
-        target = self.JOURNAL.query("id in ['8', '2']")
+        target = engine.sanitize_journal(self.JOURNAL.query("id in ['8', '2']"))
         engine.journal.mirror(target=target, delete=True)
         mirrored = engine.journal.list()
         expected = engine.journal.standardize(target)

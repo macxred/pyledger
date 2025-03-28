@@ -1023,13 +1023,13 @@ class LedgerEngine(ABC):
 
     def _unbalanced_txns(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions whose total amounts do not balance to zero."""
-        effective_amounts = df["report_amount"].copy()
-        index = effective_amounts.isna() & ~df["id"].isin(invalid_ids)
-        effective_amounts.loc[index] = self.report_amount(
+        index = df["report_amount"].isna() & ~df["id"].isin(invalid_ids)
+        df.loc[index, "report_amount"] = self.report_amount(
             amount=df.loc[index, "amount"],
             currency=df.loc[index, "currency"],
             date=df.loc[index, "date"]
         )
+        effective_amounts = df["report_amount"].copy()
         effective_amounts = effective_amounts.mask(df["contra"].notna() & df["account"].notna(), 0)
         effective_amounts = effective_amounts.mask(
             df["contra"].notna() & df["account"].isna(), -effective_amounts

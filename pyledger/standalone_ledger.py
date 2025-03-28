@@ -86,19 +86,27 @@ class StandaloneLedger(LedgerEngine):
                     "document": row["document"],
                     "currency": row["currency"],
                     "report_amount": np.nan,
-                    "tax_code": row["tax_code"]
+                    "tax_code": row["tax_code"],
+                    "profit_center": row["profit_center"]
                 }
                 if pd.notna(tax["account"]):
                     tax_journal_entries.append(base_entry | {
                         "id": f"{row['id']}:tax",
                         "contra": tax["account"],
-                        "amount": amount
+                        "amount": amount,
+                        "report_amount": self.report_amount(
+                            amount=[amount], currency=[row["currency"]], date=[row["date"]]
+                        )[0]
                     })
                 if pd.notna(tax["contra"]):
+                    amount = -1 * amount
                     tax_journal_entries.append(base_entry | {
                         "id": f"{row['id']}:tax",
                         "contra": tax["contra"],
-                        "amount": -1 * amount
+                        "amount": amount,
+                        "report_amount": self.report_amount(
+                            amount=[amount], currency=[row["currency"]], date=[row["date"]]
+                        )[0]
                     })
         result = enforce_schema(pd.DataFrame(tax_journal_entries), JOURNAL_SCHEMA)
 
@@ -136,14 +144,6 @@ class StandaloneLedger(LedgerEngine):
 
         # Add ledger entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
-
-        # Insert missing reporting currency amounts
-        index = df["report_amount"].isna()
-        df.loc[index, "report_amount"] = self.report_amount(
-            amount=df.loc[index, "amount"],
-            currency=df.loc[index, "currency"],
-            date=df.loc[index, "date"]
-        )
 
         # Add ledger entries for (currency or other) revaluations
         revaluations = self.sanitize_revaluations(self.revaluations.list())
