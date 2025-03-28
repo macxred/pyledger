@@ -159,7 +159,7 @@ def first_elements_as_str(x: List[Any], n: int = 5) -> str:
     """
     if not x:
         return ""
-    result = [str(i) for i in x[:n]]
+    result = [str(i) for i in list(x)[:n]]
     if len(x) > n:
         result.append("...")
     return ", ".join(result)

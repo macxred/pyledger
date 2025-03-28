@@ -303,8 +303,10 @@ def test_sanitize_journal(engine, capture_logs):
          8,  2024-01-01,    1000,       ,      AAA,   800000.00,              ,              ,          , Invalid currency,
          9,  2024-01-01,    1000,       ,      CHF,           0,              ,              ,          , Currencies mismatch valid with amount 0,
          10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,          , Currencies mismatch valid with amount 0,
-         11, 2024-01-01,        ,   1000,      CHF,           1,              ,              ,          , Currencies mismatch invalid,
-         12, 2024-01-01,    1000,       ,      CHF,           1,              ,              ,          , Currencies mismatch invalid,
+         11, 2024-01-01,    1200,       ,      JPY,           1,              ,              ,          , Currencies mismatch on account,
+         11, 2024-01-01,        ,   1000,      USD,           1,              ,              ,          , Currencies mismatch on account,
+         12, 2024-01-01,    1000,       ,      USD,           1,              ,              ,          , Currencies mismatch on account,
+         12, 2024-01-01,        ,   1200,      JPY,           1,              ,              ,          , Currencies mismatch on account,
          13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,          , Currencies mismatch on account in reporting currency,
          14, 2021-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , No price reference,
          15, 2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,          , Not balanced amount,
@@ -372,7 +374,7 @@ def test_sanitize_journal(engine, capture_logs):
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 7, "Expected strict number of captured logs"
+    assert len(log_messages) == 8, "Expected strict number of captured logs"
 
     # Clear captured logs
     capture_logs.seek(0)
@@ -385,4 +387,4 @@ def test_sanitize_journal(engine, capture_logs):
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 7, "Expected strict number of captured logs"
+    assert len(log_messages) == 6, "Expected strict number of captured logs"
