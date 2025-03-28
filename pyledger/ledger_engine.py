@@ -859,7 +859,8 @@ class LedgerEngine(ABC):
         invalid_ids = self._invalid_currency(df, invalid_ids)
         invalid_ids = self._invalid_prices(df, invalid_ids)
         invalid_ids = self._invalid_profit_centers(df, invalid_ids)
-        invalid_ids = self._unbalanced_txns(df, invalid_ids)
+        df["report_amount"] = self._fill_report_amounts(df, invalid_ids)
+        invalid_ids = self._unbalanced_report_amounts(df, invalid_ids)
 
         return df.query("id not in @invalid_ids").reset_index(drop=True)
 
@@ -1021,83 +1022,115 @@ class LedgerEngine(ABC):
             invalid_ids = invalid_ids.union(new_invalid_ids)
         return invalid_ids
 
-    def _unbalanced_txns(self, df: pd.DataFrame, invalid_ids: set) -> set:
-        """Mark transactions whose total amounts do not balance to zero."""
-        # Drop unbalanced transactions
-        def compute_net_sum(df, column_name):
-            """Return net sums of a specified column for each transaction."""
-            values = df[column_name].copy()
-            values = values.mask(df["contra"].notna() & df["account"].notna(), 0)
-            values = values.mask(df["contra"].notna() & df["account"].isna(), -values)
-            return values.groupby(df["id"]).sum()
+    @staticmethod
+    def _amount_multiplier(df):
+        """
+        Return a multiplier array of 0, 1, or -1 based on whether data frame
+        columns 'account' and 'contra' are missing (NA) or present.
 
-        tolerance = self.precision(self.reporting_currency) / 2
-        # Identify transactions with a single non-reporting currency that are
-        # balanced in their own currency but imbalanced in the reporting currency
-        # (which was initially unspecified).
-        grouped = df.groupby("id").agg(
-            nunique_currency=("currency", "nunique"),
-            first_currency=("currency", "first"),
-            all_na_report_balance=("report_amount", lambda x: x.isna().all()),
+        - If both are present or both are missing -> 0
+        - If account is present and contra is missing -> 1
+        - If account is missing and contra is present -> -1
+        """
+        return np.where(
+            df["account"].isna() == df["contra"].isna(),
+            0,
+            np.where(df["account"].notna(), 1, -1)
         )
-        auto_balance_ids = grouped.index[
-            (grouped["nunique_currency"] == 1)
-            & (grouped["first_currency"] != self.reporting_currency)
-            & (grouped["all_na_report_balance"])
-        ]
-        na_mask = df["report_amount"].isna() & ~df["id"].isin(invalid_ids)
-        df.loc[na_mask, "report_amount"] = self.report_amount(
+
+    def _fill_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> pd.DataFrame:
+        """
+        Fill missing report amounts with default values
+
+        Replaces NA report amounts by converting the amount in transaction
+        currency into the reporting currency. Ensures that transactions with a
+        single currency that are balanced in their original currency are also
+        balanced in reporting currency.
+        """
+        # Fill missing report amounts
+        report_amount = df["report_amount"].copy()
+        na_mask = report_amount.isna() & ~df["id"].isin(invalid_ids)
+        report_amount.loc[na_mask] = self.report_amount(
             amount=df.loc[na_mask, "amount"],
             currency=df.loc[na_mask, "currency"],
             date=df.loc[na_mask, "date"],
         )
-        amounts = compute_net_sum(df, "amount")
-        report_amounts = compute_net_sum(df, "report_amount")
-        auto_balance_ids = (
-            set(auto_balance_ids)
-            .intersection(amounts.index[amounts.abs() == 0])
-            .intersection(report_amounts.index[report_amounts.abs() > tolerance])
+
+        # Identify transactions with a single currency that are
+        # 1. balanced in in their original currency,
+        # 2. not balanced in reporting currency,
+        # 3. for which all original report amounts were missing,
+        # 4. which have at least two rows with exactly one of account or contra account specified.
+        tolerance = self.precision(self.reporting_currency) / 2
+        multiplier = self._amount_multiplier(df)
+        grouped = pd.DataFrame({
+            "id": df["id"],
+            "currency": df["currency"],
+            "amount": df['amount'] * multiplier,
+            "report_amount": report_amount * multiplier,
+            "single_account_row": multiplier != 0,
+            "original_report_amount_missing": df["report_amount"].isna()
+        })
+        grouped = grouped.groupby("id").agg(
+            nunique_currency=("currency", "nunique"),
+            first_currency=("currency", "first"),
+            all_na_report_balance=("original_report_amount_missing", "all"),
+            n_single_account_rows=("single_account_row", "sum"),
+            net_amount=("amount", "sum"),
+            net_report_amount=("report_amount", "sum"),
         )
-        for txn_id in auto_balance_ids:
-            txn_mask = df["id"] == txn_id
-            txn = df.loc[txn_mask].copy()
+        auto_balance_ids = set(grouped.index[
+            (grouped["nunique_currency"] == 1)
+            & (grouped["first_currency"] != self.reporting_currency)
+            & (grouped["all_na_report_balance"])
+            & (grouped["n_single_account_rows"] >= 2)
+            & (grouped["net_amount"].abs() == 0)
+            & (grouped["net_report_amount"].abs() > tolerance)
+        ])
+
+        # Ensure transactions with a single currency that are balanced in their
+        # original currency are also balanced in reporting currency.
+        for txn_id in auto_balance_ids.difference(invalid_ids):
+            txn_mask = (df["id"] == txn_id) & (multiplier != 0)
+            first_txn_row = np.flatnonzero(txn_mask)[0]
+            txn_multiplier = multiplier[txn_mask]
             fx_rate = self.price(
-                date=txn.iloc[0]["date"],
-                ticker=txn.iloc[0]["currency"],
+                date=df["date"].iloc[first_txn_row],
+                ticker=df["currency"].iloc[first_txn_row],
                 currency=self.reporting_currency,
             )[1]
             # Adjust sign for 'amount' and 'report_amount' where only 'contra' is specified
-            contra_mask = txn["contra"].notna() & txn["account"].isna()
-            txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
-            unrounded_values = txn["amount"] * fx_rate
+            unrounded_values = df.loc[txn_mask, "amount"] * txn_multiplier * fx_rate
+            rounded_values = report_amount[txn_mask] * txn_multiplier
             increment = self.precision(self.reporting_currency)
             while True:
-                errors = txn["report_amount"] - unrounded_values
+                errors = rounded_values - unrounded_values
                 # Exit if within tolerance
-                if abs(txn["report_amount"].sum()) <= tolerance:
+                if abs(rounded_values.sum()) <= tolerance:
                     break
                 # Reduce the row with the largest positive error
-                if txn["report_amount"].sum() > tolerance:
+                if rounded_values.sum() > tolerance:
                     idx_largest_err = errors.idxmax()
-                    txn.loc[idx_largest_err, "report_amount"] -= increment
+                    rounded_values[idx_largest_err] -= increment
                 # Increase the row with the largest negative error
-                elif txn["report_amount"].sum() < -tolerance:
+                elif rounded_values.sum() < -tolerance:
                     idx_smallest_err = errors.idxmin()
-                    txn.loc[idx_smallest_err, "report_amount"] += increment
+                    rounded_values[idx_smallest_err] += increment
             # Restore original sign where only 'contra' is specified
-            txn.loc[contra_mask, ["amount", "report_amount"]] *= -1
-            df.loc[txn_mask, "report_amount"] = txn["report_amount"]
+            report_amount[txn_mask] = rounded_values * txn_multiplier
+        return report_amount
 
-        report_amounts = compute_net_sum(df, "report_amount")
-        invalid_balance = abs(report_amounts) > tolerance
-        unbalanced_ids = report_amounts[invalid_balance].index.to_list()
-        if invalid_ids:
+    def _unbalanced_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> set:
+        """Mark transactions whose total amounts do not balance to zero as invalid."""
+        net_amount = (df["report_amount"] * self._amount_multiplier(df)).groupby(df["id"]).sum()
+        unbalanced = abs(net_amount) > self.precision(self.reporting_currency) / 2
+        if unbalanced.any():
+            unbalanced_ids = set(unbalanced.index[unbalanced])
             self._logger.warning(
                 f"Discarding {len(unbalanced_ids)} journal entries where "
                 f"amounts do not balance to zero: {first_elements_as_str(unbalanced_ids)}"
             )
             invalid_ids = invalid_ids.union(unbalanced_ids)
-
         return invalid_ids
 
     def serialize_ledger(self, df: pd.DataFrame) -> pd.DataFrame:
