@@ -408,16 +408,15 @@ class LedgerEngine(ABC):
         return df.reset_index(drop=True)
 
     def sanitized_accounts_tax_codes(self):
-        """Orchestrates the sanitization of interdependent accounts and tax codes DataFrames.
+        """Sanitization accounts and tax codes
 
-        This method handles their mutual dependencies in a multi-step process:
-        1. Sanitize accounts with no confirmed tax_codes, setting invalid ones to NA.
+        Accounts and tax_codes are interdependent. This method validates both
+        entities, navigating their mutual dependencies in a multi-step process:
+        1. Sanitize accounts with raw tax_codes.
         2. Sanitize tax_codes using the partially sanitized accounts.
-        3. Re-sanitize accounts now that we have a validated tax_codes DataFrame, ensuring
-           accounts reference only valid, sanitized tax codes.
+        3. Re-sanitize accounts with the validated tax_codes.
 
-        Logs warnings for each discarded or adjusted entry. This stepwise process ensures
-        both DataFrames end up coherent with each other.
+        Logs warnings for each discarded or adjusted entry.
 
         Returns:
             Tuple[pd.DataFrame, pd.DataFrame]: The sanitized accounts and tax_codes DataFrames.
@@ -853,28 +852,28 @@ class LedgerEngine(ABC):
         df = enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
 
         invalid_txns_mask = pd.Series(False, index=df.index)
-        invalid_txns_mask = self._invalid_multidate_txns(df, invalid_txns_mask)
+        invalid_ids = set()
         self._invalid_tax_codes(df, invalid_txns_mask)
-        invalid_txns_mask = self._invalid_accounts(df, invalid_txns_mask)
-        invalid_txns_mask = self._invalid_assets(df, invalid_txns_mask)
-        invalid_txns_mask = self._invalid_currency(df, invalid_txns_mask)
-        invalid_txns_mask = self._invalid_prices(df, invalid_txns_mask)
-        invalid_txns_mask = self._invalid_profit_centers(df, invalid_txns_mask)
-        invalid_txns_mask = self._unbalanced_txns(df, invalid_txns_mask)
+        invalid_ids = self._invalid_accounts(df, invalid_ids)
+        invalid_ids = self._invalid_assets(df, invalid_ids)
+        invalid_ids = self._invalid_currency(df, invalid_ids)
+        invalid_ids = self._invalid_prices(df, invalid_ids)
+        invalid_ids = self._invalid_profit_centers(df, invalid_ids)
+        invalid_ids = self._unbalanced_txns(df, invalid_ids)
 
         return df.query("~@invalid_txns_mask").reset_index(drop=True)
 
-    def _invalid_multidate_txns(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
+    def _invalid_multidate_txns(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions where a single 'id' spans multiple distinct 'date' values."""
-        grouped = df.groupby("id")["date"].transform("nunique") > 1
-        new_invalid_mask = grouped & ~invalid_txns_mask
-        if new_invalid_mask.any():
-            invalid_ids = df.loc[new_invalid_mask, "id"].unique().tolist()
+        invalid_date = df.groupby("id")["date"].transform("nunique") > 1
+        newly_invalid_ids = set(invalid_date.index).difference(invalid_ids)
+        if newly_invalid_ids:
             self._logger.warning(
                 f"Discarding {len(invalid_ids)} journal entries where a single 'id' "
                 f"has more than one 'date': {first_elements_as_str(invalid_ids)}"
             )
-        return invalid_txns_mask | grouped
+            invalid_ids = invalid_ids.union(newly_invalid_ids)
+        return invalid_ids
 
     def _invalid_tax_codes(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> None:
         """Drop undefined 'tax_code' references."""
