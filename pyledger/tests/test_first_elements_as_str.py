@@ -12,6 +12,8 @@ from pyledger.helpers import first_elements_as_str
         ([1, 2, 3, 4, 5], 5, "1, 2, 3, 4, 5"),  # Exactly n elements
         ([1, 2, 3, 4, 5, 6], 5, "1, 2, 3, 4, 5, ..."),  # More elements than n
         (["a", "b", "c", "d", "e", "f"], 3, "a, b, c, ..."),  # Strings and truncation
+        ((["a", "b", "c", "d", "e", "f"]), 3, "a, b, c, ..."),  # Using tuple
+        (set([1, 2, 3, 4, 5, 6]), 3, "1, 2, 3, ..."),  # Using set
         ([None, True, False], 2, "None, True, ..."),  # Mixed types and truncation
         ([None], 2, "None"),  # Single element
     ],
