@@ -342,32 +342,32 @@ def test_sanitize_journal(engine, capture_logs):
          27, 2024-12-31,        ,   1200,      CHF,     1999.99,              ,              ,          , Balanced amount,
          27, 2024-12-31,    1300,       ,      CHF,     1000.99,              ,              ,          , Balanced amount,
          27, 2024-12-31,    1400,       ,      CHF,      999.00,              ,              ,          , Balanced amount,
-         28, 2024-12-31,    1200,       ,      CHF,    -1999.99,              ,              ,          , Balanced amount,
-         28, 2024-12-31,        ,   1300,      CHF,    -1000.99,              ,              ,          , Balanced amount,
-         28, 2024-12-31,        ,   1400,      CHF,     -999.00,              ,              ,          , Balanced amount,
+         28, 2024-12-31,    1200,       ,      CHF,     1999.99,              ,              ,          , Balanced amount,
+         28, 2024-12-31,        ,   1300,      CHF,     1000.99,              ,              ,          , Balanced amount,
+         28, 2024-12-31,        ,   1400,      CHF,      999.00,              ,              ,          , Balanced amount,
     """
     EXPECTED_JOURNAL_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
-         2,  2024-01-01,    1000,       ,      USD,   800000.00,              ,              ,         , Valid,
-         2,  2024-01-01,        ,   1000,      USD,   800000.00,              ,              ,         , Valid,
-         3,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,         , Invalid tax code set to NA,
-         4,  2024-01-01,    1000,   2000,      USD,   800000.00,              ,              ,    VALID, Valid tax code,
-         9,  2024-01-01,    1000,       ,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
-         10, 2024-01-01,        ,   1000,      CHF,           0,              ,              ,         , Currencies mismatch valid with amount 0,
-         13, 2024-01-01,    1000,   2000,      CHF,           1,              ,              ,         , Currencies mismatch on account in reporting currency,
-         21, 2024-01-01,    1000,       ,      USD,     -999.99,              ,              ,         , Balanced amount,
-         21, 2024-01-01,        ,   2000,      USD,     -555.55,              ,              ,         , Balanced amount,
-         21, 2024-01-01,        ,   2000,      USD,     -444.44,              ,              ,         , Balanced amount,
-         23, 2024-01-01,        ,   1100,      JPY,   400000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,    1200,       ,      CHF,   200000.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,    1000,       ,      USD,   217660.00,              ,              ,         , Balanced amount,
-         23, 2024-01-01,        ,   1000,      USD,   441880.00,              ,              ,         , Balanced amount,
-         27, 2024-12-31,        ,   1200,      CHF,     1999.99,              ,              ,         , Balanced amount,
-         27, 2024-12-31,    1300,       ,      CHF,     1000.99,              ,              ,         , Balanced amount,
-         27, 2024-12-31,    1400,       ,      CHF,      999.00,              ,              ,         , Balanced amount,
-         28, 2024-12-31,    1200,       ,      CHF,    -1999.99,              ,              ,         , Balanced amount,
-         28, 2024-12-31,        ,   1300,      CHF,    -1000.99,              ,              ,         , Balanced amount,
-         28, 2024-12-31,        ,   1400,      CHF,     -999.00,              ,              ,         , Balanced amount,
+         2,  2024-01-01,    1000,       ,      USD,   800000.00,     800000.00,              ,         , Valid,
+         2,  2024-01-01,        ,   1000,      USD,   800000.00,     800000.00,              ,         , Valid,
+         3,  2024-01-01,    1000,   2000,      USD,   800000.00,     800000.00,              ,         , Invalid tax code set to NA,
+         4,  2024-01-01,    1000,   2000,      USD,   800000.00,     800000.00,              ,    VALID, Valid tax code,
+         9,  2024-01-01,    1000,       ,      CHF,           0,             0,              ,         , Currencies mismatch valid with amount 0,
+         10, 2024-01-01,        ,   1000,      CHF,           0,             0,              ,         , Currencies mismatch valid with amount 0,
+         13, 2024-01-01,    1000,   2000,      CHF,           1,          1.14,              ,         , Currencies mismatch on account in reporting currency,
+         21, 2024-01-01,    1000,       ,      USD,     -999.99,       -999.99,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -555.55,       -555.55,              ,         , Balanced amount,
+         21, 2024-01-01,        ,   2000,      USD,     -444.44,       -444.44,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1100,      JPY,   400000.00,       2840.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1200,       ,      CHF,   200000.00,     227060.00,              ,         , Balanced amount,
+         23, 2024-01-01,    1000,       ,      USD,   217660.00,     217660.00,              ,         , Balanced amount,
+         23, 2024-01-01,        ,   1000,      USD,   441880.00,     441880.00,              ,         , Balanced amount,
+         27, 2024-12-31,        ,   1200,      CHF,     1999.99,       2270.59,              ,         , Balanced amount,
+         27, 2024-12-31,    1300,       ,      CHF,     1000.99,       1136.42,              ,         , Balanced amount,
+         27, 2024-12-31,    1400,       ,      CHF,      999.00,       1134.17,              ,         , Balanced amount,
+         28, 2024-12-31,    1200,       ,      CHF,     1999.99,       2270.59,              ,         , Balanced amount,
+         28, 2024-12-31,        ,   1300,      CHF,     1000.99,       1136.42,              ,         , Balanced amount,
+         28, 2024-12-31,        ,   1400,      CHF,      999.00,       1134.17,              ,         , Balanced amount,
     """
     EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
@@ -391,7 +391,6 @@ def test_sanitize_journal(engine, capture_logs):
     # Sanitize journal entries without profit centers
     expected_journal_df = engine.journal.standardize(expected_journal)
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
-    breakpoint()
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) == 8, "Expected strict number of captured logs"
@@ -407,4 +406,4 @@ def test_sanitize_journal(engine, capture_logs):
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 6, "Expected strict number of captured logs"
+    assert len(log_messages) == 7, "Expected strict number of captured logs"

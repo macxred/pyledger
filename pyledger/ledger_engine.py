@@ -1045,7 +1045,7 @@ class LedgerEngine(ABC):
             & (grouped["first_currency"] != self.reporting_currency)
             & (grouped["all_na_report_balance"])
         ]
-        na_mask = df["report_amount"].isna() & ~invalid_txns_mask
+        na_mask = df["report_amount"].isna() & ~df["id"].isin(invalid_ids)
         df.loc[na_mask, "report_amount"] = self.report_amount(
             amount=df.loc[na_mask, "amount"],
             currency=df.loc[na_mask, "currency"],
