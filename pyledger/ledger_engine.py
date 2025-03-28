@@ -877,7 +877,7 @@ class LedgerEngine(ABC):
         return invalid_txns_mask | grouped
 
     def _invalid_tax_codes(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> None:
-        """Replace 'tax_code' invalid references with NA."""
+        """Drop undefined 'tax_code' references."""
         _, tax_codes = self.sanitized_accounts_tax_codes()
         raw_mask = ~df["tax_code"].isna() & ~df["tax_code"].isin(set(tax_codes["id"]))
         invalid_tax_code_mask = raw_mask & ~invalid_txns_mask
@@ -890,7 +890,10 @@ class LedgerEngine(ABC):
         df.loc[raw_mask, "tax_code"] = pd.NA
 
     def _invalid_accounts(self, df: pd.DataFrame, invalid_txns_mask: pd.Series) -> pd.Series:
-        """Mark transactions where both 'account' and 'contra' are missing or reference invalid."""
+        """
+        Mark transactions with invalid accounts:
+        - both 'account' and 'contra' are missing, or
+        - a referenced account is not defined."""
         accounts, _ = self.sanitized_accounts_tax_codes()
         accounts_set = set(accounts["account"])
 
