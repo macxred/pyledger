@@ -17,6 +17,7 @@ from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
     ACCOUNT_SCHEMA,
+    ACCOUNT_HISTORY_SCHEMA,
     ASSETS_SCHEMA,
     JOURNAL_SCHEMA,
     PRICE_SCHEMA,
@@ -651,6 +652,7 @@ class LedgerEngine(ABC):
         df = self._fetch_account_history(
             accounts, start=start, end=end, profit_centers=profit_centers
         )
+        df = enforce_schema(df, schema=ACCOUNT_HISTORY_SCHEMA)
 
         if drop:
             if len(accounts) == 1:
@@ -661,7 +663,7 @@ class LedgerEngine(ABC):
                 and accounts_df["currency"].iloc[0] == self.reporting_currency
             ):
                 df = df.drop(columns=["report_amount", "report_balance"])
-            mandatory = ACCOUNT_SCHEMA.query("mandatory == True")["column"].tolist()
+            mandatory = ACCOUNT_HISTORY_SCHEMA.query("mandatory == True")["column"].tolist()
             remove = [col for col in df.columns.difference(mandatory) if df[col].isna().all()]
             df = df.drop(columns=remove)
 
