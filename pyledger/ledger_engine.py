@@ -1023,7 +1023,7 @@ class LedgerEngine(ABC):
         return invalid_ids
 
     @staticmethod
-    def _amount_multiplier(df: pd.DataFrame) -> np.ndarray:
+    def amount_multiplier(df: pd.DataFrame) -> np.ndarray:
         """Return an array of multipliers (0, 1, or -1) based on the presence of
         'account' and 'contra' columns in the DataFrame.
 
@@ -1060,7 +1060,7 @@ class LedgerEngine(ABC):
         # 3. for which all original report amounts were missing,
         # 4. which have at least two rows with exactly one of account or contra account specified.
         tolerance = self.precision(self.reporting_currency) / 2
-        multiplier = self._amount_multiplier(df)
+        multiplier = self.amount_multiplier(df)
         grouped = pd.DataFrame({
             "id": df["id"],
             "currency": df["currency"],
@@ -1119,7 +1119,7 @@ class LedgerEngine(ABC):
 
     def _unbalanced_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions whose total amounts do not balance to zero as invalid."""
-        net_amount = (df["report_amount"] * self._amount_multiplier(df)).groupby(df["id"]).sum()
+        net_amount = (df["report_amount"] * self.amount_multiplier(df)).groupby(df["id"]).sum()
         unbalanced = abs(net_amount) > self.precision(self.reporting_currency) / 2
         if unbalanced.any():
             unbalanced_ids = set(unbalanced.index[unbalanced])
