@@ -611,7 +611,7 @@ class LedgerEngine(ABC):
         account: int | str | dict,
         period: datetime.date = None,
         profit_centers: list[str] | str = None,
-        drop: bool = True
+        drop: bool = False
     ) -> pd.DataFrame:
         """
         Return the transaction history for the specified account(s).
@@ -639,7 +639,7 @@ class LedgerEngine(ABC):
                 - The "account" column if a single account is queried
                 - "report_amount" and "report_balance" if only reporting currency
                 accounts are queried
-                Defaults to True.
+                Defaults to False.
 
         Returns:
             pd.DataFrame: Transaction history in JOURNAL_SCHEMA with additional
