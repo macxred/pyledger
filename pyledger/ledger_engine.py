@@ -1015,7 +1015,7 @@ class LedgerEngine(ABC):
                 )
             else:
                 self._logger.warning(
-                    f"Discarding {len(new_invalid_ids)} journal entries assigne to a "
+                    f"Discarding {len(new_invalid_ids)} journal entries assigned to a "
                     f"profit center, while no profit centers are defined: "
                     f"{first_elements_as_str(new_invalid_ids)}"
                 )
@@ -1023,14 +1023,14 @@ class LedgerEngine(ABC):
         return invalid_ids
 
     @staticmethod
-    def _amount_multiplier(df):
-        """
-        Return a multiplier array of 0, 1, or -1 based on whether data frame
-        columns 'account' and 'contra' are missing (NA) or present.
+    def _amount_multiplier(df: pd.DataFrame) -> np.ndarray:
+        """Return an array of multipliers (0, 1, or -1) based on the presence of
+        'account' and 'contra' columns in the DataFrame.
 
-        - If both are present or both are missing -> 0
-        - If account is present and contra is missing -> 1
-        - If account is missing and contra is present -> -1
+        Rules:
+        - If both 'account' and 'contra' are present or both are missing -> 0
+        - If only 'account' is present -> 1
+        - If only 'contra' is present -> -1
         """
         return np.where(
             df["account"].isna() == df["contra"].isna(),
@@ -1038,16 +1038,14 @@ class LedgerEngine(ABC):
             np.where(df["account"].notna(), 1, -1)
         )
 
-    def _fill_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> pd.DataFrame:
-        """
-        Fill missing report amounts with default values
+    def _fill_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> pd.Series:
+        """Fill missing report amounts with default values.
 
         Replaces NA report amounts by converting the amount in transaction
-        currency into the reporting currency. Ensures that transactions with a
-        single currency that are balanced in their original currency are also
-        balanced in reporting currency.
+        currency into the reporting currency. Ensures that transactions with a single
+        non-reporting currency that are balanced in their original currency are also balanced in
+        reporting currency.
         """
-        # Fill missing report amounts
         report_amount = df["report_amount"].copy()
         na_mask = report_amount.isna() & ~df["id"].isin(invalid_ids)
         report_amount.loc[na_mask] = self.report_amount(
@@ -1056,7 +1054,7 @@ class LedgerEngine(ABC):
             date=df.loc[na_mask, "date"],
         )
 
-        # Identify transactions with a single currency that are
+        # Identify transactions with a single non-reporting currency that are
         # 1. balanced in in their original currency,
         # 2. not balanced in reporting currency,
         # 3. for which all original report amounts were missing,
@@ -1066,7 +1064,7 @@ class LedgerEngine(ABC):
         grouped = pd.DataFrame({
             "id": df["id"],
             "currency": df["currency"],
-            "amount": df['amount'] * multiplier,
+            "amount": df["amount"] * multiplier,
             "report_amount": report_amount * multiplier,
             "single_account_row": multiplier != 0,
             "original_report_amount_missing": df["report_amount"].isna()
@@ -1087,8 +1085,7 @@ class LedgerEngine(ABC):
             & (grouped["net_amount"].abs() == 0)
             & (grouped["net_report_amount"].abs() > tolerance)
         ])
-
-        # Ensure transactions with a single currency that are balanced in their
+        # Ensure transactions with a single non-reporting currency that are balanced in their
         # original currency are also balanced in reporting currency.
         for txn_id in auto_balance_ids.difference(invalid_ids):
             txn_mask = (df["id"] == txn_id) & (multiplier != 0)
