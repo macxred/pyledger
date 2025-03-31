@@ -7,7 +7,7 @@ from consistent_df import assert_frame_equal, enforce_schema
 from pyledger.constants import ACCOUNT_BALANCE_SCHEMA, AGGREGATED_BALANCE_SCHEMA
 from .base_test import BaseTest
 from io import StringIO
-from pyledger.constants import ACCOUNT_HISTORY_SCHEMA
+from pyledger.constants import ACCOUNT_HISTORY_SCHEMA, JOURNAL_SCHEMA
 
 
 class BaseTestAccounts(BaseTest):
@@ -235,6 +235,13 @@ class BaseTestAccounts(BaseTest):
         actual = restored_engine.aggregate_account_balances(account_balances, n=2)
         expected = enforce_schema(self.EXPECTED_AGGREGATED_BALANCES, AGGREGATED_BALANCE_SCHEMA)
         assert_frame_equal(actual, expected, ignore_index=True)
+
+    def test_account_history_schema_extends_journal_schema(self):
+        extra_cols = ["balance", "report_balance"] # noqa: F841
+        account_history_schema = ACCOUNT_HISTORY_SCHEMA.query("column not in @extra_cols")
+        assert_frame_equal(
+            JOURNAL_SCHEMA, account_history_schema, ignore_columns=["mandatory"], ignore_index=True
+        )
 
     def test_account_history(self, restored_engine):
         restored_engine.restore(

@@ -112,6 +112,7 @@ AGGREGATED_BALANCE_SCHEMA = pd.read_csv(
 
 ACCOUNT_HISTORY_SCHEMA_CSV = """
     column,              dtype,                mandatory,       id
+    id,                  string[python],       False,         True
     date,                datetime64[ns],       False,        False
     account,             Int64,                False,        False
     contra,              Int64,                False,        False
