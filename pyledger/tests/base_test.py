@@ -234,6 +234,97 @@ EXPECTED_BALANCES_CSV = """
 """
 EXPECTED_BALANCES = pd.read_csv(StringIO(EXPECTED_BALANCES_CSV), skipinitialspace=True)
 
+EXPECTED_HISTORY = [{
+        "period": "2024-04-13", "account": "1000", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, contra, currency,      amount,     balance, tax_code, description, document
+            2024-01-01,       ,      USD,   800000.00,   800000.00,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-24,   4000,      USD,     1200.00,   801200.00,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-04-12,       ,      USD,   -21288.24,   779911.76,         , Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf"""
+    }, {
+        "period": "2024-12-31", "account": "2200", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, contra, currency,  amount, balance, tax_code, description, document
+            2024-01-24,   4000,      USD, -200.00, -200.00,  OUT_STD, TAX: Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-07-01,   4001,      EUR, -166.67, -366.67,  OUT_STD, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf
+            2024-07-01,   4001,      EUR,  -23.81, -390.48,  OUT_RED, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf"""
+    }, {
+        "period": "2024-03-31", "account": "1000:1999", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, account, contra, currency,      amount,     balance, report_amount, report_balance, tax_code, description, document
+            2024-01-01,    1000,       ,      USD,   800000.00,   800000.00,     800000.00,      800000.00,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1010,       ,      EUR,      120.00,   800120.00,        132.82,      800132.82,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1020,       ,      JPY, 42000000.00, 42800120.00,     298200.00,     1098332.82,         , Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-24,    1000,   4000,      USD,     1200.00, 42801320.00,       1200.00,     1099532.82,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-03-31,    1010,       ,      EUR,        0.00, 42801320.00,         -3.29,     1099529.53,         , FX revaluations,
+            2024-03-31,    1020,       ,      JPY,        0.00, 42801320.00,     -21000.00,     1078529.53,         , FX revaluations,"""
+    }, {
+        "period": "2024", "account": "1020", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, currency,       amount,     balance, report_amount, report_balance, description, document
+            2024-01-01,      JPY,  42000000.00, 42000000.00,     298200.00,      298200.00, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-03-31,      JPY,         0.00, 42000000.00,     -21000.00,      277200.00, FX revaluations,
+            2024-06-30,      JPY,         0.00, 42000000.00,     -16800.00,      260400.00, FX revaluations,
+            2024-07-04,      JPY,  12345678.00, 54345678.00,      76386.36,      336786.36, Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+            2024-09-10,      JPY,         0.00, 54345678.00,          5.55,      336791.91, Manual Foreign currency adjustment,
+            2024-09-30,      JPY,         0.00, 54345678.00,      43627.84,      380419.75, FX revaluations,"""
+    }, {
+        "period": "2024-Q4", "account": "1000", "profit_centers": None, "drop": True, "account_history":
+            """
+                  date, contra, currency,      amount, balance, description
+            2024-12-01,   3000,      USD, 10000000.00, 10776311.79, Capital Increase
+            2024-12-04,       ,      USD, -9500000.00, 1276311.79, Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places)
+            2024-12-05,       ,      USD,  -200000.00, 1076311.79, Convert USD to EUR and CHF"""
+    }, {
+        "period": "2024-05", "account": "1000:1020", "profit_centers": None, "drop": False, "account_history":
+            """
+                  date, account, contra, currency,  amount,     balance, report_amount, report_balance, tax_code, profit_center, description, document
+            2024-05-05,    1000,   5000,      USD, -555.55, 42799476.21,       -555.55,     1077973.98,   IN_STD,              , Purchase with tax, 2024/payables/2024-05-05.pdf
+            2024-05-06,    1000,   5000,      USD, -666.66, 42798809.55,       -666.66,     1077307.32,   IN_RED,              , Purchase at reduced tax, 2024/payables/2024-05-06.pdf
+            2024-05-07,    1000,   5000,      USD, -777.77, 42798031.78,       -777.77,     1076529.55,   EXEMPT,              , Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+            2024-05-08,    1000,       ,      USD, -999.99, 42797031.79,       -999.99,     1075529.56,         ,              , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+            2024-05-24,    1010,       ,      EUR,   20.00, 42797051.79,         20.50,     1075550.06,         ,              , Collective transaction - leg with credit account,
+            2024-05-24,    1000,       ,      USD,  100.00, 42797151.79,        100.00,     1075650.06,         ,              , Collective transaction with zero amount,
+            2024-05-24,    1000,       ,      USD,    0.00, 42797151.79,          0.00,     1075650.06,         ,              , Collective transaction with zero amount,
+            2024-05-24,    1000,       ,      USD, -100.00, 42797051.79,       -100.00,     1075550.06,         ,              , Collective transaction with zero amount,
+            2024-05-24,    1005,   1000,      USD, -100.00, 42796951.79,       -100.00,     1075450.06,         ,              , Collective transaction - leg with debit and credit account,
+            2024-05-24,    1000,   1005,      USD,  100.00, 42797051.79,        100.00,     1075550.06,         ,              , Collective transaction - leg with debit and credit account,
+            2024-05-24,    1015,       ,      EUR,  -20.00, 42797031.79,        -20.50,     1075529.56,         ,              , Collective transaction - leg with debit account,
+            2024-05-25,    1010,   5000,      EUR, -800.00, 42796231.79,       -863.52,     1074666.04,   IN_STD,              , Purchase goods, 2024/payables/2024-05-25.pdf"""
+    }, {
+        "period": "2024-12-31", "account": "1000", "profit_centers": "General", "drop": True, "account_history":
+            """
+                  date, contra, currency,      amount,     balance, profit_center, description, document
+            2024-01-01,       ,      USD,   800000.00,   800000.00,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-08-06,   2000,      USD,      500.00,   800500.00,       General, Payment from customer, 2024/banking/USD_2024-Q2.pdf
+            2024-08-07,   2000,      USD,     -200.00,   800300.00,       General, Payment to supplier,
+            2024-08-08,   2000,      USD,    -1000.00,   799300.00,       General, Correction of previous entry,
+            2024-12-01,   3000,      USD, 10000000.00, 10799300.00,       General, Capital Increase,
+            2024-12-05,       ,      USD,  -200000.00, 10599300.00,       General, Convert USD to EUR and CHF,"""
+    }, {
+        "period": "2024-05-30", "account": "1000:1020", "profit_centers": "General, Shop, Bakery", "drop": True, "account_history":
+            """
+                  date, account, contra, currency,       amount,      balance, report_amount, report_balance, tax_code, profit_center, description, document
+            2024-01-01,    1000,       ,      USD,    800000.00,    800000.00,     800000.00,      800000.00,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1010,       ,      EUR,       120.00,    800120.00,        132.82,      800132.82,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-01,    1020,       ,      JPY,  42000000.00,  42800120.00,     298200.00,     1098332.82,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-01-24,    1000,   4000,      USD,      1200.00,  42801320.00,       1200.00,     1099532.82,  OUT_STD,        Bakery, Sell cakes, 2024/receivables/2024-01-24.pdf
+            2024-04-12,    1010,       ,      EUR,     20000.00,  42821320.00,      21288.24,     1120821.06,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+            2024-04-12,    1000,       ,      USD,    -21288.24,  42800031.76,     -21288.24,     1099532.82,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+            2024-05-07,    1000,   5000,      USD,      -777.77,  42799253.99,       -777.77,     1098755.05,   EXEMPT,        Bakery, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+            2024-05-08,    1000,       ,      USD,      -999.99,  42798254.00,       -999.99,     1097755.06,         ,        Bakery, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf"""
+    }, {
+        "period": "2024-05", "account": "1000:1020", "profit_centers": "Cafe, Bakery", "drop": False, "account_history":
+            """
+                date, account, contra, currency,  amount,     balance, report_amount, report_balance, tax_code, profit_center, description, document
+            2024-05-05,    1000,   5000,      USD, -555.55,    644.45,       -555.55,         644.45,   IN_STD,          Cafe, Purchase with tax, 2024/payables/2024-05-05.pdf
+            2024-05-06,    1000,   5000,      USD, -666.66,    -22.21,       -666.66,         -22.21,   IN_RED,          Cafe, Purchase at reduced tax, 2024/payables/2024-05-06.pdf
+            2024-05-07,    1000,   5000,      USD, -777.77,   -799.98,       -777.77,        -799.98,   EXEMPT,        Bakery, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+            2024-05-08,    1000,       ,      USD, -999.99,  -1799.97,       -999.99,       -1799.97,         ,        Bakery, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+            2024-05-25,    1010,   5000,      EUR, -800.00,  -2599.97,       -863.52,       -2663.49,   IN_STD,          Cafe, Purchase goods, 2024/payables/2024-05-25.pdf"""
+    }
+]
+
 EXPECTED_AGGREGATED_BALANCES_CSV = """
     group,                          description,                   report_balance
     /Assets/Cash,                   Bank of America,               1076311.79
@@ -275,3 +366,4 @@ class BaseTest(ABC):
     EXPECTED_BALANCE = EXPECTED_BALANCE
     EXPECTED_BALANCES = EXPECTED_BALANCES
     EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES
+    EXPECTED_HISTORY = EXPECTED_HISTORY

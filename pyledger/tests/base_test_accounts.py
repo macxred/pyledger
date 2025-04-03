@@ -6,6 +6,8 @@ from abc import abstractmethod
 from consistent_df import assert_frame_equal, enforce_schema
 from pyledger.constants import ACCOUNT_BALANCE_SCHEMA, AGGREGATED_BALANCE_SCHEMA
 from .base_test import BaseTest
+from io import StringIO
+from pyledger.constants import ACCOUNT_HISTORY_SCHEMA, JOURNAL_SCHEMA
 
 
 class BaseTestAccounts(BaseTest):
@@ -233,3 +235,47 @@ class BaseTestAccounts(BaseTest):
         actual = restored_engine.aggregate_account_balances(account_balances, n=2)
         expected = enforce_schema(self.EXPECTED_AGGREGATED_BALANCES, AGGREGATED_BALANCE_SCHEMA)
         assert_frame_equal(actual, expected, ignore_index=True)
+
+    def test_account_history_schema_extends_journal_schema(self):
+        extra_cols = ["balance", "report_balance"]  # noqa: F841
+        account_history_schema = ACCOUNT_HISTORY_SCHEMA.query("column not in @extra_cols")
+        assert_frame_equal(
+            JOURNAL_SCHEMA, account_history_schema, ignore_columns=["mandatory"], ignore_index=True
+        )
+
+    def test_account_history(self, restored_engine):
+        restored_engine.restore(
+            accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
+            journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
+        )
+
+        def format_expected_df(df_str: str, drop: bool = False) -> pd.DataFrame:
+            """Convert expected account history CSV string into a properly formatted DataFrame."""
+            df = pd.read_csv(StringIO(df_str), skipinitialspace=True)
+            df = enforce_schema(df, schema=ACCOUNT_HISTORY_SCHEMA)
+            if drop:
+                mandatory = ACCOUNT_HISTORY_SCHEMA.query("mandatory == True")["column"].tolist()
+                drop = [col for col in df.columns.difference(mandatory) if df[col].isna().all()]
+                df = df.drop(columns=drop)
+            return df
+
+        # Test cases with profit centers
+        for case in filter(lambda c: c["profit_centers"] is not None, self.EXPECTED_HISTORY):
+            profit_centers = [pc.strip() for pc in case["profit_centers"].split(",")]
+            df = restored_engine.account_history(
+                account=case["account"], period=case["period"],
+                profit_centers=profit_centers, drop=case["drop"]
+            )
+            expected_df = format_expected_df(case["account_history"], drop=case["drop"])
+            assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])
+
+        # Test cases without profit centers
+        JOURNAL = self.JOURNAL.copy().assign(profit_center=pd.NA)
+        restored_engine.restore(profit_centers=[], journal=JOURNAL)
+        for case in filter(lambda c: c["profit_centers"] is None, self.EXPECTED_HISTORY):
+            df = restored_engine.account_history(
+                account=case["account"], period=case["period"], drop=case["drop"]
+            )
+            expected_df = format_expected_df(case["account_history"], drop=case["drop"])
+            assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])
