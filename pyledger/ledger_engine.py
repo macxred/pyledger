@@ -539,7 +539,7 @@ class LedgerEngine(ABC):
         result = {k: _standardize_currency(k, v) for k, v in result.items()}
         return result
 
-    def account_balances(
+    def individual_account_balances(
         self,
         accounts: str | int | dict[str, list[int]] | list[int] | None,
         period: str | datetime.date | None = None,

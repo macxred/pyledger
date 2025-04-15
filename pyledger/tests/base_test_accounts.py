@@ -210,8 +210,9 @@ class BaseTestAccounts(BaseTest):
             ).drop(columns=argument_cols)
             expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
             profit_centers = [pc.strip() for pc in profit_centers.split(",")]
-            actual = restored_engine.account_balances(period=period, accounts=accounts,
-                                                      profit_centers=profit_centers)
+            actual = restored_engine.individual_account_balances(
+                period=period, accounts=accounts, profit_centers=profit_centers
+            )
             assert_frame_equal(expected, actual, ignore_index=True)
 
         # Test account balances without specified profit centers
@@ -221,7 +222,7 @@ class BaseTestAccounts(BaseTest):
                 "period == @period and accounts == @accounts and profit_center.isna()"
             ).drop(columns=argument_cols)
             expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
-            actual = restored_engine.account_balances(period=period, accounts=accounts)
+            actual = restored_engine.individual_account_balances(period=period, accounts=accounts)
             assert_frame_equal(expected, actual, ignore_index=True)
 
     def test_aggregate_account_balances(self, restored_engine):
@@ -231,7 +232,9 @@ class BaseTestAccounts(BaseTest):
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
 
-        account_balances = restored_engine.account_balances(period="2024", accounts="1000:9999")
+        account_balances = restored_engine.individual_account_balances(
+            period="2024", accounts="1000:9999"
+        )
         actual = restored_engine.aggregate_account_balances(account_balances, n=2)
         expected = enforce_schema(self.EXPECTED_AGGREGATED_BALANCES, AGGREGATED_BALANCE_SCHEMA)
         assert_frame_equal(actual, expected, ignore_index=True)
