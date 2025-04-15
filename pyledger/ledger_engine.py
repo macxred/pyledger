@@ -564,24 +564,47 @@ class LedgerEngine(ABC):
                 reporting currency balances as separate rows for each account.
         """
         # Gather account list
-        result = self.accounts.list()[["group", "description", "account", "currency"]]
+        df = self.accounts.list()[["group", "description", "account", "currency"]]
         if accounts is not None:
             account_dict = self.parse_account_range(accounts)
             account_list = list(set(account_dict["add"]) - set(account_dict["subtract"]))
-            result = result.loc[result["account"].isin(account_list)]
+            df = df.loc[df["account"].isin(account_list)]
 
-        start, end = parse_date_span(period)
+        df["period"] = period
+        df["profit_center"] = [profit_centers] * len(df)
+        balances = self.total_account_balances(df)
+        df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
 
-        # Look up account balance
-        def _balance_lookup(account, currency):
-            balance = self._single_account_balance(
-                account, start=start, end=end, profit_centers=profit_centers
+        return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
+
+    def total_account_balances(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Calculate summarized balances for each row's account specification.
+
+        Expects a DataFrame with the following columns:
+        - 'account': Single account, list, or range. See `parse_account_range()`
+            for supported formats.
+        - 'period': Period or cutoff date. See `parse_date_span()` for accepted formats.
+        - 'profit_center': (optional) Filters journal entries by the given profit center(s).
+        - 'currency': Native currency in which to report the 'balance' value.
+
+        Returns:
+            pd.DataFrame with two columns:
+            - 'balance': Total in the specified currency.
+            - 'report_balance': Total in the reporting currency.
+        """
+        def _calc_balances(row):
+            balance = self.account_balance(
+                account=row["account"],
+                period=row["period"],
+                profit_centers=row["profit_center"]
             )
-            return balance.get(currency, 0), balance.get("reporting_currency", 0)
-        balances = [_balance_lookup(account, currency)
-                    for account, currency in zip(result["account"], result["currency"])]
-        result[["balance", "report_balance"]] = pd.DataFrame(balances, index=result.index)
-        result = enforce_schema(result, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
+            return pd.Series({
+                "balance": balance.get(row.get("currency"), 0),
+                "report_balance": balance.get("reporting_currency", 0)
+            })
+
+        result = df.apply(_calc_balances, axis=1)
         return result
 
     def aggregate_account_balances(self, df: pd.DataFrame = None, n: int = 1) -> pd.DataFrame:
