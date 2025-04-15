@@ -496,7 +496,8 @@ class LedgerEngine(ABC):
         self, account: int | str | dict, period: datetime.date | str | int = None,
         profit_centers: list[str] | str = None
     ) -> dict:
-        """Balance of a single account or a list of accounts.
+        """Calculate the balance of a single account
+        or the summarized balance of a list or range of accounts.
 
         Args:
             account (int, str, dict): The account(s) to be evaluated. Can be a
