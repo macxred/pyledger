@@ -545,8 +545,8 @@ class LedgerEngine(ABC):
         period: str | datetime.date | None = None,
         profit_centers: list[str] | str | None = None,
     ) -> pd.DataFrame:
-        """
-        Query balances of multiple accounts, returning a separate balance for each account.
+        """Calculate balances individually for a single account
+        or for each account in a list or range, returning one row per account.
 
         Args:
             accounts (str | int | dict[str, list[int]] | list[int] | None):
@@ -560,8 +560,8 @@ class LedgerEngine(ABC):
                            from ledger entries assigned to the specified profit centers.
 
         Returns:
-            pd.DataFrame: A data frame with LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA,
-                          providing account and reporting currency balances for each account.
+            pd.DataFrame: A data frame with ACCOUNT_BALANCE_SCHEMA, providing account and
+                reporting currency balances as separate rows for each account.
         """
         # Gather account list
         result = self.accounts.list()[["group", "description", "account", "currency"]]
