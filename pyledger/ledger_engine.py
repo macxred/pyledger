@@ -496,7 +496,8 @@ class LedgerEngine(ABC):
         self, account: int | str | dict, period: datetime.date | str | int = None,
         profit_centers: list[str] | str = None
     ) -> dict:
-        """Balance of a single account or a list of accounts.
+        """Calculate the balance of a single account
+        or the summarized balance of a list or range of accounts.
 
         Args:
             account (int, str, dict): The account(s) to be evaluated. Can be a
@@ -538,14 +539,14 @@ class LedgerEngine(ABC):
         result = {k: _standardize_currency(k, v) for k, v in result.items()}
         return result
 
-    def account_balances(
+    def individual_account_balances(
         self,
         accounts: str | int | dict[str, list[int]] | list[int] | None,
         period: str | datetime.date | None = None,
         profit_centers: list[str] | str | None = None,
     ) -> pd.DataFrame:
-        """
-        Query balances of multiple accounts, returning a separate balance for each account.
+        """Calculate balances individually for a single account
+        or for each account in a list or range, returning one row per account.
 
         Args:
             accounts (str | int | dict[str, list[int]] | list[int] | None):
@@ -559,8 +560,8 @@ class LedgerEngine(ABC):
                            from ledger entries assigned to the specified profit centers.
 
         Returns:
-            pd.DataFrame: A data frame with LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA,
-                          providing account and reporting currency balances for each account.
+            pd.DataFrame: A data frame with ACCOUNT_BALANCE_SCHEMA, providing account and
+                reporting currency balances as separate rows for each account.
         """
         # Gather account list
         result = self.accounts.list()[["group", "description", "account", "currency"]]
