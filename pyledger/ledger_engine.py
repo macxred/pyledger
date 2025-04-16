@@ -572,26 +572,27 @@ class LedgerEngine(ABC):
 
         df["period"] = period
         df["profit_center"] = [profit_centers] * len(df)
-        balances = self.total_account_balances(df)
+        balances = self.account_balances(df)
         df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
 
         return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
 
-    def total_account_balances(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Calculate summarized balances for each row's account specification.
+    def account_balances(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Calculate balances in specified and reporting currencies by processing each row
+        specification of the DataFrame.
 
         Expects a DataFrame with the following columns:
-        - 'account': Single account, list, or range. See `parse_account_range()`
-            for supported formats.
-        - 'period': Period or cutoff date. See `parse_date_span()` for accepted formats.
-        - 'profit_center': (optional) Filters journal entries by the given profit center(s).
-        - 'currency': Native currency in which to report the 'balance' value.
+        - 'account': A single account, list, or range.
+            See `parse_account_range()` for supported formats.
+        - 'period': (Optional) A cutoff date or period span.
+            See `parse_date_span()` for supported formats.
+        - 'profit_center': (Optional) One or more profit centers to filter journal entries.
+        - 'currency': Currency in which to report the 'balance' field value.
 
         Returns:
-            pd.DataFrame with two columns:
-            - 'balance': Total in the specified currency.
-            - 'report_balance': Total in the reporting currency.
+            pd.DataFrame of the same length with two columns:
+            - 'balance': Amount in the specified currency.
+            - 'report_balance': Amount in the reporting currency.
         """
         def _calc_balances(row):
             balance = self.account_balance(
