@@ -138,6 +138,18 @@ PROFIT_CENTERS_CSV = """
 """
 PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
 
+# TODO: Populate with real balances while working on #147
+RECONCILIATION_CSV = """
+    period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document
+    2023-12-31,   1000:2999,      CHF,                       ,          0.00,            0.00,          , 2023/reconciliation/2023-12-31.pdf
+    2024-01-23,   1000:2999,      EUR,                       ,          0.00,            0.00,      0.01, 2024/reconciliation/2024-01-23.pdf
+    2024-09-25,        1000,      EUR,                       ,          0.00,            0.00,         1,
+    2024-Q4,      1000:2999,         ,                       ,          0.00,            0.00,      0.01, 2024/reconciliation/2024-Q4.pdf
+    2024-08,      1000:2999,      CHF,              "General",          0.00,            0.00,      0.01,
+    2024,         1000:9999,         ,           "Restaurant",          0.00,            0.00,      0.01, 2024/reconciliation/2024.pdf
+"""
+RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
+
 # flake8: noqa: E501
 EXPECTED_BALANCE_CSV = """
     period,       account,            profit_center, balance
@@ -362,6 +374,7 @@ class BaseTest(ABC):
     JOURNAL = engine.journal.standardize(JOURNAL)
     TAX_CODES = engine.tax_codes.standardize(TAX_CODES)
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
+    RECONCILIATION = engine.reconciliation.standardize(RECONCILIATION)
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
     EXPECTED_BALANCE = EXPECTED_BALANCE
     EXPECTED_BALANCES = EXPECTED_BALANCES
