@@ -128,6 +128,20 @@ ACCOUNT_HISTORY_SCHEMA_CSV = """
 """
 ACCOUNT_HISTORY_SCHEMA = pd.read_csv(StringIO(ACCOUNT_HISTORY_SCHEMA_CSV), skipinitialspace=True)
 
+RECONCILIATION_SCHEMA_CSV = """
+    column,             dtype,                mandatory,       id
+    period,             string[python],       True,            True
+    account,            string[python],       True,            True
+    currency,           string[python],       False,           True
+    profit_center,      string[python],       True,            True
+    balance,            Float64,              False,           False
+    report_balance,     Float64,              False,           False
+    tolerance,          Float64,              False,           False
+    document,           string[python],       False,           False
+    source,             string[python],       False,           True
+"""
+RECONCILIATION_SCHEMA = pd.read_csv(StringIO(RECONCILIATION_SCHEMA_CSV), skipinitialspace=True)
+
 DEFAULT_PRECISION = 0.01
 
 DEFAULT_ASSETS = enforce_schema(
