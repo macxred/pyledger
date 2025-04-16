@@ -8,6 +8,7 @@ from .constants import (
     PRICE_SCHEMA,
     JOURNAL_SCHEMA,
     ACCOUNT_SCHEMA,
+    RECONCILIATION_SCHEMA,
     TAX_CODE_SCHEMA,
     REVALUATION_SCHEMA,
 )
@@ -47,6 +48,7 @@ class MemoryLedger(StandaloneLedger):
             on_change=self.serialized_ledger.cache_clear
         )
         self._profit_centers = DataFrameEntity(PROFIT_CENTER_SCHEMA)
+        self._reconciliation = DataFrameEntity(RECONCILIATION_SCHEMA)
 
     # ----------------------------------------------------------------------
     # Currency
