@@ -6,6 +6,7 @@ independently of third-party software.
 import datetime
 import numpy as np
 import pandas as pd
+from pyledger.storage_entity import AccountingEntity
 from .decorators import timed_cache
 from .constants import JOURNAL_SCHEMA
 from .ledger_engine import LedgerEngine
@@ -19,6 +20,13 @@ class StandaloneLedger(LedgerEngine):
     accounting software. It serves as a base for any standalone ledger implementation
     with a specific data storage choice.
     """
+
+    # ----------------------------------------------------------------------
+    # Storage entities
+
+    @property
+    def reconciliation(self) -> AccountingEntity:
+        return self._reconciliation
 
     # ----------------------------------------------------------------------
     # Tax Codes
