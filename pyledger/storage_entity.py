@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
+
+from pyledger.constants import DEFAULT_FILE_PATH_COLUMN
 from .decorators import timed_cache
 from .helpers import save_files, write_fixed_width_csv
 
@@ -521,19 +523,19 @@ class MultiCSVEntity(CSVAccountingEntity):
     """
     Stores tabular data in multiple CSV files within a root directory.
 
-    Paths relative to the root directory are specified in a `__path__` column.
+    Paths relative to the root directory are stored in a specified `file_path_column`.
     """
 
     def __init__(
         self,
         write_file: Callable[[pd.DataFrame, Path], None] = None,
+        file_path_column: str = DEFAULT_FILE_PATH_COLUMN,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
+        self.file_path_column = file_path_column
         self._write_file = write_file
-        if "__path__" in self._schema["column"]:
-            raise ValueError("MultiCSVEntity does not support schemas with a '__path__' column.")
 
     def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
         """Reads data from CSV files in the root directory.
@@ -546,10 +548,12 @@ class MultiCSVEntity(CSVAccountingEntity):
         Returns:
             pd.DataFrame: DataFrame adhering to the entity's column schema.
                           Relative paths to the root directory are stored in an
-                          additional `__path__` column.
+                          in an additional configurable `file_path_column`.
         """
         if not self._path.exists():
-            return self.standardize(None).assign(__path__=pd.Series(dtype=pd.StringDtype()))
+            df = self.standardize(None)
+            df[self.file_path_column] = pd.Series(dtype=pd.StringDtype())
+            return df
         if not self._path.is_dir():
             raise NotADirectoryError(f"Root folder is not a directory: {self._path}")
 
@@ -562,7 +566,7 @@ class MultiCSVEntity(CSVAccountingEntity):
                 df = df.rename(columns=self._column_shortcuts)
                 df = self.standardize(df, drop_extra_columns=drop_extra_columns)
                 if not df.empty:
-                    df["__path__"] = relative_path
+                    df[self.file_path_column] = relative_path
                 result.append(df)
             except Exception as e:
                 self._logger.warning(f"Skipping {relative_path}: {e}")
@@ -572,7 +576,8 @@ class MultiCSVEntity(CSVAccountingEntity):
             result = enforce_schema(result, self._schema,
                                     sort_columns=True, keep_extra_columns=not drop_extra_columns)
         else:
-            result = self.standardize(None).assign(__path__=pd.Series(dtype=pd.StringDtype()))
+            result = self.standardize(None)
+            result[self.file_path_column] = pd.Series(dtype=pd.StringDtype())
 
         return self.standardize(result, drop_extra_columns=drop_extra_columns)
 
@@ -583,46 +588,49 @@ class MultiCSVEntity(CSVAccountingEntity):
             data (pd.DataFrame): DataFrame containing new entries to add,
                                 compatible with the entity's DataFrame schema.
             default_path (str, optional): The file where data with missing (NA)
-                                          `__path__` will be stored.
+                                        `file_path_column` values will be stored.
 
         Returns:
             pd.DataFrame: A list containing the unique identifiers of the added data.
         """
         incoming = pd.DataFrame(data)
-        if "__path__" in incoming.columns:
-            incoming["__path__"] = incoming["__path__"].astype(pd.StringDtype())
-            incoming["__path__"] = incoming["__path__"].fillna(default_path)
+        col = self.file_path_column
+        if col in incoming.columns:
+            incoming[col] = incoming[col].astype(pd.StringDtype())
+            incoming[col] = incoming[col].fillna(default_path)
         elif len(incoming) > 0:
-            incoming["__path__"] = default_path
-            incoming["__path__"] = incoming["__path__"].astype(pd.StringDtype())
+            incoming[col] = default_path
+            incoming[col] = incoming[col].astype(pd.StringDtype())
         else:
-            incoming["__path__"] = pd.Series(dtype=pd.StringDtype)
+            incoming[col] = pd.Series(dtype=pd.StringDtype)
         incoming, combined = self._prepare_addition(incoming)
-        paths_to_update = incoming["__path__"].unique()
+        paths_to_update = incoming[col].unique()
         for path in paths_to_update:
             full_path = self._path / path
             full_path.parent.mkdir(parents=True, exist_ok=True)
-            df = combined.query("__path__ == @path")
-            df = df.drop(columns="__path__")
+            df = combined.query(f"`{col}` == @path")
+            df = df.drop(columns=col)
             self._store(df, full_path)
         return incoming[self._id_columns].to_dict()
 
     def modify(self, data: pd.DataFrame):
+        col = self.file_path_column
         incoming, replaced, new = self._prepare_modification(data)
-        paths_to_update = set(incoming["__path__"]).union(set(replaced["__path__"]))
+        paths_to_update = set(incoming[col]).union(set(replaced[col]))
         for path in paths_to_update:
             full_path = self._path / path
             full_path.parent.mkdir(parents=True, exist_ok=True)
-            df = new.query("__path__ == @path")
-            df = df.drop(columns="__path__")
+            df = new.query(f"`{col}` == @path")
+            df = df.drop(columns=col)
             self._store(df, full_path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
+        col = self.file_path_column
         drop, new = self._prepare_deletion(id, allow_missing=allow_missing)
-        paths_to_update = drop["__path__"].unique()
+        paths_to_update = drop[col].unique()
         for path in paths_to_update:
-            df = new.query("__path__ == @path")
-            df = df.drop(columns="__path__")
+            df = new.query(f"`{col}` == @path")
+            df = df.drop(columns=col)
             self._store(df, self._path / path)
 
 
@@ -666,8 +674,8 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
         """
         df = super()._read_data(drop_extra_columns=False)
         if not df.empty:
-            df["id"] = df["__path__"] + ":" + df["id"]
-        df = df.drop(columns="__path__")
+            df["id"] = df[self.file_path_column] + ":" + df["id"]
+        df = df.drop(columns=self.file_path_column)
         return self.standardize(df, drop_extra_columns=drop_extra_columns)
 
     def write_directory(self, df: pd.DataFrame | None = None):
@@ -686,8 +694,10 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
             df = self.list()
 
         df = self.standardize(df).copy()
-        df["__path__"] = self._csv_path(df["id"])
-        save_files(df, root=self._path, func=self._write_file)
+        df[self.file_path_column] = self._csv_path(df["id"])
+        save_files(
+            df, root=self._path, file_path_column=self.file_path_column, func=self._write_file
+        )
         self.list.cache_clear()
         self._on_change()
 

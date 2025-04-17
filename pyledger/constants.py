@@ -135,3 +135,5 @@ DEFAULT_ASSETS = enforce_schema(
 )
 
 DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
+
+DEFAULT_FILE_PATH_COLUMN = "__path__"
