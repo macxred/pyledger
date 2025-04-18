@@ -29,14 +29,11 @@ class StandaloneLedger(LedgerEngine):
             archive.writestr('reconciliation.csv', self.reconciliation.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
-        """Extend restore_from_zip to restore reconciliation data from archive if available."""
-        reconciliation = None
+        """Extend restore_from_zip to also restore reconciliation data."""
+        super().restore_from_zip(archive_path)
         with zipfile.ZipFile(archive_path, 'r') as archive:
             if 'reconciliation.csv' in archive.namelist():
-                reconciliation = pd.read_csv(archive.open('reconciliation.csv'))
-        super().restore_from_zip(archive_path)
-        if reconciliation is not None:
-            self.reconciliation.mirror(reconciliation, delete=True)
+                self.restore(reconciliation=pd.read_csv(archive.open('reconciliation.csv')))
 
     def restore(self, *args, reconciliation: pd.DataFrame | None = None, **kwargs):
         """Extend restore to reconciliation data after base restoration."""
