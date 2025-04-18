@@ -8,7 +8,7 @@ from pyledger import TextLedger
 from consistent_df import assert_frame_equal
 
 
-class TestRevaluations(BaseTestReconciliation):
+class TestReconciliation(BaseTestReconciliation):
 
     @pytest.fixture
     def engine(self, tmp_path):

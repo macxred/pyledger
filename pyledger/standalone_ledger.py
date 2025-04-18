@@ -42,7 +42,7 @@ class StandaloneLedger(LedgerEngine):
             self.reconciliation.mirror(reconciliation, delete=True)
 
     def clear(self):
-        """Extend to clear all data, including reconciliation records."""
+        """Extend clear() to also delete reconciliation records."""
         super().clear()
         self.reconciliation.mirror(None, delete=True)
 

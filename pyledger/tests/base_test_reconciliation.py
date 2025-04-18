@@ -18,8 +18,8 @@ class BaseTestReconciliation(BaseTest):
     def test_reconciliation_accessor_mutators(self, engine, ignore_row_order=False):
         # Add reconciliation one by one and with multiple rows
         reconciliation = self.RECONCILIATION.sample(frac=1).reset_index(drop=True)
-        for revaluation in reconciliation.head(-3).to_dict('records'):
-            engine.reconciliation.add([revaluation])
+        for reconciliation_entry in reconciliation.head(-3).to_dict('records'):
+            engine.reconciliation.add([reconciliation_entry])
         engine.reconciliation.add(reconciliation.tail(3))
         assert_frame_equal(
             engine.reconciliation.list(), reconciliation,
@@ -49,7 +49,7 @@ class BaseTestReconciliation(BaseTest):
             check_like=True, ignore_row_order=ignore_row_order
         )
 
-        # Modify with a multiple rows
+        # Modify multiple rows
         reconciliation.loc[reconciliation.index[[1, -1]], "document"] = "Modify multiple rows"
         engine.reconciliation.modify(reconciliation.loc[reconciliation.index[[1, -1]]])
         assert_frame_equal(
