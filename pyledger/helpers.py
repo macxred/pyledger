@@ -7,6 +7,8 @@ from pathlib import Path, PurePosixPath
 import numpy as np
 import pandas as pd
 
+from pyledger.constants import DEFAULT_FILE_PATH_COLUMN
+
 
 def represents_integer(x: Any) -> bool:
     """Check if the input is an integer number and can be cast as an integer.
@@ -106,40 +108,46 @@ def write_fixed_width_csv(
     return result.to_csv(file, sep=sep[0], index=False, na_rep=na_rep, *args, **kwargs)
 
 
-def save_files(df: pd.DataFrame, root: Path | str, func=write_fixed_width_csv):
+def save_files(
+    df: pd.DataFrame,
+    root: Path | str,
+    file_path_column: str = DEFAULT_FILE_PATH_COLUMN,
+    func=write_fixed_width_csv
+):
     """Save DataFrame entries to multiple files within a root folder.
 
     Saves a DataFrame to multiple files in the specified `root` folder, with
-    file paths within the root folder determined by the `__path__` column.
+    file paths within the root folder determined by a given `file_path_column`.
     Any existing files in the root directory that are not referenced in the
-    `__path__` column are deleted.
+    `file_path_column` are deleted.
 
     Args:
-        df (pd.DataFrame): DataFrame to save, with a `__path__` column.
+        df (pd.DataFrame): DataFrame to save, with a `file_path_column`.
         root (Path | str): Root directory where the files will be stored.
+        file_path_column (str): Name of the column containing relative file paths.
         func (callable): Function to save each DataFrame group to a file.
                          Defaults to `write_fixed_width_csv`.
 
     Raises:
-        ValueError: If the DataFrame does not contain a '__path__' column.
+        ValueError: If the DataFrame does not contain a `file_path_column`.
     """
-    if "__path__" not in df.columns:
-        raise ValueError("The DataFrame must contain a '__path__' column.")
+    if file_path_column not in df.columns:
+        raise ValueError(f"The DataFrame must contain a '{file_path_column}' column.")
 
     root = Path(root).expanduser()
     root.mkdir(parents=True, exist_ok=True)
 
     # Delete unreferenced files
     current_files = set(root.rglob("*.csv"))
-    referenced_files = set(root / path for path in df["__path__"].unique())
+    referenced_files = set(root / path for path in df[file_path_column].unique())
     for file in current_files - referenced_files:
         file.unlink()
 
     # Save DataFrame entries to their respective files
-    for path, group in df.groupby("__path__"):
+    for path, group in df.groupby(file_path_column):
         full_path = root / path
         full_path.parent.mkdir(parents=True, exist_ok=True)
-        func(group.drop(columns="__path__"), full_path)
+        func(group.drop(columns=file_path_column), full_path)
 
 
 def first_elements_as_str(x: List[Any], n: int = 5) -> str:
