@@ -4,11 +4,14 @@ import math
 import pandas as pd
 import yaml
 from pathlib import Path
+
+from pyledger.time import parse_date_span
 from .decorators import timed_cache
 from .standalone_ledger import StandaloneLedger
 from .constants import (
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
+    DEFAULT_PRECISION,
     PROFIT_CENTER_SCHEMA,
     DEFAULT_CONFIGURATION,
     JOURNAL_SCHEMA,
@@ -219,8 +222,15 @@ class TextLedger(StandaloneLedger):
             pd.DataFrame: The formatted DataFrame saved to the file.
         """
         df = enforce_schema(df, RECONCILIATION_SCHEMA, sort_columns=True, keep_extra_columns=True)
-        df["balance"] = self.format_with_precision(df["balance"], 0.01)
-        df["report_balance"] = self.format_with_precision(df["report_balance"], 0.01)
+        if not df.empty:
+            increment = df.apply(
+                lambda row: DEFAULT_PRECISION if pd.isna(row["currency"]) else self.precision(
+                    row["currency"], parse_date_span(row["period"])[1]), axis=1
+            ).min()
+            df["balance"] = self.format_with_precision(df["balance"], increment)
+            df["report_balance"] = self.format_with_precision(
+                df["report_balance"], self.precision(self.reporting_currency)
+            )
 
         # Drop columns that are all NA and not required by the schema
         na_columns = df.columns[df.isna().all()]
