@@ -147,6 +147,12 @@ class TextLedger(StandaloneLedger):
 
         return result
 
+    @staticmethod
+    def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
+        """Formats a series to a specific decimal precision."""
+        decimal_places = -1 * math.floor(math.log10(precision))
+        return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
+
     # ----------------------------------------------------------------------
     # Journal
 
@@ -175,18 +181,11 @@ class TextLedger(StandaloneLedger):
             # Record date only on the first row of collective transactions
             df = df.iloc[self.journal._id_from_path(df["id"]).argsort(kind="mergesort")]
             df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
-
-            # Apply the smallest precision
-            def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
-                """Formats a series to a specific decimal precision."""
-                decimal_places = -1 * math.floor(math.log10(precision))
-                return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
-
             increment = df.apply(
                 lambda row: self.precision(row["currency"], row["date"]), axis=1
             ).min()
-            df["amount"] = format_with_precision(df["amount"], increment)
-            df["report_amount"] = format_with_precision(
+            df["amount"] = self.format_with_precision(df["amount"], increment)
+            df["report_amount"] = self.format_with_precision(
                 df["report_amount"], self.precision(self.reporting_currency)
             )
 
@@ -220,15 +219,8 @@ class TextLedger(StandaloneLedger):
             pd.DataFrame: The formatted DataFrame saved to the file.
         """
         df = enforce_schema(df, RECONCILIATION_SCHEMA, sort_columns=True, keep_extra_columns=True)
-
-        # Apply the smallest precision
-        def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
-            """Formats a series to a specific decimal precision."""
-            decimal_places = -1 * math.floor(math.log10(precision))
-            return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
-
-        df["balance"] = format_with_precision(df["balance"], 0.01)
-        df["report_balance"] = format_with_precision(df["report_balance"], 0.01)
+        df["balance"] = self.format_with_precision(df["balance"], 0.01)
+        df["report_balance"] = self.format_with_precision(df["report_balance"], 0.01)
 
         # Drop columns that are all NA and not required by the schema
         na_columns = df.columns[df.isna().all()]
