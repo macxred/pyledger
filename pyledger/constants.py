@@ -133,7 +133,7 @@ RECONCILIATION_SCHEMA_CSV = """
     period,             string[python],       True,            True
     account,            string[python],       True,            True
     currency,           string[python],       False,           True
-    profit_center,      string[python],       True,            True
+    profit_center,      string[python],       False,           True
     balance,            Float64,              False,           False
     report_balance,     Float64,              False,           False
     tolerance,          Float64,              False,           False

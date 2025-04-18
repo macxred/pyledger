@@ -63,7 +63,7 @@ class BaseTestReconciliation(BaseTest):
             "period": reconciliation["period"].iloc[0],
             "account": reconciliation["account"].iloc[0],
             "currency": reconciliation["currency"].iloc[0],
-            "profit_center": reconciliation["profit_center"].iloc[0],
+            "profit_center": reconciliation.loc[0, "profit_center"],
         }])
         reconciliation = reconciliation.drop([0]).reset_index(drop=True)
         assert_frame_equal(
