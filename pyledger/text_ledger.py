@@ -4,21 +4,25 @@ import math
 import pandas as pd
 import yaml
 from pathlib import Path
+import datetime
+from pyledger.time import parse_date_span
 from .decorators import timed_cache
 from .standalone_ledger import StandaloneLedger
 from .constants import (
     ACCOUNT_SCHEMA,
     ASSETS_SCHEMA,
+    DEFAULT_PRECISION,
     PROFIT_CENTER_SCHEMA,
     DEFAULT_CONFIGURATION,
     JOURNAL_SCHEMA,
     PRICE_SCHEMA,
+    RECONCILIATION_SCHEMA,
     REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA
 )
 from .helpers import write_fixed_width_csv
 from consistent_df import enforce_schema
-from .storage_entity import CSVAccountingEntity, CSVJournalEntity
+from .storage_entity import CSVAccountingEntity, CSVJournalEntity, MultiCSVEntity
 
 
 # TODO: remove once old systems are migrated
@@ -93,6 +97,12 @@ class TextLedger(StandaloneLedger):
         self._profit_centers = CSVAccountingEntity(
             schema=PROFIT_CENTER_SCHEMA, path=self.root / "settings/profit_centers.csv"
         )
+        self._reconciliation = MultiCSVEntity(
+            schema=RECONCILIATION_SCHEMA,
+            path=self.root / "reconciliation",
+            write_file=self.write_reconciliation_file,
+            file_path_column="source"
+        )
 
     # ----------------------------------------------------------------------
     # Configuration
@@ -140,6 +150,12 @@ class TextLedger(StandaloneLedger):
 
         return result
 
+    @staticmethod
+    def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
+        """Formats a series to a specific decimal precision."""
+        decimal_places = -1 * math.floor(math.log10(precision))
+        return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
+
     # ----------------------------------------------------------------------
     # Journal
 
@@ -168,18 +184,11 @@ class TextLedger(StandaloneLedger):
             # Record date only on the first row of collective transactions
             df = df.iloc[self.journal._id_from_path(df["id"]).argsort(kind="mergesort")]
             df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
-
-            # Apply the smallest precision
-            def format_with_precision(series: pd.Series, precision: float) -> pd.Series:
-                """Formats a series to a specific decimal precision."""
-                decimal_places = -1 * math.floor(math.log10(precision))
-                return series.apply(lambda x: pd.NA if pd.isna(x) else f"{x:.{decimal_places}f}")
-
             increment = df.apply(
                 lambda row: self.precision(row["currency"], row["date"]), axis=1
             ).min()
-            df["amount"] = format_with_precision(df["amount"], increment)
-            df["report_amount"] = format_with_precision(
+            df["amount"] = self.format_with_precision(df["amount"], increment)
+            df["report_amount"] = self.format_with_precision(
                 df["report_amount"], self.precision(self.reporting_currency)
             )
 
@@ -196,7 +205,47 @@ class TextLedger(StandaloneLedger):
         return df
 
     # ----------------------------------------------------------------------
-    # Currency
+    # Reconciliation
+
+    def write_reconciliation_file(self, df: pd.DataFrame, file: str) -> pd.DataFrame:
+        """Save reconciliation entries to a fixed-width CSV file.
+
+        This method stores reconciliation in a fixed-width CSV format,
+        ideal for version control systems like Git. Entries are padded with spaces
+        to maintain a consistent column width for improved readability.
+
+        Args:
+            df (pd.DataFrame): The reconciliation entries to save.
+            file (str): Path of the CSV file to write.
+
+        Returns:
+            pd.DataFrame: The formatted DataFrame saved to the file.
+        """
+        df = enforce_schema(df, RECONCILIATION_SCHEMA, sort_columns=True, keep_extra_columns=True)
+        if not df.empty:
+            def _get_date(date):
+                """Return parsed end date or today's date if missing."""
+                return datetime.date.today() if pd.isna(date) else parse_date_span(date)[1]
+
+            increment = df.apply(
+                lambda row: DEFAULT_PRECISION if pd.isna(row["currency"]) else self.precision(
+                    row["currency"], _get_date(row["period"])), axis=1
+            ).min()
+            df["balance"] = self.format_with_precision(df["balance"], increment)
+            df["report_balance"] = self.format_with_precision(
+                df["report_balance"], self.precision(self.reporting_currency)
+            )
+
+        # Drop columns that are all NA and not required by the schema
+        na_columns = df.columns[df.isna().all()]
+        mandatory_columns = RECONCILIATION_SCHEMA["column"][RECONCILIATION_SCHEMA["mandatory"]]
+        df = df.drop(columns=set(na_columns).difference(mandatory_columns))
+
+        # Write a CSV with fixed column widths
+        Path(file).expanduser().parent.mkdir(parents=True, exist_ok=True)
+        write_fixed_width_csv(df, file=file)
+
+        return df
 
     @property
     def reporting_currency(self):

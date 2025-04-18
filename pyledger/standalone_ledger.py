@@ -4,8 +4,10 @@ independently of third-party software.
 """
 
 import datetime
+import zipfile
 import numpy as np
 import pandas as pd
+from pyledger.storage_entity import AccountingEntity
 from .decorators import timed_cache
 from .constants import JOURNAL_SCHEMA
 from .ledger_engine import LedgerEngine
@@ -19,6 +21,37 @@ class StandaloneLedger(LedgerEngine):
     accounting software. It serves as a base for any standalone ledger implementation
     with a specific data storage choice.
     """
+
+    def dump_to_zip(self, archive_path: str):
+        """Extend dump_to_zip to include reconciliation data in the archive."""
+        super().dump_to_zip(archive_path)
+        with zipfile.ZipFile(archive_path, 'a') as archive:
+            archive.writestr('reconciliation.csv', self.reconciliation.list().to_csv(index=False))
+
+    def restore_from_zip(self, archive_path: str):
+        """Extend restore_from_zip to also restore reconciliation data."""
+        super().restore_from_zip(archive_path)
+        with zipfile.ZipFile(archive_path, 'r') as archive:
+            if 'reconciliation.csv' in archive.namelist():
+                self.restore(reconciliation=pd.read_csv(archive.open('reconciliation.csv')))
+
+    def restore(self, *args, reconciliation: pd.DataFrame | None = None, **kwargs):
+        """Extend restore to reconciliation data after base restoration."""
+        super().restore(*args, **kwargs)
+        if reconciliation is not None:
+            self.reconciliation.mirror(reconciliation, delete=True)
+
+    def clear(self):
+        """Extend clear() to also delete reconciliation records."""
+        super().clear()
+        self.reconciliation.mirror(None, delete=True)
+
+    # ----------------------------------------------------------------------
+    # Storage entities
+
+    @property
+    def reconciliation(self) -> AccountingEntity:
+        return self._reconciliation
 
     # ----------------------------------------------------------------------
     # Tax Codes
