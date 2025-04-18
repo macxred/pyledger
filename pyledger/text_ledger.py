@@ -4,7 +4,7 @@ import math
 import pandas as pd
 import yaml
 from pathlib import Path
-
+import datetime
 from pyledger.time import parse_date_span
 from .decorators import timed_cache
 from .standalone_ledger import StandaloneLedger
@@ -223,9 +223,13 @@ class TextLedger(StandaloneLedger):
         """
         df = enforce_schema(df, RECONCILIATION_SCHEMA, sort_columns=True, keep_extra_columns=True)
         if not df.empty:
+            def _get_date(date):
+                """Return parsed end date or today's date if missing."""
+                return datetime.date.today() if pd.isna(date) else parse_date_span(date)[1]
+
             increment = df.apply(
                 lambda row: DEFAULT_PRECISION if pd.isna(row["currency"]) else self.precision(
-                    row["currency"], parse_date_span(row["period"])[1]), axis=1
+                    row["currency"], _get_date(row["period"])), axis=1
             ).min()
             df["balance"] = self.format_with_precision(df["balance"], increment)
             df["report_balance"] = self.format_with_precision(
