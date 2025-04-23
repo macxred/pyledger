@@ -435,6 +435,7 @@ def test_sanitize_reconciliation(engine, capture_logs):
         2024-01-23,   1000:2999,      EUR,                       ,          0.00,            0.00,      0.01, Valid account period
         2024-01-23,    1000-hhh,      EUR,                       ,          0.00,            0.00,      0.01, Invalid account period
         2024-01-23,   4000:9999,      EUR,                       ,          0.00,            0.00,      0.01, Invalid account reference
+        2024-01-23,        1000,         ,                       ,          0.00,            0.00,      0.01, Missing currency reference
         2024-01-23,        1000,      AAA,                       ,              ,            0.00,      0.01, Invalid currency and missing balance
         2024-01-23,        1000,      AAA,                       ,          3.44,            0.00,      0.01, Set currency balance to NA
         2024-01-23,        1000,      AAA,                       ,              ,                ,      0.01, Both missing balances
@@ -448,6 +449,7 @@ def test_sanitize_reconciliation(engine, capture_logs):
         period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document
         2024-01-23,        1000,      EUR,                       ,          0.00,            0.00,      0.01, Valid row
         2024-01-23,   1000:2999,      EUR,                       ,          0.00,            0.00,      0.01, Valid account period
+        2024-01-23,        1000,         ,                       ,          0.00,            0.00,      0.01, Missing currency reference
         2024-01-23,        1000,         ,                       ,              ,            0.00,      0.01, Set currency balance to NA
         2024,              1000,      CHF,                 "Shop",          0.00,            0.00,      0.01, Valid profit center reference
         2024-01-23,        1000,      EUR,                       ,          1.00,            2.00,    0.0005, Set lowest tolerance
