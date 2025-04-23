@@ -21,6 +21,7 @@ from .constants import (
     ASSETS_SCHEMA,
     JOURNAL_SCHEMA,
     PRICE_SCHEMA,
+    RECONCILIATION_SCHEMA,
     REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
@@ -1621,5 +1622,147 @@ class LedgerEngine(ABC):
                 f"for required currencies: {first_elements_as_str(invalid)}"
             )
             df = df.loc[currency_validation_mask]
+
+        return df.reset_index(drop=True)
+
+    # ----------------------------------------------------------------------
+    # Reconciliation
+
+    def sanitize_reconciliation(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Discard incoherent reconciliation data.
+
+        This method discards reconciliation entries that:
+        1. Have an unresolvable or missing period.
+        2. Have invalid account references.
+        3. Have unresolvable profit center references.
+        4. Have invalid or unresolvable currency references.
+        5. Specify a balance with an invalid or missing currency.
+        6. Have both 'balance' and 'report_balance' missing.
+
+        If a balance is specified but the currency is invalid, both 'balance' and 'currency'
+        are set to NA.
+
+        It also sets default tolerances when missing:
+        - Half the smaller precision if both balances are present.
+        - Half the currency precision if only 'balance' is present.
+        - Half the base currency precision if only 'report_balance' is present.
+
+        A warning specifying the reason is logged for each discarded entry.
+
+        Args:
+            df (pd.DataFrame): Reconciliation data to sanitize.
+
+        Returns:
+            pd.DataFrame: Sanitized reconciliation data containing only valid entries.
+        """
+        df = enforce_schema(df, RECONCILIATION_SCHEMA, keep_extra_columns=True)
+        id_columns = RECONCILIATION_SCHEMA.query("id == True")["column"].tolist()
+
+        def is_invalid_period(x):
+            if pd.isna(x):
+                return True
+            try:
+                return not bool(parse_date_span(x))
+            except Exception:
+                return True
+
+        invalid_period_mask = df["period"].apply(is_invalid_period)
+        if invalid_period_mask.any():
+            invalid = df.loc[invalid_period_mask, id_columns].to_dict(orient="records")
+            self._logger.warning(
+                f"Discarding {len(invalid)} reconciliation rows with invalid periods: "
+                f"{first_elements_as_str(invalid)}"
+            )
+            df = df.query("~@invalid_period_mask")
+
+        def is_invalid_account(x):
+            try:
+                return not bool(self.parse_account_range(x)["add"])
+            except Exception:
+                return True
+
+        invalid_account_mask = df["account"].apply(is_invalid_account).astype(bool)
+        if invalid_account_mask.any():
+            invalid = df.loc[invalid_account_mask, id_columns].to_dict(orient="records")
+            self._logger.warning(
+                f"Discarding {len(invalid)} reconciliation rows with invalid accounts: "
+                f"{first_elements_as_str(invalid)}"
+            )
+            df = df.query("~@invalid_account_mask")
+
+        valid_profit_centers = set(self.profit_centers.list()["profit_center"])
+        invalid_pc_mask = (
+            df["profit_center"].notna() & ~df["profit_center"].isin(valid_profit_centers)
+        )
+        if invalid_pc_mask.any():
+            invalid = df.loc[invalid_pc_mask, id_columns].to_dict(orient="records")
+            self._logger.warning(
+                f"Discarding {len(invalid)} reconciliation rows with invalid profit centers: "
+                f"{first_elements_as_str(invalid)}"
+            )
+            df = df.query("~@invalid_pc_mask")
+
+        parsed_dates = df["period"].apply(lambda x: parse_date_span(x)[1])
+
+        def is_invalid_currency(row):
+            if pd.isna(row["currency"]):
+                return False
+            try:
+                self.precision(ticker=row["currency"], date=parsed_dates[row.name])
+                return False
+            except Exception:
+                return True
+
+        invalid_currency_mask = df.apply(is_invalid_currency, axis=1)
+        has_balance_mask = df["balance"].notna()
+
+        # Compute rows with invalid currency to drop entirely
+        drop_row_mask = invalid_currency_mask & ~has_balance_mask
+        if drop_row_mask.any():
+            invalid = df.loc[drop_row_mask, id_columns].to_dict(orient="records")
+            self._logger.warning(
+                f"Discarding {len(invalid)} reconciliation rows with invalid currencies: "
+                f"{first_elements_as_str(invalid)}"
+            )
+        df = df.query("~@drop_row_mask")
+
+        # Compute rows to nullify balance + currency
+        set_na_fields_mask = invalid_currency_mask & has_balance_mask
+        if set_na_fields_mask.any():
+            invalid = df.loc[set_na_fields_mask, id_columns].to_dict(orient="records")
+            self._logger.warning(
+                f"Set balance and currency to NA for {len(invalid)} rows "
+                f"with invalid currency references: {first_elements_as_str(invalid)}"
+            )
+            df.loc[set_na_fields_mask, ["balance", "currency"]] = pd.NA
+
+        both_missing_mask = df["balance"].isna() & df["report_balance"].isna()
+        if both_missing_mask.any():
+            invalid = df.loc[both_missing_mask, id_columns].to_dict(orient="records")
+            self._logger.warning(
+                f"Discarding {len(invalid)} reconciliation rows missing both "
+                f"balance and report_balance: {first_elements_as_str(invalid)}"
+            )
+            df = df.query("~@both_missing_mask")
+
+        def assign_default_tolerance(row):
+            if pd.notna(row["tolerance"]):
+                return row["tolerance"]
+
+            precisions = []
+            if pd.notna(row["balance"]) and pd.notna(row["currency"]):
+                precisions.append(self.precision(
+                    ticker=row["currency"],
+                    date=parse_date_span(row["period"])[1]
+                ))
+            if pd.notna(row["report_balance"]):
+                precisions.append(self.precision(
+                    ticker=self.reporting_currency,
+                    date=parse_date_span(row["period"])[1]
+                ))
+            return min(precisions) / 2 if precisions else None
+
+        df["tolerance"] = df.apply(assign_default_tolerance, axis=1).astype(df["tolerance"].dtype)
 
         return df.reset_index(drop=True)
