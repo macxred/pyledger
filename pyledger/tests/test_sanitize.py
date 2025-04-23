@@ -438,7 +438,7 @@ def test_sanitize_reconciliation(engine, capture_logs):
         2024-01-23,        1000,         ,                       ,          0.00,            0.00,      0.01, Missing currency reference
         2024-01-23,        1000,      AAA,                       ,              ,            0.00,      0.01, Invalid currency and missing balance
         2024-01-23,        1000,      AAA,                       ,          3.44,            0.00,      0.01, Set currency balance to NA
-        2024-01-23,        1000,      AAA,                       ,              ,                ,      0.01, Both missing balances
+        2024-01-23,        1000,      EUR,                       ,              ,                ,      0.01, Both missing balances
         2024-08,      1000:2999,      CHF,              "General",          0.00,            0.00,      0.01, Invalid profit center reference
         2024,              1000,      CHF,                 "Shop",          0.00,            0.00,      0.01, Valid profit center reference
         2024-01-23,        1000,      EUR,                       ,          1.00,            2.00,          , Set lowest tolerance
@@ -474,4 +474,4 @@ def test_sanitize_reconciliation(engine, capture_logs):
         engine.reconciliation.standardize(expected_reconciliation), sanitized_reconciliation
     )
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 5
+    assert len(log_messages) == 6
