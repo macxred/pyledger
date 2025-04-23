@@ -1667,7 +1667,7 @@ class LedgerEngine(ABC):
             except Exception:
                 return True
 
-        invalid_period_mask = df["period"].apply(is_invalid_period)
+        invalid_period_mask = df["period"].apply(is_invalid_period).astype(bool)
         if invalid_period_mask.any():
             invalid = df.loc[invalid_period_mask, id_columns].to_dict(orient="records")
             self._logger.warning(

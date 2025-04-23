@@ -407,3 +407,69 @@ def test_sanitize_journal(engine, capture_logs):
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) == 7, "Expected strict number of captured logs"
+
+
+def test_sanitize_reconciliation(engine, capture_logs):
+    ACCOUNT_CSV = """
+        group,                       account, currency, tax_code, description
+        Assets,                         1000,      USD,         , Cash in Bank USD
+        Assets,                         1005,      CHF,         , Cash in Bank CHF
+        Assets,                         1010,      EUR,         , Cash in Bank EUR
+    """
+    ASSETS_CSV = """
+        ticker, increment,      date
+        EUR,        0.001, 2022-01-01
+        USD,        0.01, 2022-01-01
+        CHF,        0.0001, 2022-01-01
+    """
+    PROFIT_CENTERS_CSV = """
+        profit_center,
+                Shop,
+    """
+    RECONCILIATION_CSV = """
+        period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document
+        2023-12-3441,      1000,      CHF,                       ,          0.00,            0.00,          , Invalid date
+        2023-kkk,          1000,      CHF,                       ,          0.00,            0.00,          , Invalid date
+                ,          1000,      CHF,                       ,          0.00,            0.00,          , Missing date
+        2024-01-23,        1000,      EUR,                       ,          0.00,            0.00,      0.01, Valid row
+        2024-01-23,   1000:2999,      EUR,                       ,          0.00,            0.00,      0.01, Valid account period
+        2024-01-23,    1000-hhh,      EUR,                       ,          0.00,            0.00,      0.01, Invalid account period
+        2024-01-23,   4000:9999,      EUR,                       ,          0.00,            0.00,      0.01, Invalid account reference
+        2024-01-23,        1000,      AAA,                       ,              ,            0.00,      0.01, Invalid currency and missing balance
+        2024-01-23,        1000,      AAA,                       ,          3.44,            0.00,      0.01, Set currency balance to NA
+        2024-01-23,        1000,      AAA,                       ,              ,                ,      0.01, Both missing balances
+        2024-08,      1000:2999,      CHF,              "General",          0.00,            0.00,      0.01, Invalid profit center reference
+        2024,              1000,      CHF,                 "Shop",          0.00,            0.00,      0.01, Valid profit center reference
+        2024-01-23,        1000,      EUR,                       ,          1.00,            2.00,          , Set lowest tolerance
+        2024-01-23,        1000,      EUR,                       ,              ,            2.00,          , Set lowest tolerance
+        2024-01-23,        1000,      EUR,                       ,          1.00,                ,          , Set lowest tolerance
+    """
+    EXPECTED_RECONCILIATION_CSV = """
+        period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document
+        2024-01-23,        1000,      EUR,                       ,          0.00,            0.00,      0.01, Valid row
+        2024-01-23,   1000:2999,      EUR,                       ,          0.00,            0.00,      0.01, Valid account period
+        2024-01-23,        1000,         ,                       ,              ,            0.00,      0.01, Set currency balance to NA
+        2024,              1000,      CHF,                 "Shop",          0.00,            0.00,      0.01, Valid profit center reference
+        2024-01-23,        1000,      EUR,                       ,          1.00,            2.00,    0.0005, Set lowest tolerance
+        2024-01-23,        1000,      EUR,                       ,              ,            2.00,     0.005, Set lowest tolerance
+        2024-01-23,        1000,      EUR,                       ,          1.00,                ,    0.0005, Set lowest tolerance
+    """
+
+    assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
+    accounts = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    reconciliation = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
+    profit_centers = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
+    expected_reconciliation = pd.read_csv(StringIO(EXPECTED_RECONCILIATION_CSV), skipinitialspace=True)
+    engine.restore(
+        accounts=accounts, assets=assets, profit_centers=profit_centers,
+        configuration={"reporting_currency": "CHF"}
+    )
+
+    sanitized_reconciliation = engine.sanitize_reconciliation(
+        engine.reconciliation.standardize(reconciliation)
+    )
+    assert_frame_equal(
+        engine.reconciliation.standardize(expected_reconciliation), sanitized_reconciliation
+    )
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) == 5
