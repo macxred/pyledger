@@ -337,6 +337,72 @@ EXPECTED_HISTORY = [{
     }
 ]
 
+EXPECTED_RECONCILIATION = [{
+        "period": "2023-12-31", "source_pattern": None, "reconciliation":
+            """
+            period,    account, currency, profit_center,  balance,  report_balance,  tolerance,                            document, actual_balance,  actual_report_balance
+        2023-12-31,  1000:2999,      CHF,              ,      0.0,             0.0,     0.0005,  2023/reconciliation/2023-12-31.pdf,            0.0,                    0.0"""
+    }, {
+        "period": "2024-12-31", "source_pattern": None, "reconciliation":
+        """
+            period,    account, currency, profit_center,     balance,  report_balance,  tolerance,                            document, actual_balance, actual_report_balance
+        2023-12-31,  1000:2999,      CHF,              ,         0.0,             0.0,     0.0005,  2023/reconciliation/2023-12-31.pdf,           0.00,                  0.00
+              2024,  1000:9999,      EUR,       General,    27078.22,             0.0,       0.01,        2024/reconciliation/2024.pdf,       27078.22,                  0.00
+              2024,  1000:9999,      USD,       General,  -498332.82,             0.0,       0.01,        2024/reconciliation/2024.pdf,     -498332.82,                  0.00
+        2024-01-23,  1000:2999,      EUR,              ,      120.00,      1098332.82,       0.01,  2024/reconciliation/2024-01-23.pdf,         120.00,            1098332.82
+           2024-08,  1000:2999,      CHF,        Bakery,         0.0,             0.0,       0.01,                                    ,           0.00,                  0.00
+        2024-09-25,       1000,      USD,              ,   776311.79,       776311.79,        1.0,                                    ,      776311.79,             776311.79
+           2024-Q4,  1000:2999,      EUR,              , 10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,    10076638.88,           11655605.63"""
+    }, {
+        "period": "2024", "source_pattern": None, "reconciliation":
+        """
+            period,    account, currency, profit_center,       balance,  report_balance,  tolerance,                            document, actual_balance,  actual_report_balance
+              2024,  1000:9999,      EUR,       General,      27078.22,             0.0,       0.01,        2024/reconciliation/2024.pdf,       27078.22,                   0.00
+              2024,  1000:9999,      USD,       General,    -498332.82,             0.0,       0.01,        2024/reconciliation/2024.pdf,     -498332.82,                   0.00
+        2024-01-23,  1000:2999,      EUR,              ,        120.00,      1098332.82,       0.01,  2024/reconciliation/2024-01-23.pdf,         120.00,             1098332.82
+           2024-08,  1000:2999,      CHF,        Bakery,           0.0,             0.0,       0.01,                                    ,           0.00,                   0.00
+        2024-09-25,       1000,      USD,              ,     776311.79,       776311.79,        1.0,                                    ,      776311.79,              776311.79
+           2024-Q4,  1000:2999,      EUR,              ,   10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,    10076638.88,            11655605.63"""
+    }, {
+        "period": "2024-Q3", "source_pattern": None, "reconciliation":
+        """
+            period,    account, currency, profit_center,   balance,  report_balance,  tolerance, document, actual_balance,  actual_report_balance
+           2024-08,  1000:2999,      CHF,        Bakery,       0.0,             0.0,       0.01,         ,           0.00,                   0.00
+        2024-09-25,       1000,      USD,              , 776311.79,       776311.79,        1.0,         ,      776311.79,              776311.79"""
+    }, {
+        "period": "2024-09", "source_pattern": None, "reconciliation":
+        """
+            period, account, currency, profit_center,   balance,  report_balance,  tolerance, document, actual_balance,  actual_report_balance
+        2024-09-25,    1000,      USD,              , 776311.79,       776311.79,        1.0,         ,      776311.79,              776311.79"""
+    }, {
+        "period": "2023", "source_pattern": r"^2023/.*\.pdf$", "reconciliation":
+        """
+            period,    account, currency, profit_center,  balance,  report_balance,  tolerance,                            document,                 source, actual_balance,  actual_report_balance
+        2023-12-31,  1000:2999,      CHF,              ,      0.0,             0.0,     0.0005,  2023/reconciliation/2023-12-31.pdf, 2023/financial/all.pdf,            0.0,                    0.0"""
+    }, {
+        "period": "2024", "source_pattern": r"^2024/financial/.*\.pdf$", "reconciliation":
+        """
+            period,    account, currency, profit_center,     balance,  report_balance,  tolerance,                            document,                          source, actual_balance,  actual_report_balance
+              2024,  1000:9999,      EUR,       General,    27078.22,             0.0,       0.01,        2024/reconciliation/2024.pdf,          2024/financial/all.pdf,       27078.22,                   0.00
+              2024,  1000:9999,      USD,       General,  -498332.82,             0.0,       0.01,        2024/reconciliation/2024.pdf,          2024/financial/all.pdf,     -498332.82,                   0.00
+           2024-08,  1000:2999,      CHF,        Bakery,         0.0,             0.0,       0.01,                                    ,  2024/financial/custom/data.pdf,           0.00,                   0.00
+        2024-09-25,       1000,      USD,              ,   776311.79,       776311.79,        1.0,                                    ,         2024/financial/data.pdf,      776311.79,              776311.79
+           2024-Q4,  1000:2999,      EUR,              , 10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,         2024/financial/data.pdf,    10076638.88,            11655605.63"""
+    }, {
+        "period": "2024", "source_pattern": r"/custom/.*\.pdf$", "reconciliation":
+        """
+         period,    account, currency, profit_center,  balance,  report_balance,  tolerance, document,                          source, actual_balance,  actual_report_balance
+        2024-08,  1000:2999,      CHF,        Bakery,      0.0,             0.0,       0.01,         ,  2024/financial/custom/data.pdf,            0.0,                    0.0"""
+    }, {
+        "period": "2024", "source_pattern": r".*/all\.pdf$", "reconciliation":
+        """
+            period,    account, currency, profit_center,    balance,  report_balance,  tolerance,                            document,                  source, actual_balance,  actual_report_balance
+              2024,  1000:9999,      EUR,       General,   27078.22,             0.0,       0.01,        2024/reconciliation/2024.pdf,  2024/financial/all.pdf,       27078.22,                   0.00
+              2024,  1000:9999,      USD,       General, -498332.82,             0.0,       0.01,        2024/reconciliation/2024.pdf,  2024/financial/all.pdf,     -498332.82,                   0.00
+        2024-01-23,  1000:2999,      EUR,              ,     120.00,      1098332.82,       0.01,  2024/reconciliation/2024-01-23.pdf,      2024/start/all.pdf,         120.00,             1098332.82"""
+    }
+]
+
 EXPECTED_AGGREGATED_BALANCES_CSV = """
     group,                          description,                   report_balance
     /Assets/Cash,                   Bank of America,               1076311.79
@@ -380,3 +446,4 @@ class BaseTest(ABC):
     EXPECTED_BALANCES = EXPECTED_BALANCES
     EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES
     EXPECTED_HISTORY = EXPECTED_HISTORY
+    EXPECTED_RECONCILIATION = EXPECTED_RECONCILIATION
