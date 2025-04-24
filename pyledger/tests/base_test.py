@@ -138,15 +138,15 @@ PROFIT_CENTERS_CSV = """
 """
 PROFIT_CENTERS = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
 
-# TODO: Populate with real balances while working on #147
 RECONCILIATION_CSV = """
-    period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document
-    2023-12-31,   1000:2999,      CHF,                       ,          0.00,            0.00,          , 2023/reconciliation/2023-12-31.pdf
-    2024-01-23,   1000:2999,      EUR,                       ,          0.00,            0.00,      0.01, 2024/reconciliation/2024-01-23.pdf
-    2024-09-25,        1000,      EUR,                       ,          0.00,            0.00,         1,
-    2024-Q4,      1000:2999,      EUR,                       ,          0.00,            0.00,      0.01, 2024/reconciliation/2024-Q4.pdf
-    2024-08,      1000:2999,      CHF,              "General",          0.00,            0.00,      0.01,
-    2024,         1000:9999,      CHF,           "Restaurant",          0.00,            0.00,      0.01, 2024/reconciliation/2024.pdf
+    period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document,                           source
+    2023-12-31,   1000:2999,      CHF,                       ,          0.00,            0.00,          , 2023/reconciliation/2023-12-31.pdf, 2023/financial/all.pdf
+    2024-01-23,   1000:2999,      EUR,                       ,        120.00,      1098332.82,      0.01, 2024/reconciliation/2024-01-23.pdf, 2024/start/all.pdf
+    2024-09-25,        1000,      USD,                       ,     776311.79,       776311.79,         1,                                   , 2024/financial/data.pdf
+    2024-Q4,      1000:2999,      EUR,                       ,   10076638.88,     11655605.63,      0.01,    2024/reconciliation/2024-Q4.pdf, 2024/financial/data.pdf
+    2024-08,      1000:2999,      CHF,               "Bakery",          0.00,            0.00,      0.01,                                   , 2024/financial/custom/data.pdf
+    2024,         1000:9999,      EUR,              "General",      27078.22,             0.0,      0.01,       2024/reconciliation/2024.pdf, 2024/financial/all.pdf
+    2024,         1000:9999,      USD,              "General",    -498332.82,             0.0,      0.01,       2024/reconciliation/2024.pdf, 2024/financial/all.pdf
 """
 RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
 
