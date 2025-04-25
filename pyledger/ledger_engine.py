@@ -596,10 +596,11 @@ class LedgerEngine(ABC):
             - 'report_balance': Amount in the reporting currency.
         """
         def _calc_balances(row):
+            profit_centers = None if row["profit_center"] is pd.NA else row["profit_center"]
             balance = self.account_balance(
                 account=row["account"],
                 period=row["period"],
-                profit_centers=row["profit_center"]
+                profit_centers=profit_centers
             )
             return pd.Series({
                 "balance": balance.get(row.get("currency"), 0),
