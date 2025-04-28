@@ -1790,12 +1790,10 @@ class LedgerEngine(ABC):
         if period is not None:
             start, end = parse_date_span(period)
             start = pd.to_datetime(start) if start else None
-            end = pd.to_datetime(end) if end else pd.to_datetime(datetime.today())
 
             def row_within_period(row) -> bool:
                 r_start, r_end = parse_date_span(row["period"])
                 r_start = pd.to_datetime(r_start) if r_start else pd.to_datetime(r_end)
-                r_end = pd.to_datetime(r_end)
                 return (start is None or r_start >= start) and (r_end <= end)
 
             df = df[df.apply(row_within_period, axis=1)].reset_index(drop=True)
@@ -1808,4 +1806,4 @@ class LedgerEngine(ABC):
             "balance": "actual_balance",
             "report_balance": "actual_report_balance"
         })
-        return pd.concat([df.reset_index(drop=True), balances.reset_index(drop=True)], axis=1)
+        return pd.concat([df, balances.reset_index(drop=True)], axis=1)
