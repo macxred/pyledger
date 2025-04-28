@@ -66,7 +66,7 @@ class TestReconciliation(BaseTestReconciliation):
         )
 
     def test_reconcile(self, engine):
-        # Filter out cases with a defined `source_pattern` because
+        # Exclude cases where a `source_pattern` is defined, because
         # TextLedger overrides the 'source' column with the actual file path
         self.EXPECTED_RECONCILIATION = [
             v for v in self.EXPECTED_RECONCILIATION if v["source_pattern"] is None

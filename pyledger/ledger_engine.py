@@ -1774,12 +1774,11 @@ class LedgerEngine(ABC):
         period: str | datetime.date | None = None,
         source_pattern: str | None = None
     ) -> pd.DataFrame:
-        """Filter and enrich reconciliation data with actual account balances.
+        """Enrich reconciliation data with actual account balances.
 
         Args:
             df (pd.DataFrame): Reconciliation input with RECONCILIATION_SCHEMA.
-            period (datetime.date | str | None):
-                The time period to filter reconciliation data.
+            period (datetime.date | str | None): Time period to filter reconciliation data.
                 See `parse_date_span` for possible values.
             source_pattern (str | None): Regex to filter rows by 'source' path.
 
