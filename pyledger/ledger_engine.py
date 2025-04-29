@@ -354,6 +354,7 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Accounts
 
+    @profile
     def sanitize_accounts(self, df: pd.DataFrame, tax_codes: pd.DataFrame = None) -> pd.DataFrame:
         """Discard incoherent account data.
 
@@ -408,6 +409,7 @@ class LedgerEngine(ABC):
 
         return df.reset_index(drop=True)
 
+    @profile
     def sanitized_accounts_tax_codes(self):
         """Sanitize accounts and tax codes
 
@@ -847,6 +849,7 @@ class LedgerEngine(ABC):
         """
         return self.serialize_ledger(self.journal.list())
 
+    @profile
     def sanitize_journal(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Discard incoherent journal data.
@@ -904,6 +907,7 @@ class LedgerEngine(ABC):
 
         return invalid_ids
 
+    @profile
     def _invalid_tax_codes(self, df: pd.DataFrame, invalid_ids: set) -> None:
         """Drop undefined 'tax_code' references."""
         _, tax_codes = self.sanitized_accounts_tax_codes()
@@ -916,6 +920,7 @@ class LedgerEngine(ABC):
             )
         df.loc[invalid_tax_code_mask, "tax_code"] = pd.NA
 
+    @profile
     def _invalid_accounts(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """
         Mark transactions with invalid accounts:
@@ -948,6 +953,7 @@ class LedgerEngine(ABC):
 
         return invalid_ids
 
+    @profile
     def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions with invalid asset references."""
         def is_invalid(row):
@@ -970,6 +976,7 @@ class LedgerEngine(ABC):
 
         return invalid_ids
 
+    @profile
     def _invalid_currency(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions with currency mismatched to account or contra account."""
         def is_invalid(row):
@@ -1445,6 +1452,7 @@ class LedgerEngine(ABC):
 
     @property
     @timed_cache(120)
+    @profile
     def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
         """Organize assets by ticker for quick access.
 
@@ -1464,6 +1472,7 @@ class LedgerEngine(ABC):
             for ticker, group in self.sanitize_assets(self.assets.list()).groupby("ticker")
         }
 
+    @profile
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         """Returns the smallest price increment of an asset or currency.
 

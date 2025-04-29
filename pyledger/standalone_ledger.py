@@ -5,7 +5,6 @@ independently of third-party software.
 
 import datetime
 import zipfile
-from line_profiler import profile
 import numpy as np
 import pandas as pd
 from pyledger.storage_entity import AccountingEntity
@@ -57,7 +56,6 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Tax Codes
 
-    @profile
     def tax_entries(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create journal entries to book tax according to tax_codes.
 
@@ -150,7 +148,6 @@ class StandaloneLedger(LedgerEngine):
     # ----------------------------------------------------------------------
     # Accounts
 
-    @profile
     def _single_account_balance(
         self, account: int, profit_centers: list[str] | str = None,
         start: datetime.date = None, end: datetime.date = None,
@@ -172,7 +169,6 @@ class StandaloneLedger(LedgerEngine):
         """
         return self.serialize_ledger(self.complete_ledger(self.journal.list()))
 
-    @profile
     def complete_ledger(self, journal=None) -> pd.DataFrame:
         # Journal definition
         df = self.journal.standardize(journal)
@@ -187,7 +183,6 @@ class StandaloneLedger(LedgerEngine):
         revalue = self.revaluation_entries(ledger=df, revaluations=revaluations)
         return pd.concat([df, revalue], ignore_index=True)
 
-    @profile
     def revaluation_entries(
         self, ledger: pd.DataFrame, revaluations: pd.DataFrame
     ) -> pd.DataFrame:
@@ -245,7 +240,6 @@ class StandaloneLedger(LedgerEngine):
 
         return self.journal.standardize(pd.DataFrame(result))
 
-    @profile
     def _balance_from_serialized_ledger(
         self, ledger: pd.DataFrame, account: int, profit_centers: list[str] | str = None,
         start: datetime.date = None, end: datetime.date = None,
