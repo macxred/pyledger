@@ -345,6 +345,8 @@ def test_sanitize_journal(engine, capture_logs):
          28, 2024-12-31,    1200,       ,      CHF,     1999.99,              ,              ,          , Balanced amount,
          28, 2024-12-31,        ,   1300,      CHF,     1000.99,              ,              ,          , Balanced amount,
          28, 2024-12-31,        ,   1400,      CHF,      999.00,              ,              ,          , Balanced amount,
+         29, 2024-01-01,    1000,       ,      USD,  800000.211,              ,              ,          , Valid,
+         29, 2024-01-01,        ,   1000,      USD,  800000.211,              ,              ,          , Valid,
     """
     EXPECTED_JOURNAL_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
@@ -368,6 +370,8 @@ def test_sanitize_journal(engine, capture_logs):
          28, 2024-12-31,    1200,       ,      CHF,     1999.99,       2270.59,              ,         , Balanced amount,
          28, 2024-12-31,        ,   1300,      CHF,     1000.99,       1136.42,              ,         , Balanced amount,
          28, 2024-12-31,        ,   1400,      CHF,      999.00,       1134.17,              ,         , Balanced amount,
+         29, 2024-01-01,    1000,       ,      USD,   800000.312,     800000.119,              ,         , Valid,
+         29, 2024-01-01,        ,   1000,      USD,   800000.312,     800000.119,              ,         , Valid,
     """
     EXPECTED_JOURNAL_WITH_PROFIT_CENTERS_CSV = """
         id,        date, account, contra, currency,      amount, report_amount, profit_center, tax_code, description, document
