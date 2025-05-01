@@ -891,8 +891,25 @@ class LedgerEngine(ABC):
         invalid_ids = self._invalid_profit_centers(df, invalid_ids)
         df["report_amount"] = self._fill_report_amounts(df, invalid_ids, precision)
         invalid_ids = self._unbalanced_report_amounts(df, invalid_ids)
+        self._round_amounts(df, invalid_ids)
 
         return df.query("id not in @invalid_ids").reset_index(drop=True)
+
+    def _round_amounts(self, df: pd.DataFrame, invalid_ids: set):
+        """Round 'amount' and 'report_amount' columns to their respective currency precision,
+        skipping rows whose 'id' is in invalid_ids.
+        """
+        valid_mask = ~df["id"].isin(invalid_ids)
+        df.loc[valid_mask, "report_amount"] = df.loc[valid_mask].apply(
+            lambda row: self.round_to_precision(
+                row["report_amount"], self.reporting_currency, row["date"]
+            ),
+            axis=1
+        )
+        df.loc[valid_mask, "amount"] = df.loc[valid_mask].apply(
+            lambda row: self.round_to_precision(row["amount"], row["currency"], row["date"]),
+            axis=1
+        )
 
     def _invalid_multidate_txns(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions where a single 'id' spans multiple distinct 'date' values."""
