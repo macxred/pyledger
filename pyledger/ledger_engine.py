@@ -1504,11 +1504,11 @@ class LedgerEngine(ABC):
         self, dates: pd.Series, currencies: pd.Series, allow_missing: bool = False
     ) -> pd.Series:
         """
-        Returns the smallest price increment (precision) for a series of currencies or assets.
+        Returns the smallest price increment (precision) for each currency/date pair.
 
         Args:
             dates (pd.Series): Series of datetime.date values.
-            currencies (pd.Series): Series of currency or asset tickers.
+            currencies (pd.Series): Series of currency or asset tickers of same length as `dates`.
             allow_missing (bool): If True, unresolved lookups return pd.NA
                                   instead of raising an error.
 
