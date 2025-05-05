@@ -1516,7 +1516,7 @@ class LedgerEngine(ABC):
             ValueError: If allow_missing is False and no precision definition.
 
         Returns:
-            pd.Series: Precision values aligned to the input index.
+            pd.Series: Series of precision values.
         """
         def lookup(ticker, date):
             try:
