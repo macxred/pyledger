@@ -882,11 +882,12 @@ class LedgerEngine(ABC):
         invalid_ids = self._invalid_multidate_txns(df, invalid_ids)
         self._invalid_tax_codes(df, invalid_ids)
         invalid_ids = self._invalid_accounts(df, invalid_ids)
-        invalid_ids = self._invalid_assets(df, invalid_ids)
+        precision = self.precision_vectorized(df["currency"], dates=df["date"], allow_missing=True)
+        invalid_ids = self._invalid_assets(df, invalid_ids, precision)
         invalid_ids = self._invalid_currency(df, invalid_ids)
         invalid_ids = self._invalid_prices(df, invalid_ids)
         invalid_ids = self._invalid_profit_centers(df, invalid_ids)
-        df["report_amount"] = self._fill_report_amounts(df, invalid_ids)
+        df["report_amount"] = self._fill_report_amounts(df, invalid_ids, precision)
         invalid_ids = self._unbalanced_report_amounts(df, invalid_ids)
 
         return df.query("id not in @invalid_ids").reset_index(drop=True)
@@ -948,19 +949,9 @@ class LedgerEngine(ABC):
 
         return invalid_ids
 
-    def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set) -> set:
+    def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set, precision: pd.Series) -> set:
         """Mark transactions with invalid asset references."""
-        def is_invalid(row):
-            if row["id"] in invalid_ids:
-                return True
-            try:
-                self.precision(ticker=row["currency"], date=row["date"])
-                return False
-            except ValueError:
-                return True
-
-        row_mask = df.apply(is_invalid, axis=1, result_type="reduce")
-        new_invalid_ids = set(df.loc[row_mask, "id"]) - invalid_ids
+        new_invalid_ids = set(df.loc[precision.isna(), "id"]) - invalid_ids
         if new_invalid_ids:
             self._logger.warning(
                 f"Discarding {len(new_invalid_ids)} journal entries with invalid currency: "
@@ -1065,7 +1056,9 @@ class LedgerEngine(ABC):
             np.where(df["account"].notna(), 1, -1)
         )
 
-    def _fill_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> pd.Series:
+    def _fill_report_amounts(
+        self, df: pd.DataFrame, invalid_ids: set, precision: pd.Series
+    ) -> pd.Series:
         """Fill missing report amounts with default values.
 
         Replaces NA report amounts by converting the amount in transaction
@@ -1094,11 +1087,13 @@ class LedgerEngine(ABC):
             "amount": df["amount"] * multiplier,
             "report_amount": report_amount * multiplier,
             "single_account_row": multiplier != 0,
-            "original_report_amount_missing": df["report_amount"].isna()
+            "original_report_amount_missing": df["report_amount"].isna(),
+            "precision": precision,
         })
         grouped = grouped.groupby("id").agg(
             nunique_currency=("currency", "nunique"),
             first_currency=("currency", "first"),
+            first_precision=("precision", "first"),
             all_na_report_balance=("original_report_amount_missing", "all"),
             n_single_account_rows=("single_account_row", "sum"),
             net_amount=("amount", "sum"),
@@ -1109,7 +1104,7 @@ class LedgerEngine(ABC):
             & (grouped["first_currency"] != self.reporting_currency)
             & (grouped["all_na_report_balance"])
             & (grouped["n_single_account_rows"] >= 2)
-            & (grouped["net_amount"].abs() == 0)
+            & (grouped["net_amount"].abs() <= grouped["first_precision"] / 2)
             & (grouped["net_report_amount"].abs() > tolerance)
         ])
         # Ensure transactions with a single non-reporting currency that are balanced in their
@@ -1502,6 +1497,39 @@ class LedgerEngine(ABC):
                     f"No asset definition available for '{ticker}' on or before {date}."
                 )
             return asset.loc[mask[mask].index[-1], "increment"].item()
+
+    def precision_vectorized(
+        self, currencies: pd.Series, dates: pd.Series, allow_missing: bool = False
+    ) -> pd.Series:
+        """
+        Returns the smallest price increment (precision) for each currency/date pair.
+
+        Args:
+            dates (pd.Series): Series of datetime.date values.
+            currencies (pd.Series): Series of currency or asset tickers of same length as `dates`.
+            allow_missing (bool): If True, unresolved lookups return pd.NA
+                                  instead of raising an error.
+
+        Raises:
+            ValueError: If allow_missing is False and no precision definition.
+
+        Returns:
+            pd.Series: Series of precision values of type Float64.
+        """
+        def lookup(ticker, date):
+            try:
+                return self.precision(ticker=ticker, date=date)
+            except ValueError:
+                if allow_missing:
+                    return pd.NA
+                raise ValueError(
+                    f"No asset definition available for ticker '{ticker}' on or before {date}."
+                )
+
+        return pd.Series(
+            [lookup(t, d) for t, d in zip(currencies, dates)],
+            dtype="Float64", index=currencies.index
+        )
 
     # ----------------------------------------------------------------------
     # Revaluations
