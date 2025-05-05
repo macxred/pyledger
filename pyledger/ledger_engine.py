@@ -1519,6 +1519,8 @@ class LedgerEngine(ABC):
             pd.Series: Series of precision values of type Float64.
         """
         def lookup(ticker, date):
+            if allow_missing and pd.isna(ticker):
+                return pd.NA
             try:
                 return self.precision(ticker=ticker, date=date)
             except ValueError:
@@ -1679,7 +1681,8 @@ class LedgerEngine(ABC):
 
         def is_invalid_account(x):
             try:
-                return not bool(self.parse_account_range(x)["add"])
+                account_range = self.parse_account_range(x)
+                return (len(account_range["add"]) == 0) and (len(account_range["subtract"]) == 0)
             except Exception:
                 return True
 
@@ -1839,20 +1842,23 @@ class LedgerEngine(ABC):
 
         if not df.empty:
             df["delta"] = df["actual_balance"].fillna(0) - df["balance"].fillna(0)
+            df["end"] = [parse_date_span(period)[1] for period in df['period']]
+            df["precision"] = \
+                self.precision_vectorized(df["currency"], dates=df["end"], allow_missing=True)
             df["report_delta"] = \
                 df["actual_report_balance"].fillna(0) - df["report_balance"].fillna(0)
-            failed_delta = (df["delta"].abs() > df["tolerance"]) & df["balance"].notna()
+            failed_delta = \
+                (df["delta"].abs() > df["tolerance"] + df["precision"] / 2) & df["balance"].notna()
             for row in df.loc[failed_delta].to_dict("records"):
-
                 if str(row["account"]).isdigit():
                     desc = account_description(int(row["account"]))
                     msg = f"Account {row['account']} '{desc}'"
                 else:
                     msg = f"Account {row['account']}"
-
+                delta = self.round_to_precision(row['delta'], row['currency'], date=row['end'])
                 messages.append(
                     f"{msg}: Actual balance of {row['currency']} {row['actual_balance']:,} "
-                    f"differs by {row['currency']} {row['delta']:,} from expected "
+                    f"differs by {row['currency']} {delta:,} from expected "
                     f"balance of {row['currency']} {row['balance']:,} as of {row['period']}."
                 )
 
