@@ -1777,10 +1777,10 @@ class LedgerEngine(ABC):
         """Enrich reconciliation data with actual account balances.
 
         Args:
-            df (pd.DataFrame): Reconciliation input with RECONCILIATION_SCHEMA.
+            df (pd.DataFrame): Expected balances compatible with RECONCILIATION_SCHEMA.
             period (datetime.date | str | None): Time period to filter reconciliation data.
                 See `parse_date_span` for possible values.
-            source_pattern (str | None): Regex to filter rows by 'source' path.
+            source_pattern (str | None): Regex for filtering the 'source' column.
 
         Returns:
             pd.DataFrame: Enriched reconciliation DataFrame with added
@@ -1789,10 +1789,12 @@ class LedgerEngine(ABC):
         if period is not None:
             start, end = parse_date_span(period)
             start = pd.to_datetime(start) if start else None
+            end = pd.to_datetime(end)
 
             def row_within_period(row) -> bool:
                 r_start, r_end = parse_date_span(row["period"])
                 r_start = pd.to_datetime(r_start) if r_start else pd.to_datetime(r_end)
+                r_end = pd.to_datetime(r_end)
                 return (start is None or r_start >= start) and (r_end <= end)
 
             df = df[df.apply(row_within_period, axis=1)].reset_index(drop=True)
@@ -1805,4 +1807,6 @@ class LedgerEngine(ABC):
             "balance": "actual_balance",
             "report_balance": "actual_report_balance"
         })
-        return pd.concat([df, balances.reset_index(drop=True)], axis=1)
+        result = pd.concat([df.reset_index(drop=True), balances.reset_index(drop=True)], axis=1)
+        result.index = df.index
+        return result
