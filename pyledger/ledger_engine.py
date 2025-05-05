@@ -1816,8 +1816,8 @@ class LedgerEngine(ABC):
         Generates human-readable error messages for all reconciliation mismatches beyond tolerance.
 
         This method compares expected and actual balances across operational and reporting
-        currencies, identifies discrepancies that exceed the defined tolerance, and generates
-        descriptive error messages.
+        currencies and generates descriptive error messages for discrepancies that exceed the
+        defined tolerance.
 
         Args:
             df (pd.DataFrame): A DataFrame with columns from RECONCILIATION_SCHEMA_CSV,
