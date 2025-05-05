@@ -1644,9 +1644,9 @@ class LedgerEngine(ABC):
         are set to NA.
 
         It also sets default tolerances when missing:
-        - Half the smaller precision if both balances are present.
         - Half the currency precision if only 'balance' is present.
         - Half the base currency precision if only 'report_balance' is present.
+        - Half the smaller precision if both balances are present.
 
         A warning specifying the reason is logged for each discarded entry.
 
@@ -1718,14 +1718,14 @@ class LedgerEngine(ABC):
         has_balance_mask = df["balance"].notna()
 
         # Compute rows with invalid currency to drop entirely
-        drop_row_mask = invalid_currency_mask & ~has_balance_mask
+        drop_row_mask = invalid_currency_mask & df["report_balance"].isna()
         if drop_row_mask.any():
+            df = df.query("~@drop_row_mask")
             invalid = df.loc[drop_row_mask, id_columns].to_dict(orient="records")
             self._logger.warning(
-                f"Discarding {len(invalid)} reconciliation rows with invalid currencies: "
-                f"{first_elements_as_str(invalid)}"
+                f"Discarding {len(invalid)} reconciliation rows with invalid currencies "
+                f"and without report balance: {first_elements_as_str(invalid)}"
             )
-        df = df.query("~@drop_row_mask")
 
         # Compute rows to nullify balance + currency
         set_na_fields_mask = invalid_currency_mask & has_balance_mask
