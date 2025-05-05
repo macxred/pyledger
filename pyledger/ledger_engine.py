@@ -882,11 +882,12 @@ class LedgerEngine(ABC):
         invalid_ids = self._invalid_multidate_txns(df, invalid_ids)
         self._invalid_tax_codes(df, invalid_ids)
         invalid_ids = self._invalid_accounts(df, invalid_ids)
-        invalid_ids = self._invalid_assets(df, invalid_ids)
+        precision = self.precision_vectorized(df["date"], df["currency"], allow_missing=True)
+        invalid_ids = self._invalid_assets(df, invalid_ids, precision)
         invalid_ids = self._invalid_currency(df, invalid_ids)
         invalid_ids = self._invalid_prices(df, invalid_ids)
         invalid_ids = self._invalid_profit_centers(df, invalid_ids)
-        df["report_amount"] = self._fill_report_amounts(df, invalid_ids)
+        df["report_amount"] = self._fill_report_amounts(df, invalid_ids, precision)
         invalid_ids = self._unbalanced_report_amounts(df, invalid_ids)
 
         return df.query("id not in @invalid_ids").reset_index(drop=True)
@@ -1065,7 +1066,7 @@ class LedgerEngine(ABC):
             np.where(df["account"].notna(), 1, -1)
         )
 
-    def _fill_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> pd.Series:
+    def _fill_report_amounts(self, df: pd.DataFrame, invalid_ids: set, precision: pd.Series) -> pd.Series:
         """Fill missing report amounts with default values.
 
         Replaces NA report amounts by converting the amount in transaction
@@ -1094,11 +1095,13 @@ class LedgerEngine(ABC):
             "amount": df["amount"] * multiplier,
             "report_amount": report_amount * multiplier,
             "single_account_row": multiplier != 0,
-            "original_report_amount_missing": df["report_amount"].isna()
+            "original_report_amount_missing": df["report_amount"].isna(),
+            "precision": precision,
         })
         grouped = grouped.groupby("id").agg(
             nunique_currency=("currency", "nunique"),
             first_currency=("currency", "first"),
+            first_precision=("precision", "first"),
             all_na_report_balance=("original_report_amount_missing", "all"),
             n_single_account_rows=("single_account_row", "sum"),
             net_amount=("amount", "sum"),
@@ -1109,7 +1112,7 @@ class LedgerEngine(ABC):
             & (grouped["first_currency"] != self.reporting_currency)
             & (grouped["all_na_report_balance"])
             & (grouped["n_single_account_rows"] >= 2)
-            & (grouped["net_amount"].abs() == 0)
+            & (grouped["net_amount"].abs() <= grouped["precision"] / 2)
             & (grouped["net_report_amount"].abs() > tolerance)
         ])
         # Ensure transactions with a single non-reporting currency that are balanced in their
