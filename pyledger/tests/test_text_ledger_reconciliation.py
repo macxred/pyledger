@@ -64,3 +64,11 @@ class TestReconciliation(BaseTestReconciliation):
         assert_frame_equal(
             engine.reconciliation.list(drop_extra_columns=True), expected_without_extra_cols,
         )
+
+    def test_reconcile(self, engine):
+        # Exclude cases where a `source_pattern` is defined, because
+        # TextLedger overrides the 'source' column with the actual file path
+        self.EXPECTED_RECONCILIATION = [
+            v for v in self.EXPECTED_RECONCILIATION if v["source_pattern"] is None
+        ]
+        super().test_reconcile(engine)

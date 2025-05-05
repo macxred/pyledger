@@ -1,5 +1,6 @@
 """Definition of abstract base class for testing reconciliation operations."""
 
+from io import StringIO
 import pytest
 import pandas as pd
 from abc import abstractmethod
@@ -149,3 +150,21 @@ class BaseTestReconciliation(BaseTest):
         assert not engine.reconciliation.list().empty
         engine.reconciliation.mirror(engine.reconciliation.standardize(None), delete=True)
         assert engine.reconciliation.list().empty
+
+    def test_reconcile(self, engine):
+        engine.restore(
+            accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
+            journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS,
+            reconciliation=self.RECONCILIATION
+        )
+
+        for case in self.EXPECTED_RECONCILIATION:
+            df = engine.reconcile(
+                df=engine.reconciliation.list(),
+                period=case["period"], source_pattern=case["source_pattern"]
+            )
+            expected = pd.read_csv(StringIO(case["reconciliation"]), skipinitialspace=True)
+            assert_frame_equal(
+                df, engine.reconciliation.standardize(expected), ignore_columns="source"
+            )

@@ -596,10 +596,11 @@ class LedgerEngine(ABC):
             - 'report_balance': Amount in the reporting currency.
         """
         def _calc_balances(row):
+            profit_centers = None if row["profit_center"] is pd.NA else row["profit_center"]
             balance = self.account_balance(
                 account=row["account"],
                 period=row["period"],
-                profit_centers=row["profit_center"]
+                profit_centers=profit_centers
             )
             return pd.Series({
                 "balance": balance.get(row.get("currency"), 0),
@@ -1766,3 +1767,46 @@ class LedgerEngine(ABC):
         df["tolerance"] = df.apply(assign_default_tolerance, axis=1).astype(df["tolerance"].dtype)
 
         return df.reset_index(drop=True)
+
+    def reconcile(
+        self,
+        df: pd.DataFrame,
+        period: str | datetime.date | None = None,
+        source_pattern: str | None = None
+    ) -> pd.DataFrame:
+        """Enrich reconciliation data with actual account balances.
+
+        Args:
+            df (pd.DataFrame): Expected balances compatible with RECONCILIATION_SCHEMA.
+            period (datetime.date | str | None): Time period to filter reconciliation data.
+                See `parse_date_span` for possible values.
+            source_pattern (str | None): Regex for filtering the 'source' column.
+
+        Returns:
+            pd.DataFrame: Enriched reconciliation DataFrame with added
+                'actual_balance' and 'actual_report_balance' columns.
+        """
+        if period is not None:
+            start, end = parse_date_span(period)
+            start = pd.to_datetime(start) if start else None
+            end = pd.to_datetime(end)
+
+            def row_within_period(row) -> bool:
+                r_start, r_end = parse_date_span(row["period"])
+                r_start = pd.to_datetime(r_start) if r_start else pd.to_datetime(r_end)
+                r_end = pd.to_datetime(r_end)
+                return (start is None or r_start >= start) and (r_end <= end)
+
+            df = df[df.apply(row_within_period, axis=1)].reset_index(drop=True)
+
+        if source_pattern is not None:
+            df = df[df['source'].str.contains(source_pattern, na=False)]
+
+        df = self.sanitize_reconciliation(df)
+        balances = self.account_balances(df).rename(columns={
+            "balance": "actual_balance",
+            "report_balance": "actual_report_balance"
+        })
+        result = pd.concat([df.reset_index(drop=True), balances.reset_index(drop=True)], axis=1)
+        result.index = df.index
+        return result
