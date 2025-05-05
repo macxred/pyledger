@@ -882,7 +882,7 @@ class LedgerEngine(ABC):
         invalid_ids = self._invalid_multidate_txns(df, invalid_ids)
         self._invalid_tax_codes(df, invalid_ids)
         invalid_ids = self._invalid_accounts(df, invalid_ids)
-        precision = self.precision_vectorized(df["date"], df["currency"], allow_missing=True)
+        precision = self.precision_vectorized(df["currency"], dates=df["date"], allow_missing=True)
         invalid_ids = self._invalid_assets(df, invalid_ids, precision)
         invalid_ids = self._invalid_currency(df, invalid_ids)
         invalid_ids = self._invalid_prices(df, invalid_ids)
@@ -951,8 +951,7 @@ class LedgerEngine(ABC):
 
     def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set, precision: pd.Series) -> set:
         """Mark transactions with invalid asset references."""
-        invalid_mask = df["id"].isin(invalid_ids) | precision.isna()
-        new_invalid_ids = set(df.loc[invalid_mask, "id"]) - invalid_ids
+        new_invalid_ids = set(df.loc[precision.isna(), "id"]) - invalid_ids
         if new_invalid_ids:
             self._logger.warning(
                 f"Discarding {len(new_invalid_ids)} journal entries with invalid currency: "
@@ -1100,7 +1099,6 @@ class LedgerEngine(ABC):
             net_amount=("amount", "sum"),
             net_report_amount=("report_amount", "sum"),
         )
-        grouped = grouped.query("first_precision.notna()")
         auto_balance_ids = set(grouped.index[
             (grouped["nunique_currency"] == 1)
             & (grouped["first_currency"] != self.reporting_currency)
@@ -1501,7 +1499,7 @@ class LedgerEngine(ABC):
             return asset.loc[mask[mask].index[-1], "increment"].item()
 
     def precision_vectorized(
-        self, dates: pd.Series, currencies: pd.Series, allow_missing: bool = False
+        self, currencies: pd.Series, dates: pd.Series, allow_missing: bool = False
     ) -> pd.Series:
         """
         Returns the smallest price increment (precision) for each currency/date pair.
@@ -1516,7 +1514,7 @@ class LedgerEngine(ABC):
             ValueError: If allow_missing is False and no precision definition.
 
         Returns:
-            pd.Series: Series of precision values.
+            pd.Series: Series of precision values of type Float64.
         """
         def lookup(ticker, date):
             try:
@@ -1528,7 +1526,10 @@ class LedgerEngine(ABC):
                     f"No asset definition available for ticker '{ticker}' on or before {date}."
                 )
 
-        return pd.Series([lookup(t, d) for t, d in zip(currencies, dates)], index=dates.index)
+        return pd.Series(
+            [lookup(t, d) for t, d in zip(currencies, dates)],
+            dtype="Float64", index=currencies.index
+        )
 
     # ----------------------------------------------------------------------
     # Revaluations
