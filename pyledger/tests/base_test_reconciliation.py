@@ -168,3 +168,33 @@ class BaseTestReconciliation(BaseTest):
             assert_frame_equal(
                 df, engine.reconciliation.standardize(expected), ignore_columns="source"
             )
+
+    def test_reconcile_summary(self, engine):
+        engine.restore(
+            accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
+            journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS,
+            reconciliation=self.RECONCILIATION
+        )
+
+        # flake8: noqa: E501
+        RECONCILIATION_CSV = """
+            period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document,                           source,                           actual_balance, actual_report_balance
+            2023-12-31,   1000:2999,      CHF,                       ,          0.00,            0.00,          , 2023/reconciliation/2023-12-31.pdf, 2023/financial/all.pdf,                   0.00,                    0.00
+            2024-01-23,   1000:2999,      EUR,                       ,        120.00,      1098332.82,      0.01, 2024/reconciliation/2024-01-23.pdf, 2024/start/all.pdf,                     120.02,              1098332.82
+            2024-09-25,        1000,      USD,                       ,     776311.79,       776311.79,         1,                                   , 2024/financial/data.pdf,             776312.80,               776312.90
+            2024-Q4,      1000:2999,      EUR,                       ,   10076638.88,     11655605.63,      0.01,    2024/reconciliation/2024-Q4.pdf, 2024/financial/data.pdf,           10076600.00,             11655600.00
+            2024-08,      1000:2999,      CHF,               "Bakery",          0.00,            0.00,      0.01,                                   , 2024/financial/custom/data.pdf,           0.00,                    0.00
+            2024,         1000:9999,      EUR,              "General",      27078.22,            0.00,      0.01,       2024/reconciliation/2024.pdf, 2024/financial/all.pdf,               27000.00,                    0.00
+            2024,         1000:9999,      USD,              "General",    -498332.82,            0.00,      0.01,       2024/reconciliation/2024.pdf, 2024/financial/all.pdf,             -498300.00,                    0.00
+        """
+        # flake8: enable
+        RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
+        messages = engine.reconciliation_summary(engine.reconciliation.standardize(RECONCILIATION))
+        assert len(messages) == 7, f"Expected 7 error messages, but got {len(messages)}"
+
+    def test_reconcile_summary_empty_df(self, engine):
+        messages = engine.reconciliation_summary(engine.reconciliation.standardize(None))
+        assert len(messages) == 0, (
+            f"Expected 0 error messages with empty DataFrame, but got {len(messages)}"
+        )

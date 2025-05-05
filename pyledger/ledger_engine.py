@@ -1810,3 +1810,66 @@ class LedgerEngine(ABC):
         result = pd.concat([df.reset_index(drop=True), balances.reset_index(drop=True)], axis=1)
         result.index = df.index
         return result
+
+    def reconciliation_summary(self, df: pd.DataFrame) -> list[str]:
+        """
+        Generates human-readable error messages for all reconciliation mismatches beyond tolerance.
+
+        This method compares expected and actual balances across operational and reporting
+        currencies and generates descriptive error messages for discrepancies that exceed the
+        defined tolerance.
+
+        Args:
+            df (pd.DataFrame): A DataFrame with columns from RECONCILIATION_SCHEMA_CSV,
+                extended with the following:
+                - actual_balance: Calculated balance from ledger data
+                - actual_report_balance: Calculated reporting balance (if available)
+
+        Returns:
+            list[str]: Formatted error messages for each mismatch that exceeds tolerance.
+        """
+        def account_description(account):
+            """Return the text describing a given account."""
+            acc_df = self.accounts.list().query("account == @account")
+            if len(acc_df) != 1:
+                raise ValueError(f"Account {account} not found.")
+            return acc_df["description"].item()
+
+        messages = []
+
+        if not df.empty:
+            df["delta"] = df["actual_balance"].fillna(0) - df["balance"].fillna(0)
+            df["report_delta"] = \
+                df["actual_report_balance"].fillna(0) - df["report_balance"].fillna(0)
+            failed_delta = (df["delta"].abs() > df["tolerance"]) & df["balance"].notna()
+            for row in df.loc[failed_delta].to_dict("records"):
+
+                if str(row["account"]).isdigit():
+                    desc = account_description(int(row["account"]))
+                    msg = f"Account {row['account']} '{desc}'"
+                else:
+                    msg = f"Account {row['account']}"
+
+                messages.append(
+                    f"{msg}: Actual balance of {row['currency']} {row['actual_balance']:,} "
+                    f"differs by {row['currency']} {row['delta']:,} from expected "
+                    f"balance of {row['currency']} {row['balance']:,} as of {row['period']}."
+                )
+
+            failed_report_delta = (
+                (df["report_delta"].abs() > df["tolerance"]) & df["report_balance"].notna()
+            )
+            for row in df.loc[failed_report_delta].to_dict("records"):
+                if str(row["account"]).isdigit():
+                    desc = account_description(int(row["account"]))
+                    msg = f"Account {row['account']} '{desc}'"
+                else:
+                    msg = f"Account {row['account']}"
+
+                messages.append(
+                    f"{msg}: Actual reporting currency balance of {row['actual_report_balance']:,} "
+                    f"differs by {row['report_delta']:,} from "
+                    f"expected balance of {row['report_balance']:,} as of {row['period']}."
+                )
+
+        return messages
