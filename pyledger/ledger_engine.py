@@ -436,6 +436,7 @@ class LedgerEngine(ABC):
 
         return accounts_df_final, tax_codes_df
 
+    @timed_cache(120)
     def account_currency(self, account: int) -> str:
         accounts = self.accounts.list()
         if not int(account) in accounts["account"].values:
@@ -965,6 +966,8 @@ class LedgerEngine(ABC):
 
     def _invalid_currency(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions with currency mismatched to account or contra account."""
+        reporting_currency = self.reporting_currency
+
         def is_invalid(row):
             if row["id"] in invalid_ids:
                 return True
@@ -972,12 +975,12 @@ class LedgerEngine(ABC):
                 return False
             if pd.notna(row["account"]):
                 account_currency = self.account_currency(row["account"])
-                if ((account_currency != self.reporting_currency)
+                if ((account_currency != reporting_currency)
                         and (row["currency"] != account_currency)):
                     return True
             if pd.notna(row["contra"]):
                 contra_currency = self.account_currency(row["contra"])
-                if ((contra_currency != self.reporting_currency)
+                if ((contra_currency != reporting_currency)
                         and (row["currency"] != contra_currency)):
                     return True
             return False
@@ -995,14 +998,16 @@ class LedgerEngine(ABC):
 
     def _invalid_prices(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions with missing price references."""
+        reporting_currency = self.reporting_currency
+
         def is_invalid(row):
             if row["id"] in invalid_ids:
                 return True
-            if row["currency"] == self.reporting_currency or pd.notna(row["report_amount"]):
+            if row["currency"] == reporting_currency or pd.notna(row["report_amount"]):
                 return False
             try:
                 self.price(
-                    ticker=row["currency"], date=row["date"], currency=self.reporting_currency
+                    ticker=row["currency"], date=row["date"], currency=reporting_currency
                 )
                 return False
             except ValueError:
@@ -1345,6 +1350,7 @@ class LedgerEngine(ABC):
         df = df[~invalid_mask].reset_index(drop=True)
         return df
 
+    @timed_cache(120)
     def price(
         self,
         ticker: str,
@@ -1461,6 +1467,7 @@ class LedgerEngine(ABC):
             for ticker, group in self.sanitize_assets(self.assets.list()).groupby("ticker")
         }
 
+    @timed_cache(120)
     def precision(self, ticker: str, date: datetime.date = None) -> float:
         """Returns the smallest price increment of an asset or currency.
 

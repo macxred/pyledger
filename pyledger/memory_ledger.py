@@ -31,16 +31,26 @@ class MemoryLedger(StandaloneLedger):
         """
         super().__init__()
         self._reporting_currency = reporting_currency
-        self._assets = DataFrameEntity(ASSETS_SCHEMA)
+        self._assets = DataFrameEntity(
+            ASSETS_SCHEMA,
+            on_change=self.precision.cache_clear
+        )
+
+        def _clear_account_caches():
+            self.serialized_ledger.cache_clear()
+            self.account_currency.cache_clear()
         self._accounts = DataFrameEntity(
             ACCOUNT_SCHEMA,
-            on_change=self.serialized_ledger.cache_clear
+            on_change=_clear_account_caches
         )
         self._tax_codes = DataFrameEntity(
             TAX_CODE_SCHEMA,
             on_change=self.serialized_ledger.cache_clear
         )
-        self._price_history = DataFrameEntity(PRICE_SCHEMA)
+        self._price_history = DataFrameEntity(
+            PRICE_SCHEMA,
+            on_change=self.price.cache_clear
+        )
         self._revaluations = DataFrameEntity(REVALUATION_SCHEMA)
         self._journal = JournalDataFrameEntity(
             JOURNAL_SCHEMA,

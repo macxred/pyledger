@@ -68,12 +68,17 @@ class TextLedger(StandaloneLedger):
         settings_dir = self.root / "settings"
         settings_dir.mkdir(parents=True, exist_ok=True)
         self._assets = CSVAccountingEntity(
-            schema=ASSETS_SCHEMA, path=self.root / "settings/assets.csv"
+            schema=ASSETS_SCHEMA, path=self.root / "settings/assets.csv",
+            on_change=self.precision.cache_clear
         )
+
+        def _clear_account_caches():
+            self.serialized_ledger.cache_clear()
+            self.account_currency.cache_clear()
         self._accounts = CSVAccountingEntity(
             schema=ACCOUNT_SCHEMA, path=self.root / "account_chart.csv",
             column_shortcuts=ACCOUNT_COLUMN_SHORTCUTS,
-            on_change=self.serialized_ledger.cache_clear
+            on_change=_clear_account_caches
         )
         self._tax_codes = CSVAccountingEntity(
             schema=TAX_CODE_SCHEMA, path=self.root / "settings/tax_codes.csv",
@@ -81,7 +86,8 @@ class TextLedger(StandaloneLedger):
             on_change=self.serialized_ledger.cache_clear
         )
         self._price_history = CSVAccountingEntity(
-            schema=PRICE_SCHEMA, path=self.root / "settings/price_history.csv"
+            schema=PRICE_SCHEMA, path=self.root / "settings/price_history.csv",
+            on_change=self.price.cache_clear
         )
         self._revaluations = CSVAccountingEntity(
             schema=REVALUATION_SCHEMA, path=self.root / "settings/revaluations.csv"
