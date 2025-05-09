@@ -31,6 +31,7 @@ from .storage_entity import AccountingEntity
 from . import excel
 from .helpers import first_elements_as_str, prune_path, represents_integer
 from .time import parse_date_span
+import polars as pl
 
 
 class LedgerEngine(ABC):
@@ -879,7 +880,8 @@ class LedgerEngine(ABC):
             pd.DataFrame: Sanitized journal data containing only valid entries.
         """
 
-        df = enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
+        df = pl.from_pandas(enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True))
+
 
         invalid_ids = set()
         invalid_ids = self._invalid_multidate_txns(df, invalid_ids)
@@ -897,7 +899,7 @@ class LedgerEngine(ABC):
 
     def _invalid_multidate_txns(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions where a single 'id' spans multiple distinct 'date' values."""
-        invalid_date = df.groupby("id")["date"].transform("nunique") > 1
+        invalid_date = df.group_by("id")["date"].transform("nunique") > 1
         new_invalid_ids = set(df.loc[invalid_date, "id"]) - invalid_ids
         if new_invalid_ids:
             self._logger.warning(
