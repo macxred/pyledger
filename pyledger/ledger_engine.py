@@ -1757,24 +1757,7 @@ class LedgerEngine(ABC):
             )
             df = df.query("~@both_missing_mask")
 
-        def assign_default_tolerance(row):
-            if pd.notna(row["tolerance"]):
-                return row["tolerance"]
-
-            precisions = []
-            if pd.notna(row["balance"]) and pd.notna(row["currency"]):
-                precisions.append(self.precision(
-                    ticker=row["currency"],
-                    date=parse_date_span(row["period"])[1]
-                ))
-            if pd.notna(row["report_balance"]):
-                precisions.append(self.precision(
-                    ticker=self.reporting_currency,
-                    date=parse_date_span(row["period"])[1]
-                ))
-            return min(precisions) / 2 if precisions else None
-
-        df["tolerance"] = df.apply(assign_default_tolerance, axis=1).astype(df["tolerance"].dtype)
+        df["tolerance"] = df["tolerance"].fillna(0.0)
 
         return df.reset_index(drop=True)
 
