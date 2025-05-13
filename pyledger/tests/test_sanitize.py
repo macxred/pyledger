@@ -452,9 +452,9 @@ def test_sanitize_reconciliation(engine, capture_logs):
         2024-01-23,        1000,         ,                       ,          0.00,            0.00,      0.01, Missing currency reference
         2024-01-23,        1000,         ,                       ,              ,            0.00,      0.01, Set currency balance to NA
         2024,              1000,      CHF,                 "Shop",          0.00,            0.00,      0.01, Valid profit center reference
-        2024-01-23,        1000,      EUR,                       ,          1.00,            2.00,    0.0005, Set lowest tolerance
-        2024-01-23,        1000,      EUR,                       ,              ,            2.00,     0.005, Set lowest tolerance
-        2024-01-23,        1000,      EUR,                       ,          1.00,                ,    0.0005, Set lowest tolerance
+        2024-01-23,        1000,      EUR,                       ,          1.00,            2.00,      0.00, Set lowest tolerance
+        2024-01-23,        1000,      EUR,                       ,              ,            2.00,      0.00, Set lowest tolerance
+        2024-01-23,        1000,      EUR,                       ,          1.00,                ,      0.00, Set lowest tolerance
     """
 
     assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
