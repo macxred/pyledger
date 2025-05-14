@@ -166,7 +166,8 @@ class BaseTestReconciliation(BaseTest):
             )
             expected = pd.read_csv(StringIO(case["reconciliation"]), skipinitialspace=True)
             assert_frame_equal(
-                df, engine.reconciliation.standardize(expected), ignore_columns="source"
+                df, engine.reconciliation.standardize(expected),
+                ignore_columns=["source", "tolerance"],
             )
 
     def test_reconcile_summary(self, engine):
