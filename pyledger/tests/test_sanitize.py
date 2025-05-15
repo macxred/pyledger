@@ -393,7 +393,7 @@ def test_sanitize_journal(engine, capture_logs):
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 8, "Expected strict number of captured logs"
+    assert len(log_messages) == 9, "Expected strict number of captured logs"
 
     # Clear captured logs
     capture_logs.seek(0)
@@ -406,7 +406,7 @@ def test_sanitize_journal(engine, capture_logs):
     sanitized = engine.sanitize_journal(engine.journal.standardize(journal))
     assert_frame_equal(expected_journal_df, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) == 7, "Expected strict number of captured logs"
+    assert len(log_messages) == 8, "Expected strict number of captured logs"
 
 
 def test_sanitize_reconciliation(engine, capture_logs):
