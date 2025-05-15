@@ -882,24 +882,28 @@ class LedgerEngine(ABC):
 
         df = enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
 
-        full_ldf = pl.from_pandas(df).lazy()
+        ldf = pl.from_pandas(df).lazy()
         invalid_ids = set()
 
-        invalid_ids = self._invalid_multidate_txns(full_ldf.select(["id", "date"]), invalid_ids)
-        full_ldf = self._invalid_tax_codes(full_ldf, invalid_ids)
-        invalid_ids = self._invalid_accounts(full_ldf.select(["id", "account", "contra"]), invalid_ids)
-        df_clean = full_ldf.collect()
-        precision = self.precision_vectorized(df_clean["currency"], dates=df_clean["date"], allow_missing=True)
-        invalid_ids = self._invalid_assets(df_clean["id"], precision, invalid_ids)
-        invalid_ids = self._invalid_currency(df_clean.select(["id", "amount", "account", "contra", "currency"]), invalid_ids)
-        invalid_ids = self._invalid_prices(df_clean, invalid_ids)
-        invalid_ids = self._invalid_profit_centers(full_ldf.select(["id", "profit_center"]), invalid_ids)
-        df_clean = df_clean.with_columns([
-            self._fill_report_amounts(df_clean, invalid_ids, precision)
-        ])
-        invalid_ids = self._unbalanced_report_amounts(df_clean, invalid_ids)
-
-        df = df_clean.filter(~df_clean["id"].is_in(list(invalid_ids)))
+        invalid_ids = self._invalid_multidate_txns(ldf.select(["id", "date"]), invalid_ids)
+        accounts, tax_codes = self.sanitized_accounts_tax_codes()
+        ldf = self._invalid_tax_codes(ldf, tax_codes, invalid_ids)
+        invalid_ids = self._invalid_accounts(ldf, accounts, invalid_ids)
+        df = ldf.collect()
+        precision = self.precision_vectorized(
+            df["currency"], dates=df["date"], allow_missing=True
+        )
+        invalid_ids = self._invalid_assets(df["id"], precision, invalid_ids)
+        invalid_ids = self._invalid_currency(
+            df["id", "amount", "account", "contra", "currency"], invalid_ids
+        )
+        invalid_ids = self._invalid_prices(df, invalid_ids)
+        invalid_ids = self._invalid_profit_centers(
+            ldf.select(["id", "profit_center"]), invalid_ids
+        )
+        df = df.with_columns([self._fill_report_amounts(df, invalid_ids, precision)])
+        invalid_ids = self._unbalanced_report_amounts(df, invalid_ids)
+        df = df.filter(~df["id"].is_in(list(invalid_ids)))
         df = df.to_pandas()
         return enforce_schema(df, JOURNAL_SCHEMA, keep_extra_columns=True)
 
@@ -924,9 +928,10 @@ class LedgerEngine(ABC):
 
         return invalid_ids
 
-    def _invalid_tax_codes(self, df: pl.LazyFrame, invalid_ids: set) -> pl.LazyFrame:
+    def _invalid_tax_codes(
+        self, df: pl.LazyFrame, tax_codes: pd.DataFrame, invalid_ids: set
+    ) -> pl.LazyFrame:
         """Drop undefined 'tax_code' references."""
-        _, tax_codes = self.sanitized_accounts_tax_codes()
         valid_tax_codes = set(tax_codes["id"])
         mask = pl.col("tax_code").is_not_null() & ~pl.col("tax_code").is_in(valid_tax_codes)
         new_invalid_ids = set(
@@ -945,33 +950,30 @@ class LedgerEngine(ABC):
 
         return df
 
-    def _invalid_accounts(self, id_acc_ldf: pl.LazyFrame, invalid_ids: set[str]) -> set[str]:
+    def _invalid_accounts(
+        self, ldf: pl.LazyFrame, accounts: pd.DataFrame, invalid_ids: set[str]
+    ) -> set[str]:
         """
         Mark transactions with invalid accounts:
         - both 'account' and 'contra' are missing, or
         - a referenced account is not defined."""
-        accounts, _ = self.sanitized_accounts_tax_codes()
-        account_set = set(accounts["account"])
-
-        df = id_acc_ldf.select(["id", "account", "contra"]).collect()
+        df = ldf.select(["id", "account", "contra"]).collect()
+        accounts_set = set(accounts["account"])
 
         # Transactions missing both 'account' and 'contra'
-        missing_ids = (
-            df.filter(df["account"].is_null() & df["contra"].is_null())["id"]
-            .to_list()
-        )
+        missing_ids = df.filter(df["account"].is_null() & df["contra"].is_null())["id"].to_list()
         missing_ids = set(missing_ids) - invalid_ids
         if missing_ids:
             self._logger.warning(
                 f"Discarding {len(missing_ids)} journal entries with neither 'account' "
-                f"nor 'contra'specified: {first_elements_as_str(missing_ids)}"
+                f"nor 'contra' specified: {first_elements_as_str(missing_ids)}"
             )
-            invalid_ids.update(missing_ids)
+            invalid_ids = invalid_ids.union(missing_ids)
 
         # Transactions with invalid account or contra references
-        bad_account_mask = df["account"].is_not_null() & ~df["account"].is_in(account_set)
-        bad_contra_mask = df["contra"].is_not_null() & ~df["contra"].is_in(account_set)
-        ref_mask = bad_account_mask | bad_contra_mask
+        invalid_account_mask = df["account"].is_not_null() & ~df["account"].is_in(accounts_set)
+        invalid_contra_mask = df["contra"].is_not_null() & ~df["contra"].is_in(accounts_set)
+        ref_mask = invalid_account_mask | invalid_contra_mask
 
         ref_ids = set(df.filter(ref_mask)["id"].to_list()) - invalid_ids - missing_ids
         if ref_ids:
@@ -979,11 +981,13 @@ class LedgerEngine(ABC):
                 f"Discarding {len(ref_ids)} journal entries with invalid account "
                 f"or contra references: {first_elements_as_str(ref_ids)}"
             )
-            invalid_ids.update(ref_ids)
+            invalid_ids = invalid_ids.union(ref_ids)
 
         return invalid_ids
 
-    def _invalid_assets(self, id_series: pl.Series, precision: pl.Series, invalid_ids: set[str]) -> set[str]:
+    def _invalid_assets(
+        self, id_series: pl.Series, precision: pl.Series, invalid_ids: set[str]
+    ) -> set[str]:
         """Mark transactions with invalid asset references."""
         new_invalid_ids = set(id_series.filter(precision.is_null()).to_list()) - invalid_ids
         if new_invalid_ids:
@@ -998,13 +1002,13 @@ class LedgerEngine(ABC):
     def _invalid_currency(self, df: pl.DataFrame, invalid_ids: set) -> set:
         """Mark transactions with currency mismatched to account or contra account."""
         reporting_currency = self.reporting_currency
-        def row_is_invalid(row: dict) -> bool:
+
+        def is_invalid(row: dict) -> bool:
             if row["id"] in invalid_ids:
                 return True
             if row["amount"] == 0 or row["amount"] is None:
                 return False
             currency = row.get("currency")
-
             if row.get("account") is not None:
                 acct_cur = self.account_currency(row["account"])
                 if acct_cur != reporting_currency and currency != acct_cur:
@@ -1016,77 +1020,73 @@ class LedgerEngine(ABC):
                     return True
             return False
 
-        new_ids = set(
-            row["id"]
-            for row in df.iter_rows(named=True)
-            if row_is_invalid(row)
+        new_invalid_ids = set(
+            row["id"] for row in df.iter_rows(named=True) if is_invalid(row)
         ) - invalid_ids
 
-        if new_ids:
+        if new_invalid_ids:
             self._logger.warning(
-                f"Discarding {len(new_ids)} journal entries with mismatched transaction"
-                f"currency: {first_elements_as_str(new_ids)}"
+                f"Discarding {len(new_invalid_ids)} journal entries with mismatched transaction "
+                f"currency: {first_elements_as_str(new_invalid_ids)}"
             )
-            invalid_ids.union(new_ids)
+            invalid_ids = invalid_ids.union(new_invalid_ids)
 
         return invalid_ids
 
-    def _invalid_prices(self, df: pl.DataFrame, invalid_ids: set[str]) -> set[str]:
+    def _invalid_prices(self, df: pl.DataFrame, invalid_ids: set) -> set:
         """Mark transactions with missing price references."""
         reporting_currency = self.reporting_currency
 
-        def needs_price(row: dict) -> bool:
-            currency = row.get("currency")
-            if currency is None or currency == reporting_currency:
-                return False
-            return True
-
-        def missing_price(row: dict) -> bool:
-            if not needs_price(row):
+        def is_invalid(row):
+            if row["id"] in invalid_ids:
+                return True
+            if row["currency"] == reporting_currency or pd.notna(row["report_amount"]):
                 return False
             try:
-                self.price(row["date"], row["currency"], reporting_currency)
+                self.price(
+                    ticker=row["currency"], date=row["date"], currency=reporting_currency
+                )
                 return False
             except ValueError:
                 return True
 
-        new_ids = set(
+        new_invalid_ids = set(
             row["id"]
-            for row in df.select(["id", "currency", "date"]).iter_rows(named=True)
-            if missing_price(row)
+            for row in df.select(["id", "currency", "date", "report_amount"]).iter_rows(named=True)
+            if is_invalid(row)
         ) - invalid_ids
-
-        if new_ids:
+        if new_invalid_ids:
             self._logger.warning(
-                f"Discarding {len(new_ids)} journal entries with invalid price: "
-                f"{first_elements_as_str(new_ids)}"
+                f"Discarding {len(new_invalid_ids)} journal entries with invalid price: "
+                f"{first_elements_as_str(new_invalid_ids)}"
             )
-            invalid_ids.union(new_ids)
+            invalid_ids = invalid_ids.union(new_invalid_ids)
         return invalid_ids
 
-    def _invalid_profit_centers(self, id_pc_ldf: pl.LazyFrame, invalid_ids: set[str]) -> set[str]:
+    def _invalid_profit_centers(self, id_pc_ldf: pl.LazyFrame, invalid_ids: set) -> set:
         """Mark transactions with missing or invalid profit center references."""
-        centers = set(self.profit_centers.list()["profit_center"])
-        if centers:
-            mask = pl.col("profit_center").is_null() | ~pl.col("profit_center").is_in(centers)
+        profit_centers = set(self.profit_centers.list()["profit_center"])
+        if profit_centers:
+            mask = pl.col("profit_center").is_null() \
+                | ~pl.col("profit_center").is_in(profit_centers)
         else:
             mask = pl.col("profit_center").is_not_null()
 
-        new_ids = (
-            id_pc_ldf
-            .filter(mask)
-            .select("id")
-            .collect()["id"]
-            .to_list()
-        )
-        new_ids = set(new_ids) - invalid_ids
-        if len(new_ids) > 0:
-            msg = "missing or invalid" if centers else "assigned while none defined"
-            self._logger.warning(
-                f"Discarding {len(new_ids)} journal entries with profit center issues ({msg}): "
-                f"{first_elements_as_str(new_ids)}"
-            )
-            invalid_ids = invalid_ids.union(new_ids)
+        new_invalid_ids = id_pc_ldf.filter(mask).select("id").collect()["id"].to_list()
+        new_invalid_ids = set(new_invalid_ids) - invalid_ids
+        if new_invalid_ids:
+            if profit_centers:
+                self._logger.warning(
+                    f"Discarding {len(new_invalid_ids)} journal entries with missing or invalid "
+                    f"profit center: {first_elements_as_str(new_invalid_ids)}"
+                )
+            else:
+                self._logger.warning(
+                    f"Discarding {len(new_invalid_ids)} journal entries assigned to a "
+                    f"profit center, while no profit centers are defined: "
+                    f"{first_elements_as_str(new_invalid_ids)}"
+                )
+            invalid_ids = invalid_ids.union(new_invalid_ids)
         return invalid_ids
 
     @staticmethod
@@ -1105,7 +1105,9 @@ class LedgerEngine(ABC):
             np.where(df["account"].notna(), 1, -1)
         )
 
-    def _fill_report_amounts(self, df: pd.DataFrame, invalid_ids: set[str], precision: pl.Series) -> pl.Series:
+    def _fill_report_amounts(
+        self, df: pd.DataFrame, invalid_ids: set, precision: pl.Series
+    ) -> pl.Series:
         """Fill missing report amounts with default values.
 
         Replaces NA report amounts by converting the amount in transaction
@@ -1187,7 +1189,7 @@ class LedgerEngine(ABC):
             report_amount[txn_mask] = rounded_values * txn_multiplier
         return pl.Series("report_amount", report_amount)
 
-    def _unbalanced_report_amounts(self, df: pl.DataFrame, invalid_ids: set[str]) -> set[str]:
+    def _unbalanced_report_amounts(self, df: pl.DataFrame, invalid_ids: set) -> set:
         """Mark transactions whose total amounts do not balance to zero as invalid."""
         multiplier = self.amount_multiplier(df.to_pandas())
         net_report = (
@@ -1569,12 +1571,13 @@ class LedgerEngine(ABC):
         Returns the smallest price increment (precision) for each currency/date pair.
 
         Args:
-            currencies (pl.Series): Series of currency or asset tickers.
-            dates (pl.Series): Series of datetime values.
-            allow_missing (bool): If True, unresolved lookups return None.
+            dates (pl.Series): Series of datetime.date values.
+            currencies (pl.Series): Series of currency or asset tickers of same length as `dates`.
+            allow_missing (bool): If True, unresolved lookups return pd.NA
+                                  instead of raising an error.
 
         Returns:
-            pl.Series: Precision values as a Polars Series of type Float64.
+            pl.Series: Series of precision values of type Float64.
         """
         def lookup(ticker: str, date: datetime.date) -> float | None:
             if allow_missing and ticker is None:
