@@ -82,6 +82,10 @@ JOURNAL_CSV = """
     23, 2024-12-05,        ,   1000,      USD,   200000.00,              ,         ,       General, Convert USD to EUR and CHF,
     23,           ,    1010,       ,      EUR,    97750.00,     100000.00,         ,       General, Convert USD to EUR and CHF,
     23,           ,    1025,       ,      CHF, 14285714.29,     100000.00,         ,       General, Convert USD to EUR and CHF,
+    24, 2024-07-01,    4001,       ,      EUR,      166.67,        178.47,         ,          Shop, Shop sale,
+    24, 2024-07-01,    4001,       ,      EUR,       23.81,         25.50,         ,          Shop, Shop sale,
+    24, 2024-07-01,    2200,       ,      EUR,     -166.67,       -178.47,         ,          Shop, Shop sale,
+    24, 2024-07-01,    2200,       ,      EUR,      -23.81,        -25.50,         ,          Shop, Shop sale,
 """
 JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
 # flake8: enable
@@ -167,7 +171,7 @@ EXPECTED_BALANCE_CSV = """
     2024-03-31, 1000:1999,                         , "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-03-31,      7050,                         , "{reporting_currency:   21003.29, USD:    21003.29}"
     2024-03-31,      8050,                         , "{reporting_currency:       0.00, USD:        0.00}"
-    2024-12-31,      4001,                         , "{reporting_currency:   -1402.23, EUR:    -1309.52}"
+    2024-12-31,      4001,                         , "{reporting_currency:   -1198.26, EUR:    -1119.04}"
     2024-Q4,    1000:1999,                         , "{reporting_currency: 11655605.63,USD: 300000.0, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
     2024,       1000:1999,                         , "{reporting_currency: 12756779.54,USD: 1076572.64, EUR: 10026667.1, JPY: 54345678.0, CHF: 14285714.3}"
     2024-08,    1000:1999,                         , "{reporting_currency: -700.0, USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
@@ -258,8 +262,10 @@ EXPECTED_HISTORY = [{
             """
                   date, contra, currency,  amount, balance, tax_code, description, document
             2024-01-24,   4000,      USD, -200.00, -200.00,  OUT_STD, TAX: Sell cakes, 2024/receivables/2024-01-24.pdf
-            2024-07-01,   4001,      EUR, -166.67, -366.67,  OUT_STD, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf
-            2024-07-01,   4001,      EUR,  -23.81, -390.48,  OUT_RED, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf"""
+            2024-07-01,       ,      EUR, -166.67, -366.67,         , Shop sale,
+            2024-07-01,       ,      EUR,  -23.81, -390.48,         , Shop sale,
+            2024-07-01,   4001,      EUR, -166.67, -557.15,  OUT_STD, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf
+            2024-07-01,   4001,      EUR,  -23.81, -580.96,  OUT_RED, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf"""
     }, {
         "period": "2024-03-31", "account": "1000:1999", "profit_centers": None, "drop": True, "account_history":
             """
@@ -413,10 +419,10 @@ EXPECTED_AGGREGATED_BALANCES_CSV = """
     /Assets/Tax Recoverable,        VAT Recoverable (Input VAT),   360.85
     /Liabilities/Payables,          Accounts Payable USD,          700.00
     /Liabilities/Payables,          Accounts Payable EUR,          0.00
-    /Liabilities/Tax Payable,       VAT Payable (Output VAT),      -403.97
+    /Liabilities/Tax Payable,       VAT Payable (Output VAT),      -607.94
     /Equity,                        Owner's Equity,                -11098332.82
     /Revenue/Sales,                 Sales Revenue - USD,           -1000.00
-    /Revenue/Sales,                 Sales Revenue - EUR,           -1402.23
+    /Revenue/Sales,                 Sales Revenue - EUR,           -1198.26
     /Expenses/Cost of Goods Sold,   Purchases,                     3502.64
     /Expenses/Other,                Financial,                     -1659837.61
     /Revenue/Other,                 Financial,                     -5.55
