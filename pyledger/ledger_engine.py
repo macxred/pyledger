@@ -908,7 +908,7 @@ class LedgerEngine(ABC):
         invalid_date = (
             df.group_by("id")
             .agg(pl.col("date").n_unique().alias("n_dates"))
-            .filter(col("n_dates") > 1)
+            .filter(pl.col("n_dates") > 1)
             .select("id")
             .collect()["id"]
             .to_list()
@@ -928,7 +928,7 @@ class LedgerEngine(ABC):
         """Drop undefined 'tax_code' references."""
         _, tax_codes = self.sanitized_accounts_tax_codes()
         valid_tax_codes = set(tax_codes["id"])
-        mask = col("tax_code").is_not_null() & ~col("tax_code").is_in(valid_tax_codes)
+        mask = pl.col("tax_code").is_not_null() & ~pl.col("tax_code").is_in(valid_tax_codes)
         new_invalid_ids = set(
             df.filter(mask).select("id").collect()["id"].to_list()
         ) - invalid_ids
@@ -940,7 +940,7 @@ class LedgerEngine(ABC):
             )
 
         df = df.with_columns([
-            when(mask).then(lit(None)).otherwise(col("tax_code")).alias("tax_code")
+            pl.when(mask).then(pl.lit(None)).otherwise(pl.col("tax_code")).alias("tax_code")
         ])
 
         return df
@@ -1068,9 +1068,9 @@ class LedgerEngine(ABC):
         """Mark transactions with missing or invalid profit center references."""
         centers = set(self.profit_centers.list()["profit_center"])
         if centers:
-            mask = col("profit_center").is_null() | ~col("profit_center").is_in(centers)
+            mask = pl.col("profit_center").is_null() | ~pl.col("profit_center").is_in(centers)
         else:
-            mask = col("profit_center").is_not_null()
+            mask = pl.col("profit_center").is_not_null()
 
         new_ids = (
             id_pc_ldf
@@ -1200,7 +1200,7 @@ class LedgerEngine(ABC):
 
         tolerance = self.precision(self.reporting_currency) / 2
         unbalanced_ids = set(
-            net_report.filter(abs(col("net_report")) > tolerance)["id"].to_list()
+            net_report.filter(abs(pl.col("net_report")) > tolerance)["id"].to_list()
         )
 
         if unbalanced_ids:
