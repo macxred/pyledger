@@ -43,10 +43,15 @@ def test_parse_profit_center_range_valid_inputs(input_value, expected_output, en
     "invalid_input",
     [
         {"add": ["Shop", 123], "subtract": ["Bakery"]},  # Invalid dict (non-str)
+        {"add": ["Shop"]},  # Missing 'subtract'
+        {"subtract": ["General"]},  # Missing 'add'
         ["Shop", 123],  # Invalid list (non-str)
         123,  # Non-string non-list
         3.14,  # Float
         None,  # None input
+        "",  # Empty string input
+        [],  # Empty list
+        {"add": [], "subtract": []},  # Empty dict
     ]
 )
 def test_parse_profit_center_range_invalid_inputs(invalid_input, engine):
