@@ -445,7 +445,7 @@ class LedgerEngine(ABC):
 
     @abstractmethod
     def _single_account_balance(
-        self, account: int, profit_centers: list[str] | str = None,
+        self, account: int, profit_centers: dict[str, list[str]] | None = None,
         start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
         """Retrieve the balance of a single account within a date range.
@@ -456,16 +456,17 @@ class LedgerEngine(ABC):
                                              Defaults to None.
             end (datetime.date, optional): End date for the balance calculation.
                                            Defaults to None.
-            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
-                                              calculated only from journal entries assigned to one
-                                              of the profit centers in the filter.
+            profit_centers (dict[str, list[str]] | None):
+                Filter for journal entries. See `parse_profit_center_range()`for possible formats.
+                If not None, the result is calculated only from journal entries assigned
+                to the specified profit centers.
 
         Returns:
             dict: Dictionary containing the balance of the account in various currencies.
         """
 
     def _account_balance_list(
-        self, accounts: list[int], profit_centers: list[str] | str = None,
+        self, accounts: list[int], profit_centers: dict[str, list[str]] | None = None,
         start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
         result = {}
@@ -478,7 +479,7 @@ class LedgerEngine(ABC):
         return result
 
     def _account_balance_range(
-        self, accounts: dict[str, list[int]], profit_centers: list[str] | str = None,
+        self, accounts: dict[str, list[int]], profit_centers: dict[str, list[str]] | None = None,
         start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
         result = {}
@@ -496,7 +497,7 @@ class LedgerEngine(ABC):
 
     def _account_balance(
         self, account: int | str | dict, period: datetime.date | str | int = None,
-        profit_centers: list[str] | str = None
+        profit_centers: str | dict[str, list[str]] | list[str] | None = None
     ) -> dict:
         """Calculate the balance of a single account
         or the summarized balance of a list or range of accounts.
@@ -516,9 +517,10 @@ class LedgerEngine(ABC):
                 be defined as string, e.g. "2024" (the year 2024), "2024-01"
                 (January 2024), "2024-Q1" (first quarter 2024), or as a tuple
                 with start and end date. Defaults to None.
-            profit_centers: (list[str], str): Filter for journal entries. If
-                not None, the result is calculated only from journal entries
-                assigned to one of the profit centers in the filter.
+            profit_centers (str | dict[str, list[str]] | list[str] | None):
+                Filter for journal entries. See `parse_profit_center_range()`for possible formats.
+                If not None, the result is calculated only from journal entries assigned
+                to the specified profit centers.
 
         Returns:
             dict: Dictionary containing the balance of the account(s) in all
@@ -528,10 +530,8 @@ class LedgerEngine(ABC):
         """
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
-        if profit_centers is not None and profit_centers is not pd.NA:
-            profit_centers = profit_centers
-        else:
-            profit_centers = None
+        if profit_centers is not None:
+            profit_centers = self.parse_profit_center_range(profit_centers)
         result = self._account_balance_range(
             accounts=accounts, start=start, end=end, profit_centers=profit_centers
         )
@@ -549,7 +549,7 @@ class LedgerEngine(ABC):
         self,
         accounts: str | int | dict[str, list[int]] | list[int] | None,
         period: str | datetime.date | None = None,
-        profit_centers: list[str] | str | None = None,
+        profit_centers: str | dict[str, list[str]] | list[str] | None = None
     ) -> pd.DataFrame:
         """Calculate balances individually for a single account
         or for each account in a list or range, returning one row per account.
@@ -562,8 +562,10 @@ class LedgerEngine(ABC):
                 The time period for which account balances are calculated. See `parse_date_span`
                 for possible values. If a single date, the balance up to that date is returned.
                 If None, the balance is calculated from all available accounting data.
-            profit_centers (list[str], str, optional): If not None, the result is calculated only
-                           from ledger entries assigned to the specified profit centers.
+            profit_centers (str | dict[str, list[str]] | list[str] | None):
+                Filter for journal entries. See `parse_profit_center_range()`for possible formats.
+                If not None, the result is calculated only from journal entries assigned
+                to the specified profit centers.
 
         Returns:
             pd.DataFrame: A data frame with ACCOUNT_BALANCE_SCHEMA, providing account and
@@ -654,7 +656,7 @@ class LedgerEngine(ABC):
         self,
         account: int | str | dict,
         period: datetime.date = None,
-        profit_centers: list[str] | str = None,
+        profit_centers: str | dict[str, list[str]] | list[str] | None = None,
         drop: bool = False
     ) -> pd.DataFrame:
         """
@@ -676,8 +678,9 @@ class LedgerEngine(ABC):
                 transactions. Can be specified as a year ("2024"), month ("2024-01"),
                 quarter ("2024-Q1"), or start-end tuple. Defaults to None.
                 See `parse_date_span` for details.
-            profit_centers (list[str] | str, optional): Filter results by these
-                profit center(s). Defaults to None.
+            profit_center: (str | dict[str, list[str]] | list[str] | None)
+                Filter for journal entries.
+                See `parse_profit_center_range()`for supported formats.
             drop (bool, optional): If True, drops redundant information:
                 - Columns containing only NA values
                 - The "account" column if a single account is queried
@@ -693,6 +696,9 @@ class LedgerEngine(ABC):
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
         accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
+        if profit_centers is not None:
+            profit_centers = self.parse_profit_center_range(profit_centers)
+            profit_centers = list(set(profit_centers["add"]) - set(profit_centers["subtract"]))
         df = self._fetch_account_history(
             accounts, start=start, end=end, profit_centers=profit_centers
         )
@@ -715,7 +721,7 @@ class LedgerEngine(ABC):
 
     def _fetch_account_history(
         self, account: int | list[int], start: datetime.date = None, end: datetime.date = None,
-        profit_centers: list[str] | str = None
+        profit_centers: list[str] | None = None
     ) -> pd.DataFrame:
         """Fetch transaction history of a list of accounts and compute balance.
 
@@ -723,7 +729,7 @@ class LedgerEngine(ABC):
             account (int, list[int]): The account or list of accounts to fetch the history for.
             start (datetime.date, optional): Start date for the history. Defaults to None.
             end (datetime.date, optional): End date for the history. Defaults to None.
-            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
+            profit_centers: (list[str] | None): Filter for journal entries. If not None, the result is
                                               calculated only from journal entries assigned to one
                                               of the profit centers in the filter.
 
@@ -738,8 +744,6 @@ class LedgerEngine(ABC):
         if end is not None:
             filter = filter & (ledger["date"] <= pd.to_datetime(end))
         if profit_centers is not None:
-            if isinstance(profit_centers, str):
-                profit_centers = [profit_centers]
             valid_profit_centers = set(self.profit_centers.list()["profit_center"])
             invalid_profit_centers = set(profit_centers) - valid_profit_centers
             if invalid_profit_centers:
