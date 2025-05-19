@@ -1889,3 +1889,70 @@ class LedgerEngine(ABC):
                 )
 
         return messages
+
+    # ----------------------------------------------------------------------
+    # Profit center
+
+    def parse_profit_center_range(
+        self, range: str | dict[str, list[str]] | list[str]
+    ) -> dict:
+        """
+        Convert a profit center range into a standardized format.
+
+        Args:
+            range (str | dict[str, list[str]] | list[str]): The profit center(s) to be evaluated.
+                - **str**: A string expression including:
+                    - Plus (`+`) to include, e.g., `"Shop+General"`.
+                    - Minus (`-`) to exclude, e.g., `"Shop+General-Bakery"`.
+                - **dict[str, list[int]]**: A dictionary with `"add"` and `"subtract"` keys,
+                    each containing a list of profit centers to be included or excluded.
+                    Same as the return value.
+                - **list[int]**: A list of profit centers to use, same as `"add"` key
+                    in the return value.
+
+        Returns:
+            dict: A dictionary with:
+                - `"add"` (list[str]): Profit centers to include.
+                - `"subtract"` (list[str]): Profit centers to exclude.
+
+        Raises:
+            ValueError: If the input format is invalid or contains unrecognized profit centers.
+        """
+        add = []
+        subtract = []
+
+        if isinstance(range, dict):
+            if not ("add" in range and "subtract" in range):
+                raise ValueError("Dict must have 'add' and 'subtract' keys.")
+            # Ensure values are lists
+            add = list(range.get("add", []))
+            subtract = list(range.get("subtract", []))
+            if not all(isinstance(i, str) for i in add + subtract):
+                raise ValueError("Both 'add' and 'subtract' must contain only strings.")
+        elif isinstance(range, list):
+            if not all(isinstance(i, str) for i in range):
+                raise ValueError("List elements must all be strings.")
+            add = range
+        elif isinstance(range, str):
+            is_addition = True
+            for element in re.split(r"(\+|\-)", range.strip()):
+                element = element.strip()
+                if element == "":
+                    continue
+                elif element == "+":
+                    is_addition = True
+                elif element == "-":
+                    is_addition = False
+                else:
+                    profit_center = element
+                    if is_addition:
+                        add.append(profit_center)
+                    else:
+                        subtract.append(profit_center)
+        else:
+            raise ValueError(
+                f"Expecting str, dict, or list for range, not {type(range).__name__}."
+            )
+        if not add and not subtract:
+            raise ValueError(f"No profit centers matching '{range}'.")
+        return {"add": add, "subtract": subtract}
