@@ -606,7 +606,7 @@ class LedgerEngine(ABC):
             start, end = parse_date_span(row["period"])
             accounts = self.parse_account_range(row["account"])
             profit_centers = None
-            if row["profit_center"] is not None:
+            if row["profit_center"] is not None and row["profit_center"] is not pd.NA:
                 profit_centers = self.parse_profit_center_range(row["profit_center"])
                 profit_centers = list(set(profit_centers["add"]) - set(profit_centers["subtract"]))
             result = self._account_balance_range(
@@ -1817,13 +1817,13 @@ class LedgerEngine(ABC):
             df = df[df['source'].str.contains(source_pattern, na=False)]
 
         df = self.sanitize_reconciliation(df)
-        balances = self.account_balances(df).rename(columns={
-            "balance": "actual_balance",
-            "report_balance": "actual_report_balance"
-        })
-        result = pd.concat([df.reset_index(drop=True), balances.reset_index(drop=True)], axis=1)
-        result.index = df.index
-        return result
+        balances = self.account_balances(df)
+        balances.index = df.index
+        df[["actual_balance", "actual_report_balance"]] = balances[["balance", "report_balance"]]
+        df["actual_balance"] = df.apply(
+            lambda row: row["actual_balance"].get(row["currency"]), axis=1
+        )
+        return df
 
     def reconciliation_summary(self, df: pd.DataFrame) -> list[str]:
         """
