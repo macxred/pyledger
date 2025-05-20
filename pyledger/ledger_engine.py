@@ -573,21 +573,31 @@ class LedgerEngine(ABC):
     def account_balances(
         self, df: pd.DataFrame, reporting_currency_only: bool = False
     ) -> pd.DataFrame:
-        """Calculate balances in specified and reporting currencies by processing each row
-        specification of the DataFrame.
+        """Calculate balances by processing each row specification of the DataFrame.
 
-        Expects a DataFrame with the following columns:
-        - 'account': A single account, list, or range.
-            See `parse_account_range()` for supported formats.
-        - 'period': (Optional) A cutoff date or period span.
-            See `parse_date_span()` for supported formats.
-        - 'profit_center': (Optional) One or more profit centers to filter journal entries.
-        - 'currency': Currency in which to report the 'balance' field value.
+        Enriches the DataFrame with new column(s):
+        - `report_balance`: Balance in the reporting currency.
+        - `balance`: Dictionary containing the balance of the account(s) in all currencies
+        in which transactions were recorded. Keys denote currencies and values the balance.
+        The absence of a currency is interpreted as a zero balance.
+
+        Args:
+            df (pd.DataFrame): Input DataFrame with rows specifying balance queries.
+                Expected columns include:
+                - 'account': An account identifier, list, or range.
+                See `parse_account_range()` for supported formats.
+                - 'period' (optional): A cutoff date or date span.
+                See `parse_date_span()` for accepted formats.
+                - 'profit_center' (optional): Profit center filter.
+                See `parse_profit_center_range()` for accepted formats.
+            reporting_currency_only (bool, optional): If True, omits the `balance` column
+                and includes only the `report_balance` column. Defaults to False.
 
         Returns:
-            pd.DataFrame of the same length with two columns:
-            - 'balance': Amount in the specified currency.
-            - 'report_balance': Amount in the reporting currency.
+            pd.DataFrame: A DataFrame of the same length, enriched with:
+                - 'report_balance': Amount in the reporting currency.
+                - 'balance': Dictionary of currency-wise balances
+                (excluded if `reporting_currency_only` is True).
         """
         def _calc_balances(row):
             start, end = parse_date_span(row["period"])
@@ -598,6 +608,7 @@ class LedgerEngine(ABC):
             result = self._account_balance_range(
                 accounts=accounts, start=start, end=end, profit_centers=profit_centers
             )
+
             # Type consistent return value Dict[str, float]
             def _standardize_currency(ticker: str, x: float) -> float:
                 result = float(self.round_to_precision(x, ticker=ticker, date=end))
