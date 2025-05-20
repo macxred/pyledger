@@ -526,20 +526,10 @@ class LedgerEngine(ABC):
                 "reporting_currency". Keys denote currencies and values the
                 balance amounts in each currency.
         """
-        start, end = parse_date_span(period)
-        accounts = self.parse_account_range(account)
-        result = self._account_balance_range(
-            accounts=accounts, start=start, end=end, profit_centers=profit_centers
-        )
-
-        # Type consistent return value Dict[str, float]
-        def _standardize_currency(ticker: str, x: float) -> float:
-            result = float(self.round_to_precision(x, ticker=ticker, date=end))
-            if result == -0.0:
-                result = 0.0
-            return result
-        result = {k: _standardize_currency(k, v) for k, v in result.items()}
-        return result
+        result = self.account_balances(pd.DataFrame({
+            "account": [account], "period": [period], "profit_center": [profit_centers]
+        })).iloc[0]
+        return {"reporting_currency": result["report_balance"].item(), **result["balance"]}
 
     def individual_account_balances(
         self,
@@ -576,10 +566,13 @@ class LedgerEngine(ABC):
         df["profit_center"] = [profit_centers] * len(df)
         balances = self.account_balances(df)
         df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
+        df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"]), axis=1)
 
         return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
 
-    def account_balances(self, df: pd.DataFrame) -> pd.DataFrame:
+    def account_balances(
+        self, df: pd.DataFrame, reporting_currency_only: bool = False
+    ) -> pd.DataFrame:
         """Calculate balances in specified and reporting currencies by processing each row
         specification of the DataFrame.
 
@@ -597,18 +590,29 @@ class LedgerEngine(ABC):
             - 'report_balance': Amount in the reporting currency.
         """
         def _calc_balances(row):
-            profit_centers = None if row["profit_center"] is pd.NA else row["profit_center"]
-            balance = self.account_balance(
-                account=row["account"],
-                period=row["period"],
-                profit_centers=profit_centers
+            start, end = parse_date_span(row["period"])
+            accounts = self.parse_account_range(row["account"])
+            profit_centers = None
+            if row["profit_center"] is not None and row["profit_center"] is not pd.NA:
+                profit_centers = row["profit_center"]
+            result = self._account_balance_range(
+                accounts=accounts, start=start, end=end, profit_centers=profit_centers
             )
-            return pd.Series({
-                "balance": balance.get(row.get("currency"), 0),
-                "report_balance": balance.get("reporting_currency", 0)
-            })
+            # Type consistent return value Dict[str, float]
+            def _standardize_currency(ticker: str, x: float) -> float:
+                result = float(self.round_to_precision(x, ticker=ticker, date=end))
+                if result == -0.0:
+                    result = 0.0
+                return result
+            result = {k: _standardize_currency(k, v) for k, v in result.items()}
+            report_balance = result.get("reporting_currency", 0)
+            result.pop("reporting_currency", None)
+            return pd.Series({"balance": result, "report_balance": report_balance})
 
         result = df.apply(_calc_balances, axis=1)
+        if reporting_currency_only:
+            result.drop(columns="balance", inplace=True)
+
         return result
 
     def aggregate_account_balances(self, df: pd.DataFrame = None, n: int = 1) -> pd.DataFrame:
@@ -1796,13 +1800,13 @@ class LedgerEngine(ABC):
             df = df[df['source'].str.contains(source_pattern, na=False)]
 
         df = self.sanitize_reconciliation(df)
-        balances = self.account_balances(df).rename(columns={
-            "balance": "actual_balance",
-            "report_balance": "actual_report_balance"
-        })
-        result = pd.concat([df.reset_index(drop=True), balances.reset_index(drop=True)], axis=1)
-        result.index = df.index
-        return result
+        balances = self.account_balances(df)
+        balances.index = df.index
+        df[["actual_balance", "actual_report_balance"]] = balances[["balance", "report_balance"]]
+        df["actual_balance"] = df.apply(
+            lambda row: row["actual_balance"].get(row["currency"]), axis=1
+        )
+        return df
 
     def reconciliation_summary(self, df: pd.DataFrame) -> list[str]:
         """
