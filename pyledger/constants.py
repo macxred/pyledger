@@ -1,5 +1,6 @@
 """Constants used throughout the application."""
 
+from tarfile import TarError
 import pandas as pd
 from io import StringIO
 from consistent_df import enforce_schema
@@ -151,3 +152,19 @@ DEFAULT_ASSETS = enforce_schema(
 DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
 
 DEFAULT_FILE_PATH_COLUMN = "__path__"
+
+
+TARGET_BALANCE_LOOKUP_SCHEMA_CSV = """
+    column,                dtype,                mandatory,     id
+    lookup_period,         datetime64[ns],       False,         True
+    lookup_accounts,       string[python],       False,         True
+    lookup_profit_centers, string[python],       False,         True
+    balance,               Float64,              True,         False
+"""
+TARGET_BALANCE_LOOKUP_SCHEMA = pd.read_csv(
+    StringIO(TARGET_BALANCE_LOOKUP_SCHEMA_CSV), skipinitialspace=True
+)
+TARGET_BALANCE_SCHEMA = pd.concat([
+    TARGET_BALANCE_LOOKUP_SCHEMA,
+    JOURNAL_SCHEMA.query("column not in['amount', report_amount]")
+])
