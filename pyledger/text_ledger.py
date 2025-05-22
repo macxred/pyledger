@@ -18,6 +18,7 @@ from .constants import (
     PRICE_SCHEMA,
     RECONCILIATION_SCHEMA,
     REVALUATION_SCHEMA,
+    TARGET_BALANCE_SCHEMA,
     TAX_CODE_SCHEMA
 )
 from .helpers import write_fixed_width_csv
@@ -108,6 +109,9 @@ class TextLedger(StandaloneLedger):
             path=self.root / "reconciliation",
             write_file=self.write_reconciliation_file,
             file_path_column="source"
+        )
+        self._target_balance = CSVAccountingEntity(
+            schema=TARGET_BALANCE_SCHEMA, path=self.root / "settings/target_balance"
         )
 
     # ----------------------------------------------------------------------

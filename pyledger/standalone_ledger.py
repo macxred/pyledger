@@ -53,6 +53,10 @@ class StandaloneLedger(LedgerEngine):
     def reconciliation(self) -> AccountingEntity:
         return self._reconciliation
 
+    @property
+    def target_balance(self) -> AccountingEntity:
+        return self._target_balance
+
     # ----------------------------------------------------------------------
     # Tax Codes
 
