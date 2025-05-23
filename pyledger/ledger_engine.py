@@ -23,6 +23,7 @@ from .constants import (
     PRICE_SCHEMA,
     RECONCILIATION_SCHEMA,
     REVALUATION_SCHEMA,
+    TARGET_BALANCE_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
     AGGREGATED_BALANCE_SCHEMA
@@ -1937,3 +1938,47 @@ class LedgerEngine(ABC):
             raise ValueError(f"No valid profit centers found in: {profit_center}")
 
         return valid
+
+    # ----------------------------------------------------------------------
+    # Target Balance
+
+    def sanitize_target_balance(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Discard invalid or incoherent target balance entries.
+
+        This method applies the following validation rules:
+        1. The `balance` column must not be NA, otherwise discard row.
+        2. If `lookup_period` is set but cannot be parsed via `parse_date_span()`, set to it NA.
+        3. If `lookup_accounts` is set but cannot resolve to at least one account
+        via `account_range()`, set it to NA.
+        4. If `lookup_profit_centers` is set but invalid, set it to NA.
+        5. Any row is discarded if it violates journal-level integrity rules
+        (see `sanitize_journal()`), except rules involving `amount` and `report_amount` columns.
+
+        A warning is logged for each dropped entry with the specific reason.
+
+        Args:
+            df (pd.DataFrame): Target balance data to sanitize.
+
+        Returns:
+            pd.DataFrame: A sanitized DataFrame containing only valid target balance entries.
+        """
+
+        df = enforce_schema(df, TARGET_BALANCE_SCHEMA, keep_extra_columns=True)
+
+        invalid_ids = set()
+        invalid_ids = self._invalid_balance(df, invalid_ids)
+        invalid_ids = self._invalid_date_period(df, invalid_ids)
+        invalid_ids = self._invalid_accounts_range(df, invalid_ids)
+        # TODO: extend _invalid_profit_centers method to accept column name
+        invalid_ids = self._invalid_profit_centers(df, invalid_ids, column="lookup_profit_centers")
+        invalid_ids = self._invalid_multidate_txns(df, invalid_ids)
+        self._invalid_tax_codes(df, invalid_ids)
+        invalid_ids = self._invalid_accounts(df, invalid_ids)
+        precision = self.precision_vectorized(df["currency"], dates=df["date"], allow_missing=True)
+        invalid_ids = self._invalid_assets(df, invalid_ids, precision)
+        invalid_ids = self._invalid_currency(df, invalid_ids)
+        invalid_ids = self._invalid_prices(df, invalid_ids)
+        invalid_ids = self._invalid_profit_centers(df, invalid_ids, column="profit_centers")
+
+        return df.query("id not in @invalid_ids").reset_index(drop=True)
