@@ -166,5 +166,5 @@ TARGET_BALANCE_LOOKUP_SCHEMA = pd.read_csv(
 )
 TARGET_BALANCE_SCHEMA = pd.concat([
     TARGET_BALANCE_LOOKUP_SCHEMA,
-    JOURNAL_SCHEMA.query("column not in['amount', report_amount]")
+    JOURNAL_SCHEMA.query("column not in['amount', 'report_amount']")
 ])
