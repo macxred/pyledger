@@ -1,6 +1,5 @@
 """Constants used throughout the application."""
 
-from tarfile import TarError
 import pandas as pd
 from io import StringIO
 from consistent_df import enforce_schema
@@ -156,7 +155,7 @@ DEFAULT_FILE_PATH_COLUMN = "__path__"
 
 TARGET_BALANCE_LOOKUP_SCHEMA_CSV = """
     column,                dtype,                mandatory,     id
-    lookup_period,         datetime64[ns],       False,         True
+    lookup_period,         string[python],       False,         True
     lookup_accounts,       string[python],       False,         True
     lookup_profit_centers, string[python],       False,         True
     balance,               Float64,              True,         False
