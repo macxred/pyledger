@@ -528,8 +528,8 @@ class LedgerEngine(ABC):
         """
         result = self.account_balances(pd.DataFrame({
             "account": [account], "period": [period], "profit_center": [profit_centers]
-        })).iloc[0]
-        return {"reporting_currency": result["report_balance"].item(), **result["balance"]}
+        }))
+        return {"reporting_currency": result["report_balance"].item(), **result["balance"].item()}
 
     def individual_account_balances(
         self,
@@ -566,7 +566,7 @@ class LedgerEngine(ABC):
         df["profit_center"] = [profit_centers] * len(df)
         balances = self.account_balances(df)
         df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
-        df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"]), axis=1)
+        df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"], 0), axis=1)
 
         return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
 
@@ -1815,7 +1815,7 @@ class LedgerEngine(ABC):
         balances.index = df.index
         df[["actual_balance", "actual_report_balance"]] = balances[["balance", "report_balance"]]
         df["actual_balance"] = df.apply(
-            lambda row: row["actual_balance"].get(row["currency"]), axis=1
+            lambda row: row["actual_balance"].get(row["currency"], 0), axis=1
         )
         return df
 
