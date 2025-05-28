@@ -528,11 +528,12 @@ class LedgerEngine(ABC):
         """
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
-        profit_center = None
         if profit_centers is not None and profit_centers is not pd.NA:
-            profit_center = profit_centers
+            profit_centers = profit_centers
+        else:
+            profit_centers = None
         result = self._account_balance_range(
-            accounts=accounts, start=start, end=end, profit_centers=profit_center
+            accounts=accounts, start=start, end=end, profit_centers=profit_centers
         )
 
         # Type consistent return value Dict[str, float]
@@ -580,7 +581,7 @@ class LedgerEngine(ABC):
         df.reset_index(drop=True, inplace=True)
         balances = self.account_balances(df)
         df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
-        df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"], 0), axis=1)
+        df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"], 0.0), axis=1)
 
         return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
 
