@@ -587,7 +587,8 @@ class LedgerEngine(ABC):
     def account_balances(
         self, df: pd.DataFrame, reporting_currency_only: bool = False
     ) -> pd.DataFrame:
-        """Calculate balances by processing each row specification of the DataFrame.
+        """Calculate account balances from a DataFrame of flexible query specifications,
+        returning a result of the same length with the most efficient method.
 
         Enriches the DataFrame with new column(s):
         - `report_balance`: Balance in the reporting currency.
@@ -601,9 +602,9 @@ class LedgerEngine(ABC):
                 - 'account': An account identifier, list, or range.
                 See `parse_account_range()` for supported formats.
                 - 'period' (optional): A cutoff date or date span.
-                See `parse_date_span()` for accepted formats.
+                See `parse_date_span()` for supported formats.
                 - 'profit_center' (optional): Profit center filter.
-                See `parse_profit_center_range()` for accepted formats.
+                See `parse_profit_center_range()` for supported formats.
             reporting_currency_only (bool, optional): If True, omits the `balance` column
                 and includes only the `report_balance` column. Defaults to False.
 
