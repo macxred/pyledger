@@ -517,7 +517,7 @@ class LedgerEngine(ABC):
                 (January 2024), "2024-Q1" (first quarter 2024), or as a tuple
                 with start and end date. Defaults to None.
             profit_centers (str | dict[str, list[str]] | list[str], optional):
-                Filter for journal entries. See `parse_profit_center_range()`for possible formats.
+                Filter for journal entries. See `parse_profit_centers()`for possible formats.
                 If not None, the result is calculated only from journal entries assigned
                 to the specified profit centers.
 
@@ -530,7 +530,7 @@ class LedgerEngine(ABC):
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
         if profit_centers is not None:
-            profit_centers = self.parse_profit_center_range(profit_centers)
+            profit_centers = self.parse_profit_centers(profit_centers)
             profit_centers = list(set(profit_centers["add"]) - set(profit_centers["subtract"]))
         result = self._account_balance_range(
             accounts=accounts, start=start, end=end, profit_centers=profit_centers
@@ -563,7 +563,7 @@ class LedgerEngine(ABC):
                 for possible values. If a single date, the balance up to that date is returned.
                 If None, the balance is calculated from all available accounting data.
             profit_centers (str | dict[str, list[str]] | list[str], optional):
-                Filter for journal entries. See `parse_profit_center_range()`for possible formats.
+                Filter for journal entries. See `parse_profit_centers()`for possible formats.
                 If not None, the result is calculated only from journal entries assigned
                 to the specified profit centers.
 
@@ -680,7 +680,7 @@ class LedgerEngine(ABC):
                 See `parse_date_span` for details.
             profit_center: (str | dict[str, list[str]] | list[str], optional)
                 Filter for journal entries.
-                See `parse_profit_center_range()`for supported formats.
+                See `parse_profit_centers()`for supported formats.
             drop (bool, optional): If True, drops redundant information:
                 - Columns containing only NA values
                 - The "account" column if a single account is queried
@@ -697,7 +697,7 @@ class LedgerEngine(ABC):
         accounts = self.parse_account_range(account)
         accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
         if profit_centers is not None:
-            profit_centers = self.parse_profit_center_range(profit_centers)
+            profit_centers = self.parse_profit_centers(profit_centers)
             profit_centers = list(set(profit_centers["add"]) - set(profit_centers["subtract"]))
         df = self._fetch_account_history(
             accounts, start=start, end=end, profit_centers=profit_centers
