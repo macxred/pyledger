@@ -494,7 +494,7 @@ class LedgerEngine(ABC):
             result[currency] = result.get(currency, 0) - value
         return result
 
-    def account_balance(
+    def _account_balance(
         self, account: int | str | dict, period: datetime.date | str | int = None,
         profit_centers: list[str] | str = None
     ) -> dict:
@@ -526,10 +526,23 @@ class LedgerEngine(ABC):
                 "reporting_currency". Keys denote currencies and values the
                 balance amounts in each currency.
         """
-        result = self.account_balances(pd.DataFrame({
-            "account": [account], "period": [period], "profit_center": [profit_centers]
-        }))
-        return {"reporting_currency": result["report_balance"].item(), **result["balance"].item()}
+        start, end = parse_date_span(period)
+        accounts = self.parse_account_range(account)
+        profit_center = None
+        if profit_centers is not None and profit_centers is not pd.NA:
+            profit_center = profit_centers
+        result = self._account_balance_range(
+            accounts=accounts, start=start, end=end, profit_centers=profit_center
+        )
+
+        # Type consistent return value Dict[str, float]
+        def _standardize_currency(ticker: str, x: float) -> float:
+            result = float(self.round_to_precision(x, ticker=ticker, date=end))
+            if result == -0.0:
+                result = 0.0
+            return result
+        result = {k: _standardize_currency(k, v) for k, v in result.items()}
+        return result
 
     def individual_account_balances(
         self,
@@ -564,6 +577,7 @@ class LedgerEngine(ABC):
 
         df["period"] = period
         df["profit_center"] = [profit_centers] * len(df)
+        df.reset_index(drop=True, inplace=True)
         balances = self.account_balances(df)
         df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
         df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"], 0), axis=1)
@@ -599,32 +613,18 @@ class LedgerEngine(ABC):
                 - 'balance': Dictionary of currency-wise balances
                 (excluded if `reporting_currency_only` is True).
         """
-        def _calc_balances(row):
-            start, end = parse_date_span(row["period"])
-            accounts = self.parse_account_range(row["account"])
-            profit_centers = None
-            if row["profit_center"] is not None and row["profit_center"] is not pd.NA:
-                profit_centers = row["profit_center"]
-            result = self._account_balance_range(
-                accounts=accounts, start=start, end=end, profit_centers=profit_centers
-            )
+        results = [
+            self._account_balance(account=acct, period=prd, profit_centers=pc)
+            for prd, acct, pc in zip(df["period"], df["account"], df["profit_center"])
+        ]
+        report_balances = [r.pop("reporting_currency", 0.0) for r in results]
+        currency_balances = results
+        output = pd.DataFrame({"report_balance": report_balances})
 
-            # Type consistent return value Dict[str, float]
-            def _standardize_currency(ticker: str, x: float) -> float:
-                result = float(self.round_to_precision(x, ticker=ticker, date=end))
-                if result == -0.0:
-                    result = 0.0
-                return result
-            result = {k: _standardize_currency(k, v) for k, v in result.items()}
-            report_balance = result.get("reporting_currency", 0)
-            result.pop("reporting_currency", None)
-            return pd.Series({"balance": result, "report_balance": report_balance})
+        if not reporting_currency_only:
+            output["balance"] = currency_balances
 
-        result = df.apply(_calc_balances, axis=1)
-        if reporting_currency_only:
-            result.drop(columns="balance", inplace=True)
-
-        return result
+        return output
 
     def aggregate_account_balances(self, df: pd.DataFrame = None, n: int = 1) -> pd.DataFrame:
         """

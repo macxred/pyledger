@@ -168,7 +168,7 @@ class BaseTestAccounts(BaseTest):
             account = row['account']
             expected = row['balance']
             profit_centers = row["profit_center"]
-            actual = restored_engine.account_balance(
+            actual = restored_engine._account_balance(
                 period=period, account=account, profit_centers=profit_centers
             )
             assert expected == actual, (
@@ -184,7 +184,7 @@ class BaseTestAccounts(BaseTest):
             period = row['period']
             account = row['account']
             expected = row['balance']
-            actual = restored_engine.account_balance(period=period, account=account)
+            actual = restored_engine._account_balance(period=period, account=account)
             assert expected == actual, (
                 f"Account balance for {account} on {period} of {actual} differs from {expected}."
             )
