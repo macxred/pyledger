@@ -1893,30 +1893,29 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Profit center
 
-    def parse_profit_centers(
-        self, range: str | dict[str, list[str]] | list[str]
-    ) -> dict:
+    def parse_profit_centers(self, range: str | dict[str, list[str]] | list[str]) -> dict:
         """
-        Convert a profit center range into a standardized format.
+        Parse a profit center expression into a standardized dict with 'add' and 'subtract' keys.
+
+        The input may be a string like "Shop+General-Bakery", a list of profit centers, or a
+        dictionary with 'add' and 'subtract' lists. Invalid profit centers are discarded with
+        a warning.
 
         Args:
-            range (str | dict[str, list[str]] | list[str]): The profit center(s) to be evaluated.
-                - **str**: A string expression including:
-                    - Plus (`+`) to include, e.g., `"Shop+General"`.
-                    - Minus (`-`) to exclude, e.g., `"Shop+General-Bakery"`.
-                - **dict[str, list[int]]**: A dictionary with `"add"` and `"subtract"` keys,
-                    each containing a list of profit centers to be included or excluded.
-                    Same as the return value.
-                - **list[int]**: A list of profit centers to use, same as `"add"` key
-                    in the return value.
+            range (str | dict[str, list[str]] | list[str]): Profit center expression to be parsed.
+                - str: A string expression using '+' to include and '-' to exclude profit centers,
+                  e.g., "Shop+General-Bakery".
+                - list[str]: A list of profit centers to include (equivalent to 'add' only).
+                - dict[str, list[str]]: A dictionary with 'add' and 'subtract' keys.
 
         Returns:
             dict: A dictionary with:
-                - `"add"` (list[str]): Profit centers to include.
-                - `"subtract"` (list[str]): Profit centers to exclude.
+                - 'add' (list[str]): Profit centers to include.
+                - 'subtract' (list[str]): Profit centers to exclude.
 
         Raises:
-            ValueError: If the input format is invalid or contains unrecognized profit centers.
+            ValueError: If the input format is invalid
+                or the result contains no valid profit centers.
         """
         add = []
         subtract = []
