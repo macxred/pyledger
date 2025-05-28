@@ -614,18 +614,17 @@ class LedgerEngine(ABC):
                 - 'balance': Dictionary of currency-wise balances
                 (excluded if `reporting_currency_only` is True).
         """
-        results = [
+        balances = [
             self._account_balance(account=acct, period=prd, profit_centers=pc)
             for prd, acct, pc in zip(df["period"], df["account"], df["profit_center"])
         ]
-        report_balances = [r.pop("reporting_currency", 0.0) for r in results]
-        currency_balances = results
-        output = pd.DataFrame({"report_balance": report_balances})
+        report_balances = [r.pop("reporting_currency", 0.0) for r in balances]
+        result = pd.DataFrame({"report_balance": report_balances})
 
         if not reporting_currency_only:
-            output["balance"] = currency_balances
+            result["balance"] = balances
 
-        return output
+        return result
 
     def aggregate_account_balances(self, df: pd.DataFrame = None, n: int = 1) -> pd.DataFrame:
         """
