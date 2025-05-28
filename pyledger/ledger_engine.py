@@ -1893,7 +1893,7 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Profit center
 
-    def parse_profit_center_range(
+    def parse_profit_centers(
         self, range: str | dict[str, list[str]] | list[str]
     ) -> dict:
         """
@@ -1925,8 +1925,8 @@ class LedgerEngine(ABC):
             if not ("add" in range and "subtract" in range):
                 raise ValueError("Dict must have 'add' and 'subtract' keys.")
             # Ensure values are lists
-            add = list(range.get("add", []))
-            subtract = list(range.get("subtract", []))
+            add = list(range["add"])
+            subtract = list(range["subtract"])
             if not all(isinstance(i, str) for i in add + subtract):
                 raise ValueError("Both 'add' and 'subtract' must contain only strings.")
         elif isinstance(range, list):
@@ -1955,4 +1955,17 @@ class LedgerEngine(ABC):
             )
         if not add and not subtract:
             raise ValueError(f"No profit centers matching '{range}'.")
-        return {"add": add, "subtract": subtract}
+
+        defined = set(self.profit_centers.list()["profit_center"])
+        add_set, subtract_set = set(add), set(subtract)
+        invalid = (add_set | subtract_set) - defined
+        if invalid:
+            self._logger.warning(
+                f"Discarding {len(invalid)} undefined profit centers: "
+                f"{first_elements_as_str(invalid)}."
+            )
+
+        return {
+            "add": list(add_set & defined),
+            "subtract": list(subtract_set & defined),
+        }
