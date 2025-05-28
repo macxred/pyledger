@@ -1,4 +1,4 @@
-"""Test suite for parse_profit_center_range() method."""
+"""Test suite for parse_profit_centers() method."""
 
 from io import StringIO
 import pandas as pd

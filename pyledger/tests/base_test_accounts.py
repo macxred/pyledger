@@ -167,7 +167,7 @@ class BaseTestAccounts(BaseTest):
             period = row['period']
             account = row['account']
             expected = row['balance']
-            profit_centers = row["profit_center"]
+            profit_centers = None if pd.isna(row["profit_center"]) else row["profit_center"]
             actual = restored_engine.account_balance(
                 period=period, account=account, profit_centers=profit_centers
             )
