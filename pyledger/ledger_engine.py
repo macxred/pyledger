@@ -1893,7 +1893,7 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Profit center
 
-    def parse_profit_centers(self, range: str | dict[str, list[str]] | list[str]) -> dict:
+    def parse_profit_centers(self, profit_center: str | dict[str, list[str]] | list[str]) -> dict:
         """
         Parse a profit center expression into a standardized dict with 'add' and 'subtract' keys.
 
@@ -1902,7 +1902,7 @@ class LedgerEngine(ABC):
         a warning.
 
         Args:
-            range (str | dict[str, list[str]] | list[str]): Profit center expression to be parsed.
+            profit_center (str | dict[str, list[str]] | list[str]): Profit center expression.
                 - str: A string expression using '+' to include and '-' to exclude profit centers,
                   e.g., "Shop+General-Bakery".
                 - list[str]: A list of profit centers to include (equivalent to 'add' only).
@@ -1920,21 +1920,21 @@ class LedgerEngine(ABC):
         add = []
         subtract = []
 
-        if isinstance(range, dict):
-            if not ("add" in range and "subtract" in range):
+        if isinstance(profit_center, dict):
+            if not ("add" in profit_center and "subtract" in profit_center):
                 raise ValueError("Dict must have 'add' and 'subtract' keys.")
             # Ensure values are lists
-            add = list(range["add"])
-            subtract = list(range["subtract"])
+            add = list(profit_center["add"])
+            subtract = list(profit_center["subtract"])
             if not all(isinstance(i, str) for i in add + subtract):
                 raise ValueError("Both 'add' and 'subtract' must contain only strings.")
-        elif isinstance(range, list):
-            if not all(isinstance(i, str) for i in range):
+        elif isinstance(profit_center, list):
+            if not all(isinstance(i, str) for i in profit_center):
                 raise ValueError("List elements must all be strings.")
-            add = range
-        elif isinstance(range, str):
+            add = profit_center
+        elif isinstance(profit_center, str):
             is_addition = True
-            for element in re.split(r"(\+|\-)", range.strip()):
+            for element in re.split(r"(\+|\-)", profit_center.strip()):
                 element = element.strip()
                 if element == "":
                     continue
@@ -1950,10 +1950,10 @@ class LedgerEngine(ABC):
                         subtract.append(profit_center)
         else:
             raise ValueError(
-                f"Expecting str, dict, or list for range, not {type(range).__name__}."
+                f"Expecting str, dict, or list as input, not {type(profit_center).__name__}."
             )
         if not add and not subtract:
-            raise ValueError(f"No profit centers matching '{range}'.")
+            raise ValueError(f"No profit centers matching '{profit_center}'.")
 
         defined = set(self.profit_centers.list()["profit_center"])
         add_set, subtract_set = set(add), set(subtract)
