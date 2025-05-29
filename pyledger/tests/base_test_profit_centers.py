@@ -58,8 +58,8 @@ class BaseTestProfitCenters(BaseTest):
         self, engine, error_class=ValueError, error_message="Some ids are not present in the data."
     ):
         with pytest.raises(error_class, match=error_message):
-            engine.profit_centers.delete([{"profit_center": "Bank"}], allow_missing=False)
-        engine.profit_centers.delete([{"profit_center": "Bank"}], allow_missing=True)
+            engine.profit_centers.delete([{"profit_center": "Test"}], allow_missing=False)
+        engine.profit_centers.delete([{"profit_center": "Test"}], allow_missing=True)
 
     def test_mirror_profit_centers(self, engine):
         engine.restore(configuration=self.CONFIGURATION)
