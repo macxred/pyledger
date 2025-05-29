@@ -1889,3 +1889,52 @@ class LedgerEngine(ABC):
                 )
 
         return messages
+
+    # ----------------------------------------------------------------------
+    # Profit center
+
+    def parse_profit_centers(self, profit_center: str | list[str]) -> set[str]:
+        """
+        Parse a profit center expression into a set of valid profit center names.
+
+        The input can be a '+'-separated string (e.g., "Shop+General+Bakery") or a list of names.
+        Any undefined or invalid profit centers are discarded with a warning.
+
+        Args:
+            profit_center (str | list[str]): Profit center input.
+                - str: A string with profit centers separated by '+'.
+                - list[str]: A list of profit center names.
+
+        Returns:
+            set[str]: A set of valid profit center names.
+
+        Raises:
+            ValueError: If the input format is invalid or no valid profit centers are found.
+        """
+        if isinstance(profit_center, list):
+            items = list(profit_center)
+        elif isinstance(profit_center, str):
+            items = [part.strip() for part in profit_center.strip().split("+") if part.strip()]
+        else:
+            raise ValueError(
+                f"Expecting str or list as input, not {type(profit_center).__name__}."
+            )
+
+        if not all(isinstance(i, str) for i in items):
+            raise ValueError("All profit center entries must be strings.")
+
+        defined = set(self.profit_centers.list()["profit_center"])
+        selected = set(items)
+        valid = selected & defined
+        invalid = selected - defined
+
+        if invalid:
+            self._logger.warning(
+                f"Discarding {len(invalid)} undefined profit centers: "
+                f"{first_elements_as_str(invalid)}."
+            )
+
+        if not valid:
+            raise ValueError(f"No valid profit centers found in: {profit_center}")
+
+        return valid
