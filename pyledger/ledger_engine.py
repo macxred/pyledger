@@ -494,7 +494,7 @@ class LedgerEngine(ABC):
             result[currency] = result.get(currency, 0) - value
         return result
 
-    def account_balance(
+    def _account_balance(
         self, account: int | str | dict, period: datetime.date | str | int = None,
         profit_centers: list[str] | str = None
     ) -> dict:
@@ -528,6 +528,10 @@ class LedgerEngine(ABC):
         """
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
+        if profit_centers is not None and profit_centers is not pd.NA:
+            profit_centers = profit_centers
+        else:
+            profit_centers = None
         result = self._account_balance_range(
             accounts=accounts, start=start, end=end, profit_centers=profit_centers
         )
@@ -574,41 +578,53 @@ class LedgerEngine(ABC):
 
         df["period"] = period
         df["profit_center"] = [profit_centers] * len(df)
+        df.reset_index(drop=True, inplace=True)
         balances = self.account_balances(df)
         df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
+        df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"], 0.0), axis=1)
 
         return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
 
-    def account_balances(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate balances in specified and reporting currencies by processing each row
-        specification of the DataFrame.
+    def account_balances(
+        self, df: pd.DataFrame, reporting_currency_only: bool = False
+    ) -> pd.DataFrame:
+        """Calculate account balances from a DataFrame of flexible query specifications,
+        returning a result of the same length with the most efficient method.
 
-        Expects a DataFrame with the following columns:
-        - 'account': A single account, list, or range.
-            See `parse_account_range()` for supported formats.
-        - 'period': (Optional) A cutoff date or period span.
-            See `parse_date_span()` for supported formats.
-        - 'profit_center': (Optional) One or more profit centers to filter journal entries.
-        - 'currency': Currency in which to report the 'balance' field value.
+        Enriches the DataFrame with new column(s):
+        - `report_balance`: Balance in the reporting currency.
+        - `balance`: Dictionary containing the balance of the account(s) in all currencies
+        in which transactions were recorded. Keys denote currencies and values the balance.
+        The absence of a currency is interpreted as a zero balance.
+
+        Args:
+            df (pd.DataFrame): Input DataFrame with rows specifying balance queries.
+                Expected columns include:
+                - 'account': An account identifier, list, or range.
+                See `parse_account_range()` for supported formats.
+                - 'period' (optional): A cutoff date or date span.
+                See `parse_date_span()` for supported formats.
+                - 'profit_center' (optional): Profit center filter.
+                See `parse_profit_center_range()` for supported formats.
+            reporting_currency_only (bool, optional): If True, omits the `balance` column
+                and includes only the `report_balance` column. Defaults to False.
 
         Returns:
-            pd.DataFrame of the same length with two columns:
-            - 'balance': Amount in the specified currency.
-            - 'report_balance': Amount in the reporting currency.
+            pd.DataFrame: A DataFrame of the same length, enriched with:
+                - 'report_balance': Amount in the reporting currency.
+                - 'balance': Dictionary of currency-wise balances
+                (excluded if `reporting_currency_only` is True).
         """
-        def _calc_balances(row):
-            profit_centers = None if row["profit_center"] is pd.NA else row["profit_center"]
-            balance = self.account_balance(
-                account=row["account"],
-                period=row["period"],
-                profit_centers=profit_centers
-            )
-            return pd.Series({
-                "balance": balance.get(row.get("currency"), 0),
-                "report_balance": balance.get("reporting_currency", 0)
-            })
+        balances = [
+            self._account_balance(account=acct, period=prd, profit_centers=pc)
+            for prd, acct, pc in zip(df["period"], df["account"], df["profit_center"])
+        ]
+        report_balances = [r.pop("reporting_currency", 0.0) for r in balances]
+        result = pd.DataFrame({"report_balance": report_balances})
 
-        result = df.apply(_calc_balances, axis=1)
+        if not reporting_currency_only:
+            result["balance"] = balances
+
         return result
 
     def aggregate_account_balances(self, df: pd.DataFrame = None, n: int = 1) -> pd.DataFrame:
@@ -1796,13 +1812,13 @@ class LedgerEngine(ABC):
             df = df[df['source'].str.contains(source_pattern, na=False)]
 
         df = self.sanitize_reconciliation(df)
-        balances = self.account_balances(df).rename(columns={
-            "balance": "actual_balance",
-            "report_balance": "actual_report_balance"
-        })
-        result = pd.concat([df.reset_index(drop=True), balances.reset_index(drop=True)], axis=1)
-        result.index = df.index
-        return result
+        balances = self.account_balances(df)
+        balances.index = df.index
+        df[["actual_balance", "actual_report_balance"]] = balances[["balance", "report_balance"]]
+        df["actual_balance"] = df.apply(
+            lambda row: row["actual_balance"].get(row["currency"], 0), axis=1
+        )
+        return df
 
     def reconciliation_summary(self, df: pd.DataFrame) -> list[str]:
         """
