@@ -153,17 +153,22 @@ DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
 DEFAULT_FILE_PATH_COLUMN = "__path__"
 
 
-TARGET_BALANCE_LOOKUP_SCHEMA_CSV = """
-    column,                dtype,                mandatory,     id
-    lookup_period,         string[python],       False,         True
-    lookup_accounts,       string[python],       False,         True
-    lookup_profit_centers, string[python],       False,         True
-    balance,               Float64,              True,         False
+TARGET_BALANCE_SCHEMA_CSV = """
+    column,                dtype,                mandatory,       id
+    id,                    string[python],       False,         True
+    date,                  datetime64[ns],       True,          True
+    account,               Int64,                True,          True
+    contra,                Int64,                False,         True
+    currency,              string[python],       True,         False
+    tax_code,              string[python],       False,        False
+    profit_center,         string[python],       False,         True
+    description,           string[python],       True,         False
+    document,              string[python],       False,        False
+    lookup_period,         string[python],       False,        False
+    lookup_accounts,       string[python],       False,        False
+    lookup_profit_centers, string[python],       False,        False
+    balance,               Float64,              True,         True
 """
-TARGET_BALANCE_LOOKUP_SCHEMA = pd.read_csv(
-    StringIO(TARGET_BALANCE_LOOKUP_SCHEMA_CSV), skipinitialspace=True
+TARGET_BALANCE_SCHEMA = pd.read_csv(
+    StringIO(TARGET_BALANCE_SCHEMA_CSV), skipinitialspace=True
 )
-TARGET_BALANCE_SCHEMA = pd.concat([
-    TARGET_BALANCE_LOOKUP_SCHEMA,
-    JOURNAL_SCHEMA.query("column not in['amount', 'report_amount']")
-])
