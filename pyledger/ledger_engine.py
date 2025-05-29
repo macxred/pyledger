@@ -1893,78 +1893,48 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Profit center
 
-    def parse_profit_centers(self, profit_center: str | dict[str, list[str]] | list[str]) -> dict:
+    def parse_profit_centers(self, profit_center: str | list[str]) -> set[str]:
         """
-        Parse a profit center expression into a standardized dict with 'add' and 'subtract' keys.
+        Parse a profit center expression into a set of valid profit center names.
 
-        The input may be a string like "Shop+General-Bakery", a list of profit centers, or a
-        dictionary with 'add' and 'subtract' lists. Invalid profit centers are discarded with
-        a warning.
+        The input can be a '+'-separated string (e.g., "Shop+General+Bakery") or a list of names.
+        Any undefined or invalid profit centers are discarded with a warning.
 
         Args:
-            profit_center (str | dict[str, list[str]] | list[str]): Profit center expression.
-                - str: A string expression using '+' to include and '-' to exclude profit centers,
-                  e.g., "Shop+General-Bakery".
-                - list[str]: A list of profit centers to include (equivalent to 'add' only).
-                - dict[str, list[str]]: A dictionary with 'add' and 'subtract' keys.
+            profit_center (str | list[str]): Profit center input.
+                - str: A string with profit centers separated by '+'.
+                - list[str]: A list of profit center names.
 
         Returns:
-            dict: A dictionary with:
-                - 'add' (list[str]): Profit centers to include.
-                - 'subtract' (list[str]): Profit centers to exclude.
+            set[str]: A set of valid profit center names.
 
         Raises:
-            ValueError: If the input format is invalid
-                or the result contains no valid profit centers.
+            ValueError: If the input format is invalid or no valid profit centers are found.
         """
-        add = []
-        subtract = []
-
-        if isinstance(profit_center, dict):
-            if not ("add" in profit_center and "subtract" in profit_center):
-                raise ValueError("Dict must have 'add' and 'subtract' keys.")
-            # Ensure values are lists
-            add = list(profit_center["add"])
-            subtract = list(profit_center["subtract"])
-            if not all(isinstance(i, str) for i in add + subtract):
-                raise ValueError("Both 'add' and 'subtract' must contain only strings.")
-        elif isinstance(profit_center, list):
-            if not all(isinstance(i, str) for i in profit_center):
-                raise ValueError("List elements must all be strings.")
-            add = profit_center
+        if isinstance(profit_center, list):
+            items = list(profit_center)
         elif isinstance(profit_center, str):
-            is_addition = True
-            for element in re.split(r"(\+|\-)", profit_center.strip()):
-                element = element.strip()
-                if element == "":
-                    continue
-                elif element == "+":
-                    is_addition = True
-                elif element == "-":
-                    is_addition = False
-                else:
-                    profit_center = element
-                    if is_addition:
-                        add.append(profit_center)
-                    else:
-                        subtract.append(profit_center)
+            items = [part.strip() for part in profit_center.strip().split("+") if part.strip()]
         else:
             raise ValueError(
-                f"Expecting str, dict, or list as input, not {type(profit_center).__name__}."
+                f"Expecting str or list as input, not {type(profit_center).__name__}."
             )
-        if not add and not subtract:
-            raise ValueError(f"No profit centers matching '{profit_center}'.")
+
+        if not all(isinstance(i, str) for i in items):
+            raise ValueError("All profit center entries must be strings.")
 
         defined = set(self.profit_centers.list()["profit_center"])
-        add_set, subtract_set = set(add), set(subtract)
-        invalid = (add_set | subtract_set) - defined
+        selected = set(items)
+        valid = selected & defined
+        invalid = selected - defined
+
         if invalid:
             self._logger.warning(
                 f"Discarding {len(invalid)} undefined profit centers: "
                 f"{first_elements_as_str(invalid)}."
             )
 
-        return {
-            "add": list(add_set & defined),
-            "subtract": list(subtract_set & defined),
-        }
+        if not valid:
+            raise ValueError(f"No valid profit centers found in: {profit_center}")
+
+        return valid

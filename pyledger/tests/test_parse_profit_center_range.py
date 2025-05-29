@@ -1,4 +1,4 @@
-"""Test suite for parse_profit_center_range() method."""
+"""Test suite for parse_profit_centers() method."""
 
 from io import StringIO
 import pandas as pd
@@ -22,15 +22,10 @@ def engine():
 @pytest.mark.parametrize(
     "input_value, expected_output",
     [
-        ("Shop", {"add": ["Shop"], "subtract": []}),
-        (["Shop", "General"], {"add": ["General", "Shop"], "subtract": []}),
-        ({"add": ["Shop"], "subtract": ["General"]}, {"add": ["Shop"], "subtract": ["General"]}),
-        ("Shop+General", {"add": ["General", "Shop"], "subtract": []}),
-        ("Shop+General+Bakery", {"add": ["General", "Shop"], "subtract": []}),
-        ("Shop+General-Bakery", {"add": ["General", "Shop"], "subtract": []}),
-        ("-General", {"add": [], "subtract": ["General"]}),
-        ("-General-Bakery", {"add": [], "subtract": ["General"]}),
-        ("-Bakery+Shop", {"add": ["Shop"], "subtract": []}),
+        ("Shop", {"Shop"}),
+        (["Shop", "General"], {"Shop", "General"}),
+        ("Shop+General", {"Shop", "General"}),
+        ("Shop+General+Bakery", {"Shop", "General"}),  # 'Bakery' discarded
     ]
 )
 def test_parse_profit_centers_valid_inputs(input_value, expected_output, engine):
@@ -40,16 +35,14 @@ def test_parse_profit_centers_valid_inputs(input_value, expected_output, engine)
 @pytest.mark.parametrize(
     "invalid_input",
     [
-        {"add": ["Shop", 123], "subtract": ["General"]},  # Non-str in list
-        {"add": ["Shop"]},                                # Missing 'subtract'
-        {"subtract": ["General"]},                        # Missing 'add'
-        ["Shop", 123],                                    # Non-str in list
+        {"add": ["Shop", 123]},  # dicts no longer allowed
+        {"subtract": ["General"]},
+        ["Shop", 123],           # Non-str in list
         123,
         3.14,
         None,
-        "",                                               # Empty string
-        [],                                               # Empty list
-        {"add": [], "subtract": []},                      # Empty dict
+        "",                      # Empty string
+        [],                      # Empty list
     ]
 )
 def test_parse_profit_centers_invalid_inputs(invalid_input, engine):
@@ -58,8 +51,8 @@ def test_parse_profit_centers_invalid_inputs(invalid_input, engine):
 
 
 def test_parse_profit_centers_discarded_warns(engine, caplog):
-    input_value = "Shop+Unknown1+Unknown2-General-Unknown3"
-    expected = {"add": ["Shop"], "subtract": ["General"]}
+    input_value = "Shop+Unknown1+Unknown2"
+    expected = {"Shop"}
     output = engine.parse_profit_centers(input_value)
     assert output == expected
 
