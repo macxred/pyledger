@@ -1943,17 +1943,18 @@ class LedgerEngine(ABC):
     # Target Balance
 
     def sanitize_target_balance(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard invalid or incoherent target balance entries.
+        """Discard incoherent target balance data.
 
         This method applies the following validation rules:
-        1. The `balance` column must not be NA, otherwise discard row.
-        2. If `lookup_period` if cannot be parsed via `parse_date_span()`, discard row.
-        3. If `lookup_accounts` if cannot resolve to at least one account
-        via `account_range()`, discard row.
-        4. If `lookup_profit_centers` is not resolving to at least one profit center,
-        discard row.
-        5. Any row is discarded if it violates journal-level integrity rules
-        (see `sanitize_journal()`), except rules involving `amount` and `report_amount` columns.
+        1. The `balance` column must not be NA, otherwise discard the row.
+        2. `lookup_period` should follow formats supported by `parse_date_span()`,
+            otherwise discard the row.
+        3. `lookup_accounts` should follow the format of `parse_account_range()`,
+            otherwise discard the row.
+        4. `lookup_profit_centers` must reference valid profit centers,
+            otherwise discard the row.
+        5. Discard any row that violates journal-level integrity rules
+            (see `sanitize_journal()`), except for rules involving `amount` and `report_amount`.
 
         A warning is logged for each dropped entry with the specific reason.
 
