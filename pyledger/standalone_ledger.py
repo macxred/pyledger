@@ -180,10 +180,114 @@ class StandaloneLedger(LedgerEngine):
         # Add ledger entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
-        # Add ledger entries for (currency or other) revaluations
+        corrections = self.correcting_entries(df)
+        if not corrections.empty:
+            df = pd.concat([df, corrections], ignore_index=True)
+
+        return df
+
+    def correcting_entries(self, ledger: pd.DataFrame) -> pd.DataFrame:
+        """Compute all ledger correction entries (target balances and revaluations),
+        in historical order. Target balances are applied before revaluations on same date.
+
+        Args:
+            ledger (pd.DataFrame): The initial ledger.
+
+        Returns:
+            pd.DataFrame: Correction entries to append to the ledger.
+        """
         revaluations = self.sanitize_revaluations(self.revaluations.list())
-        revalue = self.revaluation_entries(ledger=df, revaluations=revaluations)
-        return pd.concat([df, revalue], ignore_index=True)
+        target_balances = self.sanitize_target_balance(self.target_balance.list())
+        dates = pd.Series(
+            list(revaluations["date"]) + list(target_balances["date"])
+        ).dropna().drop_duplicates().sort_values()
+        result = []
+
+        for date in dates:
+            combined = pd.concat([ledger] + result)
+
+            # Calculate target balance entries
+            target_balance_rows = target_balances.query("date == @date")
+            if not target_balance_rows.empty:
+                target_balance_entries = self.target_balance_entries(
+                    ledger=combined,
+                    target_balance=target_balance_rows,
+                )
+                result.append(target_balance_entries)
+            else:
+                target_balance_entries = None
+
+            # Calculate revaluation entries
+            revaluation_rows = revaluations.query("date == @date")
+            if not revaluation_rows.empty:
+                revaluation_ledger = (
+                    pd.concat([combined, target_balance_entries])
+                    if target_balance_entries is not None else combined
+                )
+                revaluation_entries = self.revaluation_entries(
+                    ledger=revaluation_ledger,
+                    revaluations=revaluation_rows,
+                )
+                result.append(revaluation_entries)
+
+        return (
+            pd.concat(result, ignore_index=True)
+            if result else pd.DataFrame(columns=ledger.columns)
+        )
+
+    def target_balance_entries(
+        self, ledger: pd.DataFrame, target_balance: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Compute ledger entries to enforce target balances."""
+        result = []
+        reporting_currency = self.reporting_currency
+
+        for row in target_balance.to_dict("records"):
+            entries = self.journal.standardize(pd.DataFrame(result))
+            df = self.serialize_ledger(pd.concat([ledger, entries]))
+            if pd.isna(row["lookup_profit_centers"]):
+                profit_centers = None
+            else:
+                profit_centers = self.parse_profit_centers(row["lookup_profit_centers"])
+            balance = self._account_balance(
+                ledger=df, account=row["lookup_accounts"],
+                period=row["lookup_period"], profit_centers=profit_centers
+            )
+            current = balance.get("reporting_currency", 0.0)
+            delta = row["balance"] - current
+            delta = self.round_to_precision(delta, ticker=reporting_currency, date=row["date"])
+            report_delta = self.report_amount(
+                amount=[delta], currency=[reporting_currency], date=[row["date"]]
+            )[0]
+
+            if delta != 0:
+                entry_id = (
+                    f"target_balance:{row['lookup_period']}:{row['lookup_accounts']}:"
+                    f"{row['lookup_profit_centers']}"
+                )
+                base_entry = {
+                    "id": entry_id,
+                    "date": row["date"],
+                    "currency": reporting_currency,
+                    "description": row["description"],
+                    "document": row["document"],
+                }
+                result.append({
+                    **base_entry,
+                    "account": row["account"],
+                    "contra": row["contra"],
+                    "amount": delta,
+                    "report_amount": report_delta,
+                })
+                result.append({
+                    **base_entry,
+                    "account": row["contra"],
+                    "contra": row["account"],
+                    "amount": delta,
+                    "report_amount": -report_delta,
+                })
+
+        return self.journal.standardize(pd.DataFrame(result))
 
     def revaluation_entries(
         self, ledger: pd.DataFrame, revaluations: pd.DataFrame
