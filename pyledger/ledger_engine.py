@@ -443,7 +443,6 @@ class LedgerEngine(ABC):
             raise ValueError(f"Account {account} is not defined.")
         return accounts.loc[accounts["account"] == account, "currency"].values[0]
 
-    @abstractmethod
     def _single_account_balance(
         self, account: int, profit_centers: list[str] | str = None,
         start: datetime.date = None, end: datetime.date = None,
