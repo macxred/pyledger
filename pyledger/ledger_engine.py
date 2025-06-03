@@ -1893,17 +1893,18 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Profit center
 
-    def parse_profit_centers(self, profit_center: str | list[str]) -> set[str]:
+    def parse_profit_centers(self, profit_center: str | list[str] | set[str]) -> set[str]:
         """
         Parse a profit center expression into a set of valid profit center names.
 
-        The input can be a '+'-separated string (e.g., "Shop+General+Bakery") or a list of names.
-        Any undefined or invalid profit centers are discarded with a warning.
+        The input can be a '+'-separated string (e.g., "Shop+General+Bakery"),
+        a list of names, or a set of names. Any undefined or invalid profit
+        centers are discarded with a warning.
 
         Args:
-            profit_center (str | list[str]): Profit center input.
+            profit_center (str | list[str] | set[str]): Profit center input.
                 - str: A string with profit centers separated by '+'.
-                - list[str]: A list of profit center names.
+                - list[str] or set[str]: A collection of profit center names.
 
         Returns:
             set[str]: A set of valid profit center names.
@@ -1911,22 +1912,21 @@ class LedgerEngine(ABC):
         Raises:
             ValueError: If the input format is invalid or no valid profit centers are found.
         """
-        if isinstance(profit_center, list):
-            items = list(profit_center)
+        if isinstance(profit_center, (list, set)):
+            items = set(profit_center)
         elif isinstance(profit_center, str):
-            items = [part.strip() for part in profit_center.strip().split("+") if part.strip()]
+            items = set(part.strip() for part in profit_center.strip().split("+") if part.strip())
         else:
             raise ValueError(
-                f"Expecting str or list as input, not {type(profit_center).__name__}."
+                f"Expecting str, list, or set as input, not {type(profit_center).__name__}."
             )
 
         if not all(isinstance(i, str) for i in items):
             raise ValueError("All profit center entries must be strings.")
 
         defined = set(self.profit_centers.list()["profit_center"])
-        selected = set(items)
-        valid = selected & defined
-        invalid = selected - defined
+        valid = items & defined
+        invalid = items - defined
 
         if invalid:
             self._logger.warning(

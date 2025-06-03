@@ -1,6 +1,5 @@
 """Test suite for parse_profit_centers() method."""
 
-from io import StringIO
 import pandas as pd
 import pytest
 from pyledger import MemoryLedger
@@ -8,12 +7,7 @@ from pyledger import MemoryLedger
 
 @pytest.fixture
 def engine():
-    PROFIT_CENTERS_CSV = """
-        profit_center,
-            Shop,
-            General,
-    """
-    profit_centers = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
+    profit_centers = pd.DataFrame({"profit_center": ["Shop", "General"]})
     engine = MemoryLedger()
     engine.restore(profit_centers=profit_centers)
     return engine
@@ -24,6 +18,7 @@ def engine():
     [
         ("Shop", {"Shop"}),
         (["Shop", "General"], {"Shop", "General"}),
+        ({"Shop", "General"}, {"Shop", "General"}),  # set input
         ("Shop+General", {"Shop", "General"}),
         ("Shop+General+Bakery", {"Shop", "General"}),  # 'Bakery' discarded
     ]
@@ -35,9 +30,8 @@ def test_parse_profit_centers_valid_inputs(input_value, expected_output, engine)
 @pytest.mark.parametrize(
     "invalid_input",
     [
-        {"add": ["Shop", 123]},  # dicts no longer allowed
-        {"subtract": ["General"]},
         ["Shop", 123],           # Non-str in list
+        {"Shop", 123},           # Non-str in set
         123,
         3.14,
         None,
