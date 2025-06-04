@@ -183,15 +183,59 @@ class StandaloneLedger(LedgerEngine):
         # Add ledger entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
-        # Add ledger entries for (currency or other) revaluations
+        corrections = self.correcting_entries(df)
+        return pd.concat([df, corrections], ignore_index=True)
+
+    def correcting_entries(self, ledger: pd.DataFrame) -> pd.DataFrame:
+        """Compute all ledger correction entries (target balances and revaluations),
+        in historical order. Target balances are applied before revaluations on same date.
+
+        Args:
+            ledger (pd.DataFrame): The initial ledger.
+
+        Returns:
+            pd.DataFrame: Correction entries to append to the ledger.
+        """
         revaluations = self.sanitize_revaluations(self.revaluations.list())
-        revalue = self.revaluation_entries(ledger=df, revaluations=revaluations)
-        df = pd.concat([df, revalue], ignore_index=True)
-        target_balance = self.sanitize_target_balance(self.target_balance.list())
-        target_balance_entries = self.target_balance_entries(
-            ledger=df, target_balance=target_balance
+        target_balances = self.sanitize_target_balance(self.target_balance.list())
+
+        dates = pd.Series(
+            list(revaluations["date"]) + list(target_balances["date"])
+        ).dropna().drop_duplicates().sort_values()
+
+        result = []
+
+        for date in dates:
+            combined = pd.concat([ledger] + result)
+
+            # Calculate target balance entries
+            tb_rows = target_balances.query("date == @date")
+            if not tb_rows.empty:
+                tb_entries = self.target_balance_entries(
+                    ledger=combined,
+                    target_balance=tb_rows,
+                )
+                result.append(tb_entries)
+            else:
+                tb_entries = None
+
+            # Calculate revaluation entries
+            reval_rows = revaluations.query("date == @date")
+            if not reval_rows.empty:
+                reval_ledger = (
+                    pd.concat([combined, tb_entries])
+                    if tb_entries is not None else combined
+                )
+                reval_entries = self.revaluation_entries(
+                    ledger=reval_ledger,
+                    revaluations=reval_rows,
+                )
+                result.append(reval_entries)
+
+        return (
+            pd.concat(result, ignore_index=True)
+            if result else pd.DataFrame(columns=ledger.columns)
         )
-        return pd.concat([df, target_balance_entries], ignore_index=True)
 
     def target_balance_entries(
         self, ledger: pd.DataFrame, target_balance: pd.DataFrame
