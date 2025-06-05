@@ -83,9 +83,9 @@ JOURNAL_CSV = """
     23,           ,    1010,       ,      EUR,    97750.00,     100000.00,         ,       General, Convert USD to EUR and CHF,
     23,           ,    1025,       ,      CHF, 14285714.29,     100000.00,         ,       General, Convert USD to EUR and CHF,
     24, 2024-07-01,    4001,       ,      EUR,      166.67,        178.47,         ,          Shop, Shop sale,
-    24, 2024-07-01,    4001,       ,      EUR,       23.81,         25.50,         ,          Shop, Shop sale,
-    24, 2024-07-01,    2200,       ,      EUR,     -166.67,       -178.47,         ,          Shop, Shop sale,
-    24, 2024-07-01,    2200,       ,      EUR,      -23.81,        -25.50,         ,          Shop, Shop sale,
+    24,           ,    4001,       ,      EUR,       23.81,         25.50,         ,          Shop, Shop sale,
+    24,           ,    2200,       ,      EUR,     -166.67,       -178.47,         ,          Shop, Shop sale,
+    24,           ,    2200,       ,      EUR,      -23.81,        -25.50,         ,          Shop, Shop sale,
 """
 JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
 # flake8: enable
