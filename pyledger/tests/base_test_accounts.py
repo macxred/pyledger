@@ -162,6 +162,7 @@ class BaseTestAccounts(BaseTest):
             journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
+        restored_engine.target_balance.mirror(self.TARGET_BALANCE, delete=True)
         # Test account balance with specified profit centers
         for _, row in self.EXPECTED_BALANCE.iterrows():
             period = row['period']
@@ -195,6 +196,7 @@ class BaseTestAccounts(BaseTest):
             journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
+        restored_engine.target_balance.mirror(self.TARGET_BALANCE, delete=True)
 
         # Extract unique test cases
         df = self.EXPECTED_BALANCES.copy()
