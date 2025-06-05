@@ -184,7 +184,10 @@ class StandaloneLedger(LedgerEngine):
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
         corrections = self.correcting_entries(df)
-        return pd.concat([df, corrections], ignore_index=True)
+        if not corrections.empty:
+            df = pd.concat([df, corrections], ignore_index=True)
+
+        return df
 
     def correcting_entries(self, ledger: pd.DataFrame) -> pd.DataFrame:
         """Compute all ledger correction entries (target balances and revaluations),
@@ -259,6 +262,9 @@ class StandaloneLedger(LedgerEngine):
             current = balance.get("reporting_currency", 0.0)
             delta = row["balance"] - current
             delta = self.round_to_precision(delta, ticker=reporting_currency, date=row["date"])
+            report_delta = self.report_amount(
+                amount=[delta], currency=[reporting_currency], date=[row["date"]]
+            )[0]
 
             if delta != 0:
                 entry_id = (
@@ -277,15 +283,15 @@ class StandaloneLedger(LedgerEngine):
                     **base_entry,
                     "account": row["account"],
                     "contra": row["contra"],
-                    "amount": 0,
-                    "report_amount": delta,
+                    "amount": delta,
+                    "report_amount": report_delta,
                 })
                 result.append({
                     **base_entry,
                     "account": row["contra"],
                     "contra": row["account"],
                     "amount": delta,
-                    "report_amount": -delta,
+                    "report_amount": -report_delta,
                 })
 
         return self.journal.standardize(pd.DataFrame(result))
