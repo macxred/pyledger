@@ -158,7 +158,7 @@ class StandaloneLedger(LedgerEngine):
         start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
         return self._balance_from_serialized_ledger(
-            self.serialized_ledger(), account=account, profit_centers=profit_centers,
+            self.serialized_ledger(), accounts=account, profit_centers=profit_centers,
             start=start, end=end,
         )
 
@@ -354,14 +354,15 @@ class StandaloneLedger(LedgerEngine):
         return self.journal.standardize(pd.DataFrame(result))
 
     def _balance_from_serialized_ledger(
-        self, ledger: pd.DataFrame, account: int, profit_centers: list[str] | str = None,
-        start: datetime.date = None, end: datetime.date = None,
+        self, ledger: pd.DataFrame, accounts: int | list[int] | set[int] = None,
+        profit_centers: list[str] | str = None, start: datetime.date = None,
+        end: datetime.date = None,
     ) -> dict:
         """Compute balance from serialized ledger.
 
         Args:
             ledger (DataFrame): General ledger in long format following JOURNAL_SCHEMA.
-            account (int): The account number.
+            accounts (int | list[int] | set[int]): The account number(s) can be int or list of ints.
             date (datetime.date, optional): The date up to which the balance is computed.
                                             Defaults to None.
             profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
@@ -371,8 +372,11 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             dict: Dictionary containing the balance of the account in various currencies.
         """
-        # TODO: allow for multiple accounts
-        rows = ledger["account"] == int(account)
+        if isinstance(accounts, int):
+            accounts = [accounts]
+        if isinstance(accounts, set):
+            accounts = list(accounts)
+        rows = ledger["account"].isin(accounts)
         if profit_centers is not None:
             if isinstance(profit_centers, str):
                 profit_centers = [profit_centers]
@@ -387,25 +391,26 @@ class StandaloneLedger(LedgerEngine):
             rows = rows & (ledger["date"] >= pd.Timestamp(start))
         if end is not None:
             rows = rows & (ledger["date"] <= pd.Timestamp(end))
-        cols = ["amount", "report_amount", "currency"]
+        cols = ["amount", "report_amount", "currency", "account"]
         if rows.sum() == 0:
             result = {"reporting_currency": 0.0}
-            currency = self.account_currency(account)
-            if currency is not None:
-                result[currency] = 0.0
+            for acc in accounts:
+                currency = self.account_currency(acc)
+                if currency is not None:
+                    result[currency] = result.get(currency, 0.0)
         else:
             sub = ledger.loc[rows, cols]
             report_amount = sub["report_amount"].sum()
-            account_currency = self.account_currency(account)
-            if pd.isna(account_currency):
-                amount = sub.groupby("currency").agg({"amount": "sum"})
-                amount = {currency: amount
-                          for currency, amount in zip(amount.index, amount["amount"])}
-            elif account_currency == self.reporting_currency:
-                amount = {self.reporting_currency: report_amount}
-            elif not all(sub["currency"] == account_currency):
-                raise ValueError(f"Unexpected currencies in transactions for account {account}.")
-            else:
-                amount = {account_currency: sub["amount"].sum()}
-            result = {"reporting_currency": report_amount} | amount
+            result = {"reporting_currency": report_amount}
+            for acc, group in sub.groupby("account"):
+                account_currency = self.account_currency(acc)
+                if pd.isna(account_currency):
+                    amounts = group.groupby("currency")["amount"].sum()
+                    for currency, amount in amounts.items():
+                        result[currency] = result.get(currency, 0.0) + amount
+                elif account_currency == self.reporting_currency:
+                    result[self.reporting_currency] = result.get(self.reporting_currency, 0.0)
+                else:
+                    amount = group["amount"].sum()
+                    result[account_currency] = result.get(account_currency, 0.0) + amount
         return result
