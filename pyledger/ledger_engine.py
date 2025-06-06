@@ -2028,8 +2028,7 @@ class LedgerEngine(ABC):
                 return True
             try:
                 accounts = self.parse_account_range(val)
-                accounts = set(accounts["add"]) | set(accounts["subtract"])
-                return len(accounts) == 0
+                return (len(accounts["add"]) == 0) and (len(accounts["subtract"]) == 0)
             except Exception:
                 return True
 
