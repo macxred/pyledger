@@ -162,34 +162,21 @@ class BaseTestAccounts(BaseTest):
             journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
             revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
         )
+        columns_to_drop = ["period", "account", "profit_center"]
+
         # Test account balance with specified profit centers
-        for _, row in self.EXPECTED_BALANCE.iterrows():
-            period = row['period']
-            account = row['account']
-            expected = row['balance']
-            profit_centers = row["profit_center"]
-            actual = restored_engine._account_balance(
-                period=period, account=account, profit_centers=profit_centers
-            )
-            assert expected == actual, (
-                f"Account balance for {account} on {period} with "
-                f"{profit_centers} profit centers of {actual} differs from {expected}."
-            )
+        expected_with_pc = self.EXPECTED_BALANCES.query("profit_center.notna()")
+        balances = restored_engine.account_balances(expected_with_pc)
+        expected_with_pc = expected_with_pc.drop(columns=columns_to_drop)
+        assert_frame_equal(balances, expected_with_pc, ignore_index=True, check_like=True)
 
         # Test account balance without specified profit centers
-        JOURNAL = self.JOURNAL.copy().assign(profit_center=pd.NA)
-        restored_engine.restore(profit_centers=[], journal=JOURNAL)
-        EXPECTED_BALANCE_NO_PROFIT_CENTERS = self.EXPECTED_BALANCE.query("profit_center.isna()")
-        for _, row in EXPECTED_BALANCE_NO_PROFIT_CENTERS.iterrows():
-            period = row['period']
-            account = row['account']
-            expected = row['balance']
-            actual = restored_engine._account_balance(period=period, account=account)
-            assert expected == actual, (
-                f"Account balance for {account} on {period} of {actual} differs from {expected}."
-            )
+        expected_without_pc = self.EXPECTED_BALANCES.query("profit_center.isna()")
+        balances = restored_engine.account_balances(expected_without_pc)
+        expected_without_pc = expected_without_pc.drop(columns=columns_to_drop)
+        assert_frame_equal(balances, expected_without_pc, ignore_index=True, check_like=True)
 
-    def test_account_balances(self, restored_engine):
+    def test_individual_account_balances(self, restored_engine):
         restored_engine.restore(
             accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
             journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
@@ -197,7 +184,7 @@ class BaseTestAccounts(BaseTest):
         )
 
         # Extract unique test cases
-        df = self.EXPECTED_BALANCES.copy()
+        df = self.EXPECTED_INDIVIDUAL_BALANCES.copy()
         argument_cols = ["period", "accounts", "profit_center"]
         df[argument_cols] = df[argument_cols].ffill()
         cases = df.drop_duplicates(subset=argument_cols).sort_values("period")

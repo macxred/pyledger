@@ -155,46 +155,43 @@ RECONCILIATION_CSV = """
 RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
 
 # flake8: noqa: E501
-EXPECTED_BALANCE_CSV = """
-    period,       account,            profit_center, balance
-    2023-12-31, 1000:9999,                         , "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-01-01, 1000:9999,                         , "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-01-01, 1000:1999,                         , "{reporting_currency: 1098332.82, USD:   800000.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-01-01,      1000,                         , "{reporting_currency:  800000.00, USD:   800000.00}"
-    2024-01-01,      1010,                         , "{reporting_currency:     132.82, EUR:      120.00}"
-    2024-01-01,      1020,                         , "{reporting_currency:  298200.00, JPY: 42000000.00}"
-    2024-01-23,      1000,                         , "{reporting_currency:  800000.00, USD:   800000.00}"
-    2024-01-23,      2200,                         , "{reporting_currency:       0.00, USD:        0.00}"
-    2024-01-24,      1000,                         , "{reporting_currency:  801200.00, USD:   801200.00}"
-    2024-01-24,      2200,                         , "{reporting_currency:    -200.00, USD:     -200.00}"
-    2024-03-30, 1000:1999,                         , "{reporting_currency: 1099532.82, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-03-31, 1000:1999,                         , "{reporting_currency: 1078529.53, USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-03-31,      7050,                         , "{reporting_currency:   21003.29, USD:    21003.29}"
-    2024-03-31,      8050,                         , "{reporting_currency:       0.00, USD:        0.00}"
-    2024-12-31,      4001,                         , "{reporting_currency:   -1198.26, EUR:    -1119.04}"
-    2024-Q4,    1000:1999,                         , "{reporting_currency: 11655605.63,USD: 300000.0, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
-    2024,       1000:1999,                         , "{reporting_currency: 12756779.54,USD: 1076572.64, EUR: 10026667.1, JPY: 54345678.0, CHF: 14285714.3}"
-    2024-08,    1000:1999,                         , "{reporting_currency: -700.0, USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2023-12-31, 1000:9999,                "General", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2023-12-31, 1000:9999,    "General, Shop, Cafe", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-01-01, 1000:9999,                "General", "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-01-01, 1000:9999,    "General, Shop, Cafe", "{reporting_currency: 0.0, USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-01-01, 1000:9999,                   "Cafe", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-01-23,      1000,                "General", "{reporting_currency: 800000.0, USD: 800000.0}"
-    2024-01-23,      1000,  "General, Shop, Bakery", "{reporting_currency: 800000.0, USD: 800000.0}"
-    2024-01-24,      1000,  "General, Shop, Bakery", "{reporting_currency: 801200.0, USD: 801200.0}"
-    2024-01-24,      2200,  "General, Shop, Bakery", "{reporting_currency:  -200.00, USD: -200.00}"
-    2024-03-31, 1000:1999,  "General, Shop, Bakery", "{reporting_currency: 1099532.82, USD: 801200.0, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-03-31, 1000:1999,             "Restaurant", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-12-31, 1000:9999,             "Restaurant", "{reporting_currency: 0.0, USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-12-31, 1000:9999,    "General, Restaurant", "{reporting_currency: 0.0, USD: -498332.82, EUR: 27078.22, JPY: 54345678.0, CHF: 14285714.3}"
-"""
-EXPECTED_BALANCE = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), skipinitialspace=True)
-EXPECTED_BALANCE["balance"] = (EXPECTED_BALANCE["balance"]
-                               .str.replace(r'(\w+):', r'"\1":', regex=True)
-                               .apply(json.loads))
-
 EXPECTED_BALANCES_CSV = """
+    period,       account,            profit_center, report_balance,   balance
+    2023-12-31, 1000:9999,                         ,            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-01-01, 1000:9999,                         ,            0.0,   "{USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-01-01, 1000:1999,                         ,     1098332.82,   "{USD:   800000.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-01-01,      1000,                         ,      800000.00,   "{USD:   800000.00}"
+    2024-01-01,      1010,                         ,         132.82,   "{EUR:      120.00}"
+    2024-01-01,      1020,                         ,      298200.00,   "{JPY: 42000000.00}"
+    2024-01-23,      1000,                         ,      800000.00,   "{USD:   800000.00}"
+    2024-01-23,      2200,                         ,           0.00,   "{USD:        0.00}"
+    2024-01-24,      1000,                         ,      801200.00,   "{USD:   801200.00}"
+    2024-01-24,      2200,                         ,        -200.00,   "{USD:     -200.00}"
+    2024-03-30, 1000:1999,                         ,     1099532.82,   "{USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-03-31, 1000:1999,                         ,     1078529.53,   "{USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-03-31,      7050,                         ,       21003.29,   "{USD:    21003.29}"
+    2024-03-31,      8050,                         ,           0.00,   "{USD:        0.00}"
+    2024-12-31,      4001,                         ,       -1198.26,   "{EUR:    -1119.04}"
+    2024-Q4,    1000:1999,                         ,    11655605.63,   "{USD: 300000.0, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
+    2024,       1000:1999,                         ,    12756779.54,   "{USD: 1076572.64, EUR: 10026667.1, JPY: 54345678.0, CHF: 14285714.3}"
+    2024-08,    1000:1999,                         ,         -700.0,   "{USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2023-12-31, 1000:9999,                "General",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2023-12-31, 1000:9999,    "General, Shop, Cafe",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-01-01, 1000:9999,                "General",            0.0,   "{USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-01-01, 1000:9999,    "General, Shop, Cafe",            0.0,   "{USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-01-01, 1000:9999,                   "Cafe",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-01-23,      1000,                "General",       800000.0,   "{USD: 800000.0}"
+    2024-01-23,      1000,  "General, Shop, Bakery",       800000.0,   "{USD: 800000.0}"
+    2024-01-24,      1000,  "General, Shop, Bakery",       801200.0,   "{USD: 801200.0}"
+    2024-01-24,      2200,  "General, Shop, Bakery",        -200.00,   "{USD: -200.00}"
+    2024-03-31, 1000:1999,  "General, Shop, Bakery",     1099532.82,   "{USD: 801200.0, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
+    2024-03-31, 1000:1999,             "Restaurant",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-12-31, 1000:9999,             "Restaurant",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-12-31, 1000:9999,    "General, Restaurant",            0.0,   "{USD: -498332.82, EUR: 27078.22, JPY: 54345678.0, CHF: 14285714.3}"
+"""
+EXPECTED_BALANCES = pd.read_csv(StringIO(EXPECTED_BALANCES_CSV), skipinitialspace=True)
+
+EXPECTED_INDIVIDUAL_BALANCES_CSV = """
         period,  accounts,            profit_center,  group,                          description,                 account, currency,     balance, report_balance
     2023-12-31, 1000:1015,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
@@ -248,7 +245,7 @@ EXPECTED_BALANCES_CSV = """
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,        0.00, 0.00
               ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
 """
-EXPECTED_BALANCES = pd.read_csv(StringIO(EXPECTED_BALANCES_CSV), skipinitialspace=True)
+EXPECTED_INDIVIDUAL_BALANCES = pd.read_csv(StringIO(EXPECTED_INDIVIDUAL_BALANCES_CSV), skipinitialspace=True)
 
 EXPECTED_HISTORY = [{
         "period": "2024-04-13", "account": "1000", "profit_centers": None, "drop": True, "account_history":
@@ -428,14 +425,20 @@ EXPECTED_AGGREGATED_BALANCES_CSV = """
     /Revenue/Other,                 Financial,                     -5.55
 """
 EXPECTED_AGGREGATED_BALANCES = pd.read_csv(StringIO(EXPECTED_AGGREGATED_BALANCES_CSV), skipinitialspace=True)
+# flake8: enable
 
 def parse_profit_center(value):
     """Function to split values by commas and convert to list"""
     if pd.isna(value) or value.strip() == "":
         return None
     return [item.strip() for item in value.split(",")]
-EXPECTED_BALANCE["profit_center"] = EXPECTED_BALANCE["profit_center"].apply(parse_profit_center)
-# flake8: enable
+
+def parse_balance_series(balance):
+    """Convert a Series of strings like {USD: 100} into actual Python dictionaries."""
+    return balance.replace(r'(\w+):', r'"\1":', regex=True).apply(json.loads)
+
+EXPECTED_BALANCES["profit_center"] = EXPECTED_BALANCES["profit_center"].apply(parse_profit_center)
+EXPECTED_BALANCES["balance"] = parse_balance_series(EXPECTED_BALANCES["balance"])
 
 class BaseTest(ABC):
     engine = MemoryLedger()
@@ -448,8 +451,8 @@ class BaseTest(ABC):
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
     RECONCILIATION = engine.reconciliation.standardize(RECONCILIATION)
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
-    EXPECTED_BALANCE = EXPECTED_BALANCE
     EXPECTED_BALANCES = EXPECTED_BALANCES
+    EXPECTED_INDIVIDUAL_BALANCES = EXPECTED_INDIVIDUAL_BALANCES
     EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES
     EXPECTED_HISTORY = EXPECTED_HISTORY
     EXPECTED_RECONCILIATION = EXPECTED_RECONCILIATION
