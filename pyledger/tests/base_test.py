@@ -1,7 +1,6 @@
 """Definition of abstract base class for testing."""
 
-import ast
-import re
+import json
 import pandas as pd
 from abc import ABC
 from io import StringIO
@@ -434,15 +433,12 @@ def parse_profit_center(value):
         return None
     return [item.strip() for item in value.split(",")]
 
-def parse_balance(string):
-    """Convert a string of currency mappings into a Python dictionary."""
-    if pd.isna(string):
-        return {}
-    string = re.sub(r"(\b[A-Z]{3}\b):", r"'\1':", string)
-    return ast.literal_eval(string)
+def parse_balance_series(balance):
+    """Convert a Series of strings like {USD: 100} into actual Python dictionaries."""
+    return balance.replace(r'(\w+):', r'"\1":', regex=True).apply(json.loads)
 
 EXPECTED_BALANCES["profit_center"] = EXPECTED_BALANCES["profit_center"].apply(parse_profit_center)
-EXPECTED_BALANCES["balance"] = EXPECTED_BALANCES["balance"].apply(parse_balance)
+EXPECTED_BALANCES["balance"] = parse_balance_series(EXPECTED_BALANCES["balance"])
 
 class BaseTest(ABC):
     engine = MemoryLedger()
