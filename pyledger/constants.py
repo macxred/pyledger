@@ -160,7 +160,6 @@ TARGET_BALANCE_SCHEMA_CSV = """
     account,               Int64,                True,          True
     contra,                Int64,                False,         True
     currency,              string[python],       True,         False
-    tax_code,              string[python],       False,        False
     profit_center,         string[python],       False,         True
     description,           string[python],       True,         False
     document,              string[python],       False,        False

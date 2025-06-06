@@ -1954,7 +1954,8 @@ class LedgerEngine(ABC):
         4. `lookup_profit_centers` must reference valid profit centers,
             otherwise discard the row.
         5. Discard any row that violates journal-level integrity rules
-            (see `sanitize_journal()`), except for rules involving `amount` and `report_amount`.
+            (see `sanitize_journal()`), except for rules involving `tax_code`,
+            `amount`, and `report_amount`.
 
         A warning is logged for each dropped entry with the specific reason.
 
@@ -1972,7 +1973,6 @@ class LedgerEngine(ABC):
         invalid_ids = self._invalid_lookup_period(df, invalid_ids)
         invalid_ids = self._invalid_accounts_range(df, invalid_ids)
         invalid_ids = self._invalid_lookup_profit_centers(df, invalid_ids)
-        self._invalid_tax_codes(df, invalid_ids)
         invalid_ids = self._invalid_accounts(df, invalid_ids)
         precision = self.precision_vectorized(df["currency"], dates=df["date"], allow_missing=True)
         invalid_ids = self._invalid_assets(df, invalid_ids, precision)
