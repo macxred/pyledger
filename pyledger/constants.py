@@ -151,3 +151,23 @@ DEFAULT_ASSETS = enforce_schema(
 DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
 
 DEFAULT_FILE_PATH_COLUMN = "__path__"
+
+
+TARGET_BALANCE_SCHEMA_CSV = """
+    column,                dtype,                mandatory,       id
+    id,                    string[python],       False,         True
+    date,                  datetime64[ns],       True,          True
+    account,               Int64,                True,          True
+    contra,                Int64,                False,         True
+    currency,              string[python],       True,         False
+    profit_center,         string[python],       False,         True
+    description,           string[python],       True,         False
+    document,              string[python],       False,        False
+    lookup_period,         string[python],       False,        False
+    lookup_accounts,       string[python],       False,        False
+    lookup_profit_centers, string[python],       False,        False
+    balance,               Float64,              True,         True
+"""
+TARGET_BALANCE_SCHEMA = pd.read_csv(
+    StringIO(TARGET_BALANCE_SCHEMA_CSV), skipinitialspace=True
+)

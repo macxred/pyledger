@@ -475,3 +475,96 @@ def test_sanitize_reconciliation(engine, capture_logs):
     )
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) == 6
+
+
+def test_sanitize_target_balance(engine, capture_logs):
+    ACCOUNT_CSV = """
+        group,          account, currency,   tax_code,   description
+        Assets,            1000,      USD,           , VALID_CURR
+        Assets,            1100,      JPY,           , VALID_CURR
+        Assets,            1200,      CHF,           , VALID_CURR
+        Assets,            2000,      USD,           , VALID_CURR
+    """
+    TAX_CSV = """
+        id,            account, rate,  is_inclusive,    description,      contra
+        EXEMPT,               , 0.00,          True,    Exempt from VAT,
+        VALID,            1000, 0.05,          True,    Valid tax code,
+    """
+    ASSETS_CSV = """
+        ticker, increment,      date
+        EUR,        0.01, 2022-01-01
+        JPY,        1.00, 2022-01-02
+        USD,        0.01, 2022-01-01
+        CHF,        0.01, 2022-01-01
+    """
+    PRICES_CSV = """
+        date,       ticker,  price, currency
+        2023-12-28,    EUR, 1.1068, USD
+        2023-12-29,    JPY, 0.0071, USD
+        2023-12-29,    CHF, 1.1353, USD
+    """
+    PROFIT_CENTERS_CSV = """
+        profit_center,
+                Shop,
+    """
+    # flake8: noqa: E501
+    TARGET_BALANCE_CSV = """
+        id,        date, account, contra, currency, profit_center,         description, document, balance, lookup_period, lookup_accounts, lookup_profit_centers
+         1,  2024-01-01,    1000,   2000,      USD,              ,     invalid balance,         ,        ,          2024,            1000,
+         2,  2024-01-01,    1000,   2000,      USD,              ,       valid balance,         ,       1,          2024,            1000,
+         3,  2024-01-01,    1000,   2000,      USD,              ,      invalid period,         ,       1,        period,            1000,
+         4,  2024-01-01,    1000,   2000,      USD,              ,      invalid period,         ,       1,       33434:4,            1000,
+         5,  2024-01-01,    1000,   2000,      USD,              ,        valid period,         ,       1,       2024-Q4,            1000,
+         6,  2024-01-01,    1000,   2000,      USD,              ,    invalid accounts,         ,       1,          2024,            cccc,
+         7,  2024-01-01,    1000,   2000,      USD,              ,    invalid accounts,         ,       1,          2024,         1000:df,
+         8,  2024-01-01,    1000,   2000,      USD,              ,      valid accounts,         ,       1,          2024,       1000:9999,
+         9,  2024-01-01,    1000,   2000,      USD,              ,      valid accounts,         ,       1,          2024,  1000:9999-1200,
+        10,  2024-01-01,    1000,   2000,      USD,              ,      valid accounts,         ,       1,          2024,  3000:9999+1200,
+        11,  2024-01-01,    1000,   2000,      USD,          Shop, invalid profit cntr,         ,       1,       2024-Q4,            1000, invalid_pc
+        12,  2024-01-01,    1000,   2000,      USD,          Shop,   valid profit cntr,         ,       1,       2024-Q4,            1000,
+        13,  2024-01-01,    1000,   2000,      USD,          Shop,   valid profit cntr,         ,       1,       2024-Q4,            1000, Shop
+    """
+    EXPECTED_TARGET_BALANCE_CSV = """
+        id,        date, account, contra, currency, profit_center,         description, document, balance, lookup_period, lookup_accounts, lookup_profit_centers
+         2,  2024-01-01,    1000,   2000,      USD,              ,       valid balance,         ,       1,          2024,            1000,
+         5,  2024-01-01,    1000,   2000,      USD,              ,        valid period,         ,       1,       2024-Q4,            1000,
+         8,  2024-01-01,    1000,   2000,      USD,              ,      valid accounts,         ,       1,          2024,       1000:9999,
+         9,  2024-01-01,    1000,   2000,      USD,              ,      valid accounts,         ,       1,          2024,  1000:9999-1200,
+        10,  2024-01-01,    1000,   2000,      USD,              ,      valid accounts,         ,       1,          2024,  3000:9999+1200,
+    """
+    EXPECTED_TARGET_BALANCE_WITH_PROFIT_CENTERS_CSV = """
+        id,        date, account, contra, currency, profit_center,         description, document, balance, lookup_period, lookup_accounts, lookup_profit_centers
+        12,  2024-01-01,    1000,   2000,      USD,          Shop,   valid profit cntr,         ,       1,       2024-Q4,            1000,
+        13,  2024-01-01,    1000,   2000,      USD,          Shop,   valid profit cntr,         ,       1,       2024-Q4,            1000, Shop
+    """
+    tax_df = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
+    prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
+    assets = pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True)
+    accounts_df = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    profit_centers = pd.read_csv(StringIO(PROFIT_CENTERS_CSV), skipinitialspace=True)
+    expected_target_balance = pd.read_csv(StringIO(EXPECTED_TARGET_BALANCE_CSV), skipinitialspace=True)
+    target_balance = pd.read_csv(StringIO(TARGET_BALANCE_CSV), skipinitialspace=True)
+    engine.restore(
+        accounts=accounts_df, tax_codes=tax_df, price_history=prices, assets=assets
+    )
+
+    # Sanitize target balance without profit centers
+    expected_target_balance = engine.target_balance.standardize(expected_target_balance)
+    sanitized = engine.sanitize_target_balance(engine.target_balance.standardize(target_balance))
+    assert_frame_equal(expected_target_balance, sanitized)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) == 5, "Expected strict number of captured logs"
+
+    # Clear captured logs
+    capture_logs.seek(0)
+    capture_logs.truncate(0)
+
+    # Sanitize target balance with profit centers
+    engine.restore(profit_centers=profit_centers)
+    expected_target_balance = engine.target_balance.standardize(
+        pd.read_csv(StringIO(EXPECTED_TARGET_BALANCE_WITH_PROFIT_CENTERS_CSV), skipinitialspace=True)
+    )
+    sanitized = engine.sanitize_target_balance(engine.target_balance.standardize(target_balance))
+    assert_frame_equal(expected_target_balance, sanitized)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) == 5, "Expected strict number of captured logs"
