@@ -23,28 +23,37 @@ class StandaloneLedger(LedgerEngine):
     """
 
     def dump_to_zip(self, archive_path: str):
-        """Extend dump_to_zip to include reconciliation data in the archive."""
+        """Extend dump_to_zip to include reconciliation and target balance data in the archive."""
         super().dump_to_zip(archive_path)
         with zipfile.ZipFile(archive_path, 'a') as archive:
             archive.writestr('reconciliation.csv', self.reconciliation.list().to_csv(index=False))
+            archive.writestr('target_balance.csv', self.target_balance.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
-        """Extend restore_from_zip to also restore reconciliation data."""
+        """Extend restore_from_zip to also restore reconciliation and target balance data."""
         super().restore_from_zip(archive_path)
         with zipfile.ZipFile(archive_path, 'r') as archive:
             if 'reconciliation.csv' in archive.namelist():
                 self.restore(reconciliation=pd.read_csv(archive.open('reconciliation.csv')))
+            if 'target_balance.csv' in archive.namelist():
+                self.restore(target_balance=pd.read_csv(archive.open('target_balance.csv')))
 
-    def restore(self, *args, reconciliation: pd.DataFrame | None = None, **kwargs):
-        """Extend restore to reconciliation data after base restoration."""
+    def restore(
+        self, *args, reconciliation: pd.DataFrame | None = None,
+        target_balance: pd.DataFrame | None = None, **kwargs
+    ):
+        """Extend restore to reconciliation and target balance data after base restoration."""
         super().restore(*args, **kwargs)
         if reconciliation is not None:
             self.reconciliation.mirror(reconciliation, delete=True)
+        if target_balance is not None:
+            self.target_balance.mirror(target_balance, delete=True)
 
     def clear(self):
-        """Extend clear() to also delete reconciliation records."""
+        """Extend clear() to also delete reconciliation and target balance records."""
         super().clear()
         self.reconciliation.mirror(None, delete=True)
+        self.target_balance.mirror(None, delete=True)
 
     # ----------------------------------------------------------------------
     # Storage entities
