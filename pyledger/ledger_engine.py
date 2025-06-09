@@ -467,107 +467,6 @@ class LedgerEngine(ABC):
             raise ValueError(f"Account {account} is not defined.")
         return accounts.loc[accounts["account"] == account, "currency"].values[0]
 
-    def _single_account_balance(
-        self, account: int, profit_centers: list[str] | str = None,
-        start: datetime.date = None, end: datetime.date = None,
-    ) -> dict:
-        """Retrieve the balance of a single account within a date range.
-
-        Args:
-            account (int): Account number.
-            start (datetime.date, optional): Start date for the balance calculation.
-                                             Defaults to None.
-            end (datetime.date, optional): End date for the balance calculation.
-                                           Defaults to None.
-            profit_centers: (list[str], str): Filter for journal entries. If not None, the result is
-                                              calculated only from journal entries assigned to one
-                                              of the profit centers in the filter.
-
-        Returns:
-            dict: Dictionary containing the balance of the account in various currencies.
-        """
-
-    def _account_balance_list(
-        self, accounts: list[int], profit_centers: list[str] | str = None,
-        start: datetime.date = None, end: datetime.date = None,
-    ) -> dict:
-        result = {}
-        for account in accounts:
-            account_balance = self._single_account_balance(
-                account, start=start, end=end, profit_centers=profit_centers
-            )
-            for currency, value in account_balance.items():
-                result[currency] = result.get(currency, 0) + value
-        return result
-
-    def _account_balance_range(
-        self, accounts: dict[str, list[int]], profit_centers: list[str] | str = None,
-        start: datetime.date = None, end: datetime.date = None,
-    ) -> dict:
-        result = {}
-        add = self._account_balance_list(
-            accounts["add"], start=start, end=end, profit_centers=profit_centers
-        )
-        subtract = self._account_balance_list(
-            accounts["subtract"], start=start, end=end, profit_centers=profit_centers
-        )
-        for currency, value in add.items():
-            result[currency] = result.get(currency, 0) + value
-        for currency, value in subtract.items():
-            result[currency] = result.get(currency, 0) - value
-        return result
-
-    def _account_balance(
-        self, account: int | str | dict, period: datetime.date | str | int = None,
-        profit_centers: list[str] | str = None
-    ) -> dict:
-        """Calculate the balance of a single account
-        or the summarized balance of a list or range of accounts.
-
-        Args:
-            account (int, str, dict): The account(s) to be evaluated. Can be a
-                a single account, e.g. 1020, a sequence of accounts separated
-                by a column, e.g. "1000:1999", in which case the combined
-                balance of all accounts within that range is returned. Multiple
-                accounts and/or account sequences can be separated by a plus or
-                minus sign, e.g. "1000+1020:1025", in which case the combined
-                balance of all accounts is returned, or "1020:1025-1000", in
-                which case the balance of account 1000 is subtracted from the
-                combined balance of accounts 1020:1025.
-            period (datetime.date, str, int, optional): The period for which or
-                date as of which the account balance is calculated. Periods can
-                be defined as string, e.g. "2024" (the year 2024), "2024-01"
-                (January 2024), "2024-Q1" (first quarter 2024), or as a tuple
-                with start and end date. Defaults to None.
-            profit_centers: (list[str], str): Filter for journal entries. If
-                not None, the result is calculated only from journal entries
-                assigned to one of the profit centers in the filter.
-
-        Returns:
-            dict: Dictionary containing the balance of the account(s) in all
-                currencies, in which transactions were recorded plus in
-                "reporting_currency". Keys denote currencies and values the
-                balance amounts in each currency.
-        """
-        start, end = parse_date_span(period)
-        accounts = self.parse_account_range(account)
-        if profit_centers is not None and profit_centers is not pd.NA:
-            profit_centers = profit_centers
-        else:
-            profit_centers = None
-        result = self._account_balance_range(
-            accounts=accounts, start=start, end=end, profit_centers=profit_centers
-        )
-
-        # Type consistent return value Dict[str, float]
-        def _standardize_currency(ticker: str, x: float) -> float:
-            result = float(self.round_to_precision(x, ticker=ticker, date=end))
-            if result == -0.0:
-                result = 0.0
-            return result
-        result = {k: _standardize_currency(k, v) for k, v in result.items()}
-        return result
-
     def individual_account_balances(
         self,
         accounts: str | int | dict[str, list[int]] | list[int] | None,
@@ -638,8 +537,9 @@ class LedgerEngine(ABC):
                 - 'balance': Dictionary of currency-wise balances
                 (excluded if `reporting_currency_only` is True).
         """
+        ledger = self.serialized_ledger()
         balances = [
-            self._account_balance(account=acct, period=prd, profit_centers=pc)
+            self._account_balance(ledger, account=acct, period=prd, profit_centers=pc)
             for prd, acct, pc in zip(df["period"], df["account"], df["profit_center"])
         ]
         report_balances = [r.pop("reporting_currency", 0.0) for r in balances]
@@ -1839,7 +1739,7 @@ class LedgerEngine(ABC):
         balances.index = df.index
         df[["actual_balance", "actual_report_balance"]] = balances[["balance", "report_balance"]]
         df["actual_balance"] = df.apply(
-            lambda row: row["actual_balance"].get(row["currency"], 0), axis=1
+            lambda row: row["actual_balance"].get(row["currency"], 0.0), axis=1
         )
         return df
 
