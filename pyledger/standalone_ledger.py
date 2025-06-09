@@ -219,8 +219,8 @@ class StandaloneLedger(LedgerEngine):
                             f"FX rate currency mismatch: expected {reporting_currency}, got "
                             f"{fx_rate[0]}"
                         )
-                    target = balance[currency] * fx_rate[1]
-                    amount = target - balance["reporting_currency"]
+                    target = balance.get(currency, 0.0) * fx_rate[1]
+                    amount = target - balance.get("reporting_currency", 0.0)
                     amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
                     id = f"revaluation:{date}:{account}"
                     if amount != 0:
@@ -254,24 +254,29 @@ class StandaloneLedger(LedgerEngine):
         return self.journal.standardize(pd.DataFrame(result))
 
     def _balance_from_serialized_ledger(
-        self, ledger: pd.DataFrame, account: int, profit_centers: list[str] | str = None,
+        self, ledger: pd.DataFrame, account: str | int | dict | list,
+        profit_centers: list[str] | str = None,
         start: datetime.date = None, end: datetime.date = None,
     ) -> dict:
-        """Compute balance from serialized ledger.
+        """Compute balance from serialized ledger with multiplier and precision alignment.
 
         Args:
             ledger (DataFrame): General ledger in long format following JOURNAL_SCHEMA.
-            account (int): The account number.
-            date (datetime.date, optional): The date up to which the balance is computed.
-                                            Defaults to None.
+            account (str | int | dict[str, list[int]] | list[int]):
+                The range of accounts to be evaluated. See `parse_account_range()` for supported formats.
             profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                              calculated only from ledger entries assigned to one
-                                              of the profit centers in the filter.
+                                            calculated only from ledger entries assigned to one
+                                            of the profit centers in the filter.
+            start (datetime.date, optional): Filter for entries starting from this date.
+            end (datetime.date, optional): Filter for entries up to this date.
 
         Returns:
-            dict: Dictionary containing the balance of the account in various currencies.
+            dict: Dictionary with reporting currency total and per-currency balances.
         """
-        rows = ledger["account"] == int(account)
+        multipliers = self.account_multipliers(self.parse_account_range(account))
+        multipliers = pd.DataFrame(list(multipliers.items()), columns=["account", "multiplier"])
+        rows = ledger["account"].isin(multipliers["account"])
+
         if profit_centers is not None:
             if isinstance(profit_centers, str):
                 profit_centers = [profit_centers]
@@ -286,25 +291,35 @@ class StandaloneLedger(LedgerEngine):
             rows = rows & (ledger["date"] >= pd.Timestamp(start))
         if end is not None:
             rows = rows & (ledger["date"] <= pd.Timestamp(end))
-        cols = ["amount", "report_amount", "currency"]
+
+        cols = ["account", "amount", "report_amount", "currency"]
         if rows.sum() == 0:
-            result = {"reporting_currency": 0.0}
-            currency = self.account_currency(account)
-            if currency is not None:
-                result[currency] = 0.0
-        else:
-            sub = ledger.loc[rows, cols]
-            report_amount = sub["report_amount"].sum()
+            return {"reporting_currency": 0.0}
+
+        sub = ledger.loc[rows, cols].merge(multipliers, on="account", how="inner")
+        sub["amount"] *= sub["multiplier"]
+        sub["report_amount"] *= sub["multiplier"]
+
+        # Report balance
+        report_amount = sub["report_amount"].sum()
+
+        # Validate and aggregate per account
+        grouped = sub.groupby("account", sort=False)
+        currency_totals = {}
+
+        for account, group in grouped:
             account_currency = self.account_currency(account)
+
             if pd.isna(account_currency):
-                amount = sub.groupby("currency").agg({"amount": "sum"})
-                amount = {currency: amount
-                          for currency, amount in zip(amount.index, amount["amount"])}
+                amt = group.groupby("currency")["amount"].sum()
+                for currency, value in amt.items():
+                    currency_totals[currency] = currency_totals.get(currency, 0.0) + value
             elif account_currency == self.reporting_currency:
-                amount = {self.reporting_currency: report_amount}
-            elif not all(sub["currency"] == account_currency):
+                currency_totals[self.reporting_currency] = currency_totals.get(self.reporting_currency, 0.0) + group["report_amount"].sum()
+            elif not all(group["currency"] == account_currency):
                 raise ValueError(f"Unexpected currencies in transactions for account {account}.")
             else:
-                amount = {account_currency: sub["amount"].sum()}
-            result = {"reporting_currency": report_amount} | amount
-        return result
+                value = group["amount"].sum()
+                currency_totals[account_currency] = currency_totals.get(account_currency, 0.0) + value
+
+        return {"reporting_currency": report_amount, **currency_totals}
