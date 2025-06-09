@@ -283,34 +283,28 @@ class StandaloneLedger(LedgerEngine):
         if end is not None:
             rows = rows & (ledger["date"] <= pd.Timestamp(end))
 
-        cols = ["account", "amount", "report_amount", "currency"]
         if rows.sum() == 0:
             return {"reporting_currency": 0.0}
 
-        sub = ledger.loc[rows, cols].merge(multipliers, on="account", how="inner")
+        sub = ledger.loc[rows, ["account", "amount", "report_amount", "currency"]]
+        sub = sub.merge(multipliers, on="account", how="inner")
         sub["amount"] *= sub["multiplier"]
         sub["report_amount"] *= sub["multiplier"]
 
-        # Report balance
-        report_amount = sub["report_amount"].sum()
+        account_currencies = sub["account"].map(lambda acc: self.account_currency(acc))
+        sub.loc[account_currencies == self.reporting_currency, "amount"] = sub["report_amount"]
+        sub["currency"] = account_currencies.combine_first(sub["currency"])
 
-        # Validate and aggregate per account
-        grouped = sub.groupby("account", sort=False)
-        currency_totals = {}
+        grouped = sub.groupby("currency", sort=False)["amount"].sum().reset_index()
+        rounded_amounts = dict(zip(
+            grouped["currency"],
+            self.round_to_precision(grouped["amount"], grouped["currency"], end)
+        ))
+        report_total = self.round_to_precision(
+            [sub["report_amount"].sum()], [self.reporting_currency], end
+        )[0]
 
-        for account, group in grouped:
-            account_currency = self.account_currency(account)
-
-            if pd.isna(account_currency):
-                amt = group.groupby("currency")["amount"].sum()
-                for currency, value in amt.items():
-                    currency_totals[currency] = currency_totals.get(currency, 0.0) + value
-            elif account_currency == self.reporting_currency:
-                currency_totals[self.reporting_currency] = currency_totals.get(self.reporting_currency, 0.0) + group["report_amount"].sum()
-            elif not all(group["currency"] == account_currency):
-                raise ValueError(f"Unexpected currencies in transactions for account {account}.")
-            else:
-                value = group["amount"].sum()
-                currency_totals[account_currency] = currency_totals.get(account_currency, 0.0) + value
-
-        return {"reporting_currency": report_amount, **currency_totals}
+        return {
+            "reporting_currency": report_total,
+            **rounded_amounts
+        }
