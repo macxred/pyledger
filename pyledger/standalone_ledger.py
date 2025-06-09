@@ -8,6 +8,7 @@ import zipfile
 import numpy as np
 import pandas as pd
 from pyledger.storage_entity import AccountingEntity
+from pyledger.time import parse_date_span
 from .decorators import timed_cache
 from .constants import JOURNAL_SCHEMA
 from .ledger_engine import LedgerEngine
@@ -159,18 +160,6 @@ class StandaloneLedger(LedgerEngine):
         return result
 
     # ----------------------------------------------------------------------
-    # Accounts
-
-    def _single_account_balance(
-        self, account: int, profit_centers: list[str] | str = None,
-        start: datetime.date = None, end: datetime.date = None,
-    ) -> dict:
-        return self._balance_from_serialized_ledger(
-            self.serialized_ledger(), account=account, profit_centers=profit_centers,
-            start=start, end=end,
-        )
-
-    # ----------------------------------------------------------------------
     # Journal
 
     @timed_cache(120)
@@ -212,7 +201,7 @@ class StandaloneLedger(LedgerEngine):
             for account in accounts:
                 currency = self.account_currency(account)
                 if currency != reporting_currency:
-                    balance = self._balance_from_serialized_ledger(df, account, end=date)
+                    balance = self._account_balance(df, account, period=date)
                     fx_rate = self.price(currency, date=date, currency=reporting_currency)
                     if fx_rate[0] != reporting_currency:
                         raise ValueError(
@@ -253,31 +242,43 @@ class StandaloneLedger(LedgerEngine):
 
         return self.journal.standardize(pd.DataFrame(result))
 
-    def _balance_from_serialized_ledger(
+    def _account_balance(
         self, ledger: pd.DataFrame, account: str | int | dict | list,
         profit_centers: list[str] | str = None,
-        start: datetime.date = None, end: datetime.date = None,
+        period: datetime.date | str = None,
     ) -> dict:
-        """Compute balance from serialized ledger with multiplier and precision alignment.
+        """Calculate the balance of account(s) from serialized ledger.
 
         Args:
-            ledger (DataFrame): General ledger in long format following JOURNAL_SCHEMA.
-            account (str | int | dict[str, list[int]] | list[int]):
-                The range of accounts to be evaluated. See `parse_account_range()` for supported formats.
-            profit_centers: (list[str], str): Filter for ledger entries. If not None, the result is
-                                            calculated only from ledger entries assigned to one
-                                            of the profit centers in the filter.
-            start (datetime.date, optional): Filter for entries starting from this date.
-            end (datetime.date, optional): Filter for entries up to this date.
+            account (int, str, dict): The account(s) to be evaluated. Can be a
+                a single account, e.g. 1020, a sequence of accounts separated
+                by a column, e.g. "1000:1999", in which case the combined
+                balance of all accounts within that range is returned. Multiple
+                accounts and/or account sequences can be separated by a plus or
+                minus sign, e.g. "1000+1020:1025", in which case the combined
+                balance of all accounts is returned, or "1020:1025-1000", in
+                which case the balance of account 1000 is subtracted from the
+                combined balance of accounts 1020:1025.
+            period (datetime.date, str, int, optional): The period for which or
+                date as of which the account balance is calculated. Periods can
+                be defined as string, e.g. "2024" (the year 2024), "2024-01"
+                (January 2024), "2024-Q1" (first quarter 2024), or as a tuple
+                with start and end date. Defaults to None.
+            profit_centers: (list[str], str): Filter for journal entries. If
+                not None, the result is calculated only from journal entries
+                assigned to one of the profit centers in the filter.
 
         Returns:
-            dict: Dictionary with reporting currency total and per-currency balances.
+            dict: Dictionary containing the balance of the account(s) in all
+                currencies, in which transactions were recorded plus in
+                "reporting_currency". Keys denote currencies and values the
+                balance amounts in each currency.
         """
         multipliers = self.account_multipliers(self.parse_account_range(account))
         multipliers = pd.DataFrame(list(multipliers.items()), columns=["account", "multiplier"])
         rows = ledger["account"].isin(multipliers["account"])
 
-        if profit_centers is not None:
+        if profit_centers is not None and profit_centers is not pd.NA:
             if isinstance(profit_centers, str):
                 profit_centers = [profit_centers]
             valid_profit_centers = set(self.profit_centers.list()["profit_center"])
@@ -287,6 +288,7 @@ class StandaloneLedger(LedgerEngine):
                     f"Profit centers: {', '.join(invalid_profit_centers)} do not exist."
                 )
             rows = rows & (ledger["profit_center"].isin(profit_centers))
+        start, end = parse_date_span(period)
         if start is not None:
             rows = rows & (ledger["date"] >= pd.Timestamp(start))
         if end is not None:
