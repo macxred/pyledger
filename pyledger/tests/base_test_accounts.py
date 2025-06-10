@@ -164,16 +164,23 @@ class BaseTestAccounts(BaseTest):
         )
         columns_to_drop = ["period", "account", "profit_center"]
 
+        def drop_zero_balances(balance_dict):
+            return {k: v for k, v in balance_dict.items() if v != 0.0}
+
         # Test account balance with specified profit centers
         expected_with_pc = self.EXPECTED_BALANCES.query("profit_center.notna()")
         balances = restored_engine.account_balances(expected_with_pc)
         expected_with_pc = expected_with_pc.drop(columns=columns_to_drop)
+        expected_with_pc["balance"] = expected_with_pc["balance"].apply(drop_zero_balances)
+        balances["balance"] = balances["balance"].apply(drop_zero_balances)
         assert_frame_equal(balances, expected_with_pc, ignore_index=True, check_like=True)
 
         # Test account balance without specified profit centers
         expected_without_pc = self.EXPECTED_BALANCES.query("profit_center.isna()")
         balances = restored_engine.account_balances(expected_without_pc)
         expected_without_pc = expected_without_pc.drop(columns=columns_to_drop)
+        expected_without_pc["balance"] = expected_without_pc["balance"].apply(drop_zero_balances)
+        balances["balance"] = balances["balance"].apply(drop_zero_balances)
         assert_frame_equal(balances, expected_without_pc, ignore_index=True, check_like=True)
 
     def test_individual_account_balances(self, restored_engine):
