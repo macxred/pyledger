@@ -1,6 +1,7 @@
 """This module defines Abstract base class for a double entry accounting system."""
 
 from abc import ABC, abstractmethod
+from collections import Counter
 import datetime
 import logging
 import math
@@ -355,6 +356,28 @@ class LedgerEngine(ABC):
 
     # ----------------------------------------------------------------------
     # Accounts
+
+    @staticmethod
+    def account_multipliers(accounts: dict) -> dict[str, int]:
+        """
+        Compute net multipliers for accounts based on their frequency in the
+        'add' and 'subtract' lists. Each occurrence in 'add' contributes +1,
+        each in 'subtract' contributes -1.
+
+        Args:
+            accounts (dict): Dictionary with two keys:
+                - 'add': list of accounts to include positively
+                - 'subtract': list of accounts to include negatively
+
+        Returns:
+            dict[str, int]: Mapping of account identifier to net multiplier.
+        """
+        add_counts = Counter(accounts.get("add", []))
+        sub_counts = Counter(accounts.get("subtract", []))
+        return {
+            acc: add_counts.get(acc, 0) - sub_counts.get(acc, 0)
+            for acc in set(add_counts) | set(sub_counts)
+        }
 
     def sanitize_accounts(self, df: pd.DataFrame, tax_codes: pd.DataFrame = None) -> pd.DataFrame:
         """Discard incoherent account data.
