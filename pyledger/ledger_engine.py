@@ -537,9 +537,8 @@ class LedgerEngine(ABC):
                 - 'balance': Dictionary of currency-wise balances
                 (excluded if `reporting_currency_only` is True).
         """
-        ledger = self.serialized_ledger()
         balances = [
-            self._account_balance(ledger, account=acct, period=prd, profit_centers=pc)
+            self._account_balance(account=acct, period=prd, profit_centers=pc)
             for prd, acct, pc in zip(df["period"], df["account"], df["profit_center"])
         ]
         report_balances = [r.pop("reporting_currency", 0.0) for r in balances]

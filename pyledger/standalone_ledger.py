@@ -192,7 +192,7 @@ class StandaloneLedger(LedgerEngine):
             for account in accounts:
                 currency = self.account_currency(account)
                 if currency != reporting_currency:
-                    balance = self._account_balance(df, account, period=date)
+                    balance = self._account_balance(ledger=df, account=account, period=date)
                     fx_rate = self.price(currency, date=date, currency=reporting_currency)
                     if fx_rate[0] != reporting_currency:
                         raise ValueError(
@@ -234,13 +234,14 @@ class StandaloneLedger(LedgerEngine):
         return self.journal.standardize(pd.DataFrame(result))
 
     def _account_balance(
-        self, ledger: pd.DataFrame, account: str | int | dict | list,
-        profit_centers: list[str] | str = None,
-        period: datetime.date | str = None,
+        self, account: str | int | dict | list, ledger: pd.DataFrame = None,
+        profit_centers: list[str] | str = None, period: datetime.date | str = None,
     ) -> dict:
-        """Calculate the balance of account(s) from serialized ledger.
+        """Compute the balance of one or more accounts from the serialized ledger.
 
         Args:
+            ledger (pd.DataFrame, optional): Ledger entries to compute balance from.
+                If None, defaults to the result of `self.serialized_ledger()`.
             account (int, str, dict): The account(s) to be evaluated. Can be a
                 a single account, e.g. 1020, a sequence of accounts separated
                 by a column, e.g. "1000:1999", in which case the combined
@@ -265,6 +266,9 @@ class StandaloneLedger(LedgerEngine):
                 "reporting_currency". Keys denote currencies and values the
                 balance amounts in each currency.
         """
+        if ledger is None:
+            ledger = self.serialized_ledger()
+
         multipliers = self.account_multipliers(self.parse_account_range(account))
         multipliers = pd.DataFrame(list(multipliers.items()), columns=["account", "multiplier"])
         rows = ledger["account"].isin(multipliers["account"])
