@@ -198,39 +198,37 @@ class StandaloneLedger(LedgerEngine):
         """
         revaluations = self.sanitize_revaluations(self.revaluations.list())
         target_balances = self.sanitize_target_balance(self.target_balance.list())
-
         dates = pd.Series(
             list(revaluations["date"]) + list(target_balances["date"])
         ).dropna().drop_duplicates().sort_values()
-
         result = []
 
         for date in dates:
             combined = pd.concat([ledger] + result)
 
             # Calculate target balance entries
-            tb_rows = target_balances.query("date == @date")
-            if not tb_rows.empty:
-                tb_entries = self.target_balance_entries(
+            target_balance_rows = target_balances.query("date == @date")
+            if not target_balance_rows.empty:
+                target_balance_entries = self.target_balance_entries(
                     ledger=combined,
-                    target_balance=tb_rows,
+                    target_balance=target_balance_rows,
                 )
-                result.append(tb_entries)
+                result.append(target_balance_entries)
             else:
-                tb_entries = None
+                target_balance_entries = None
 
             # Calculate revaluation entries
-            reval_rows = revaluations.query("date == @date")
-            if not reval_rows.empty:
-                reval_ledger = (
-                    pd.concat([combined, tb_entries])
-                    if tb_entries is not None else combined
+            revaluation_rows = revaluations.query("date == @date")
+            if not revaluation_rows.empty:
+                revaluation_ledger = (
+                    pd.concat([combined, target_balance_entries])
+                    if target_balance_entries is not None else combined
                 )
-                reval_entries = self.revaluation_entries(
-                    ledger=reval_ledger,
-                    revaluations=reval_rows,
+                revaluation_entries = self.revaluation_entries(
+                    ledger=revaluation_ledger,
+                    revaluations=revaluation_rows,
                 )
-                result.append(reval_entries)
+                result.append(revaluation_entries)
 
         return (
             pd.concat(result, ignore_index=True)
@@ -247,9 +245,12 @@ class StandaloneLedger(LedgerEngine):
         for row in target_balance.to_dict("records"):
             entries = self.journal.standardize(pd.DataFrame(result))
             df = self.serialize_ledger(pd.concat([ledger, entries]))
-            profit_centers = self.parse_profit_centers(row["lookup_profit_centers"])
+            if pd.isna(row["lookup_profit_centers"]):
+                profit_centers = None
+            else:
+                profit_centers = self.parse_profit_centers(row["lookup_profit_centers"])
             balance = self._account_balance(
-                df, account=row["lookup_accounts"],
+                ledger=df, account=row["lookup_accounts"],
                 period=row["lookup_period"], profit_centers=profit_centers
             )
             current = balance.get("reporting_currency", 0.0)
@@ -269,7 +270,6 @@ class StandaloneLedger(LedgerEngine):
                     "date": row["date"],
                     "currency": reporting_currency,
                     "description": row["description"],
-                    "tax_code": row["tax_code"],
                     "document": row["document"],
                 }
                 result.append({
