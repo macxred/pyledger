@@ -18,23 +18,30 @@ TAX_CSV = """
 TAX_CODES = pd.read_csv(StringIO(TAX_CSV), skipinitialspace=True)
 
 ACCOUNT_CSV = """
-    group,                                 account, currency, tax_code, description
-    Assets/Cash/Bank of America,              1000,      USD,         , Cash in Bank USD
-    Assets/Cash/Other Bank,                   1005,      USD,         , Cash in other Bank USD
-    Assets/Cash/Deutsche Bank,                1010,      EUR,         , Cash in Bank EUR
-    Assets/Cash/Other Bank,                   1015,      EUR,         , Cash in other Bank EUR
-    Assets/Cash/Mitsubishi UFJ,               1020,      JPY,         , Cash in Bank JPY
-    Assets/Cash/UBS,                          1025,      CHF,         , Cash in Bank CHF
-    Assets/Tax Recoverable,                   1300,      USD,         , VAT Recoverable (Input VAT)
-    Liabilities/Payables,                     2000,      USD,         , Accounts Payable USD
-    Liabilities/Payables,                     2010,      EUR,         , Accounts Payable EUR
-    Liabilities/Tax Payable,                  2200,      USD,         , VAT Payable (Output VAT)
-    Equity,                                   3000,      USD,         , Owner's Equity
-    Revenue/Sales,                            4000,      USD,  OUT_STD, Sales Revenue - USD
-    Revenue/Sales,                            4001,      EUR,  OUT_STD, Sales Revenue - EUR
-    Expenses/Cost of Goods Sold,              5000,      USD,   IN_STD, Purchases
-    Expenses/Other/Financial,                 7050,      USD,         , Foreign Exchange Gain/Loss
-    Revenue/Other/Financial,                  8050,      USD,         , Foreign Exchange Gain
+    group,                                                           account, currency, tax_code, description
+    Assets/Cash/Bank of America,                                        1000,      USD,         , Cash in Bank USD
+    Assets/Cash/Other Bank,                                             1005,      USD,         , Cash in other Bank USD
+    Assets/Cash/Deutsche Bank,                                          1010,      EUR,         , Cash in Bank EUR
+    Assets/Cash/Other Bank,                                             1015,      EUR,         , Cash in other Bank EUR
+    Assets/Cash/Mitsubishi UFJ,                                         1020,      JPY,         , Cash in Bank JPY
+    Assets/Cash/UBS,                                                    1025,      CHF,         , Cash in Bank CHF
+    Assets/Current Assets/Current receivables,                          1170,      USD,         , Input VAT on materials goods services energy
+    Assets/Current Assets/Current receivables,                          1171,      USD,         , Input VAT on investments other operating expenses
+    Assets/Current Assets/Current receivables,                          1175,      USD,         , Accounts Receivable VAT Cleared
+    Assets/Tax Recoverable,                                             1300,      USD,         , VAT Recoverable (Input VAT)
+    Liabilities/Payables,                                               2000,      USD,         , Accounts Payable USD
+    Liabilities & Equity/Current Liabilities/Accrued Liabilities,       2201,      USD,         , Accounts Payable VAT Cleared
+    Liabilities/Payables,                                               2010,      EUR,         , Accounts Payable EUR
+    Liabilities & Equity/Current Liabilities/Accrued Liabilities,       2200,      USD,         , VAT payable (output tax)
+    Liabilities & Equity/Shareholder's Equity/Loss brought forward,     2970,      USD,         , Profit/Loss Carried Forward
+    Liabilities & Equity/Shareholder's Equity/Profit for the year,      2979,      USD,         , Profit/Loss for the Year
+    Equity,                                                             3000,      USD,         , Owner's Equity
+    Revenue/Sales,                                                      4000,      USD,  OUT_STD, Sales Revenue - USD
+    Revenue/Sales,                                                      4001,      EUR,  OUT_STD, Sales Revenue - EUR
+    Expenses/Cost of Goods Sold,                                        5000,      USD,   IN_STD, Purchases
+    Expenses/Other/Financial,                                           7050,      USD,         , Foreign Exchange Gain/Loss
+    Revenue/Other/Financial,                                            8050,      USD,         , Foreign Exchange Gain
+    Balance,                                                            9200,      USD,         , Net Profit/Loss for the Year
 
 """
 ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
@@ -154,13 +161,13 @@ RECONCILIATION_CSV = """
 """
 RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
 
-# TODO: Update with actual target balance data
 TARGET_BALANCE_CSV = """
-    id, date,       account, contra, currency, tax_code, profit_center,                       description,                     document,    lookup_period, lookup_accounts, lookup_profit_centers, balance
-    1,  2024-03-31,    3000,   8050,      USD,         ,       General,     Carry forward P&L into equity,      2024/financials/pnl.pdf,             2024,       2999:9999,               General,       0
-    2,  2025-01-01,    8050,   3000,      USD,         ,       General,        Zero-out P&L for reporting,      2024/financials/pnl.pdf,             2024,       2999:9999,               General,       0
-    3,  2024-05-31,    2010,   2200,      EUR,         ,       General,    Quarterly income tax provision,        2024/q1/tax_calc.xlsx,          2024-Q2,       1000:2999,               General,   15000
-    4,  2025-09-02,    1000,   8050,      USD,         ,       General,   Adjust cash to liquidity buffer,  2024/planning/liquidity.pdf,             2024,            1000,               General, 1000000
+    id, date,       account, contra, currency, profit_center,                                  description, lookup_period, lookup_accounts,     balance
+    1,  2024-12-31,    2979,   9200,      USD,       General,                        P&L for the year 2024,          2024,       3000:9999,           0
+    2,  2025-01-02,    2979,   2970,      USD,       General, Move P&L for the year to P&L Carried Forward,          2024,            2979,           0
+    3,  2024-12-31,    1170,   1175,      USD,       General,                    VAT return 2024 input tax,          2024,            1170,           0
+    4,  2024-12-31,    1171,   1175,      USD,       General,                    VAT return 2024 input tax,          2024,            1171,           0
+    5,  2024-12-31,    2200,   1175,      USD,       General,                    VAT return 2024 sales tax,          2024,            2200,           0
 """
 TARGET_BALANCE = pd.read_csv(StringIO(TARGET_BALANCE_CSV), skipinitialspace=True)
 
@@ -182,9 +189,19 @@ EXPECTED_BALANCES_CSV = """
     2024-03-31,      7050,                         ,       21003.29,   "{USD:    21003.29}"
     2024-03-31,      8050,                         ,           0.00,   "{USD:        0.00}"
     2024-12-31,      4001,                         ,       -1198.26,   "{EUR:    -1119.04}"
-    2024-Q4,    1000:1999,                         ,    11655605.63,   "{USD: 300000.0, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
-    2024,       1000:1999,                         ,    12756779.54,   "{USD: 1076428.72, EUR: 10026811.02, JPY: 54345678.0, CHF: 14285714.3}"
+    2024-Q4,    1000:1999,                         ,    11654389.75,   "{USD: 300000.0, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
+    2024,       1000:1999,                         ,    12755563.66,   "{USD: 1076428.72, EUR: 10026811.02, JPY: 54345678.0, CHF: 14285714.3}"
     2024-08,    1000:1999,                         ,         -700.0,   "{USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-12-31,      2970,                         ,           0.00,   "{USD:    0.00}"
+    2024-12-31,      9200,                         ,   -22202531.94,   "{USD:    -22202531.94}"
+    2024-12-31,      2979,                         ,    22202531.94,   "{USD:    22202531.94}"
+    2025-01-02,      2979,                         ,   -22202531.94,   "{USD:    -22202531.94}"
+    2025-01-02,      2970,                         ,    44405063.88,   "{USD:    44405063.88}"
+    2025-01-02,      9200,                         ,   -22202531.94,   "{USD:    -22202531.94}"
+    2024-12-31,      1170,                         ,           0.00,   "{USD:    0.00}"
+    2024-12-31,      1171,                         ,           0.00,   "{USD:    0.00}"
+    2024-12-31,      1175,                         ,       -1215.88,   "{USD:    -1215.88}"
+    2024-12-31,      2200,                         ,         607.94,   "{USD:    607.94}"
     2023-12-31, 1000:9999,                "General",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2023-12-31, 1000:9999,    "General, Shop, Cafe",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2024-01-01, 1000:9999,                "General",            0.0,   "{USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
@@ -207,28 +224,25 @@ EXPECTED_INDIVIDUAL_BALANCES_CSV = """
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,        0.00, 0.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-    2024-01-01, 1000:1999,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
+    2024-01-01, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,     120.00, 132.82
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
               ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 42000000.00, 298200.00
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,        0.00, 0.00
-              ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
     2024-01-01,      1000,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
-       2024-Q4, 1000:1999,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
+       2024-Q4, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11255605.63
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
               ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,        0.00, 0.00
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
-              ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
-          2024, 1000:1999,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,  1076311.79, 1076311.79
+          2024, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,  1076311.79, 1076311.79
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,     -100.00, -100.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10026687.10, 11199809.49
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,     -20.00, -22.34
               ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 54345678.00, 380419.75
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
-              ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,      216.93, 360.85
        2024-12, 1000:1025,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11255605.63
@@ -239,21 +253,19 @@ EXPECTED_INDIVIDUAL_BALANCES_CSV = """
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,        0.00, 0.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-    2024-01-01, 1000:1999,                "General", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
+    2024-01-01, 1000:1050,                "General", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,     120.00, 132.82
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
               ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 42000000.00, 298200.00
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,        0.00, 0.00
-              ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
     2024-01-24,      1000,  "General, Shop, Bakery", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   801200.00, 801200.00
-    2024-03-31, 1000:1999,  "General, Shop, Bakery", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   801200.00, 801200.00
+    2024-03-31, 1000:1050,  "General, Shop, Bakery", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   801200.00, 801200.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,     120.00, 132.82
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
               ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 42000000.00, 298200.00
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,        0.00, 0.00
-              ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,        0.00, 0.00
 """
 EXPECTED_INDIVIDUAL_BALANCES = pd.read_csv(StringIO(EXPECTED_INDIVIDUAL_BALANCES_CSV), skipinitialspace=True)
 
@@ -417,22 +429,26 @@ EXPECTED_RECONCILIATION = [{
 ]
 
 EXPECTED_AGGREGATED_BALANCES_CSV = """
-    group,                          description,                   report_balance
-    /Assets/Cash,                   Bank of America,               1076311.79
-    /Assets/Cash,                   Other Bank,                    -122.34
-    /Assets/Cash,                   Deutsche Bank,                 11199809.49
-    /Assets/Cash,                   Mitsubishi UFJ,                380419.75
-    /Assets/Cash,                   UBS,                           100000.00
-    /Assets/Tax Recoverable,        VAT Recoverable (Input VAT),   360.85
-    /Liabilities/Payables,          Accounts Payable USD,          700.00
-    /Liabilities/Payables,          Accounts Payable EUR,          0.00
-    /Liabilities/Tax Payable,       VAT Payable (Output VAT),      -607.94
-    /Equity,                        Owner's Equity,                -11098332.82
-    /Revenue/Sales,                 Sales Revenue - USD,           -1000.00
-    /Revenue/Sales,                 Sales Revenue - EUR,           -1198.26
-    /Expenses/Cost of Goods Sold,   Purchases,                     3502.64
-    /Expenses/Other,                Financial,                     -1659837.61
-    /Revenue/Other,                 Financial,                     -5.55
+    group,                                       description,                   report_balance
+    /Assets/Cash,                                Bank of America,               1076311.79
+    /Assets/Cash,                                Other Bank,                    -122.34
+    /Assets/Cash,                                Deutsche Bank,                 11199809.49
+    /Assets/Cash,                                Mitsubishi UFJ,                380419.75
+    /Assets/Cash,                                UBS,                           100000.0
+    /Assets/Current Assets,                      Current receivables,           0.0
+    /Assets/Tax Recoverable,                     VAT Recoverable (Input VAT),   360.85
+    /Liabilities/Payables,                       Accounts Payable USD,          700.0
+    /Liabilities/Payables,                       Accounts Payable EUR,          0.0
+    /Liabilities & Equity/Current Liabilities,   Accrued Liabilities,           -607.94
+    /Liabilities & Equity/Shareholder's Equity,  Loss brought forward,          0.0
+    /Liabilities & Equity/Shareholder's Equity,  Profit for the year,           0.0
+    /Equity,                                     Owner's Equity,                -11098332.82
+    /Revenue/Sales,                              Sales Revenue - USD,           -1000.0
+    /Revenue/Sales,                              Sales Revenue - EUR,           -1198.26
+    /Expenses/Cost of Goods Sold,                Purchases,                     3502.64
+    /Expenses/Other,                             Financial,                     -1659837.61
+    /Revenue/Other,                              Financial,                     -5.55
+    /Balance,                                    Net Profit/Loss for the Year,  0.0
 """
 EXPECTED_AGGREGATED_BALANCES = pd.read_csv(StringIO(EXPECTED_AGGREGATED_BALANCES_CSV), skipinitialspace=True)
 # flake8: enable
