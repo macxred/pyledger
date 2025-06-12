@@ -172,7 +172,19 @@ class StandaloneLedger(LedgerEngine):
         return self.serialize_ledger(self.complete_ledger(self.journal.list()))
 
     def complete_ledger(self, journal=None) -> pd.DataFrame:
-        # Journal definition
+        """
+        Return a fully processed ledger with all corrections and automated entries applied.
+
+        This includes journal sanitization, tax-related entries, and generated automated
+        entries (e.g., target balances and revaluations), producing a complete, chronologically
+        ordered ledger ready for reporting.
+
+        Args:
+            journal (pd.DataFrame, optional): The raw journal entries to complete.
+
+        Returns:
+            pd.DataFrame: The completed ledger with all adjustments included.
+        """
         df = self.journal.standardize(journal)
         df = self.sanitize_journal(df)
         df = df.sort_values(["date", "id"])
@@ -180,21 +192,31 @@ class StandaloneLedger(LedgerEngine):
         # Add ledger entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
-        corrections = self.correcting_entries(df)
-        if not corrections.empty:
-            df = pd.concat([df, corrections], ignore_index=True)
+        automated_entries = self.generate_automated_entries(df)
+        if not automated_entries.empty:
+            df = pd.concat([df, automated_entries], ignore_index=True)
 
         return df
 
-    def correcting_entries(self, ledger: pd.DataFrame) -> pd.DataFrame:
-        """Compute all ledger correction entries (target balances and revaluations),
-        in historical order. Target balances are applied before revaluations on same date.
+    def generate_automated_entries(self, ledger: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generate all automated ledger entries, including target balance adjustments
+        and currency revaluations, applied in strict historical order.
+
+        For each unique correction date, this method generates:
+        1. Target balance entries to adjust specified accounts to configured target values.
+        2. Revaluation entries to reflect updated currency values for foreign-denominated balances.
+
+        Target balance entries are always applied before revaluations on the same date,
+        as they may influence account balances that require revaluation. The resulting
+        corrections are suitable for appending to the original ledger to achieve a
+        fully adjusted view.
 
         Args:
-            ledger (pd.DataFrame): The initial ledger.
+            ledger (pd.DataFrame): The initial ledger with JOURNAL_SCHEMA.
 
         Returns:
-            pd.DataFrame: Correction entries to append to the ledger.
+            pd.DataFrame: A DataFrame of all generated entries, in chronological order.
         """
         revaluations = self.sanitize_revaluations(self.revaluations.list())
         target_balances = self.sanitize_target_balance(self.target_balance.list())
@@ -238,7 +260,32 @@ class StandaloneLedger(LedgerEngine):
     def target_balance_entries(
         self, ledger: pd.DataFrame, target_balance: pd.DataFrame
     ) -> pd.DataFrame:
-        """Compute ledger entries to enforce target balances."""
+        """
+        Generate automated ledger entries based on target balance specifications.
+
+        In accounting, certain accounts must be periodically cleared or closed—such as
+        P&L at year-end or tax accounts after filing. Defining target balance rules
+        allows this process to be automated, eliminating manual closing entries and
+        ensuring consistency across periods.
+
+        All rules are processed in ascending order of their booking dates, as each
+        generated entry may influence the balances of subsequent rules. For each rule,
+        the method computes the current balance based on the specified lookup filters
+        (e.g., account ranges, periods, profit centers). If the balance differs from
+        the target, it creates ledger entries that adjust the specified account to the
+        desired value—typically zero—offsetting the difference to a designated
+        contra account.
+
+        Args:
+            ledger (pd.DataFrame): The existing ledger with JOURNAL_SCHEMA.
+            target_balance (pd.DataFrame): A DataFrame defining target balance rules,
+                with TARGET_BALANCE_SCHEMA.
+
+        Returns:
+            pd.DataFrame: A DataFrame of generated ledger entries that enforce
+                the target balances.
+        """
+
         result = []
         reporting_currency = self.reporting_currency
 
