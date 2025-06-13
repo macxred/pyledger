@@ -41,7 +41,7 @@ ACCOUNT_CSV = """
     Expenses/Cost of Goods Sold,                                        5000,      USD,   IN_STD, Purchases
     Expenses/Other/Financial,                                           7050,      USD,         , Foreign Exchange Gain/Loss
     Revenue/Other/Financial,                                            8050,      USD,         , Foreign Exchange Gain
-    Balance,                                                            9200,      USD,         , Net Profit/Loss for the Year
+    Revenue/Balance,                                                    9200,      USD,         , Net Profit/Loss for the Year
 
 """
 ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
@@ -448,7 +448,7 @@ EXPECTED_AGGREGATED_BALANCES_CSV = """
     /Expenses/Cost of Goods Sold,                Purchases,                     3502.64
     /Expenses/Other,                             Financial,                     -1659837.61
     /Revenue/Other,                              Financial,                     -5.55
-    /Balance,                                    Net Profit/Loss for the Year,  0.0
+    /Revenue/Balance,                                    Net Profit/Loss for the Year,  0.0
 """
 EXPECTED_AGGREGATED_BALANCES = pd.read_csv(StringIO(EXPECTED_AGGREGATED_BALANCES_CSV), skipinitialspace=True)
 # flake8: enable
