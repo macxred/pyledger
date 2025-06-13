@@ -568,3 +568,26 @@ def test_sanitize_target_balance(engine, capture_logs):
     assert_frame_equal(expected_target_balance, sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert len(log_messages) == 5, "Expected strict number of captured logs"
+
+def test_sanitize_profit_center(engine, capture_logs):
+    PROFIT_CENTER_CSV = """
+        profit_center
+        SALES
+        +MARKETING
+        FINANCE
+        DEV+OPS
+        HR
+    """
+    EXPECTED_CSV = """
+        profit_center
+        SALES
+        FINANCE
+        HR
+    """
+
+    profit_centers = pd.read_csv(StringIO(PROFIT_CENTER_CSV), skipinitialspace=True)
+    expected = pd.read_csv(StringIO(EXPECTED_CSV), skipinitialspace=True)
+    sanitized = engine.sanitize_profit_center(profit_centers)
+    assert_frame_equal(expected.reset_index(drop=True), sanitized, check_dtype=False)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert any("Discarding" in msg and "+" in msg for msg in log_messages)
