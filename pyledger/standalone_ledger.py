@@ -228,29 +228,29 @@ class StandaloneLedger(LedgerEngine):
         for date in dates:
             combined = pd.concat([ledger] + result)
 
-            # Calculate target balance entries
-            target_balance_rows = target_balances.query("date == @date")
-            if not target_balance_rows.empty:
-                target_balance_entries = self.target_balance_entries(
-                    ledger=combined,
-                    target_balance=target_balance_rows,
-                )
-                result.append(target_balance_entries)
-            else:
-                target_balance_entries = None
-
             # Calculate revaluation entries
             revaluation_rows = revaluations.query("date == @date")
             if not revaluation_rows.empty:
-                revaluation_ledger = (
-                    pd.concat([combined, target_balance_entries])
-                    if target_balance_entries is not None else combined
-                )
                 revaluation_entries = self.revaluation_entries(
-                    ledger=revaluation_ledger,
+                    ledger=combined,
                     revaluations=revaluation_rows,
                 )
                 result.append(revaluation_entries)
+            else:
+                revaluation_entries = None
+
+            # Calculate target balance entries
+            target_balance_rows = target_balances.query("date == @date")
+            if not target_balance_rows.empty:
+                target_balance_ledger = (
+                    pd.concat([combined, revaluation_entries])
+                    if revaluation_entries is not None else combined
+                )
+                target_balance_entries = self.target_balance_entries(
+                    ledger=target_balance_ledger,
+                    target_balance=target_balance_rows,
+                )
+                result.append(target_balance_entries)
 
         return (
             pd.concat(result, ignore_index=True)
@@ -323,15 +323,15 @@ class StandaloneLedger(LedgerEngine):
                     **base_entry,
                     "account": row["account"],
                     "contra": row["contra"],
-                    "amount": delta,
-                    "report_amount": report_delta,
+                    "amount": -delta,
+                    "report_amount": -report_delta,
                 })
                 result.append({
                     **base_entry,
                     "account": row["contra"],
                     "contra": row["account"],
                     "amount": delta,
-                    "report_amount": -report_delta,
+                    "report_amount": report_delta,
                 })
 
         return self.journal.standardize(pd.DataFrame(result))
@@ -451,7 +451,7 @@ class StandaloneLedger(LedgerEngine):
         if rows.sum() == 0:
             return {"reporting_currency": 0.0}
 
-        sub = ledger.loc[rows, ["account", "amount", "report_amount", "currency"]]
+        sub = ledger.loc[rows, ["account", "contra", "amount", "report_amount", "currency"]]
         sub = sub.merge(multipliers, on="account", how="inner")
         sub["amount"] *= sub["multiplier"]
         sub["report_amount"] *= sub["multiplier"]
