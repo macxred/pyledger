@@ -63,10 +63,6 @@ class StandaloneLedger(LedgerEngine):
     def reconciliation(self) -> AccountingEntity:
         return self._reconciliation
 
-    @property
-    def target_balance(self) -> AccountingEntity:
-        return self._target_balance
-
     # ----------------------------------------------------------------------
     # Tax Codes
 
@@ -172,7 +168,19 @@ class StandaloneLedger(LedgerEngine):
         return self.serialize_ledger(self.complete_ledger(self.journal.list()))
 
     def complete_ledger(self, journal=None) -> pd.DataFrame:
-        # Journal definition
+        """
+        Return a fully processed ledger with all corrections and automated entries applied.
+
+        This includes journal sanitization, tax-related entries, and generated automated
+        entries (e.g., target balances and revaluations), producing a complete, chronologically
+        ordered ledger ready for reporting.
+
+        Args:
+            journal (pd.DataFrame, optional): The raw journal entries to complete.
+
+        Returns:
+            pd.DataFrame: The completed ledger with all adjustments included.
+        """
         df = self.journal.standardize(journal)
         df = self.sanitize_journal(df)
         df = df.sort_values(["date", "id"])
@@ -180,10 +188,149 @@ class StandaloneLedger(LedgerEngine):
         # Add ledger entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
-        # Add ledger entries for (currency or other) revaluations
+        automated_entries = self.generate_automated_entries(df)
+        if not automated_entries.empty:
+            df = pd.concat([df, automated_entries], ignore_index=True)
+
+        return df
+
+    def generate_automated_entries(self, ledger: pd.DataFrame) -> pd.DataFrame:
+        """
+        Generate all automated ledger entries, including target balance adjustments
+        and currency revaluations, applied in strict historical order.
+
+        For each unique correction date, this method generates:
+        1. Target balance entries to adjust specified accounts to configured target values.
+        2. Revaluation entries to reflect updated currency values for foreign-denominated balances.
+
+        Target balance entries are always applied before revaluations on the same date,
+        as they may influence account balances that require revaluation. The resulting
+        corrections are suitable for appending to the original ledger to achieve a
+        fully adjusted view.
+
+        Args:
+            ledger (pd.DataFrame): The initial ledger with JOURNAL_SCHEMA.
+
+        Returns:
+            pd.DataFrame: A DataFrame of all generated entries, in chronological order.
+        """
         revaluations = self.sanitize_revaluations(self.revaluations.list())
-        revalue = self.revaluation_entries(ledger=df, revaluations=revaluations)
-        return pd.concat([df, revalue], ignore_index=True)
+        target_balances = self.sanitize_target_balance(self.target_balance.list())
+        dates = pd.Series(
+            list(revaluations["date"]) + list(target_balances["date"])
+        ).dropna().drop_duplicates().sort_values()
+        result = []
+
+        for date in dates:
+            combined = pd.concat([ledger] + result)
+
+            # Calculate target balance entries
+            target_balance_rows = target_balances.query("date == @date")
+            if not target_balance_rows.empty:
+                target_balance_entries = self.target_balance_entries(
+                    ledger=combined,
+                    target_balance=target_balance_rows,
+                )
+                result.append(target_balance_entries)
+            else:
+                target_balance_entries = None
+
+            # Calculate revaluation entries
+            revaluation_rows = revaluations.query("date == @date")
+            if not revaluation_rows.empty:
+                revaluation_ledger = (
+                    pd.concat([combined, target_balance_entries])
+                    if target_balance_entries is not None else combined
+                )
+                revaluation_entries = self.revaluation_entries(
+                    ledger=revaluation_ledger,
+                    revaluations=revaluation_rows,
+                )
+                result.append(revaluation_entries)
+
+        return (
+            pd.concat(result, ignore_index=True)
+            if result else pd.DataFrame(columns=ledger.columns)
+        )
+
+    def target_balance_entries(
+        self, ledger: pd.DataFrame, target_balance: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Generate automated ledger entries based on target balance specifications.
+
+        In accounting, certain accounts must be periodically cleared or closed—such as
+        P&L at year-end or tax accounts after filing. Defining target balance rules
+        allows this process to be automated, eliminating manual closing entries and
+        ensuring consistency across periods.
+
+        All rules are processed in ascending order of their booking dates, as each
+        generated entry may influence the balances of subsequent rules. For each rule,
+        the method computes the current balance based on the specified lookup filters
+        (e.g., account ranges, periods, profit centers). If the balance differs from
+        the target, it creates ledger entries that adjust the specified account to the
+        desired value—typically zero—offsetting the difference to a designated
+        contra account.
+
+        Args:
+            ledger (pd.DataFrame): The existing ledger with JOURNAL_SCHEMA.
+            target_balance (pd.DataFrame): A DataFrame defining target balance rules,
+                with TARGET_BALANCE_SCHEMA.
+
+        Returns:
+            pd.DataFrame: A DataFrame of generated ledger entries that enforce
+                the target balances.
+        """
+
+        result = []
+        reporting_currency = self.reporting_currency
+
+        for row in target_balance.to_dict("records"):
+            entries = self.journal.standardize(pd.DataFrame(result))
+            df = self.serialize_ledger(pd.concat([ledger, entries]))
+            if pd.isna(row["lookup_profit_centers"]):
+                profit_centers = None
+            else:
+                profit_centers = self.parse_profit_centers(row["lookup_profit_centers"])
+            balance = self._account_balance(
+                ledger=df, account=row["lookup_accounts"],
+                period=row["lookup_period"], profit_centers=profit_centers
+            )
+            current = balance.get("reporting_currency", 0.0)
+            delta = row["balance"] - current
+            delta = self.round_to_precision(delta, ticker=reporting_currency, date=row["date"])
+            report_delta = self.report_amount(
+                amount=[delta], currency=[reporting_currency], date=[row["date"]]
+            )[0]
+
+            if delta != 0:
+                entry_id = (
+                    f"target_balance:{row['lookup_period']}:{row['lookup_accounts']}:"
+                    f"{row['lookup_profit_centers']}"
+                )
+                base_entry = {
+                    "id": entry_id,
+                    "date": row["date"],
+                    "currency": reporting_currency,
+                    "description": row["description"],
+                    "document": row["document"],
+                }
+                result.append({
+                    **base_entry,
+                    "account": row["account"],
+                    "contra": row["contra"],
+                    "amount": delta,
+                    "report_amount": report_delta,
+                })
+                result.append({
+                    **base_entry,
+                    "account": row["contra"],
+                    "contra": row["account"],
+                    "amount": delta,
+                    "report_amount": -report_delta,
+                })
+
+        return self.journal.standardize(pd.DataFrame(result))
 
     def revaluation_entries(
         self, ledger: pd.DataFrame, revaluations: pd.DataFrame
