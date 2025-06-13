@@ -81,6 +81,10 @@ class LedgerEngine(ABC):
     def profit_centers(self) -> AccountingEntity:
         return self._profit_centers
 
+    @property
+    def target_balance(self) -> AccountingEntity:
+        return self._target_balance
+
     # ----------------------------------------------------------------------
     # File Operations
 
