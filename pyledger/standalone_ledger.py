@@ -326,7 +326,7 @@ class StandaloneLedger(LedgerEngine):
                     **base_entry,
                     "account": row["contra"],
                     "contra": row["account"],
-                    "amount": delta,
+                    "amount": -delta,
                     "report_amount": -report_delta,
                 })
 
