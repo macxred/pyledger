@@ -1580,8 +1580,7 @@ class LedgerEngine(ABC):
     # Reconciliation
 
     def sanitize_reconciliation(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Discard incoherent reconciliation data.
+        """Discard incoherent reconciliation data.
 
         This method discards reconciliation entries that:
         1. Have an unresolvable or missing period.
@@ -1609,8 +1608,41 @@ class LedgerEngine(ABC):
         """
         df = enforce_schema(df, RECONCILIATION_SCHEMA, keep_extra_columns=True)
         id_columns = RECONCILIATION_SCHEMA.query("id == True")["column"].tolist()
+        id_data = df[id_columns]
+        invalid_mask = pd.Series(False, index=df.index)
 
-        def is_invalid_period(x):
+        mask = self._invalid_periods(df["period"], invalid_mask)
+        self._log_invalid_rows("invalid periods", mask, id_data)
+        invalid_mask |= mask
+
+        mask = self._invalid_reconciliation_accounts(df["account"], invalid_mask)
+        self._log_invalid_rows("invalid accounts", mask, id_data)
+        invalid_mask |= mask
+
+        mask = self._invalid_reconciliation_profit_centers(df["profit_center"], invalid_mask)
+        self._log_invalid_rows("invalid profit centers", mask, id_data)
+        invalid_mask |= mask
+
+        drop_mask, patch_mask = self._invalid_currencies(
+            df["currency"], df["period"], df["balance"], df["report_balance"], invalid_mask
+        )
+        self._log_invalid_rows("invalid currencies without report balance", drop_mask, id_data)
+        self._log_invalid_rows(
+            "invalid currencies with patch (clearing balance & currency)", patch_mask, id_data
+        )
+        df.loc[patch_mask, ["balance", "currency"]] = pd.NA
+        invalid_mask |= drop_mask
+
+        mask = self._invalid_missing_balances(df["balance"], df["report_balance"], invalid_mask)
+        self._log_invalid_rows("missing both balances", mask, id_data)
+        invalid_mask |= mask
+        df["tolerance"] = df["tolerance"].fillna(0.0)
+
+        return df.loc[~invalid_mask].reset_index(drop=True)
+
+    def _invalid_periods(self, period: pd.Series, invalid_mask: pd.Series) -> pd.Series:
+        """Mark rows with invalid periods."""
+        def is_invalid(x):
             if pd.isna(x):
                 return True
             try:
@@ -1618,89 +1650,73 @@ class LedgerEngine(ABC):
             except Exception:
                 return True
 
-        invalid_period_mask = df["period"].apply(is_invalid_period).astype(bool)
-        if invalid_period_mask.any():
-            invalid = df.loc[invalid_period_mask, id_columns].to_dict(orient="records")
-            self._logger.warning(
-                f"Discarding {len(invalid)} reconciliation rows with invalid periods: "
-                f"{first_elements_as_str(invalid)}"
-            )
-            df = df.query("~@invalid_period_mask")
+        mask = period.apply(is_invalid)
+        return mask & ~invalid_mask
 
-        def is_invalid_account(x):
+    def _invalid_reconciliation_accounts(
+        self, account: pd.Series, invalid_mask: pd.Series
+    ) -> pd.Series:
+        """Mark rows with invalid account references."""
+        def is_invalid(x):
             try:
-                account_range = self.parse_account_range(x)
-                return (len(account_range["add"]) == 0) and (len(account_range["subtract"]) == 0)
+                acc = self.parse_account_range(x)
+                return not acc["add"] and not acc["subtract"]
             except Exception:
                 return True
 
-        invalid_account_mask = df["account"].apply(is_invalid_account).astype(bool)
-        if invalid_account_mask.any():
-            invalid = df.loc[invalid_account_mask, id_columns].to_dict(orient="records")
-            self._logger.warning(
-                f"Discarding {len(invalid)} reconciliation rows with invalid accounts: "
-                f"{first_elements_as_str(invalid)}"
-            )
-            df = df.query("~@invalid_account_mask")
+        mask = account.apply(is_invalid)
+        return mask & ~invalid_mask
 
-        valid_profit_centers = set(self.profit_centers.list()["profit_center"])
-        invalid_pc_mask = (
-            df["profit_center"].notna() & ~df["profit_center"].isin(valid_profit_centers)
-        )
-        if invalid_pc_mask.any():
-            invalid = df.loc[invalid_pc_mask, id_columns].to_dict(orient="records")
-            self._logger.warning(
-                f"Discarding {len(invalid)} reconciliation rows with invalid profit centers: "
-                f"{first_elements_as_str(invalid)}"
-            )
-            df = df.query("~@invalid_pc_mask")
+    def _invalid_reconciliation_profit_centers(
+        self, pc: pd.Series, invalid_mask: pd.Series
+    ) -> pd.Series:
+        """Mark rows with invalid profit centers."""
+        valid_set = set(self.profit_centers.list()["profit_center"])
+        mask = pc.notna() & ~pc.isin(valid_set)
+        return mask & ~invalid_mask
 
-        parsed_dates = df["period"].apply(lambda x: parse_date_span(x)[1])
+    def _invalid_currencies(
+        self,
+        currency: pd.Series,
+        period: pd.Series,
+        balance: pd.Series,
+        report_balance: pd.Series,
+        invalid_mask: pd.Series,
+    ) -> tuple[pd.Series, pd.Series]:
+        """Mark rows with invalid currencies and identify patchable ones."""
+        valid_idx = ~invalid_mask
+        end_dates = period.loc[valid_idx].map(lambda x: parse_date_span(x)[1])
 
-        def is_invalid_currency(row):
-            if pd.isna(row["currency"]):
+        def is_invalid(ticker, date):
+            if pd.isna(ticker):
                 return False
             try:
-                self.precision(ticker=row["currency"], date=parsed_dates[row.name])
+                self.precision(ticker=ticker, date=date)
                 return False
             except Exception:
                 return True
 
-        invalid_currency_mask = df.apply(is_invalid_currency, axis=1)
-        has_balance_mask = df["balance"].notna()
+        invalid_local = [is_invalid(t, d) for t, d in zip(currency.loc[valid_idx], end_dates)]
+        full_mask = pd.Series(False, index=currency.index)
+        full_mask.loc[currency.index[valid_idx][invalid_local]] = True
+        drop_mask = full_mask & report_balance.isna()
+        patch_mask = full_mask & balance.notna()
+        return drop_mask, patch_mask
 
-        # Compute rows with invalid currency to drop entirely
-        drop_row_mask = invalid_currency_mask & df["report_balance"].isna()
-        if drop_row_mask.any():
-            df = df.query("~@drop_row_mask")
-            invalid = df.loc[drop_row_mask, id_columns].to_dict(orient="records")
+    def _invalid_missing_balances(
+        self, balance: pd.Series, report_balance: pd.Series, invalid_mask: pd.Series
+    ) -> pd.Series:
+        """Mark rows missing both balances."""
+        mask = balance.isna() & report_balance.isna()
+        return mask & ~invalid_mask
+
+    def _log_invalid_rows(self, reason: str, mask: pd.Series, id_data: pd.DataFrame) -> None:
+        """Log a warning for invalid rows."""
+        if mask.any():
             self._logger.warning(
-                f"Discarding {len(invalid)} reconciliation rows with invalid currencies "
-                f"and without report balance: {first_elements_as_str(invalid)}"
+                f"Discarding {mask.sum()} reconciliation rows with {reason}: "
+                f"{first_elements_as_str(id_data.loc[mask].to_dict('records'))}"
             )
-
-        # Compute rows to nullify balance + currency
-        set_na_fields_mask = invalid_currency_mask & has_balance_mask
-        if set_na_fields_mask.any():
-            invalid = df.loc[set_na_fields_mask, id_columns].to_dict(orient="records")
-            self._logger.warning(
-                f"Set balance and currency to NA for {len(invalid)} rows "
-                f"with invalid currency references: {first_elements_as_str(invalid)}"
-            )
-            df.loc[set_na_fields_mask, ["balance", "currency"]] = pd.NA
-
-        both_missing_mask = df["balance"].isna() & df["report_balance"].isna()
-        if both_missing_mask.any():
-            invalid = df.loc[both_missing_mask, id_columns].to_dict(orient="records")
-            self._logger.warning(
-                f"Discarding {len(invalid)} reconciliation rows missing both "
-                f"balance and report_balance: {first_elements_as_str(invalid)}"
-            )
-            df = df.query("~@both_missing_mask")
-
-        df["tolerance"] = df["tolerance"].fillna(0.0)
-
-        return df.reset_index(drop=True)
 
     def reconcile(
         self,
