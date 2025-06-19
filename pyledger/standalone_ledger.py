@@ -283,8 +283,7 @@ class StandaloneLedger(LedgerEngine):
         rows = ledger["account"].isin(multipliers["account"])
 
         if profit_centers is not None and profit_centers is not pd.NA:
-            if isinstance(profit_centers, str):
-                profit_centers = [profit_centers]
+            profit_centers = self.parse_profit_centers(profit_centers)
             valid_profit_centers = set(self.profit_centers.list()["profit_center"])
             invalid_profit_centers = set(profit_centers) - valid_profit_centers
             if invalid_profit_centers:
