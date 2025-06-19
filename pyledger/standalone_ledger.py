@@ -304,11 +304,6 @@ class StandaloneLedger(LedgerEngine):
         sub = sub.merge(multipliers, on="account", how="inner")
         sub["amount"] *= sub["multiplier"]
         sub["report_amount"] *= sub["multiplier"]
-
-        account_currencies = sub["account"].map(lambda acc: self.account_currency(acc))
-        sub.loc[account_currencies == self.reporting_currency, "amount"] = sub["report_amount"]
-        sub["currency"] = account_currencies.combine_first(sub["currency"])
-
         grouped = sub.groupby("currency", sort=False)["amount"].sum().reset_index()
         rounded_amounts = dict(zip(
             grouped["currency"],

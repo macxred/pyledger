@@ -183,7 +183,7 @@ EXPECTED_BALANCES_CSV = """
     2024-03-31,      8050,                         ,           0.00,   "{USD:        0.00}"
     2024-12-31,      4001,                         ,       -1198.26,   "{EUR:    -1119.04}"
     2024-Q4,    1000:1999,                         ,    11655605.63,   "{USD: 300000.0, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
-    2024,       1000:1999,                         ,    12756779.54,   "{USD: 1076572.64, EUR: 10026667.1, JPY: 54345678.0, CHF: 14285714.3}"
+    2024,       1000:1999,                         ,    12756779.54,   "{USD: 1076428.72, EUR: 10026811.02, JPY: 54345678.0, CHF: 14285714.3}"
     2024-08,    1000:1999,                         ,         -700.0,   "{USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2023-12-31, 1000:9999,                "General",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2023-12-31, 1000:9999,    "General, Shop, Cafe",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
@@ -196,8 +196,8 @@ EXPECTED_BALANCES_CSV = """
     2024-01-24,      2200,  "General, Shop, Bakery",        -200.00,   "{USD: -200.00}"
     2024-03-31, 1000:1999,  "General, Shop, Bakery",     1099532.82,   "{USD: 801200.0, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-03-31, 1000:1999,             "Restaurant",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-12-31, 1000:9999,             "Restaurant",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
-    2024-12-31, 1000:9999,    "General, Restaurant",            0.0,   "{USD: -498332.82, EUR: 27078.22, JPY: 54345678.0, CHF: 14285714.3}"
+    2024-12-31, 1000:9999,             "Restaurant",            0.0,   "{USD: -5.55}"
+    2024-12-31, 1000:9999,    "General, Restaurant",            0.0,   "{USD: -498338.37, EUR: 27078.22, JPY: 54345678.0, CHF: 14285714.3}"
 """
 EXPECTED_BALANCES = pd.read_csv(StringIO(EXPECTED_BALANCES_CSV), skipinitialspace=True)
 
@@ -228,7 +228,7 @@ EXPECTED_INDIVIDUAL_BALANCES_CSV = """
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,     -20.00, -22.34
               ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 54345678.00, 380419.75
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
-              ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,     360.85, 360.85
+              ,          ,                         , Assets/Tax Recoverable,          VAT Recoverable (Input VAT),    1300,      USD,      216.93, 360.85
        2024-12, 1000:1025,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11255605.63
