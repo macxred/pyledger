@@ -154,16 +154,6 @@ RECONCILIATION_CSV = """
 """
 RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
 
-# TODO: Update with actual target balance data
-TARGET_BALANCE_CSV = """
-    id, date,       account, contra, currency, tax_code, profit_center,                       description,                     document,    lookup_period, lookup_accounts, lookup_profit_centers, balance
-    1,  2024-03-31,    3000,   8050,      USD,         ,       General,     Carry forward P&L into equity,      2024/financials/pnl.pdf,             2024,       2999:9999,               General,       0
-    2,  2025-01-01,    8050,   3000,      USD,         ,       General,        Zero-out P&L for reporting,      2024/financials/pnl.pdf,             2024,       2999:9999,               General,       0
-    3,  2024-05-31,    2010,   2200,      EUR,         ,       General,    Quarterly income tax provision,        2024/q1/tax_calc.xlsx,          2024-Q2,       1000:2999,               General,   15000
-    4,  2025-09-02,    1000,   8050,      USD,         ,       General,   Adjust cash to liquidity buffer,  2024/planning/liquidity.pdf,             2024,            1000,               General, 1000000
-"""
-TARGET_BALANCE = pd.read_csv(StringIO(TARGET_BALANCE_CSV), skipinitialspace=True)
-
 # flake8: noqa: E501
 EXPECTED_BALANCES_CSV = """
     period,       account,            profit_center, report_balance,   balance
@@ -461,7 +451,6 @@ class BaseTest(ABC):
     REVALUATIONS = engine.revaluations.standardize(REVALUATIONS)
     RECONCILIATION = engine.reconciliation.standardize(RECONCILIATION)
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
-    TARGET_BALANCE = engine.target_balance.standardize(TARGET_BALANCE)
     EXPECTED_BALANCES = EXPECTED_BALANCES
     EXPECTED_INDIVIDUAL_BALANCES = EXPECTED_INDIVIDUAL_BALANCES
     EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES

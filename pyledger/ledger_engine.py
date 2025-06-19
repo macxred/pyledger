@@ -941,10 +941,7 @@ class LedgerEngine(ABC):
         def is_invalid(row):
             if row["id"] in invalid_ids:
                 return True
-            if (
-                row.get("currency") == reporting_currency
-                or ("report_amount" in df.columns and pd.notna(row.get("report_amount")))
-            ):
+            if row["currency"] == reporting_currency or pd.notna(row["report_amount"]):
                 return False
             try:
                 self.price(
