@@ -169,7 +169,7 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        return self.serialize_ledger(self.complete_ledger(self.journal.list()))
+        return self.complete_ledger(self.journal.list())
 
     def complete_ledger(self, journal=None) -> pd.DataFrame:
         """
@@ -192,20 +192,25 @@ class StandaloneLedger(LedgerEngine):
         # Add ledger entries for tax
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
-        automated_entries = self.generate_automated_entries(df)
+        automated_entries = self.generate_automated_entries(
+            df, target_balances=self.target_balance.list(), revaluations=self.revaluations.list()
+        )
         if not automated_entries.empty:
-            df = pd.concat([df, automated_entries], ignore_index=True)
+            df = pd.concat([self.serialize_ledger(df), automated_entries], ignore_index=True)
 
         return df
 
-    def generate_automated_entries(self, ledger: pd.DataFrame) -> pd.DataFrame:
+    def generate_automated_entries(
+        self, ledger: pd.DataFrame, target_balances: pd.DataFrame, revaluations: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Generate all automated ledger entries, including target balance adjustments
         and currency revaluations, applied in strict historical order.
 
         For each unique correction date, this method generates:
-        1. Target balance entries to adjust specified accounts to configured target values.
-        2. Revaluation entries to reflect updated currency values for foreign-denominated balances.
+        1. Revaluation entries to reflect updated reporting currency values for foreign
+        currency balances.
+        2. Target balance entries to adjust specified accounts to configured target values.
 
         Target balance entries are always applied before revaluations on the same date,
         as they may influence account balances that require revaluation. The resulting
@@ -218,8 +223,8 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: A DataFrame of all generated entries, in chronological order.
         """
-        revaluations = self.sanitize_revaluations(self.revaluations.list())
-        target_balances = self.sanitize_target_balance(self.target_balance.list())
+        revaluations = self.sanitize_revaluations(revaluations)
+        target_balances = self.sanitize_target_balance(target_balances)
         dates = pd.Series(
             list(revaluations["date"]) + list(target_balances["date"])
         ).dropna().drop_duplicates().sort_values()
@@ -290,15 +295,10 @@ class StandaloneLedger(LedgerEngine):
         reporting_currency = self.reporting_currency
 
         for row in target_balance.to_dict("records"):
-            entries = self.journal.standardize(pd.DataFrame(result))
-            df = self.serialize_ledger(pd.concat([ledger, entries]))
-            if pd.isna(row["lookup_profit_centers"]):
-                profit_centers = None
-            else:
-                profit_centers = self.parse_profit_centers(row["lookup_profit_centers"])
+            df = self.serialize_ledger(ledger)
             balance = self._account_balance(
                 ledger=df, account=row["lookup_accounts"],
-                period=row["lookup_period"], profit_centers=profit_centers
+                period=row["lookup_period"], profit_centers=row["lookup_profit_centers"]
             )
             current = balance.get("reporting_currency", 0.0)
             delta = row["balance"] - current
