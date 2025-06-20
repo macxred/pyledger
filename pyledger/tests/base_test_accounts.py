@@ -160,7 +160,8 @@ class BaseTestAccounts(BaseTest):
         restored_engine.restore(
             accounts=self.ACCOUNTS, configuration=self.CONFIGURATION, tax_codes=self.TAX_CODES,
             journal=self.JOURNAL, assets=self.ASSETS, price_history=self.PRICES,
-            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS
+            revaluations=self.REVALUATIONS, profit_centers=self.PROFIT_CENTERS,
+            target_balance=self.TARGET_BALANCE
         )
         columns_to_drop = ["period", "account", "profit_center"]
 
