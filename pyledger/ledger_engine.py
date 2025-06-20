@@ -22,6 +22,7 @@ from .constants import (
     ASSETS_SCHEMA,
     JOURNAL_SCHEMA,
     PRICE_SCHEMA,
+    PROFIT_CENTER_SCHEMA,
     RECONCILIATION_SCHEMA,
     REVALUATION_SCHEMA,
     TARGET_BALANCE_SCHEMA,
@@ -1833,6 +1834,29 @@ class LedgerEngine(ABC):
 
     # ----------------------------------------------------------------------
     # Profit center
+
+    def sanitize_profit_center(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard profit centers that contain the '+' character and log a warning.
+
+        The '+' character is reserved for profit center concatenation.
+
+        Args:
+            df (pd.DataFrame): Profit center data to sanitize.
+
+        Returns:
+            pd.DataFrame: A sanitized DataFrame containing only valid profit center entries.
+        """
+        df = enforce_schema(df, PROFIT_CENTER_SCHEMA, keep_extra_columns=True)
+
+        invalid_mask = df["profit_center"].astype(str).str.contains(r"\+")
+        if invalid_mask.any():
+            invalid_names = df.loc[invalid_mask, "profit_center"].tolist()
+            self._logger.warning(
+                f"Discarding {invalid_mask.sum()} profit center entries with '+' "
+                f"in 'profit_center': {first_elements_as_str(invalid_names)}"
+            )
+
+        return df.loc[~invalid_mask].reset_index(drop=True)
 
     def parse_profit_centers(self, profit_center: str | list[str] | set[str]) -> set[str]:
         """
