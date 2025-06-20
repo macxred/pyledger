@@ -1941,8 +1941,7 @@ class LedgerEngine(ABC):
         invalid_ids = self._invalid_accounts(df, invalid_ids)
         precision = self.precision_vectorized(df["currency"], dates=df["date"], allow_missing=True)
         invalid_ids = self._invalid_assets(df, invalid_ids, precision)
-        invalid_ids = self._invalid_currency(df, invalid_ids)
-        invalid_ids = self._invalid_prices(df, invalid_ids)
+        # TODO: validate currency and price including possible "reporting_currency" value
         invalid_ids = self._invalid_profit_centers(df, invalid_ids)
 
         return df.query("id not in @invalid_ids").reset_index(drop=True)

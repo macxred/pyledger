@@ -169,9 +169,9 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        return self.complete_ledger(self.journal.list())
+        return self.accounting_ledger(self.journal.list())
 
-    def complete_ledger(self, journal=None) -> pd.DataFrame:
+    def accounting_ledger(self, journal=None) -> pd.DataFrame:
         """
         Return a fully processed ledger with all corrections and automated entries applied.
 
@@ -237,8 +237,7 @@ class StandaloneLedger(LedgerEngine):
             revaluation_rows = revaluations.query("date == @date")
             if not revaluation_rows.empty:
                 revaluation_entries = self.revaluation_entries(
-                    ledger=combined,
-                    revaluations=revaluation_rows,
+                    ledger=combined, revaluations=revaluation_rows,
                 )
                 result.append(revaluation_entries)
             else:
@@ -252,8 +251,7 @@ class StandaloneLedger(LedgerEngine):
                     if revaluation_entries is not None else combined
                 )
                 target_balance_entries = self.target_balance_entries(
-                    ledger=target_balance_ledger,
-                    target_balance=target_balance_rows,
+                    ledger=target_balance_ledger, target_balance=target_balance_rows,
                 )
                 result.append(target_balance_entries)
 
@@ -293,46 +291,49 @@ class StandaloneLedger(LedgerEngine):
 
         result = []
         reporting_currency = self.reporting_currency
+        df = self.serialize_ledger(ledger)
 
         for row in target_balance.to_dict("records"):
-            df = self.serialize_ledger(ledger)
             balance = self._account_balance(
                 ledger=df, account=row["lookup_accounts"],
                 period=row["lookup_period"], profit_centers=row["lookup_profit_centers"]
             )
-            current = balance.get("reporting_currency", 0.0)
-            delta = row["balance"] - current
-            delta = self.round_to_precision(delta, ticker=reporting_currency, date=row["date"])
+            current_balance = balance.get(row["currency"], 0.0)
+            currency = (
+                reporting_currency if row["currency"] == "reporting_currency" else row["currency"]
+            )
+            delta = row["balance"] - current_balance
+            delta = self.round_to_precision(delta, ticker=currency, date=row["date"])
             report_delta = self.report_amount(
-                amount=[delta], currency=[reporting_currency], date=[row["date"]]
+                amount=[delta], currency=[currency], date=[row["date"]]
             )[0]
 
-            if delta != 0:
-                entry_id = (
-                    f"target_balance:{row['lookup_period']}:{row['lookup_accounts']}:"
-                    f"{row['lookup_profit_centers']}"
-                )
-                base_entry = {
-                    "id": entry_id,
-                    "date": row["date"],
-                    "currency": reporting_currency,
-                    "description": row["description"],
-                    "document": row["document"],
-                }
-                result.append({
-                    **base_entry,
-                    "account": row["account"],
-                    "contra": row["contra"],
-                    "amount": -delta,
-                    "report_amount": -report_delta,
-                })
-                result.append({
-                    **base_entry,
-                    "account": row["contra"],
-                    "contra": row["account"],
-                    "amount": delta,
-                    "report_amount": report_delta,
-                })
+            if report_delta == 0:
+                continue
+
+            entry_id = f"tb:{row['lookup_period']}:{row['account']}:{row['lookup_profit_centers']}"
+            base_entry = {
+                "id": entry_id,
+                "date": row["date"],
+                "currency": currency,
+                "description": row["description"],
+                "document": row["document"],
+            }
+
+            result.append({
+                **base_entry,
+                "account": row["account"],
+                "contra": row["contra"],
+                "amount": -report_delta,
+                "report_amount": -report_delta,
+            })
+            result.append({
+                **base_entry,
+                "account": row["contra"],
+                "contra": row["account"],
+                "amount": report_delta,
+                "report_amount": report_delta,
+            })
 
         return self.journal.standardize(pd.DataFrame(result))
 
@@ -451,7 +452,7 @@ class StandaloneLedger(LedgerEngine):
         if rows.sum() == 0:
             return {"reporting_currency": 0.0}
 
-        sub = ledger.loc[rows, ["account", "contra", "amount", "report_amount", "currency"]]
+        sub = ledger.loc[rows, ["account", "amount", "report_amount", "currency"]]
         sub = sub.merge(multipliers, on="account", how="inner")
         sub["amount"] *= sub["multiplier"]
         sub["report_amount"] *= sub["multiplier"]

@@ -162,12 +162,12 @@ RECONCILIATION_CSV = """
 RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True)
 
 TARGET_BALANCE_CSV = """
-    id, date,       account, contra, currency, profit_center,                                  description, lookup_period, lookup_accounts,     balance
-    1,  2024-12-31,    2979,   9200,      USD,       General,                        P&L for the year 2024,          2024,       3000:9999,           0
-    2,  2025-01-02,    2979,   2970,      USD,       General, Move P&L for the year to P&L Carried Forward,          2024,            2979,           0
-    3,  2024-12-31,    1170,   1175,      USD,       General,                    VAT return 2024 input tax,          2024,            1170,           0
-    4,  2024-12-31,    1171,   1175,      USD,       General,                    VAT return 2024 input tax,          2024,            1171,           0
-    5,  2024-12-31,    2200,   1175,      USD,       General,                    VAT return 2024 sales tax,          2024,            2200,           0
+    id, date,       account, contra,            currency, profit_center,                                  description, lookup_period, lookup_accounts,     balance
+    1,  2024-12-31,    2979,   9200,  reporting_currency,       General,                        P&L for the year 2024,          2024,       3000:9999,           0
+    2,  2025-01-02,    2979,   2970,  reporting_currency,       General, Move P&L for the year to P&L Carried Forward,          2024,            2979,           0
+    3,  2024-12-31,    1170,   1175,                 USD,       General,                    VAT return 2024 input tax,          2024,            1170,           0
+    4,  2024-12-31,    1171,   1175,                 USD,       General,                    VAT return 2024 input tax,          2024,            1171,           0
+    5,  2024-12-31,    2200,   1175,                 USD,       General,                    VAT return 2024 sales tax,          2024,            2200,           0
 """
 TARGET_BALANCE = pd.read_csv(StringIO(TARGET_BALANCE_CSV), skipinitialspace=True)
 
@@ -189,8 +189,8 @@ EXPECTED_BALANCES_CSV = """
     2024-03-31,      7050,                         ,       21003.29,   "{USD:    21003.29}"
     2024-03-31,      8050,                         ,           0.00,   "{USD:        0.00}"
     2024-12-31,      4001,                         ,       -1198.26,   "{EUR:    -1119.04}"
-    2024-Q4,    1000:1999,                         ,    11656213.57,   "{USD: 300607.94, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
-    2024,       1000:1999,                         ,    12757387.48,   "{USD: 1077036.66, EUR: 10026811.02, JPY: 54345678.0, CHF: 14285714.3}"
+    2024-Q4,    1000:1999,                         ,    11655805.63,   "{USD: 300200.00, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
+    2024,       1000:1999,                         ,    12756979.54,   "{USD: 1076628.72, EUR: 10026800.43, JPY: 54345678.0, CHF: 14285714.3}"
     2024-08,    1000:1999,                         ,         -700.0,   "{USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2024-12-31,      2970,                         ,           0.00,   "{USD:    0.00}"
     2024-12-31,      9200,                         ,    12756871.60,   "{USD: 12756871.60}"
@@ -200,8 +200,8 @@ EXPECTED_BALANCES_CSV = """
     2025-01-02,      9200,                         ,    12756871.60,   "{USD: 12756871.60}"
     2024-12-31,      1170,                         ,           0.00,   "{USD: 0.00}"
     2024-12-31,      1171,                         ,           0.00,   "{USD: 0.00}"
-    2024-12-31,      1175,                         ,         607.94,   "{USD: 607.94}"
-    2024-12-31,      2200,                         ,       -1215.88,   "{USD: -807.94, EUR: -380.96}"
+    2024-12-31,      1175,                         ,         200.00,   "{USD: 200.00}"
+    2024-12-31,      2200,                         ,        -807.94,   "{USD: -400.0, EUR: -380.96}"
     2023-12-31, 1000:9999,                "General",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2023-12-31, 1000:9999,    "General, Shop, Cafe",            0.0,   "{USD: 0.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2024-01-01, 1000:9999,                "General",            0.0,   "{USD: -298332.82, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
