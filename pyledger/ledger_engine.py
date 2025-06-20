@@ -1836,13 +1836,9 @@ class LedgerEngine(ABC):
     # Profit center
 
     def sanitize_profit_center(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Discard incoherent profit center data.
+        """Discard profit centers that contain the '+' character and log a warning.
 
-        This method applies the following validation rule:
-        1. The `profit_center` column must not contain the '+' character,
-        otherwise discard the row.
-
-        A warning is logged for each dropped entry with the specific reason.
+        The '+' character is reserved for profit center concatenation.
 
         Args:
             df (pd.DataFrame): Profit center data to sanitize.
@@ -1852,25 +1848,15 @@ class LedgerEngine(ABC):
         """
         df = enforce_schema(df, PROFIT_CENTER_SCHEMA, keep_extra_columns=True)
 
-        invalid_indices = set()
-        invalid_indices = self._invalid_profit_center_name(df, invalid_indices)
-
-        return df.loc[~df.index.isin(invalid_indices)].reset_index(drop=True)
-
-    def _invalid_profit_center_name(self, df: pd.DataFrame, invalid_indices: set) -> set:
-        """Mark profit center entries that contain '+' in the `profit_center` column."""
         invalid_mask = df["profit_center"].astype(str).str.contains(r"\+")
-        new_indices = set(df.index[invalid_mask]) - invalid_indices
-
-        if new_indices:
-            invalid_names = df.loc[list(new_indices), "profit_center"].tolist()
+        if invalid_mask.any():
+            invalid_names = df.loc[invalid_mask, "profit_center"].tolist()
             self._logger.warning(
-                f"Discarding {len(new_indices)} profit center entries with '+' in 'profit_center': "
-                f"{first_elements_as_str(invalid_names)}"
+                f"Discarding {invalid_mask.sum()} profit center entries with '+' "
+                f"in 'profit_center': {first_elements_as_str(invalid_names)}"
             )
-            invalid_indices = invalid_indices.union(new_indices)
 
-        return invalid_indices
+        return df.loc[~invalid_mask].reset_index(drop=True)
 
     def parse_profit_centers(self, profit_center: str | list[str] | set[str]) -> set[str]:
         """
