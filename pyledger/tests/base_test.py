@@ -453,21 +453,21 @@ EXPECTED_AGGREGATED_BALANCES_CSV = """
 EXPECTED_AGGREGATED_BALANCES = pd.read_csv(StringIO(EXPECTED_AGGREGATED_BALANCES_CSV), skipinitialspace=True)
 # flake8: enable
 
-def parse_profit_center(value):
-    """Function to split values by commas and convert to list"""
-    if pd.isna(value) or value.strip() == "":
-        return None
-    return [item.strip() for item in value.split(",")]
-
-def parse_balance_series(balance):
-    """Convert a Series of strings like {USD: 100} into actual Python dictionaries."""
-    return balance.replace(r'(\w+):', r'"\1":', regex=True).apply(json.loads)
-
-EXPECTED_BALANCES["profit_center"] = EXPECTED_BALANCES["profit_center"].apply(parse_profit_center)
-EXPECTED_BALANCES["balance"] = parse_balance_series(EXPECTED_BALANCES["balance"])
-
 class BaseTest(ABC):
     engine = MemoryLedger()
+
+    @staticmethod
+    def parse_profit_center(value):
+        """Function to split values by commas and convert to list"""
+        if pd.isna(value) or value.strip() == "":
+            return None
+        return [item.strip() for item in value.split(",")]
+
+    @staticmethod
+    def parse_balance_series(balance):
+        """Convert a Series of strings like {USD: 100} into actual Python dictionaries."""
+        return balance.replace(r'(\w+):', r'"\1":', regex=True).apply(json.loads)
+
     CONFIGURATION = {"REPORTING_CURRENCY": "USD"}
     ASSETS = engine.assets.standardize(ASSETS)
     ACCOUNTS = engine.accounts.standardize(ACCOUNTS)
@@ -479,6 +479,8 @@ class BaseTest(ABC):
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
     TARGET_BALANCE = engine.target_balance.standardize(TARGET_BALANCE)
     EXPECTED_BALANCES = EXPECTED_BALANCES
+    EXPECTED_BALANCES["profit_center"] = EXPECTED_BALANCES["profit_center"].apply(parse_profit_center)
+    EXPECTED_BALANCES["balance"] = parse_balance_series(EXPECTED_BALANCES["balance"])
     EXPECTED_INDIVIDUAL_BALANCES = EXPECTED_INDIVIDUAL_BALANCES
     EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES
     EXPECTED_HISTORY = EXPECTED_HISTORY
