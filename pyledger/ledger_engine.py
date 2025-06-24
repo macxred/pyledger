@@ -1163,53 +1163,63 @@ class LedgerEngine(ABC):
 
     def round_to_precision(
         self,
-        amount: float | List[float],
-        ticker: str | List[str],
+        amount: float | list[float],
+        ticker: str | list[str],
         date: datetime.date = None
-    ) -> float | list:
+    ) -> float | list[float]:
         """
         Round amounts to the precision of the specified ticker (currency or asset).
 
         Args:
-            amount (float, List[float]): Value(s) to be rounded.
-            ticker (str, List[str]): Ticker symbol(s) of the currency or asset.
-                If amount and ticker are both vectors, they must be of same length.
-            date (datetime.date, optional): Date for precision determination. Defaults to
-                                            today's date.
+            amount (float | list[float]): Value(s) to be rounded.
+            ticker (str | list[str]): Ticker symbol(s) of the currency or asset.
+                                    If amount and ticker are both lists, they must match in length.
+            date (datetime.date, optional): Date for precision determination (default: today).
 
         Returns:
-            float or list: Rounded amount(s), adjusted to the specified ticker's precision.
+            float or list[float]: Rounded amount(s), adjusted to the specified ticker's precision.
 
         Raises:
-            ValueError: If the lengths of `amount` and `ticker` do not match, or if input
-                        lists have zero length.
+            ValueError: If vector inputs have mismatched lengths.
         """
-        def round_scalar(amount: float, ticker: str, date: datetime.date = None) -> float:
-            """Round a scaler to the precision of the specified ticker."""
-            precision = self.precision(ticker=ticker, date=date)
-            result = round(amount / precision, 0) * precision
-            return round(result, -1 * math.floor(math.log10(precision)))
+        is_scalar = np.isscalar(amount) and np.isscalar(ticker)
 
-        if np.isscalar(amount) and np.isscalar(ticker):
-            result = round_scalar(amount=amount, ticker=ticker, date=date)
-        elif np.isscalar(amount):
-            result = [None if pd.isna(tck)
-                      else round_scalar(amount=amount, ticker=tck, date=date)
-                      for tck in ticker]
-        elif np.isscalar(ticker):
-            result = [None if pd.isna(amt)
-                      else round_scalar(amount=amt, ticker=ticker, date=date)
-                      for amt in amount]
+        # Normalize inputs
+        if np.isscalar(amount):
+            amount_list = [amount] * len(ticker) if not np.isscalar(ticker) else [amount]
         else:
-            # amount and ticker are both array-like
-            if len(amount) != len(ticker):
-                raise ValueError("Amount and ticker lists must be of the same length")
-            result = [
-                None if pd.isna(amt) or pd.isna(tck)
-                else round_scalar(amount=amt, ticker=tck, date=date)
-                for amt, tck in zip(amount, ticker)
-            ]
-        return result
+            amount_list = list(amount)
+
+        if np.isscalar(ticker):
+            ticker_list = [ticker] * len(amount_list)
+        else:
+            ticker_list = list(ticker)
+
+        if len(amount_list) != len(ticker_list):
+            raise ValueError("Amount and ticker lists must be of the same length")
+
+        # Use today as default date
+        date = date or datetime.date.today()
+        date_list = [date] * len(ticker_list)
+
+        # Get precision vector
+        precision = self.precision_vectorized(
+            currencies=pl.Series("ticker", ticker_list, strict=False),
+            dates=pl.Series("date", date_list, dtype=pl.Date),
+            allow_missing=True
+        )
+
+        precision_values = precision.to_numpy()
+        result = []
+        for amt, prec in zip(amount_list, precision_values):
+            if prec is None or pd.isna(amt):
+                result.append(None)
+            else:
+                scaled = round(amt / prec, 0) * prec
+                rounded = round(scaled, -1 * math.floor(math.log10(prec)))
+                result.append(rounded)
+
+        return result[0] if is_scalar else result
 
     def report_amount(
         self, amount: list[float], currency: list[str], date: list[datetime.date]
