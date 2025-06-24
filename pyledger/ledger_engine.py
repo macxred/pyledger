@@ -399,18 +399,11 @@ class LedgerEngine(ABC):
         """
         df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=True)
 
-        def validate_currency() -> pd.Series:
-            """Validate that each account's currency is supported using the precision() method."""
-            def is_valid(row):
-                try:
-                    self.precision(ticker=row["currency"])
-                    return True
-                except ValueError:
-                    return False
-            return df.apply(is_valid, axis=1)
-
-        # Validate currencies
-        valid_currency_mask = validate_currency()
+        dates = pl.Series(name="date", values=[None] * len(df))
+        precision = self.precision_vectorized(
+            currencies=df["currency"], dates=dates, allow_missing=True
+        )
+        valid_currency_mask = ~precision.is_null().to_numpy()
         if not valid_currency_mask.all():
             invalid = df.loc[~valid_currency_mask, "account"].tolist()
             self._logger.warning(
@@ -892,9 +885,11 @@ class LedgerEngine(ABC):
 
         return invalid_ids
 
-    def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set, precision: pd.Series) -> set:
+    def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set, precision: pl.Series) -> set:
         """Mark transactions with invalid asset references."""
-        new_invalid_ids = set(df.loc[precision.isna(), "id"]) - invalid_ids
+        null_mask = precision.is_null().to_numpy()
+        new_invalid_ids = set(df.loc[null_mask, "id"]) - invalid_ids
+
         if new_invalid_ids:
             self._logger.warning(
                 f"Discarding {len(new_invalid_ids)} journal entries with invalid currency: "
@@ -1261,20 +1256,14 @@ class LedgerEngine(ABC):
         """
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=True)
 
-        # The `precision` method validates the existence of a valid asset definition
-        # and relies on sanitized data, serving as a centralized validation point.
-        def invalid_asset_reference(ticker: pd.Series, date: pd.Series) -> pd.Series:
-            """Validate specified column values for asset references."""
-            def is_valid(ticker, date):
-                try:
-                    self.precision(ticker=ticker, date=date)
-                    return False
-                except ValueError:
-                    return True
-            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
-
-        invalid_tickers_mask = invalid_asset_reference(df["ticker"], df["date"])
-        invalid_currencies_mask = invalid_asset_reference(df["currency"], df["date"])
+        ticker_precision = self.precision_vectorized(
+            currencies=df["ticker"], dates=df["date"], allow_missing=True,
+        )
+        currency_precision = self.precision_vectorized(
+            currencies=df["currency"], dates=df["date"], allow_missing=True,
+        )
+        invalid_tickers_mask = ticker_precision.is_null().to_numpy()
+        invalid_currencies_mask = currency_precision.is_null().to_numpy()
 
         if invalid_tickers_mask.any():
             invalid_tickers = df.loc[invalid_tickers_mask, "ticker"].unique().tolist()
@@ -1290,7 +1279,7 @@ class LedgerEngine(ABC):
             )
 
         invalid_mask = invalid_tickers_mask | invalid_currencies_mask
-        df = df[~invalid_mask].reset_index(drop=True)
+        df = df.loc[~invalid_mask].reset_index(drop=True)
         return df
 
     @timed_cache(120)
@@ -1688,20 +1677,20 @@ class LedgerEngine(ABC):
     ) -> tuple[pd.Series, pd.Series]:
         """Mark rows with invalid currencies and identify patchable ones."""
         valid_idx = ~invalid_mask
-        end_dates = period.loc[valid_idx].map(lambda x: parse_date_span(x)[1])
+        currency_valid = currency.loc[valid_idx]
+        period_valid = period.loc[valid_idx].map(lambda x: parse_date_span(x)[1])
+        precision = self.precision_vectorized(
+            currencies=pl.Series(name="currency", values=currency_valid.tolist(), strict=False),
+            dates=pl.Series(name="period", values=period_valid.tolist(), strict=False),
+            allow_missing=True,
+        )
 
-        def is_invalid(ticker, date):
-            if pd.isna(ticker):
-                return False
-            try:
-                self.precision(ticker=ticker, date=date)
-                return False
-            except Exception:
-                return True
-
-        invalid_local = [is_invalid(t, d) for t, d in zip(currency.loc[valid_idx], end_dates)]
+        currency_na_mask = currency_valid.isna().to_numpy()
+        precision_null_mask = precision.is_null().to_numpy()
+        invalid_local = (~currency_na_mask) & precision_null_mask
         full_mask = pd.Series(False, index=currency.index)
-        full_mask.loc[currency.index[valid_idx][invalid_local]] = True
+        full_mask.loc[currency_valid.index[invalid_local]] = True
+
         drop_mask = full_mask & report_balance.isna()
         patch_mask = full_mask & balance.notna()
         return drop_mask, patch_mask
