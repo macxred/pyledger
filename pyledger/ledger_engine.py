@@ -14,6 +14,7 @@ import re
 import numpy as np
 import openpyxl
 import pandas as pd
+import polars as pl
 from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
@@ -1450,39 +1451,40 @@ class LedgerEngine(ABC):
             return asset.loc[mask[mask].index[-1], "increment"].item()
 
     def precision_vectorized(
-        self, currencies: pd.Series, dates: pd.Series, allow_missing: bool = False
-    ) -> pd.Series:
+        self, currencies: pl.Series, dates: pl.Series, allow_missing: bool = False
+    ) -> pl.Series:
         """
         Returns the smallest price increment (precision) for each currency/date pair.
 
         Args:
-            dates (pd.Series): Series of datetime.date values.
-            currencies (pd.Series): Series of currency or asset tickers of same length as `dates`.
-            allow_missing (bool): If True, unresolved lookups return pd.NA
-                                  instead of raising an error.
+            dates (pl.Series): Series of datetime.date values.
+            currencies (pl.Series): Series of currency or asset tickers of same length as `dates`.
+            allow_missing (bool): If True, unresolved lookups return None
+                                instead of raising an error.
 
         Raises:
             ValueError: If allow_missing is False and no precision definition.
 
         Returns:
-            pd.Series: Series of precision values of type Float64.
+            pl.Series: Series of precision values (Float64 or Null).
         """
-        def lookup(ticker, date):
-            if allow_missing and pd.isna(ticker):
-                return pd.NA
+        def lookup(ticker: str | None, date) -> float | None:
+            if allow_missing and ticker is None:
+                return None
             try:
                 return self.precision(ticker=ticker, date=date)
             except ValueError:
                 if allow_missing:
-                    return pd.NA
+                    return None
                 raise ValueError(
                     f"No asset definition available for ticker '{ticker}' on or before {date}."
                 )
 
-        return pd.Series(
-            [lookup(t, d) for t, d in zip(currencies, dates)],
-            dtype="Float64", index=currencies.index
-        )
+        precisions = [
+            lookup(ticker, date)
+            for ticker, date in zip(currencies.to_list(), dates.to_list())
+        ]
+        return pl.Series("precision", precisions, dtype=pl.Float64)
 
     # ----------------------------------------------------------------------
     # Revaluations
