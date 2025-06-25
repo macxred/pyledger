@@ -8,7 +8,7 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
@@ -1390,64 +1390,75 @@ class LedgerEngine(ABC):
 
     @property
     @timed_cache(120)
-    def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
-        """Organize assets by ticker for quick access.
+    def _assets_as_dict_of_df(self) -> Dict[str, pl.DataFrame]:
+        """Organize user and default assets by ticker for quick access.
 
         Splits assets by ticker for efficient lookup of increments by ticker
-        and date.
+        and date. Includes both user-defined and fallback default assets.
 
         Returns:
-            Dict[str, pd.DataFrame]: Maps each asset ticker to a DataFrame of
-            its `increment` history, sorted by `date` with `NaT` values first.
+            Dict[str, pl.DataFrame]: Maps each asset ticker to a Polars DataFrame of
+            its `increment` history, sorted by `date` with `null` values first.
         """
+        user_assets = pl.from_pandas(self.sanitize_assets(self.assets.list()))
+        default_assets = pl.from_pandas(DEFAULT_ASSETS)
+        combined = (
+            pl.concat([user_assets, default_assets])
+            .unique(subset=["ticker", "date"], keep="first")
+            .sort("date", nulls_last=False)
+        )
+
         return {
-            ticker: (
-                group[["date", "increment"]]
-                .sort_values("date", na_position="first")
-                .reset_index(drop=True)
-            )
-            for ticker, group in self.sanitize_assets(self.assets.list()).groupby("ticker")
+            group["ticker"][0]: group.select(["date", "increment"])
+            for group in combined.partition_by("ticker")
         }
 
     @timed_cache(120)
-    def precision(self, ticker: str, date: datetime.date = None) -> float:
+    def precision(self, ticker: str | None, date: datetime.date = None, allow_missing: bool = False) -> float | None:
         """Returns the smallest price increment of an asset or currency.
 
         This is the precision, to which prices should be rounded.
 
         Args:
-            ticker (str): Identifier of the currency or asset.
+            ticker (str | None): Identifier of the currency or asset. If None and `allow_missing` is True, returns None.
             date (datetime.date, optional): Date for which to retrieve the precision.
                                             Defaults to today's date.
+            allow_missing (bool): If True, return None instead of raising errors on missing lookups.
 
         Returns:
-            float: The smallest price increment.
+            float | None: The smallest price increment, or None if missing and allowed.
         """
+        if ticker is None:
+            if allow_missing:
+                return None
+            raise ValueError("Ticker is None and allow_missing is False.")
 
         if ticker == "reporting_currency":
             ticker = self.reporting_currency
 
-        if date is None:
-            date = datetime.date.today()
-        elif not isinstance(date, datetime.date):
-            date = pd.to_datetime(date).date()
-
         asset = self._assets_as_dict_of_df.get(ticker)
         if asset is None:
-            # Asset is not defined by the user, fall back to hard-coded defaults
-            increment = DEFAULT_ASSETS.loc[DEFAULT_ASSETS["ticker"] == ticker, "increment"]
-            if len(increment) < 1:
-                raise ValueError(f"No asset definition available for ticker '{ticker}'.")
-            if len(increment) > 1:
-                raise ValueError(f"Multiple default definitions for asset '{ticker}'.")
-            return increment.item()
+            if allow_missing:
+                return None
+            raise ValueError(f"No asset definition available for ticker '{ticker}'.")
+
+        if date is None:
+            filtered = asset.filter(pl.col("date").is_null())
         else:
-            mask = asset["date"].isna() | (asset["date"] <= pd.Timestamp(date))
-            if not mask.any():
-                raise ValueError(
-                    f"No asset definition available for '{ticker}' on or before {date}."
-                )
-            return asset.loc[mask[mask].index[-1], "increment"].item()
+            if not isinstance(date, datetime.date):
+                date = pd.to_datetime(date).date()
+            filtered = (
+                asset
+                .filter(pl.col("date").is_null() | (pl.col("date") <= date))
+                .sort("date", descending=True)
+            )
+
+        if filtered.height == 0:
+            if allow_missing:
+                return None
+            raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
+
+        return filtered[0, "increment"]
 
     def precision_vectorized(
         self, currencies: pl.Series, dates: pl.Series, allow_missing: bool = False
@@ -1458,30 +1469,14 @@ class LedgerEngine(ABC):
         Args:
             dates (pl.Series): Series of datetime.date values.
             currencies (pl.Series): Series of currency or asset tickers of same length as `dates`.
-            allow_missing (bool): If True, unresolved lookups return None
-                                instead of raising an error.
-
-        Raises:
-            ValueError: If allow_missing is False and no precision definition.
+            allow_missing (bool): If True, unresolved lookups return None instead of raising an error.
 
         Returns:
             pl.Series: Series of precision values (Float64 or Null).
         """
-        def lookup(ticker: str | None, date) -> float | None:
-            if allow_missing and ticker is None:
-                return None
-            try:
-                return self.precision(ticker=ticker, date=date)
-            except ValueError:
-                if allow_missing:
-                    return None
-                raise ValueError(
-                    f"No asset definition available for ticker '{ticker}' on or before {date}."
-                )
-
         precisions = [
-            lookup(ticker, date)
-            for ticker, date in zip(currencies.to_list(), dates.to_list())
+            self.precision(ticker=t, date=d, allow_missing=allow_missing)
+            for t, d in zip(currencies.to_list(), dates.to_list())
         ]
         return pl.Series("precision", precisions, dtype=pl.Float64)
 
