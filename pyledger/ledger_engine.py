@@ -1393,25 +1393,35 @@ class LedgerEngine(ABC):
     def _assets_as_dict_of_df(self) -> Dict[str, pl.DataFrame]:
         """Organize user and default assets by ticker for quick access.
 
-        Splits assets by ticker for efficient lookup of increments by ticker
-        and date. Includes both user-defined and fallback default assets.
+        Combines user-defined and default asset definitions, then returns:
+        - Timeless DataFrame (where `date` is null) with `ticker` and `increment`.
+        - Dated DataFrame (where `date` is not null) with `ticker`, `date`, and `increment`.
 
         Returns:
-            Dict[str, pl.DataFrame]: Maps each asset ticker to a Polars DataFrame of
-            its `increment` history, sorted by `date` with `null` values first.
+            Tuple[pl.DataFrame, pl.DataFrame]: (timeless_df, dated_df)
         """
         user_assets = pl.from_pandas(self.sanitize_assets(self.assets.list()))
         default_assets = pl.from_pandas(DEFAULT_ASSETS)
         combined = (
             pl.concat([user_assets, default_assets])
             .unique(subset=["ticker", "date"], keep="first")
-            .sort("date", nulls_last=False)
         )
 
-        return {
-            group["ticker"][0]: group.select(["date", "increment"])
-            for group in combined.partition_by("ticker")
-        }
+        timeless_dict = dict(zip(
+            *combined
+            .filter(pl.col("date").is_null())
+            .select(["ticker", "increment"])
+            .to_dict(as_series=False)
+            .values()
+        ))
+        dated_df = (
+            combined
+            .filter(pl.col("date").is_not_null())
+            .sort(["ticker", "date"], descending=[False, True])
+            .select(["ticker", "date", "increment"])
+        )
+
+        return timeless_dict, dated_df
 
     @timed_cache(120)
     def precision(self, ticker: str | None, date: datetime.date = None, allow_missing: bool = False) -> float | None:
@@ -1421,8 +1431,7 @@ class LedgerEngine(ABC):
 
         Args:
             ticker (str | None): Identifier of the currency or asset. If None and `allow_missing` is True, returns None.
-            date (datetime.date, optional): Date for which to retrieve the precision.
-                                            Defaults to today's date.
+            date (datetime.date, optional): Date for which to retrieve the precision. Defaults to today's date.
             allow_missing (bool): If True, return None instead of raising errors on missing lookups.
 
         Returns:
@@ -1436,29 +1445,31 @@ class LedgerEngine(ABC):
         if ticker == "reporting_currency":
             ticker = self.reporting_currency
 
-        asset = self._assets_as_dict_of_df.get(ticker)
-        if asset is None:
-            if allow_missing:
-                return None
-            raise ValueError(f"No asset definition available for ticker '{ticker}'.")
+        if date is not None and not isinstance(date, datetime.date):
+            date = pd.to_datetime(date).date()
 
-        if date is None:
-            filtered = asset.filter(pl.col("date").is_null())
-        else:
-            if not isinstance(date, datetime.date):
-                date = pd.to_datetime(date).date()
-            filtered = (
-                asset
-                .filter(pl.col("date").is_null() | (pl.col("date") <= date))
-                .sort("date", descending=True)
+        timeless_df, dated_df = self._assets_as_dict_of_df
+
+        # Try dated lookup first if date is given
+        if date is not None:
+            dated_result = dated_df.filter(
+                (pl.col("ticker") == ticker) & (pl.col("date") <= date)
             )
+            if not dated_result.is_empty():
+                return dated_result[0, "increment"]
 
-        if filtered.height == 0:
-            if allow_missing:
-                return None
-            raise ValueError(f"No asset definition available for '{ticker}' on or before {date}.")
+        # Fallback to timeless
+        timeless_result = timeless_df.get(ticker, None)
+        if timeless_result is not None:
+            return timeless_result
 
-        return filtered[0, "increment"]
+        if allow_missing:
+            return None
+
+        msg = f"No asset definition available for '{ticker}'"
+        if date is not None:
+            msg += f" on or before {date}"
+        raise ValueError(msg)
 
     def precision_vectorized(
         self, currencies: pl.Series, dates: pl.Series, allow_missing: bool = False
