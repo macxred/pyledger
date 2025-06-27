@@ -70,7 +70,6 @@ class TextLedger(StandaloneLedger):
         settings_dir.mkdir(parents=True, exist_ok=True)
         self._assets = CSVAccountingEntity(
             schema=ASSETS_SCHEMA, path=self.root / "settings/assets.csv",
-            on_change=self.precision.cache_clear
         )
 
         def _clear_account_caches():

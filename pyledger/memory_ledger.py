@@ -34,7 +34,6 @@ class MemoryLedger(StandaloneLedger):
         self._reporting_currency = reporting_currency
         self._assets = DataFrameEntity(
             ASSETS_SCHEMA,
-            on_change=self.precision.cache_clear
         )
 
         def _clear_account_caches():

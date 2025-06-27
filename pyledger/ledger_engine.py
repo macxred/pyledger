@@ -1024,7 +1024,7 @@ class LedgerEngine(ABC):
         # 2. not balanced in reporting currency,
         # 3. for which all original report amounts were missing,
         # 4. which have at least two rows with exactly one of account or contra account specified.
-        tolerance = self.precision(self.reporting_currency) / 2
+        tolerance = self.precision_vectorized(pl.Series(["reporting_currency"]), pl.Series([None]))[0] / 2
         multiplier = self.amount_multiplier(df)
         grouped = pd.DataFrame({
             "id": df["id"],
@@ -1066,7 +1066,7 @@ class LedgerEngine(ABC):
             # Adjust sign for 'amount' and 'report_amount' where only 'contra' is specified
             unrounded_values = df.loc[txn_mask, "amount"] * txn_multiplier * fx_rate
             rounded_values = report_amount[txn_mask] * txn_multiplier
-            increment = self.precision(self.reporting_currency)
+            increment = self.precision_vectorized(pl.Series(["reporting_currency"]), pl.Series([None]))[0]
             while True:
                 errors = rounded_values - unrounded_values
                 # Exit if within tolerance
@@ -1087,7 +1087,7 @@ class LedgerEngine(ABC):
     def _unbalanced_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions whose total amounts do not balance to zero as invalid."""
         net_amount = (df["report_amount"] * self.amount_multiplier(df)).groupby(df["id"]).sum()
-        unbalanced = abs(net_amount) > self.precision(self.reporting_currency) / 2
+        unbalanced = abs(net_amount) > self.precision_vectorized(pl.Series(["reporting_currency"]), pl.Series([None]))[0] / 2
         if unbalanced.any():
             unbalanced_ids = set(unbalanced.index[unbalanced])
             self._logger.warning(
@@ -1423,54 +1423,6 @@ class LedgerEngine(ABC):
 
         return timeless_dict, dated_df
 
-    @timed_cache(120)
-    def precision(self, ticker: str | None, date: datetime.date = None, allow_missing: bool = False) -> float | None:
-        """Returns the smallest price increment of an asset or currency.
-
-        This is the precision, to which prices should be rounded.
-
-        Args:
-            ticker (str | None): Identifier of the currency or asset. If None and `allow_missing` is True, returns None.
-            date (datetime.date, optional): Date for which to retrieve the precision. Defaults to today's date.
-            allow_missing (bool): If True, return None instead of raising errors on missing lookups.
-
-        Returns:
-            float | None: The smallest price increment, or None if missing and allowed.
-        """
-        if ticker is None:
-            if allow_missing:
-                return None
-            raise ValueError("Ticker is None and allow_missing is False.")
-
-        if ticker == "reporting_currency":
-            ticker = self.reporting_currency
-
-        if date is not None and not isinstance(date, datetime.date):
-            date = pd.to_datetime(date).date()
-
-        timeless_df, dated_df = self._assets_as_dict_of_df
-
-        # Try dated lookup first if date is given
-        if date is not None:
-            dated_result = dated_df.filter(
-                (pl.col("ticker") == ticker) & (pl.col("date") <= date)
-            )
-            if not dated_result.is_empty():
-                return dated_result[0, "increment"]
-
-        # Fallback to timeless
-        timeless_result = timeless_df.get(ticker, None)
-        if timeless_result is not None:
-            return timeless_result
-
-        if allow_missing:
-            return None
-
-        msg = f"No asset definition available for '{ticker}'"
-        if date is not None:
-            msg += f" on or before {date}"
-        raise ValueError(msg)
-
     def precision_vectorized(
         self, currencies: pl.Series, dates: pl.Series, allow_missing: bool = False
     ) -> pl.Series:
@@ -1478,16 +1430,50 @@ class LedgerEngine(ABC):
         Returns the smallest price increment (precision) for each currency/date pair.
 
         Args:
-            dates (pl.Series): Series of datetime.date values.
             currencies (pl.Series): Series of currency or asset tickers of same length as `dates`.
+            dates (pl.Series): Series of datetime.date values.
             allow_missing (bool): If True, unresolved lookups return None instead of raising an error.
 
         Returns:
             pl.Series: Series of precision values (Float64 or Null).
         """
+        timeless_df, dated_df = self._assets_as_dict_of_df
+        reporting_currency = self.reporting_currency
+
+        @timed_cache(120)
+        def resolve_precision(ticker: str | None, date: datetime.date | None) -> float | None:
+            if ticker is None:
+                return None if allow_missing else (_ for _ in ()).throw(
+                    ValueError("Ticker is None and allow_missing is False.")
+                )
+
+            if ticker == "reporting_currency":
+                ticker = reporting_currency
+
+            if date is not None and not isinstance(date, datetime.date):
+                date = pd.to_datetime(date).date()
+
+            # Dated lookup
+            if date is not None:
+                dated_result = dated_df.filter(
+                    (pl.col("ticker") == ticker) & (pl.col("date") <= date)
+                )
+                if not dated_result.is_empty():
+                    return dated_result[0, "increment"]
+
+            # Timeless fallback
+            timeless_result = timeless_df.get(ticker)
+            if timeless_result is not None:
+                return timeless_result
+
+            return None if allow_missing else (_ for _ in ()).throw(
+                ValueError(f"No asset definition available for '{ticker}'"
+                        + (f" on or before {date}" if date else ""))
+            )
+
         precisions = [
-            self.precision(ticker=t, date=d, allow_missing=allow_missing)
-            for t, d in zip(currencies.to_list(), dates.to_list())
+            resolve_precision(ticker, date)
+            for ticker, date in zip(currencies.to_list(), dates.to_list())
         ]
         return pl.Series("precision", precisions, dtype=pl.Float64)
 
