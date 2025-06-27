@@ -1391,14 +1391,19 @@ class LedgerEngine(ABC):
     @property
     @timed_cache(120)
     def _assets_as_dict_of_df(self) -> Dict[str, pl.DataFrame]:
-        """Organize user and default assets by ticker for quick access.
+        """
+        Organize asset definitions into timeless and dated precision lookups.
 
-        Combines user-defined and default asset definitions, then returns:
-        - Timeless DataFrame (where `date` is null) with `ticker` and `increment`.
-        - Dated DataFrame (where `date` is not null) with `ticker`, `date`, and `increment`.
+        Combines user-defined and default asset definitions, removes duplicates
+        (by 'ticker' and 'date'), and returns two structures:
+
+        - A dictionary mapping tickers with no associated date to their precision increment.
+        - A Polars DataFrame containing all dated entries, sorted by ticker and date descending.
 
         Returns:
-            Tuple[pl.DataFrame, pl.DataFrame]: (timeless_df, dated_df)
+            tuple:
+                - dict[str, float]: Timeless precision increments by ticker.
+                - pl.DataFrame: Dated asset definitions with columns: 'ticker', 'date', 'increment'.
         """
         user_assets = pl.from_pandas(self.sanitize_assets(self.assets.list()))
         default_assets = pl.from_pandas(DEFAULT_ASSETS)
@@ -1428,6 +1433,7 @@ class LedgerEngine(ABC):
     ) -> pl.Series:
         """
         Returns the smallest price increment (precision) for each currency/date pair.
+
         Args:
             dates (pl.Series): Series of datetime.date values.
             currencies (pl.Series): Series of currency or asset tickers of same length as `dates`.
@@ -1469,8 +1475,7 @@ class LedgerEngine(ABC):
                 raise ValueError(f"No asset definition available for '{ticker}' on {date}")
 
         precisions = [
-            resolve_precision(ticker, date)
-            for ticker, date in zip(currencies, dates)
+            resolve_precision(ticker, date) for ticker, date in zip(currencies, dates)
         ]
         return pl.Series("precision", precisions, dtype=pl.Float64)
 
