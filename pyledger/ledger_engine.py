@@ -1238,15 +1238,23 @@ class LedgerEngine(ABC):
             ValueError: If the lengths of `amount`, `currency`, and `date` are not equal.
         """
 
-        reporting_currency = self.reporting_currency
         if not (len(amount) == len(currency) == len(date)):
             raise ValueError("Vectors 'amount', 'currency', and 'date' must have the same length.")
-        result = [
-            self.round_to_precision(
-                a * self.price(t, date=d, currency=reporting_currency)[1],
-                reporting_currency, date=d)
-            for a, t, d in zip(amount, currency, date)]
-        return result
+
+        reporting_currency = self.reporting_currency
+        prices = [
+            self.price(src_currency, date=dt, currency=reporting_currency)[1]
+            for src_currency, dt in zip(currency, date)
+        ]
+        amounts = [
+            amt * rate if amt is not None and rate is not None else None
+            for amt, rate in zip(amount, prices)
+        ]
+        if isinstance(date, pd.Series):
+            date = date.iloc[0] if not date.empty else None
+        else:
+            date = date[0] if date and pd.notna(date[0]) else None
+        return self.round_to_precision(amounts, [reporting_currency] * len(amounts), date)
 
     # ----------------------------------------------------------------------
     # Price
