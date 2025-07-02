@@ -21,6 +21,7 @@ from .constants import (
     ACCOUNT_SCHEMA,
     ACCOUNT_HISTORY_SCHEMA,
     ASSETS_SCHEMA,
+    DEFAULT_DATE,
     JOURNAL_SCHEMA,
     PRICE_SCHEMA,
     PROFIT_CENTER_SCHEMA,
@@ -1390,89 +1391,82 @@ class LedgerEngine(ABC):
 
     @property
     @timed_cache(120)
-    def _assets_as_dict_of_df(self) -> Dict[str, pl.DataFrame]:
-        """Organize user and default assets by ticker for quick access.
+    def _assets_as_df(self) -> pl.DataFrame:
+        """
+        Returns a clean, unified DataFrame of asset definitions for precision lookups.
 
-        Combines user-defined and default asset definitions, then returns:
-        - Timeless DataFrame (where `date` is null) with `ticker` and `increment`.
-        - Dated DataFrame (where `date` is not null) with `ticker`, `date`, and `increment`.
+        Merges default and user-defined assets, fills missing dates with a fallback default date,
+        removes duplicates on ('ticker', 'date') keeping the first occurrence, and sorts
+        values by ticker and date.
 
         Returns:
-            Tuple[pl.DataFrame, pl.DataFrame]: (timeless_df, dated_df)
+            pl.DataFrame: A Polars DataFrame with columns:
+                - 'ticker' (str): Asset ticker symbol.
+                - 'date' (date): Effective date (or fallback default for timeless entries).
+                - 'increment' (float): Precision increment for the asset.
         """
-        user_assets = pl.from_pandas(self.sanitize_assets(self.assets.list()))
-        default_assets = pl.from_pandas(DEFAULT_ASSETS)
         combined = (
-            pl.concat([user_assets, default_assets])
+            pl.concat([
+                pl.from_pandas(self.sanitize_assets(self.assets.list())),
+                pl.from_pandas(DEFAULT_ASSETS),
+            ])
+            .with_columns([
+                pl.col("ticker").cast(pl.Utf8),
+                pl.col("date").fill_null(DEFAULT_DATE).cast(pl.Date),
+            ])
             .unique(subset=["ticker", "date"], keep="first")
+            .sort(["ticker", "date"])
         )
-
-        timeless_dict = dict(zip(
-            *combined
-            .filter(pl.col("date").is_null())
-            .select(["ticker", "increment"])
-            .to_dict(as_series=False)
-            .values()
-        ))
-        dated_df = (
-            combined
-            .filter(pl.col("date").is_not_null())
-            .sort(["ticker", "date"], descending=[False, True])
-            .select(["ticker", "date", "increment"])
-        )
-
-        return timeless_dict, dated_df
+        return combined
 
     def precision_vectorized(
         self, currencies: pl.Series, dates: pl.Series, allow_missing: bool = False
     ) -> pl.Series:
         """
-        Returns the smallest price increment (precision) for each currency/date pair.
+        Returns the smallest price increment (precision) for each (currency, date) pair.
+
+        Falls back to the earliest known date for timeless assets. Raises on unresolved
+        lookups unless `allow_missing=True`.
+
         Args:
-            dates (pl.Series): Series of datetime.date values.
-            currencies (pl.Series): Series of currency or asset tickers of same length as `dates`.
-            allow_missing (bool): If True, unresolved lookups return pd.NA
-                                  instead of raising an error.
+            currencies (pl.Series): Currency or asset tickers, e.g. 'USD', 'BTC'.
+            dates (pl.Series): Corresponding datetime.date values, same length as `currencies`.
+            allow_missing (bool): If True, missing entries return null instead of raising.
+
         Raises:
-            ValueError: If allow_missing is False and no precision definition.
+            ValueError: If no precision is found and `allow_missing` is False.
 
         Returns:
-            pl.Series: Series of precision values of type Float64 or Null.
+            pl.Series: Precision increments (float or null), one per (currency, date) input.
         """
-        reporting_currency = self.reporting_currency
-        timeless_df, dated_df = self._assets_as_dict_of_df
+        currencies = pl.Series(currencies) if not isinstance(currencies, pl.Series) else currencies
+        dates = pl.Series(dates) if not isinstance(dates, pl.Series) else dates
 
-        def resolve_precision(ticker: str | None, date: datetime.date | None) -> float | None:
-            if ticker is None or ticker is pd.NA:
-                if allow_missing:
-                    return None
-                else:
-                    raise ValueError("Ticker is None and allow_missing is False.")
-
-            if ticker == "reporting_currency":
-                ticker = reporting_currency
-
-            if date is not None and not isinstance(date, datetime.date):
-                date = pd.to_datetime(date).date()
-
-            if pd.notna(date):
-                dated_result = dated_df.filter(
-                    (pl.col("ticker") == ticker) & (pl.col("date") <= date)
-                )
-                if not dated_result.is_empty():
-                    return dated_result[0, "increment"]
-
-            timeless_result = timeless_df.get(ticker, None)
-            if timeless_result is not None or allow_missing:
-                return timeless_result
-            else:
-                raise ValueError(f"No asset definition available for '{ticker}' on {date}")
-
-        precisions = [
-            resolve_precision(ticker, date)
-            for ticker, date in zip(currencies, dates)
+        tickers = [
+            self.reporting_currency if c == "reporting_currency" else c
+            for c in currencies.to_list()
         ]
-        return pl.Series("precision", precisions, dtype=pl.Float64)
+        lookup_df = pl.DataFrame({
+            "ticker": pl.Series(tickers, dtype=pl.Utf8),
+            "date": pl.Series(dates, dtype=pl.Date).fill_null(DEFAULT_DATE)
+        })
+        joined = lookup_df.join_asof(
+            self._assets_as_df,
+            by="ticker",
+            on="date",
+            strategy="backward",
+            check_sortedness=False,
+        )
+
+        if not allow_missing:
+            missing_idx = joined["increment"].is_null().arg_true().min()
+            if missing_idx is not None:
+                raise ValueError(
+                    "No asset definition available for "
+                    f"'{joined['ticker'][missing_idx]}' on {joined['date'][missing_idx]}"
+                )
+
+        return joined["increment"]
 
     # ----------------------------------------------------------------------
     # Revaluations

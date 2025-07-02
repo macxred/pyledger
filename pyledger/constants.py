@@ -1,5 +1,6 @@
 """Constants used throughout the application."""
 
+import datetime
 import pandas as pd
 from io import StringIO
 from consistent_df import enforce_schema
@@ -143,6 +144,8 @@ RECONCILIATION_SCHEMA_CSV = """
 RECONCILIATION_SCHEMA = pd.read_csv(StringIO(RECONCILIATION_SCHEMA_CSV), skipinitialspace=True)
 
 DEFAULT_PRECISION = 0.01
+DEFAULT_DATE = datetime.date(1900, 1, 1)
+
 
 DEFAULT_ASSETS = enforce_schema(
     pd.read_csv(StringIO(ASSETS_CSV), skipinitialspace=True), ASSETS_SCHEMA

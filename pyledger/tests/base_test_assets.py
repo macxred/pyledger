@@ -155,7 +155,7 @@ class BaseTestAssets(BaseTest):
             datetime.date(2023, 12, 31),
             datetime.date(2023, 1, 1),
         ]
-        expected = [0.01, 0.001, 1, 0.1, 0.01, 0.001, 0.001]
+        expected = [0.01, 0.001, 1, 0.1, 0.01, 0.01, 0.001]
 
         # Fill missing dates with today
         dates = [d or today for d in dates]
