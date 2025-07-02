@@ -122,7 +122,6 @@ class StandaloneLedger(LedgerEngine):
             else:
                 amount = row["amount"] * tax["rate"]
             amount = amount * multiplier
-            amount = self.round_to_precision(amount, row["currency"])
 
             # Create a new journal entry for the tax amount
             if amount != 0:
@@ -141,9 +140,6 @@ class StandaloneLedger(LedgerEngine):
                         "id": f"{row['id']}:tax",
                         "contra": tax["account"],
                         "amount": amount,
-                        "report_amount": self.report_amount(
-                            amount=[amount], currency=[row["currency"]], date=[row["date"]]
-                        )[0]
                     })
                 if pd.notna(tax["contra"]):
                     amount = -1 * amount
@@ -151,12 +147,15 @@ class StandaloneLedger(LedgerEngine):
                         "id": f"{row['id']}:tax",
                         "contra": tax["contra"],
                         "amount": amount,
-                        "report_amount": self.report_amount(
-                            amount=[amount], currency=[row["currency"]], date=[row["date"]]
-                        )[0]
                     })
-        result = enforce_schema(pd.DataFrame(tax_journal_entries), JOURNAL_SCHEMA)
 
+        # Round amounts and remove balanced entries after rounding
+        result = enforce_schema(pd.DataFrame(tax_journal_entries), JOURNAL_SCHEMA)
+        result["amount"] = self.round_to_precision(result["amount"], result["currency"])
+        result = result.loc[result["amount"] != 0]
+        result["report_amount"] = self.report_amount(
+            result["amount"], result["currency"], result["date"]
+        )
         return result
 
     # ----------------------------------------------------------------------
