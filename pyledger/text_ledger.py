@@ -70,7 +70,6 @@ class TextLedger(StandaloneLedger):
         settings_dir.mkdir(parents=True, exist_ok=True)
         self._assets = CSVAccountingEntity(
             schema=ASSETS_SCHEMA, path=self.root / "settings/assets.csv",
-            on_change=self.precision.cache_clear
         )
 
         def _clear_account_caches():
@@ -194,12 +193,10 @@ class TextLedger(StandaloneLedger):
             # Record date only on the first row of collective transactions
             df = df.iloc[self.journal._id_from_path(df["id"]).argsort(kind="mergesort")]
             df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
-            increment = df.apply(
-                lambda row: self.precision(row["currency"], row["date"]), axis=1
-            ).min()
+            increment = self.precision_vectorized(df["currency"], df["date"]).min()
             df["amount"] = self.format_with_precision(df["amount"], increment)
             df["report_amount"] = self.format_with_precision(
-                df["report_amount"], self.precision(self.reporting_currency)
+                df["report_amount"], self.precision_vectorized(["reporting_currency"], [None])[0]
             )
 
         # Drop columns that are all NA and not required by the schema
@@ -233,17 +230,19 @@ class TextLedger(StandaloneLedger):
         """
         df = enforce_schema(df, RECONCILIATION_SCHEMA, sort_columns=True, keep_extra_columns=True)
         if not df.empty:
-            def _get_date(date):
-                """Return parsed end date or today's date if missing."""
-                return datetime.date.today() if pd.isna(date) else parse_date_span(date)[1]
-
-            increment = df.apply(
-                lambda row: DEFAULT_PRECISION if pd.isna(row["currency"]) else self.precision(
-                    row["currency"], _get_date(row["period"])), axis=1
+            def _get_dates(periods):
+                return [
+                    datetime.date.today() if pd.isna(p) else parse_date_span(p)[1]
+                    for p in periods
+                ]
+            increment = self.precision_vectorized(
+                df["currency"], _get_dates(df["period"]), allow_missing=True
             ).min()
+            if not increment:
+                increment = DEFAULT_PRECISION
             df["balance"] = self.format_with_precision(df["balance"], increment)
             df["report_balance"] = self.format_with_precision(
-                df["report_balance"], self.precision(self.reporting_currency)
+                df["report_balance"], self.precision_vectorized(["reporting_currency"], [None])[0]
             )
 
         # Drop columns that are all NA and not required by the schema

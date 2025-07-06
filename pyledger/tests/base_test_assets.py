@@ -135,37 +135,39 @@ class BaseTestAssets(BaseTest):
         engine.restore(configuration=self.CONFIGURATION, assets=self.ASSETS)
         return engine
 
-    @pytest.mark.parametrize(
-        "ticker, date, expected",
-        [
-            # Default increment for reporting_currency (CHF); date=None uses today
-            ("reporting_currency", None, 0.01),
-            # Exact date match for AUD on 2023-01-01
-            ("AUD", datetime.date(2023, 1, 1), 0.001),
-            # Default to today’s date for EUR
-            ("TRY", None, 1),
-            # Date before all CAD entries, uses NaT entry
-            ("CAD", datetime.date(2020, 1, 1), 0.1),
-            # Date after all AUD dates, uses latest increment
-            ("AUD", datetime.date(2222, 1, 1), 0.01),
-            # Latest date on/before 2023-12-31 for AUD
-            ("AUD", datetime.date(2023, 12, 31), 0.001),
-            # NaT and valid dates for EUR, date before all valid dates
-            ("CHF", datetime.date(2023, 1, 1), 0.001),
+    def test_precision_vectorized(self, engine_with_assets):
+        today = datetime.date.today()
+        tickers = [
+            "reporting_currency",  # Default increment for reporting_currency (CHF)
+            "AUD",  # Exact date match for AUD on 2023-01-01
+            "TRY",  # Default to today’s date for EUR
+            "CAD",  # Date before all CAD entries, uses NaT entry
+            "AUD",  # Date after all AUD dates, uses latest increment
+            "AUD",  # Latest date on/before 2023-12-31 for AUD
+            "CHF",  # NaT and valid dates for EUR, date before all valid dates
         ]
-    )
-    def test_precision(self, engine_with_assets, ticker, date, expected):
-        assert engine_with_assets.precision(ticker, date) == expected
+        dates = [
+            None,
+            datetime.date(2023, 1, 1),
+            None,
+            datetime.date(2020, 1, 1),
+            datetime.date(2222, 1, 1),
+            datetime.date(2023, 12, 31),
+            datetime.date(2023, 1, 1),
+        ]
+        expected = [0.01, 0.001, 1, 0.1, 0.01, 0.01, 0.001]
 
-    @pytest.mark.parametrize(
-        "ticker, date, expected_exception, match",
-        [
-            ("XYZ", None, ValueError, "No asset definition available for ticker 'XYZ'"),
-            ("GBP", datetime.date(2022, 1, 1), ValueError, "No asset definition available"),
-        ]
-    )
-    def test_precision_exceptions(
-        self, engine_with_assets, ticker, date, expected_exception, match
-    ):
-        with pytest.raises(expected_exception, match=match):
-            engine_with_assets.precision(ticker, date)
+        # Fill missing dates with today
+        dates = [d or today for d in dates]
+        result = engine_with_assets.precision_vectorized(tickers, dates)
+
+        assert result.to_list() == expected
+
+    def test_precision_vectorized_exceptions(self, engine_with_assets):
+        today = datetime.date.today()
+
+        with pytest.raises(ValueError, match="No asset definition available"):
+            engine_with_assets.precision_vectorized(["XYZ"], [today])
+
+        with pytest.raises(ValueError, match="No asset definition available"):
+            engine_with_assets.precision_vectorized(["GBD"], [datetime.date(2022, 1, 1)])

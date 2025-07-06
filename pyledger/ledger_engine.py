@@ -8,18 +8,20 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
 import openpyxl
 import pandas as pd
+import polars as pl
 from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
     ACCOUNT_SCHEMA,
     ACCOUNT_HISTORY_SCHEMA,
     ASSETS_SCHEMA,
+    DEFAULT_DATE,
     JOURNAL_SCHEMA,
     PRICE_SCHEMA,
     PROFIT_CENTER_SCHEMA,
@@ -398,18 +400,11 @@ class LedgerEngine(ABC):
         """
         df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=True)
 
-        def validate_currency() -> pd.Series:
-            """Validate that each account's currency is supported using the precision() method."""
-            def is_valid(row):
-                try:
-                    self.precision(ticker=row["currency"])
-                    return True
-                except ValueError:
-                    return False
-            return df.apply(is_valid, axis=1)
-
-        # Validate currencies
-        valid_currency_mask = validate_currency()
+        dates = pl.Series(name="date", values=[None] * len(df))
+        precision = self.precision_vectorized(
+            currencies=df["currency"], dates=dates, allow_missing=True
+        )
+        valid_currency_mask = ~precision.is_null().to_numpy()
         if not valid_currency_mask.all():
             invalid = df.loc[~valid_currency_mask, "account"].tolist()
             self._logger.warning(
@@ -891,9 +886,11 @@ class LedgerEngine(ABC):
 
         return invalid_ids
 
-    def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set, precision: pd.Series) -> set:
+    def _invalid_assets(self, df: pd.DataFrame, invalid_ids: set, precision: pl.Series) -> set:
         """Mark transactions with invalid asset references."""
-        new_invalid_ids = set(df.loc[precision.isna(), "id"]) - invalid_ids
+        null_mask = precision.is_null().to_numpy()
+        new_invalid_ids = set(df.loc[null_mask, "id"]) - invalid_ids
+
         if new_invalid_ids:
             self._logger.warning(
                 f"Discarding {len(new_invalid_ids)} journal entries with invalid currency: "
@@ -1028,7 +1025,7 @@ class LedgerEngine(ABC):
         # 2. not balanced in reporting currency,
         # 3. for which all original report amounts were missing,
         # 4. which have at least two rows with exactly one of account or contra account specified.
-        tolerance = self.precision(self.reporting_currency) / 2
+        tolerance = self.precision_vectorized(["reporting_currency"], [None])[0] / 2
         multiplier = self.amount_multiplier(df)
         grouped = pd.DataFrame({
             "id": df["id"],
@@ -1070,7 +1067,7 @@ class LedgerEngine(ABC):
             # Adjust sign for 'amount' and 'report_amount' where only 'contra' is specified
             unrounded_values = df.loc[txn_mask, "amount"] * txn_multiplier * fx_rate
             rounded_values = report_amount[txn_mask] * txn_multiplier
-            increment = self.precision(self.reporting_currency)
+            increment = self.precision_vectorized(["reporting_currency"], [None])[0]
             while True:
                 errors = rounded_values - unrounded_values
                 # Exit if within tolerance
@@ -1091,7 +1088,8 @@ class LedgerEngine(ABC):
     def _unbalanced_report_amounts(self, df: pd.DataFrame, invalid_ids: set) -> set:
         """Mark transactions whose total amounts do not balance to zero as invalid."""
         net_amount = (df["report_amount"] * self.amount_multiplier(df)).groupby(df["id"]).sum()
-        unbalanced = abs(net_amount) > self.precision(self.reporting_currency) / 2
+        precision = self.precision_vectorized(["reporting_currency"], [None])[0] / 2
+        unbalanced = abs(net_amount) > precision
         if unbalanced.any():
             unbalanced_ids = set(unbalanced.index[unbalanced])
             self._logger.warning(
@@ -1167,10 +1165,10 @@ class LedgerEngine(ABC):
 
     def round_to_precision(
         self,
-        amount: float | List[float],
-        ticker: str | List[str],
+        amount: float | list[float],
+        ticker: str | list[str],
         date: datetime.date = None
-    ) -> float | list:
+    ) -> float | list[float]:
         """
         Round amounts to the precision of the specified ticker (currency or asset).
 
@@ -1188,32 +1186,39 @@ class LedgerEngine(ABC):
             ValueError: If the lengths of `amount` and `ticker` do not match, or if input
                         lists have zero length.
         """
-        def round_scalar(amount: float, ticker: str, date: datetime.date = None) -> float:
-            """Round a scaler to the precision of the specified ticker."""
-            precision = self.precision(ticker=ticker, date=date)
-            result = round(amount / precision, 0) * precision
-            return round(result, -1 * math.floor(math.log10(precision)))
+        is_scalar = np.isscalar(amount) and np.isscalar(ticker)
 
-        if np.isscalar(amount) and np.isscalar(ticker):
-            result = round_scalar(amount=amount, ticker=ticker, date=date)
-        elif np.isscalar(amount):
-            result = [None if pd.isna(tck)
-                      else round_scalar(amount=amount, ticker=tck, date=date)
-                      for tck in ticker]
-        elif np.isscalar(ticker):
-            result = [None if pd.isna(amt)
-                      else round_scalar(amount=amt, ticker=ticker, date=date)
-                      for amt in amount]
+        if np.isscalar(amount):
+            amounts = [amount] * len(ticker) if not np.isscalar(ticker) else [amount]
         else:
-            # amount and ticker are both array-like
-            if len(amount) != len(ticker):
-                raise ValueError("Amount and ticker lists must be of the same length")
-            result = [
-                None if pd.isna(amt) or pd.isna(tck)
-                else round_scalar(amount=amt, ticker=tck, date=date)
-                for amt, tck in zip(amount, ticker)
-            ]
-        return result
+            amounts = list(amount)
+
+        if np.isscalar(ticker):
+            tickers = [ticker] * len(amounts)
+        else:
+            tickers = list(ticker)
+
+        if len(amounts) != len(tickers):
+            raise ValueError("Amount and ticker lists must be of the same length")
+
+        date = date or datetime.date.today()
+        dates = [date] * len(tickers)
+
+        # Get precision vector
+        precision = self.precision_vectorized(
+            currencies=tickers, dates=dates, allow_missing=True
+        )
+
+        result = []
+        for amt, prec in zip(amounts, precision):
+            if prec is None or pd.isna(amt):
+                result.append(None)
+            else:
+                scaled = round(amt / prec, 0) * prec
+                rounded = round(scaled, -1 * math.floor(math.log10(prec)))
+                result.append(rounded)
+
+        return result[0] if is_scalar else result
 
     def report_amount(
         self, amount: list[float], currency: list[str], date: list[datetime.date]
@@ -1260,20 +1265,16 @@ class LedgerEngine(ABC):
         """
         df = enforce_schema(df, PRICE_SCHEMA, keep_extra_columns=True)
 
-        # The `precision` method validates the existence of a valid asset definition
+        # The `precision_vectorized` method validates the existence of a valid asset definition
         # and relies on sanitized data, serving as a centralized validation point.
-        def invalid_asset_reference(ticker: pd.Series, date: pd.Series) -> pd.Series:
-            """Validate specified column values for asset references."""
-            def is_valid(ticker, date):
-                try:
-                    self.precision(ticker=ticker, date=date)
-                    return False
-                except ValueError:
-                    return True
-            return pd.Series([is_valid(ticker=t, date=d) for t, d in zip(ticker, date)])
-
-        invalid_tickers_mask = invalid_asset_reference(df["ticker"], df["date"])
-        invalid_currencies_mask = invalid_asset_reference(df["currency"], df["date"])
+        ticker_precision = self.precision_vectorized(
+            currencies=df["ticker"], dates=df["date"], allow_missing=True,
+        )
+        currency_precision = self.precision_vectorized(
+            currencies=df["currency"], dates=df["date"], allow_missing=True,
+        )
+        invalid_tickers_mask = ticker_precision.is_null().to_numpy()
+        invalid_currencies_mask = currency_precision.is_null().to_numpy()
 
         if invalid_tickers_mask.any():
             invalid_tickers = df.loc[invalid_tickers_mask, "ticker"].unique().tolist()
@@ -1289,7 +1290,7 @@ class LedgerEngine(ABC):
             )
 
         invalid_mask = invalid_tickers_mask | invalid_currencies_mask
-        df = df[~invalid_mask].reset_index(drop=True)
+        df = df.loc[~invalid_mask].reset_index(drop=True)
         return df
 
     @timed_cache(120)
@@ -1390,99 +1391,82 @@ class LedgerEngine(ABC):
 
     @property
     @timed_cache(120)
-    def _assets_as_dict_of_df(self) -> Dict[str, pd.DataFrame]:
-        """Organize assets by ticker for quick access.
+    def _assets_as_df(self) -> pl.DataFrame:
+        """
+        Returns a clean, unified DataFrame of asset definitions for precision lookups.
 
-        Splits assets by ticker for efficient lookup of increments by ticker
-        and date.
+        Merges default and user-defined assets, fills missing dates with a fallback default date,
+        removes duplicates on ('ticker', 'date') keeping the first occurrence, and sorts
+        values by ticker and date.
 
         Returns:
-            Dict[str, pd.DataFrame]: Maps each asset ticker to a DataFrame of
-            its `increment` history, sorted by `date` with `NaT` values first.
+            pl.DataFrame: A Polars DataFrame with columns:
+                - 'ticker' (str): Asset ticker symbol.
+                - 'date' (date): Effective date (or fallback default for timeless entries).
+                - 'increment' (float): Precision increment for the asset.
         """
-        return {
-            ticker: (
-                group[["date", "increment"]]
-                .sort_values("date", na_position="first")
-                .reset_index(drop=True)
-            )
-            for ticker, group in self.sanitize_assets(self.assets.list()).groupby("ticker")
-        }
-
-    @timed_cache(120)
-    def precision(self, ticker: str, date: datetime.date = None) -> float:
-        """Returns the smallest price increment of an asset or currency.
-
-        This is the precision, to which prices should be rounded.
-
-        Args:
-            ticker (str): Identifier of the currency or asset.
-            date (datetime.date, optional): Date for which to retrieve the precision.
-                                            Defaults to today's date.
-
-        Returns:
-            float: The smallest price increment.
-        """
-
-        if ticker == "reporting_currency":
-            ticker = self.reporting_currency
-
-        if date is None:
-            date = datetime.date.today()
-        elif not isinstance(date, datetime.date):
-            date = pd.to_datetime(date).date()
-
-        asset = self._assets_as_dict_of_df.get(ticker)
-        if asset is None:
-            # Asset is not defined by the user, fall back to hard-coded defaults
-            increment = DEFAULT_ASSETS.loc[DEFAULT_ASSETS["ticker"] == ticker, "increment"]
-            if len(increment) < 1:
-                raise ValueError(f"No asset definition available for ticker '{ticker}'.")
-            if len(increment) > 1:
-                raise ValueError(f"Multiple default definitions for asset '{ticker}'.")
-            return increment.item()
-        else:
-            mask = asset["date"].isna() | (asset["date"] <= pd.Timestamp(date))
-            if not mask.any():
-                raise ValueError(
-                    f"No asset definition available for '{ticker}' on or before {date}."
-                )
-            return asset.loc[mask[mask].index[-1], "increment"].item()
+        combined = (
+            pl.concat([
+                pl.from_pandas(self.sanitize_assets(self.assets.list())),
+                pl.from_pandas(DEFAULT_ASSETS),
+            ])
+            .with_columns([
+                pl.col("ticker").cast(pl.Utf8),
+                pl.col("date").fill_null(DEFAULT_DATE).cast(pl.Date),
+            ])
+            .unique(subset=["ticker", "date"], keep="first")
+            .sort(["ticker", "date"])
+        )
+        return combined
 
     def precision_vectorized(
-        self, currencies: pd.Series, dates: pd.Series, allow_missing: bool = False
-    ) -> pd.Series:
+        self, currencies: pl.Series, dates: pl.Series, allow_missing: bool = False
+    ) -> pl.Series:
         """
-        Returns the smallest price increment (precision) for each currency/date pair.
+        Returns the smallest price increment (precision) for each (currency, date) pair.
+
+        Falls back to the earliest known date for timeless assets. Raises on unresolved
+        lookups unless `allow_missing=True`.
 
         Args:
-            dates (pd.Series): Series of datetime.date values.
-            currencies (pd.Series): Series of currency or asset tickers of same length as `dates`.
-            allow_missing (bool): If True, unresolved lookups return pd.NA
-                                  instead of raising an error.
+            currencies (pl.Series): Currency or asset tickers, e.g. 'USD', 'BTC'.
+            dates (pl.Series): Corresponding datetime.date values, same length as `currencies`.
+            allow_missing (bool): If True, missing entries return null instead of raising.
 
         Raises:
-            ValueError: If allow_missing is False and no precision definition.
+            ValueError: If no precision is found and `allow_missing` is False.
 
         Returns:
-            pd.Series: Series of precision values of type Float64.
+            pl.Series: Precision increments (float or null), one per (currency, date) input.
         """
-        def lookup(ticker, date):
-            if allow_missing and pd.isna(ticker):
-                return pd.NA
-            try:
-                return self.precision(ticker=ticker, date=date)
-            except ValueError:
-                if allow_missing:
-                    return pd.NA
+        currencies = pl.Series(currencies) if not isinstance(currencies, pl.Series) else currencies
+        dates = pl.Series(dates) if not isinstance(dates, pl.Series) else dates
+
+        tickers = [
+            self.reporting_currency if c == "reporting_currency" else c
+            for c in currencies.to_list()
+        ]
+        lookup_df = pl.DataFrame({
+            "ticker": pl.Series(tickers, dtype=pl.Utf8),
+            "date": pl.Series(dates, dtype=pl.Date).fill_null(DEFAULT_DATE)
+        })
+        joined = lookup_df.join_asof(
+            self._assets_as_df,
+            by="ticker",
+            on="date",
+            strategy="backward",
+            check_sortedness=False,
+        )
+
+        if not allow_missing:
+            missing_idx = joined["increment"].is_null().arg_true().min()
+            if missing_idx is not None:
                 raise ValueError(
-                    f"No asset definition available for ticker '{ticker}' on or before {date}."
+                    "No asset definition available for "
+                    f"'{joined['ticker'][missing_idx]}' on {joined['date'][missing_idx]}"
                 )
 
-        return pd.Series(
-            [lookup(t, d) for t, d in zip(currencies, dates)],
-            dtype="Float64", index=currencies.index
-        )
+        return joined["increment"]
 
     # ----------------------------------------------------------------------
     # Revaluations
@@ -1686,20 +1670,18 @@ class LedgerEngine(ABC):
     ) -> tuple[pd.Series, pd.Series]:
         """Mark rows with invalid currencies and identify patchable ones."""
         valid_idx = ~invalid_mask
-        end_dates = period.loc[valid_idx].map(lambda x: parse_date_span(x)[1])
+        currency_valid = currency.loc[valid_idx]
+        period_valid = period.loc[valid_idx].map(lambda x: parse_date_span(x)[1])
+        precision = self.precision_vectorized(
+            currencies=currency_valid, dates=period_valid, allow_missing=True
+        )
 
-        def is_invalid(ticker, date):
-            if pd.isna(ticker):
-                return False
-            try:
-                self.precision(ticker=ticker, date=date)
-                return False
-            except Exception:
-                return True
-
-        invalid_local = [is_invalid(t, d) for t, d in zip(currency.loc[valid_idx], end_dates)]
+        currency_na_mask = currency_valid.isna().to_numpy()
+        precision_null_mask = precision.is_null().to_numpy()
+        invalid_local = (~currency_na_mask) & precision_null_mask
         full_mask = pd.Series(False, index=currency.index)
-        full_mask.loc[currency.index[valid_idx][invalid_local]] = True
+        full_mask.loc[currency_valid.index[invalid_local]] = True
+
         drop_mask = full_mask & report_balance.isna()
         patch_mask = full_mask & balance.notna()
         return drop_mask, patch_mask
@@ -1810,7 +1792,7 @@ class LedgerEngine(ABC):
                     f"balance of {row['currency']} {row['balance']:,} as of {row['period']}."
                 )
 
-            precision = self.precision(self.reporting_currency)
+            precision = self.precision_vectorized(["reporting_currency"], [None])[0]
             failed_report_delta = (
                 (df["report_delta"].abs() > df["tolerance"] + precision / 2)
                 & df["report_balance"].notna()
