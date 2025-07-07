@@ -91,12 +91,8 @@ class StandaloneLedger(LedgerEngine):
 
         for row in df.loc[df["tax_code"].notna()].to_dict("records"):
             tax = tax_definitions[row["tax_code"]]
-            account_tax_code = (
-                account_tax_map.get(row["account"]) if pd.notna(row["account"]) else None
-            )
-            contra_tax_code = (
-                account_tax_map.get(row["contra"]) if pd.notna(row["contra"]) else None
-            )
+            account_tax_code = account_tax_map.get(row["account"])
+            contra_tax_code = account_tax_map.get(row["contra"])
             if pd.isna(account_tax_code) and pd.isna(contra_tax_code):
                 self._logger.warning(
                     f"Skip tax code '{row['tax_code']}' for {row['id']}: Neither account nor "
