@@ -87,18 +87,12 @@ class StandaloneLedger(LedgerEngine):
         tax_definitions = self.tax_codes.list().set_index("id").to_dict("index")
         tax_journal_entries = []
         accounts = self.accounts.list()
-        for _, row in df.loc[df["tax_code"].notna()].iterrows():
+        account_tax_map = accounts.set_index("account")["tax_code"].to_dict()
+
+        for row in df.loc[df["tax_code"].notna()].to_dict("records"):
             tax = tax_definitions[row["tax_code"]]
-            account_tax_code = (
-                accounts.loc[
-                    accounts["account"] == row["account"], "tax_code"
-                ].values[0] if pd.notna(row["account"]) else None
-            )
-            contra_tax_code = (
-                accounts.loc[
-                    accounts["account"] == row["contra"], "tax_code"
-                ].values[0] if pd.notna(row["contra"]) else None
-            )
+            account_tax_code = account_tax_map.get(row["account"])
+            contra_tax_code = account_tax_map.get(row["contra"])
             if pd.isna(account_tax_code) and pd.isna(contra_tax_code):
                 self._logger.warning(
                     f"Skip tax code '{row['tax_code']}' for {row['id']}: Neither account nor "
@@ -106,15 +100,16 @@ class StandaloneLedger(LedgerEngine):
                 )
             elif pd.isna(account_tax_code) and pd.notna(contra_tax_code):
                 multiplier = 1.0
-                account = (row["contra"] if tax["is_inclusive"] else row["account"])
+                account = row["contra"] if tax["is_inclusive"] else row["account"]
             elif pd.notna(account_tax_code) and pd.isna(contra_tax_code):
                 multiplier = -1.0
-                account = (row["account"] if tax["is_inclusive"] else row["contra"])
+                account = row["account"] if tax["is_inclusive"] else row["contra"]
             else:
                 self._logger.warning(
                     f"Skip tax code '{row['tax_code']}' for {row['id']}: Both account and "
                     f"counter accounts have tax_code."
                 )
+                continue
 
             # Calculate tax amount
             if tax["is_inclusive"]:
@@ -352,8 +347,7 @@ class StandaloneLedger(LedgerEngine):
         result = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            revalue = self.journal.standardize(pd.DataFrame(result))
-            df = self.serialize_ledger(pd.concat([ledger, revalue]))
+            df = self.serialize_ledger(pd.concat([ledger, pd.DataFrame(result)]))
             date = row["date"]
             accounts = self.parse_account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
