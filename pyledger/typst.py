@@ -13,24 +13,27 @@ def df_to_typst(
     colnames: bool = True,
 ) -> str:
     """
-    Convert a pandas DataFrame into a Typst table string.
+    Converts a DataFrame into a Typst table string with customizable layout and styling.
 
-    Ignores the index and creates a simple table.
+    This method is intended for generating Typst-compatible table strings with control over
+    column alignment, width, missing value substitution, bold row styling, and horizontal dividers.
+    Column names can be included as a header row, and the DataFrame index is always excluded.
 
     Args:
         df (pd.DataFrame): The DataFrame to convert.
-        align (list[str], optional):
-            List of alignment specifiers for columns (e.g., "left", "center", "right").
-            Defaults to None (Typst default will be used).
-        columns (list[str], optional):
-            List of column width specifiers. If None, a default column count will be used.
-        na_value (str): Replacement string for NA/NaN values in the DataFrame.
-        hline (list[int]): List of row indices after which horizontal lines will be added
-                           (0-based, including header if present).
-        colnames (bool): Whether to include column names as the header row. Defaults to True.
+        align (list[str], optional): Alignment specifiers for columns ("left", "center", "right").
+            Defaults to Typst's automatic alignment.
+        columns (list[str], optional): Column width specifiers (e.g., "auto", "1fr", "2cm").
+            If None, the number of columns is inferred from the DataFrame.
+        na_value (str): Replacement string for NA/NaN values. Defaults to an empty string.
+        hline (list[int], optional): Row indices after which horizontal lines are inserted.
+            Indices are 0-based and include the header if `colnames=True`.
+        bold (list[int], optional): Row indices to render in bold. Header is index 0
+            if `colnames=True`, followed by data rows.
+        colnames (bool): Whether to include column names as the first row. Defaults to True.
 
     Returns:
-        str: A string representation of the Typst table.
+        str: A Typst `table(...)` string representing the formatted DataFrame.
     """
     result = ["table(", "  stroke: none,"]
 
