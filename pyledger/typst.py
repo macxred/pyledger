@@ -2,12 +2,14 @@
 
 import pandas as pd
 
+
 def df_to_typst(
     df: pd.DataFrame,
     align: list[str] = None,
     columns: list[str] = None,
     na_value: str = "",
     hline: list[int] = [],
+    bold: list[int] = [],
     colnames: bool = True,
 ) -> str:
     """
@@ -30,10 +32,7 @@ def df_to_typst(
     Returns:
         str: A string representation of the Typst table.
     """
-    result = [
-        "table("
-        "  stroke: none,"
-    ]
+    result = ["table(", "  stroke: none,"]
 
     # Add layout specifiers
     if columns is None:
@@ -47,27 +46,29 @@ def df_to_typst(
     if colnames:
         if 0 in hline:
             result.append("  table.hline(),")
-        result.append("  " + _df_row_to_typst(df.columns, na_value=na_value))
+        result.append("  " + _df_row_to_typst(df.columns, na_value=na_value, bold=(0 in bold)))
 
     # Add data rows
     for row_idx, (_, row) in enumerate(df.iterrows()):
-        if row_idx + int(colnames) in hline:
+        idx = row_idx + int(colnames)
+        if idx in hline:
             result.append("  table.hline(),")
-        result.append("  " + _df_row_to_typst(row, na_value=na_value))
+        result.append("  " + _df_row_to_typst(row, na_value=na_value, bold=(idx in bold)))
     if len(df) + int(colnames) in hline:
         result.append("  table.hline(),")
 
-    # Close the table
     result.append(")")
     return "\n".join(result)
 
 
 def _df_attribute_to_typst(x: list) -> str:
-    """Join list of column attributes for Typst syntax."""
+    """Convert list of column attributes into Typst-compatible comma-separated format."""
     return ", ".join(map(str, x))
 
 
-def _df_row_to_typst(row: list, na_value: str = "") -> str:
+def _df_row_to_typst(row: list, na_value: str = "", bold: bool = False) -> str:
     """Convert a data frame row to a Typst-formatted table row."""
     cells = [na_value if pd.isna(cell) else cell for cell in list(row)]
+    if bold:
+        return " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)
     return " ".join(f"[{cell}]," for cell in cells)
