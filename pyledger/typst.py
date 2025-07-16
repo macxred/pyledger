@@ -46,7 +46,7 @@ def df_to_typst(
         result.append(f"  align: ({_df_attribute_to_typst(align)}),")
 
     # Add table header
-    if colnames:
+    if colnames and len(df.columns) > 0:
         if 0 in hline:
             result.append("  table.hline(),")
         result.append("  " + _df_row_to_typst(df.columns, na_value=na_value, bold=(0 in bold)))
