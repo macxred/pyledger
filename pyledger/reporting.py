@@ -32,7 +32,16 @@ def summarize_groups(
 
     Returns:
         pd.DataFrame: A formatted DataFrame with headers, summaries, and gaps.
+
+    Raises:
+        ValueError: If the input DataFrame does not contain all required columns:
+            [group, description, *summarize.keys()]
     """
+    required_columns = [group, description] + list(summarize.keys())
+    missing = set(required_columns) - set(df.columns)
+    if missing:
+        raise ValueError(f"DataFrame missing required columns: {missing}.")
+
     schema = pd.DataFrame({
         "column": ["level", group, description] + list(summarize.keys()),
         "dtype": ["string", "string", "string"] + ["Float64"] * len(summarize)
