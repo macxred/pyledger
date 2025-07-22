@@ -8,7 +8,7 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Literal
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
@@ -20,6 +20,7 @@ from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
     ACCOUNT_SCHEMA,
     ACCOUNT_HISTORY_SCHEMA,
+    ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA,
     ASSETS_SCHEMA,
     DEFAULT_DATE,
     JOURNAL_SCHEMA,
@@ -36,6 +37,12 @@ from .storage_entity import AccountingEntity
 from . import excel
 from .helpers import first_elements_as_str, prune_path, represents_integer
 from .time import parse_date_span
+from .typst import (
+    df_to_typst,
+    format_threshold,
+    format_typst_text,
+    format_typst_links,
+)
 
 
 class LedgerEngine(ABC):
@@ -2023,3 +2030,81 @@ class LedgerEngine(ABC):
             invalid_ids = invalid_ids.union(new_ids)
 
         return invalid_ids
+
+    # ----------------------------------------------------------------------
+    # Reporting
+
+    def account_sheet_tables(
+        self,
+        period: str,
+        config: pd.DataFrame,
+        profit_centers: str | None = None,
+        root_folder: str | None = None,
+        output: Literal["typst", "dataframe"] = "typst"
+    ) -> dict[str, str | pd.DataFrame]:
+        """
+        Generate Typst-formatted tables or formatted DataFrames with transaction history
+        for each account.
+
+        For each account number, this method retrieves its transaction history for the
+        specified period and optional profit centers, formats the data according to the
+        provided configuration DataFrame, and returns either Typst-formatted strings
+        or raw formatted DataFrames.
+
+        Args:
+            period (str): Period or date range for transactions. Accepts values such as
+                a year ("2024"), month ("2024-01"), quarter ("2024-Q1"), or a full
+                start–end span. See `parse_date_span` for accepted formats.
+            config (pd.DataFrame): A configuration DataFrame specifying which columns to
+                include, their labels, widths, and alignments.
+            profit_centers (str | None, optional): Optional filter to include only
+                transactions for the specified profit center(s).
+            root_folder (str | None, optional): If provided, values in the 'document'
+                column will be rendered as Typst links using this base folder path.
+            output (Literal["typst", "dataframe"]): Determines return type: either
+                rendered Typst table strings or raw formatted DataFrames. Defaults to "typst".
+
+        Returns:
+            dict[str, str | pd.DataFrame]: A mapping from account numbers to either Typst
+            table strings or formatted DataFrames, depending on `output`.
+        """
+        config = enforce_schema(config, ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA)
+        accounts_df = self.accounts.list()
+        tolerance = self.precision_vectorized([self.reporting_currency], [None])[0] / 2
+        column_order = config["column"].tolist()
+        result = {}
+
+        for account in accounts_df["account"]:
+            df = self.account_history(
+                account, period=period, profit_centers=profit_centers, drop=True
+            )
+            if df.empty:
+                continue
+
+            df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+            df["amount"] = format_threshold(df["amount"], tolerance)
+            df["balance"] = format_threshold(df["balance"], tolerance)
+            df["description"] = format_typst_text(df["description"])
+            if "report_amount" in df.columns:
+                df["report_amount"] = format_threshold(df["report_amount"], tolerance)
+            if "report_balance" in df.columns:
+                df["report_balance"] = format_threshold(df["report_balance"], tolerance)
+            if "document" in df.columns:
+                df["document"] = format_typst_links(df["document"], root_folder)
+
+            visible_cols = [col for col in column_order if col in df.columns]
+            df = df[visible_cols]
+
+            if output == "dataframe":
+                result[account] = df
+            else:
+                colspecs = config.set_index("column").loc[visible_cols]["width"].tolist()
+                align = config.set_index("column").loc[visible_cols]["align"].tolist()
+                labels = config.set_index("column").loc[visible_cols]["label"].tolist()
+                df.columns = [f"*{lbl.replace(' ', '\\-').upper()}*" for lbl in labels]
+
+                result[account] = df_to_typst(
+                    df, columns=colspecs, align=align, hline=[1], colnames=True
+                )
+
+        return result
