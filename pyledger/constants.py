@@ -174,3 +174,15 @@ TARGET_BALANCE_SCHEMA_CSV = """
 TARGET_BALANCE_SCHEMA = pd.read_csv(
     StringIO(TARGET_BALANCE_SCHEMA_CSV), skipinitialspace=True
 )
+
+
+ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA_CSV = """
+    column,             dtype,                mandatory,       id
+    column,             string[python],       True,          True
+    label,              string[python],       True,          False
+    width,              string[python],       True,          False
+    align,              string[python],       True,          False
+"""
+ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA = pd.read_csv(
+    StringIO(ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA_CSV), skipinitialspace=True
+)

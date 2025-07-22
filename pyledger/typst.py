@@ -107,3 +107,24 @@ def format_threshold(series: pd.Series, threshold: float) -> pd.Series:
     return series.map(
         lambda x: "" if pd.isna(x) or abs(x) < threshold else format_number(x)
     )
+
+
+def format_typst_text(series: pd.Series) -> pd.Series:
+    """Escape Typst-sensitive characters: <, >, and @."""
+    return series.map(
+        lambda text: (
+            text.replace("<", "\\<")
+                .replace(">", "\\>")
+                .replace("@", "\\@")
+        ) if isinstance(text, str) else text
+    )
+
+
+def format_typst_links(series: pd.Series, root: str | None) -> pd.Series:
+    """Wrap non-null strings as Typst links using a base folder path."""
+    if root:
+        root = root.rstrip("/")
+        return series.map(
+            lambda x: f'link("{root}/{x}", "{x}")' if pd.notna(x) else ""
+        )
+    return series.fillna("")
