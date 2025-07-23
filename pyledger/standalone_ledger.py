@@ -260,7 +260,7 @@ class StandaloneLedger(LedgerEngine):
                 target_balance_entries = self.target_balance_entries(
                     ledger=target_balance_ledger, target_balance=target_balance_rows,
                 )
-                result.append(target_balance_entries)
+                result.append(self.serialize_ledger(target_balance_entries))
 
         return (
             pd.concat(result, ignore_index=True)
@@ -271,7 +271,7 @@ class StandaloneLedger(LedgerEngine):
         self, ledger: pd.DataFrame, target_balance: pd.DataFrame
     ) -> pd.DataFrame:
         """
-        Generate automated ledger entries based on target balance specifications.
+        Generate automated journal entries based on target balance specifications.
 
         In accounting, certain accounts must be periodically cleared or closed—such as
         P&L at year-end or tax accounts after filing. Defining target balance rules
@@ -282,7 +282,7 @@ class StandaloneLedger(LedgerEngine):
         generated entry may influence the balances of subsequent rules. For each rule,
         the method computes the current balance based on the specified lookup filters
         (e.g., account ranges, periods, profit centers). If the balance differs from
-        the target, it creates ledger entries that adjust the specified account to the
+        the target, it creates journal entries that adjust the specified account to the
         desired value—typically zero—offsetting the difference to a designated
         contra account.
 
@@ -292,7 +292,7 @@ class StandaloneLedger(LedgerEngine):
                 with TARGET_BALANCE_SCHEMA.
 
         Returns:
-            pd.DataFrame: A DataFrame of generated ledger entries that enforce
+            pd.DataFrame: A DataFrame of generated journal entries that enforce
                 the target balances.
         """
 
@@ -331,13 +331,6 @@ class StandaloneLedger(LedgerEngine):
                 "contra": row["contra"],
                 "amount": -report_delta,
                 "report_amount": -report_delta,
-            })
-            result.append({
-                **base_entry,
-                "account": row["contra"],
-                "contra": row["account"],
-                "amount": report_delta,
-                "report_amount": report_delta,
             })
 
         return self.journal.standardize(pd.DataFrame(result))
