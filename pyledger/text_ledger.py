@@ -110,7 +110,7 @@ class TextLedger(StandaloneLedger):
             file_path_column="source"
         )
         self._target_balance = CSVAccountingEntity(
-            schema=TARGET_BALANCE_SCHEMA, path=self.root / "settings/target_balance"
+            schema=TARGET_BALANCE_SCHEMA, path=self.root / "settings/target_balance.csv"
         )
 
     # ----------------------------------------------------------------------
