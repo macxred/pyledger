@@ -1,6 +1,6 @@
 import pandas as pd
 import textwrap
-from pyledger.typst import df_to_typst
+from pyledger.typst import df_to_typst, format_number, format_threshold
 
 
 def test_empty_dataframe():
@@ -10,6 +10,7 @@ def test_empty_dataframe():
         "table(\n"
         "  stroke: none,\n"
         "  columns: 0,\n"
+        "  \n"
         ")"
     )
     assert result.strip() == expected.strip()
@@ -76,12 +77,11 @@ def test_hline_rows():
         table(
           stroke: none,
           columns: 2,
-          table.hline(),
           [A], [B],
           table.hline(),
           [1], [3],
-          [2], [4],
           table.hline(),
+          [2], [4],
         )""")
     assert result.strip() == expected.strip()
 
@@ -125,11 +125,11 @@ def test_bold_and_hline_interaction():
         table(
           stroke: none,
           columns: 2,
-          table.hline(),
           text(weight: "bold", [A]), text(weight: "bold", [B]),
-          [1], [3],
           table.hline(),
+          [1], [3],
           text(weight: "bold", [2]), text(weight: "bold", [4]),
+          table.hline(),
         )""")
     assert result.strip() == expected.strip()
 
@@ -146,3 +146,18 @@ def test_mismatched_column_specs():
           [1], [2], [3],
         )""")
     assert result.strip() == expected.strip()
+
+
+def test_format_number():
+    assert format_number(1234567.89) == "1'234'567.89"
+    assert format_number(0) == "0.00"
+    assert format_number(-98765.4321) == "-98'765.43"
+
+
+def test_format_threshold():
+    series = pd.Series([1000, 0.004, -2000, float("nan"), 5])
+    threshold = 10
+    result = format_threshold(series, threshold)
+
+    expected = pd.Series(["1'000.00", "", "-2'000.00", "", ""])
+    pd.testing.assert_series_equal(result, expected)
