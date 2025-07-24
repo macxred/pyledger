@@ -15,6 +15,8 @@ import numpy as np
 import openpyxl
 import pandas as pd
 import polars as pl
+from .reporting import summarize_groups
+from .typst import format_threshold, df_to_typst
 from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
@@ -2023,3 +2025,71 @@ class LedgerEngine(ABC):
             invalid_ids = invalid_ids.union(new_ids)
 
         return invalid_ids
+
+    # ----------------------------------------------------------------------
+    # Reporting
+
+    def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
+        """
+        Compute and aggregate balances for a given period and set of accounts.
+        Applies sign negation for accounts marked with 'negate_in_report'.
+
+        Args:
+            row (dict): Config row with 'period', 'label', and optional 'profit_centers'.
+            accounts (pd.DataFrame): Account definitions with 'negate_in_report' column.
+            prune_level (int): Grouping depth for aggregation.
+
+        Returns:
+            pd.DataFrame: Aggregated balances with renamed report column.
+        """
+        balances = self.individual_account_balances(
+            accounts=accounts["account"].tolist(),
+            period=row["period"],
+            profit_centers=row.get("profit_centers")
+        ).drop(columns=["group", "description", "currency"], errors="ignore")
+        balances = balances.merge(
+            accounts[["account", "group", "description", "currency", "account_multiplier"]],
+            on="account", how="right"
+        )
+        # Apply account multiplier
+        balances["balance"] *= balances["account_multiplier"]
+        balances["report_balance"] *= balances["account_multiplier"]
+        aggregated = self.aggregate_account_balances(balances, n=prune_level)
+
+        # Hack: aggregate_account_balances always adds a leading slash, need to remove it manually
+        aggregated["group"] = aggregated["group"].str.removeprefix("/")
+        return aggregated[["group", "description", "report_balance"]].rename(
+            columns={"report_balance": row["label"]}
+        )
+
+    def report_table(self, config, accounts, staggered=False, prune_level=2) -> str:
+        dfs = [self._report_column(row, accounts, prune_level) for row in config.to_dict("records")]
+        sheet = pd.concat(dfs, axis=1).loc[:, ~pd.concat(dfs, axis=1).columns.duplicated()]
+
+        label_cols = list(config["label"])
+        report = summarize_groups(
+            df=sheet,
+            summarize={col: "sum" for col in label_cols},
+            group="group",
+            description="description",
+            leading_space=1,
+            staggered=staggered
+        )
+
+        threshold = self.precision_vectorized([self.reporting_currency], [None])[0] / 2
+        for col in label_cols:
+            report[col] = format_threshold(report[col], threshold=threshold)
+
+        bold = [0] + (report.index[report["level"].str.match(r"^[HS][0-9]$")] + 1).tolist()
+        hline = (report.index[report["level"] == "H1"] + 1).tolist()
+        report = report[["description"] + label_cols]
+        report.columns = [""] + label_cols
+
+        return df_to_typst(
+            df=report,
+            hline=hline,
+            bold=bold,
+            columns=["auto"] + ["1fr"] * len(label_cols),
+            align=["left"] + ["right"] * len(label_cols),
+            colnames=True
+        )
