@@ -1,4 +1,4 @@
-"""Utilities for generating tables in the Typst typesetting engine."""
+"""Utilities for generating and formatting tables in the Typst typesetting engine."""
 
 import pandas as pd
 
@@ -45,21 +45,23 @@ def df_to_typst(
     if align is not None:
         result.append(f"  align: ({_df_attribute_to_typst(align)}),")
 
-    # Add table header
-    if colnames and len(df.columns) > 0:
-        if 0 in hline:
+    current_row_idx = 0
+    # Header
+    if colnames:
+        result.append(
+            "  " + _df_row_to_typst(df.columns, na_value=na_value, bold=(current_row_idx in bold))
+        )
+        current_row_idx += 1
+        if (current_row_idx - 1) in hline:
             result.append("  table.hline(),")
-        result.append("  " + _df_row_to_typst(df.columns, na_value=na_value, bold=(0 in bold)))
-
-    # Add data rows
-    for row_idx, (_, row) in enumerate(df.iterrows()):
-        idx = row_idx + int(colnames)
-        if idx in hline:
+    # Data rows
+    for _, row in df.iterrows():
+        result.append(
+            "  " + _df_row_to_typst(row, na_value=na_value, bold=(current_row_idx in bold))
+        )
+        if current_row_idx in hline:
             result.append("  table.hline(),")
-        result.append("  " + _df_row_to_typst(row, na_value=na_value, bold=(idx in bold)))
-    if len(df) + int(colnames) in hline:
-        result.append("  table.hline(),")
-
+        current_row_idx += 1
     result.append(")")
     return "\n".join(result)
 
@@ -75,3 +77,15 @@ def _df_row_to_typst(row: list, na_value: str = "", bold: bool = False) -> str:
     if bold:
         return " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)
     return " ".join(f"[{cell}]," for cell in cells)
+
+
+def format_number(x: float) -> str:
+    """Format a float with apostrophe separators and two decimal places."""
+    return f"{x:,.2f}".replace(",", "'")
+
+
+def format_threshold(series: pd.Series, threshold: float) -> pd.Series:
+    """Format values using `format_number`, or return empty string if below threshold or NaN."""
+    return series.map(
+        lambda x: "" if pd.isna(x) or abs(x) < threshold else format_number(x)
+    )
