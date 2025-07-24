@@ -2062,7 +2062,20 @@ class LedgerEngine(ABC):
             columns={"report_balance": row["label"]}
         )
 
-    def report_table(self, config, accounts, staggered=False, prune_level=2) -> str:
+    def report_table(self, config, accounts, staggered=False, prune_level=2, format="typst"):
+        """
+        Generate a financial report table from configuration and accounts.
+
+        Args:
+            config (pd.DataFrame): Configuration with columns like 'label', 'period', etc.
+            accounts (list or dict): Account data to pull values from.
+            staggered (bool): Whether to indent subtotal rows for readability.
+            prune_level (int): How deep to aggregate account groups.
+            format (str): Output format, either 'typst' or 'dataframe'.
+
+        Returns:
+            Union[str, pd.DataFrame]: Typst string or raw DataFrame, depending on format.
+        """
         dfs = [self._report_column(row, accounts, prune_level) for row in config.to_dict("records")]
         sheet = pd.concat(dfs, axis=1).loc[:, ~pd.concat(dfs, axis=1).columns.duplicated()]
 
@@ -2085,11 +2098,14 @@ class LedgerEngine(ABC):
         report = report[["description"] + label_cols]
         report.columns = [""] + label_cols
 
-        return df_to_typst(
-            df=report,
-            hline=hline,
-            bold=bold,
-            columns=["auto"] + ["1fr"] * len(label_cols),
-            align=["left"] + ["right"] * len(label_cols),
-            colnames=True
-        )
+        if format == "typst":
+            return df_to_typst(
+                df=report,
+                hline=hline,
+                bold=bold,
+                columns=["auto"] + ["1fr"] * len(label_cols),
+                align=["left"] + ["right"] * len(label_cols),
+                colnames=True
+            )
+
+        return report
