@@ -5,37 +5,39 @@ from consistent_df import enforce_schema
 
 
 def summarize_groups(
-    df, group="group", description="description",
-    summarize={"report_balance": "sum"}, leading_space=0
+    df,
+    group="group",
+    description="description",
+    summarize={"report_balance": "sum"},
+    leading_space=0,
+    staggered=False
 ):
     """
-    Format a table with hierarchical groups for clear reporting.
+    Summarize a DataFrame into a multi-level reporting layout with headers,
+    body rows, and totals or cumulative subtotals per group.
 
-    This method expands a DataFrame where each row belongs to a hierarchical group and adds:
-    - A title row above each group
-    - A summary row below each group, showing aggregated values
-    - A "level" column to mark the row type:
-      - "H1", "H2", etc. for group headers by depth
-      - "body" for original data rows
-      - "S1", "S2", etc. for group summaries
-      - "gap" for blank spacer rows between groups
+    In hierarchical mode (`staggered=False`), slash-separated group paths
+    generate nested sections with headers (`H1`, `H2`, ...) and per-level totals
+    (`S1`, `S2`, ...). Optional spacing is added before headers.
+
+    In staggered mode (`staggered=True`), the same hierarchy is retained but
+    totals are replaced with cumulative subtotals (`subtotal`) and top-level
+    headers are omitted.
 
     Args:
-        df (pd.DataFrame): Input DataFrame with at least `group`, `description`,
-            and the columns listed in `summarize` argument.
-        group (str): Name of the column containing hierarchical group paths (POSIX-style).
-        description (str): Name of the column with line item descriptions.
-        summarize (dict): Columns to summarize and how (e.g. {"amount": "sum"}),
-            passed to `DataFrame.agg()`.
-        leading_space (int): If greater than 0, inserts a blank row before headers up to
-            the specified level ("H1", "H2", etc.), except at the top of the table.
+        df (pd.DataFrame): Input with `group`, `description`, and summary columns.
+        group (str): Column with slash-separated group paths.
+        description (str): Column with row labels.
+        summarize (dict): Mapping of columns to aggregation functions.
+        leading_space (int): Number of header levels to prefix with a gap (hierarchical only).
+        staggered (bool): Use cumulative totals instead of per-level totals.
 
     Returns:
-        pd.DataFrame: A formatted DataFrame with headers, summaries, and gaps.
-
-    Raises:
-        ValueError: If the input DataFrame does not contain all required columns:
-            [group, description, *summarize.keys()]
+        pd.DataFrame: Structured output with row types marked in the `level` column:
+            - 'H1', 'H2', ...: Headers
+            - 'S1', 'S2', ...: Totals (hierarchical)
+            - 'body': Original data rows
+            - 'gap': Blank spacer rows
     """
     required_columns = [group, description] + list(summarize.keys())
     missing = set(required_columns) - set(df.columns)
@@ -49,8 +51,10 @@ def summarize_groups(
     if df.empty:
         return enforce_schema(None, schema)
 
+    cumulative = pd.DataFrame({col: 0.0 for col in summarize}, index=[0]) if staggered else None
     result = _summarize_groups(
-        df.copy(), group=group, description=description, summarize=summarize
+        df.copy(), group, description, summarize,
+        level=1, staggered=staggered, cumulative=cumulative
     )
 
     # Drop leading and trailing "gap" rows
@@ -74,7 +78,7 @@ def summarize_groups(
     return enforce_schema(result, schema, sort_columns=True)
 
 
-def _summarize_groups(df, group, description, summarize, level=1):
+def _summarize_groups(df, group, description, summarize, level=1, staggered=False, cumulative=None):
     """Recursively adds headers and summaries for nested group levels."""
     rows = []
     next_level = df[group].apply(lambda x: x.split('/', 1)[0] if '/' in x else x)
@@ -86,13 +90,15 @@ def _summarize_groups(df, group, description, summarize, level=1):
         # Blank line
         rows.append({group: part, description: '', 'level': 'gap'})
         # Header line
-        rows.append({group: part, description: part, 'level': f'H{level}'})
+        if not (staggered and level == 1):
+            rows.append({group: part, description: part, 'level': f'H{level}'})
 
-        # Recursively process sub-groups
+        # Recursively process child groups
         if any(subdf[group] != ''):
             child_rows = _summarize_groups(
                 subdf[subdf[group] != ''], group=group,
-                description=description, summarize=summarize, level=level + 1
+                description=description, summarize=summarize,
+                level=level + 1, staggered=staggered, cumulative=cumulative
             )
             child_rows[group] = part + "/" + child_rows[group]
             rows.extend(child_rows.to_dict('records'))
@@ -100,12 +106,21 @@ def _summarize_groups(df, group, description, summarize, level=1):
         # Body rows
         body_rows = subdf[subdf[group] == ''].assign(level='body')
         rows.extend(body_rows.assign(group=part).to_dict('records'))
-        # Summary line
-        rows.append({
-            group: part, description: f'Total {part}', **group_summary, 'level': f'S{level}'
-        })
 
-        # Blank line
+        # Add total
+        if not staggered:
+            rows.append({
+                group: part, description: f'Total {part}',
+                **group_summary, 'level': f'S{level}'
+            })
+        else:
+            cumulative += pd.DataFrame([group_summary])
+            rows.append({
+                group: part, description: f'{part}',
+                **cumulative.to_dict(orient="records")[0], 'level': 'H1'
+            })
+
+        # Closing blank line
         rows.append({group: part, description: '', 'level': 'gap'})
 
     return pd.DataFrame(rows)
