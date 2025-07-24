@@ -7,17 +7,18 @@ from consistent_df import assert_frame_equal
 from pyledger.reporting import summarize_groups
 
 
-def test_summarize_groups():
-    BALANCE_CSV = """
-    group,                                               description,                report_balance
-    Assets/Other,                                        Cash in other Bank EUR,     -22.34
-    Assets/Cash/UBS,                                     Cash in Bank CHF,           100000.0
-    Assets/Cash/Bank of America,                         Cash in Bank USD,           1076311.79
-    Liabilities/Payables,                                Accounts Payable USD,       700.0
-    Liabilities/Current Liabilities/Accrued,             VAT payable (output tax),   -807.94
-    """
-    BALANCE = pd.read_csv(StringIO(BALANCE_CSV), skipinitialspace=True)
+BALANCE_CSV = """
+group,                                               description,                report_balance
+Assets/Other,                                        Cash in other Bank EUR,     -22.34
+Assets/Cash/UBS,                                     Cash in Bank CHF,           100000.0
+Assets/Cash/Bank of America,                         Cash in Bank USD,           1076311.79
+Liabilities/Payables,                                Accounts Payable USD,       700.0
+Liabilities/Current Liabilities/Accrued,             VAT payable (output tax),   -807.94
+"""
+BALANCE = pd.read_csv(StringIO(BALANCE_CSV), skipinitialspace=True)
 
+
+def test_summarize_groups():
     EXPECTED_OUTPUT_CSV = """
     level,group,                                     description,                    report_balance
     H1,   Assets,                                    Assets,
@@ -56,9 +57,50 @@ def test_summarize_groups():
     gap,  Liabilities/Current Liabilities,           ,
     S1,   Liabilities,                               Total Liabilities,              -107.94
     """
-
     EXPECTED = pd.read_csv(StringIO(EXPECTED_OUTPUT_CSV), skipinitialspace=True)
     result = summarize_groups(BALANCE)
+    EXPECTED["description"] = EXPECTED["description"].fillna("")
+    EXPECTED["report_balance"] = EXPECTED["report_balance"].astype("Float64")
+    assert_frame_equal(result, EXPECTED, check_dtype=False)
+
+
+def test_summarize_groups_staggered():
+    EXPECTED_OUTPUT_CSV = """
+    level,group,                                     description,                    report_balance
+    H2,   Assets/Other,                              Other,
+    body, Assets/Other,                              Cash in other Bank EUR,         -22.34
+    H1,   Assets/Other,                              Other,                          -22.34
+    gap,  Assets/Other,                              ,
+    H2,   Assets/Cash,                               Cash,
+    gap,  Assets/Cash/UBS,                           ,
+    H3,   Assets/Cash/UBS,                           UBS,
+    body, Assets/Cash/UBS,                           Cash in Bank CHF,               100000.0
+    H1,   Assets/Cash/UBS,                           UBS,                            99977.66
+    gap,  Assets/Cash/UBS,                           ,
+    H3,   Assets/Cash/Bank of America,               Bank of America,
+    body, Assets/Cash/Bank of America,               Cash in Bank USD,               1076311.79
+    H1,   Assets/Cash/Bank of America,               Bank of America,               1176289.45
+    gap,  Assets/Cash/Bank of America,               ,
+    H1,   Assets/Cash,                               Cash,                          2352601.24
+    gap,  Assets/Cash,                               ,
+    H1,   Assets,                                    Assets,                        3528890.69
+    gap,  Assets,                                    ,
+    H2,   Liabilities/Payables,                      Payables,
+    body, Liabilities/Payables,                      Accounts Payable USD,           700.0
+    H1,   Liabilities/Payables,                      Payables,                      3529590.69
+    gap,  Liabilities/Payables,                      ,
+    H2,   Liabilities/Current Liabilities,           Current Liabilities,
+    gap,  Liabilities/Current Liabilities/Accrued,   ,
+    H3,   Liabilities/Current Liabilities/Accrued,   Accrued,
+    body, Liabilities/Current Liabilities/Accrued,   VAT payable (output tax),       -807.94
+    H1,   Liabilities/Current Liabilities/Accrued,   Accrued,                       3528782.75
+    gap,  Liabilities/Current Liabilities/Accrued,   ,
+    H1,   Liabilities/Current Liabilities,           Current Liabilities,           3527974.81
+    gap,  Liabilities/Current Liabilities,           ,
+    H1,   Liabilities,                               Liabilities,                   3527866.87
+    """
+    EXPECTED = pd.read_csv(StringIO(EXPECTED_OUTPUT_CSV), skipinitialspace=True)
+    result = summarize_groups(BALANCE, staggered=True)
     EXPECTED["description"] = EXPECTED["description"].fillna("")
     EXPECTED["report_balance"] = EXPECTED["report_balance"].astype("Float64")
     assert_frame_equal(result, EXPECTED, check_dtype=False)
