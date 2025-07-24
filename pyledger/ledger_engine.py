@@ -15,6 +15,8 @@ import numpy as np
 import openpyxl
 import pandas as pd
 import polars as pl
+from .reporting import summarize_groups
+from .typst import format_threshold, df_to_typst
 from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
@@ -2023,3 +2025,123 @@ class LedgerEngine(ABC):
             invalid_ids = invalid_ids.union(new_ids)
 
         return invalid_ids
+
+    # ----------------------------------------------------------------------
+    # Reporting
+
+    def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
+        """
+        Compute aggregated balances for a reporting period based on account definitions.
+
+        Retrieves individual account balances for the specified period and optional
+        profit centers, applies any `account_multiplier` transformations (e.g., for
+        negation or scaling), and aggregates the results up to the desired group level.
+
+        The final DataFrame is structured with `"group"`, `"description"`, and a
+        single column labeled according to the configuration (e.g., year or period label).
+
+        Args:
+            row (dict): A configuration row with keys:
+                - "period" (str): The reporting period (e.g., "2024", "Q1 2025").
+                - "label" (str): The column label to use for the resulting values.
+                - "profit_centers" (optional, list[str]): Optional filters for profit centers.
+            accounts (pd.DataFrame): Account metadata with required columns:
+                - "account" (str): Unique account identifier.
+                - "negate_in_report" or "account_multiplier" (float): Value transformation.
+                - "group", "description", "currency": Used for aggregation and display.
+            prune_level (int): Level of hierarchy to retain during aggregation.
+
+        Returns:
+            pd.DataFrame: A DataFrame with columns ["group", "description", <label>],
+            where <label> is dynamically renamed based on `row["label"]`.
+        """
+        balances = self.individual_account_balances(
+            accounts=accounts["account"].tolist(),
+            period=row["period"],
+            profit_centers=row.get("profit_centers")
+        ).drop(columns=["group", "description", "currency"], errors="ignore")
+        balances = balances.merge(
+            accounts[["account", "group", "description", "currency", "account_multiplier"]],
+            on="account", how="right"
+        )
+        # Apply account multiplier
+        balances["balance"] *= balances["account_multiplier"]
+        balances["report_balance"] *= balances["account_multiplier"]
+        aggregated = self.aggregate_account_balances(balances, n=prune_level)
+
+        # Hack: aggregate_account_balances always adds a leading slash, need to remove it manually
+        aggregated["group"] = aggregated["group"].str.removeprefix("/")
+        return aggregated[["group", "description", "report_balance"]].rename(
+            columns={"report_balance": row["label"]}
+        )
+
+    def report_table(self, config, accounts, staggered=False, prune_level=2, format="typst"):
+        """
+        Create a multi-period financial report from account balances.
+
+        This method builds a tabular financial report—such as a Profit & Loss or
+        Balance Sheet—by combining account balances across multiple time periods
+        or scenarios defined in the configuration.
+
+        For each row in the config (representing a reporting column like "2024", "2025 YTD",
+        or "Budget Q1"), it fetches the relevant account balances, applies any required
+        transformations (such as negating values for liability or revenue accounts),
+        and aggregates them into meaningful groups—like headings, subgroups, or
+        leaf-level accounts—based on the chart of accounts.
+
+        The result is a structured report with one column per period and rows grouped
+        according to your chart hierarchy. You can choose to visually indent subgroups
+        using the `staggered` option, and control how deep the grouping goes using
+        `prune_level`.
+
+        Args:
+            config (pd.DataFrame): One row per report column. Required:
+                - "period": Accounting period to fetch.
+                - "label": Column header.
+                - "profit_centers": Filter balances by segment.
+            accounts (pd.DataFrame): Account definitions with:
+                - "account", "group", "description", "currency", "account_multiplier" columns.
+            staggered (bool): Indent subgroups to reflect hierarchy visually.
+            prune_level (int): Aggregation depth; e.g. 1 = top-level groups, 3 = detailed lines.
+            format (str): Output format:
+                - "typst": Formatted string for Typst rendering.
+                - "dataframe": Raw DataFrame for inspection or export.
+
+        Returns:
+            str or pd.DataFrame:
+                - Typst string if `format="typst"` (for PDF layout).
+                - DataFrame if `format="dataframe"` (for further processing).
+        """
+        dfs = [self._report_column(row, accounts, prune_level) for row in config.to_dict("records")]
+        sheet = pd.concat(dfs, axis=1).loc[:, ~pd.concat(dfs, axis=1).columns.duplicated()]
+
+        label_cols = list(config["label"])
+        report = summarize_groups(
+            df=sheet,
+            summarize={col: "sum" for col in label_cols},
+            group="group",
+            description="description",
+            leading_space=1,
+            staggered=staggered
+        )
+
+        threshold = self.precision_vectorized([self.reporting_currency], [None])[0] / 2
+        for col in label_cols:
+            report[col] = format_threshold(report[col], threshold=threshold)
+
+        bold = [0] + (report.index[report["level"].str.match(r"^[HS][0-9]$")] + 1).tolist()
+        hline = (report.index[report["level"] == "H1"] + 1).tolist()
+        report = report[["description"] + label_cols]
+        report.columns = [""] + label_cols
+
+        if format == "typst":
+            return df_to_typst(
+                df=report,
+                hline=hline,
+                bold=bold,
+                columns=["auto"] + ["1fr"] * len(label_cols),
+                align=["left"] + ["right"] * len(label_cols),
+                colnames=True
+            )
+
+        return report
