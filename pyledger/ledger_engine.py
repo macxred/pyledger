@@ -2031,16 +2031,29 @@ class LedgerEngine(ABC):
 
     def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
         """
-        Compute and aggregate balances for a given period and set of accounts.
-        Applies sign negation for accounts marked with 'negate_in_report'.
+        Compute aggregated balances for a reporting period based on account definitions.
+
+        Retrieves individual account balances for the specified period and optional
+        profit centers, applies any `account_multiplier` transformations (e.g., for
+        negation or scaling), and aggregates the results up to the desired group level.
+
+        The final DataFrame is structured with `"group"`, `"description"`, and a
+        single column labeled according to the configuration (e.g., year or period label).
 
         Args:
-            row (dict): Config row with 'period', 'label', and optional 'profit_centers'.
-            accounts (pd.DataFrame): Account definitions with 'negate_in_report' column.
-            prune_level (int): Grouping depth for aggregation.
+            row (dict): A configuration row with keys:
+                - "period" (str): The reporting period (e.g., "2024", "Q1 2025").
+                - "label" (str): The column label to use for the resulting values.
+                - "profit_centers" (optional, list[str]): Optional filters for profit centers.
+            accounts (pd.DataFrame): Account metadata with required columns:
+                - "account" (str): Unique account identifier.
+                - "negate_in_report" or "account_multiplier" (float): Value transformation.
+                - "group", "description", "currency": Used for aggregation and display.
+            prune_level (int): Level of hierarchy to retain during aggregation.
 
         Returns:
-            pd.DataFrame: Aggregated balances with renamed report column.
+            pd.DataFrame: A DataFrame with columns ["group", "description", <label>],
+            where <label> is dynamically renamed based on `row["label"]`.
         """
         balances = self.individual_account_balances(
             accounts=accounts["account"].tolist(),
@@ -2064,17 +2077,40 @@ class LedgerEngine(ABC):
 
     def report_table(self, config, accounts, staggered=False, prune_level=2, format="typst"):
         """
-        Generate a financial report table from configuration and accounts.
+        Create a multi-period financial report from account balances.
+
+        This method builds a tabular financial report—such as a Profit & Loss or
+        Balance Sheet—by combining account balances across multiple time periods
+        or scenarios defined in the configuration.
+
+        For each row in the config (representing a reporting column like "2024", "2025 YTD",
+        or "Budget Q1"), it fetches the relevant account balances, applies any required
+        transformations (such as negating values for liability or revenue accounts),
+        and aggregates them into meaningful groups—like headings, subgroups, or
+        leaf-level accounts—based on the chart of accounts.
+
+        The result is a structured report with one column per period and rows grouped
+        according to your chart hierarchy. You can choose to visually indent subgroups
+        using the `staggered` option, and control how deep the grouping goes using
+        `prune_level`.
 
         Args:
-            config (pd.DataFrame): Configuration with columns like 'label', 'period', etc.
-            accounts (list or dict): Account data to pull values from.
-            staggered (bool): Whether to indent subtotal rows for readability.
-            prune_level (int): How deep to aggregate account groups.
-            format (str): Output format, either 'typst' or 'dataframe'.
+            config (pd.DataFrame): One row per report column. Required:
+                - "period": Accounting period to fetch.
+                - "label": Column header.
+                - "profit_centers": Filter balances by segment.
+            accounts (pd.DataFrame): Account definitions with:
+                - "account", "group", "description", "currency", "account_multiplier" columns.
+            staggered (bool): Indent subgroups to reflect hierarchy visually.
+            prune_level (int): Aggregation depth; e.g. 1 = top-level groups, 3 = detailed lines.
+            format (str): Output format:
+                - "typst": Formatted string for Typst rendering.
+                - "dataframe": Raw DataFrame for inspection or export.
 
         Returns:
-            Union[str, pd.DataFrame]: Typst string or raw DataFrame, depending on format.
+            str or pd.DataFrame:
+                - Typst string if `format="typst"` (for PDF layout).
+                - DataFrame if `format="dataframe"` (for further processing).
         """
         dfs = [self._report_column(row, accounts, prune_level) for row in config.to_dict("records")]
         sheet = pd.concat(dfs, axis=1).loc[:, ~pd.concat(dfs, axis=1).columns.duplicated()]
