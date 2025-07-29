@@ -277,3 +277,33 @@ class BaseTestAccounts(BaseTest):
             )
             expected_df = format_expected_df(case["account_history"], drop=case["drop"])
             assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])
+
+    def test_account_history_entry_in_both_accounts(self, engine):
+        """This test verifies that transactions are correctly reflected in both the main
+        account and the contra account, as expected from a double-entry bookkeeping system.
+
+        See: #193 — related issue discussing missing entries in contra account history.
+        """
+
+        ACCOUNT_CSV = """
+            group,                account, currency, tax_code, description
+            /Revenue/Sales,          2200,      USD,         , VAT Payable (Output VAT)
+            /Revenue/Sales,          4001,      USD,         , Sales Revenue - EUR
+        """
+        ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+
+        JOURNAL_CSV = """
+        id,       date, account, contra, currency,    amount, report_amount, tax_code, description,
+        1, 2024-07-01,    4001,   2200,      USD,       100,              ,         ,    2024 txn,
+        """
+        JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
+        engine.restore(
+            configuration={"REPORTING_CURRENCY": "USD"}, accounts=ACCOUNTS, journal=JOURNAL
+        )
+
+        assert not engine.account_history(2200).empty, (
+            "No entries found in account history for account 2200 (the contra account)."
+        )
+        assert not engine.account_history(4001).empty, (
+            "No entries found in account history for account 4001."
+        )
