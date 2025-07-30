@@ -8,12 +8,12 @@ from io import StringIO
 from consistent_df import assert_frame_equal
 
 
-CONFIG_CSV = """
+COLUMNS_CSV = """
 label,period,profit_centers
  2024,  2024,
  2025,  2025,
 """
-CONFIG = pd.read_csv(StringIO(CONFIG_CSV), skipinitialspace=True, dtype="string")
+COLUMNS = pd.read_csv(StringIO(COLUMNS_CSV), skipinitialspace=True, dtype="string")
 
 # flake8: noqa: E501
 EXPECTED_TYPST = (
@@ -56,24 +56,18 @@ EXPECTED_TYPST_STAGGERED = (
     "  [Deutsche Bank], [11'199'809.49], [],\n"
     "  [Mitsubishi UFJ], [380'419.75], [],\n"
     "  [UBS], [100'000.00], [],\n"
-    "  [], [], [],\n"
-    "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", [12'756'418.69]), text(weight: \"bold\", []),\n"
-    "  table.hline(),\n"
+    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12'756'418.69]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Current receivables], [], [],\n"
-    "  [], [], [],\n"
-    "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", [12'756'418.69]), text(weight: \"bold\", []),\n"
-    "  table.hline(),\n"
+    "  text(weight: \"bold\", [Total Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
-    "  [], [], [],\n"
-    "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", [12'756'779.54]), text(weight: \"bold\", []),\n"
-    "  table.hline(),\n"
+    "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  [], [], [],\n"
-    "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", [25'513'559.08]), text(weight: \"bold\", []),\n"
+    "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", [12'756'779.54]), text(weight: \"bold\", []),\n"
     "  table.hline(),\n"
     ")"
 )
@@ -139,7 +133,7 @@ def balance_accounts(restored_engine):
 
 def test_account_balance_typst_format(restored_engine, balance_accounts):
     balance_table = restored_engine.report_table(
-        config=CONFIG,
+        columns=COLUMNS,
         accounts=balance_accounts,
         staggered=False
     )
@@ -148,7 +142,7 @@ def test_account_balance_typst_format(restored_engine, balance_accounts):
 
 def test_account_balance_typst_format_staggered(restored_engine, balance_accounts):
     balance_table = restored_engine.report_table(
-        config=CONFIG,
+        columns=COLUMNS,
         accounts=balance_accounts,
         staggered=True
     )
@@ -157,10 +151,25 @@ def test_account_balance_typst_format_staggered(restored_engine, balance_account
 
 def test_account_balance_dataframe_format(restored_engine, balance_accounts):
     balance_table = restored_engine.report_table(
-        config=CONFIG,
+        columns=COLUMNS,
         accounts=balance_accounts,
         staggered=False,
         format="dataframe"
     )
     EXPECTED_DATAFRAME.columns = balance_table.columns
     assert_frame_equal(balance_table, EXPECTED_DATAFRAME.fillna(""), check_dtype=False)
+
+
+def test_duplicate_labels_raises(restored_engine, balance_accounts):
+    config_with_duplicates = pd.DataFrame({
+        "label": ["2024", "2024"],  # duplicate label
+        "period": ["2024", "2025"],
+        "profit_centers": [None, None]
+    }, dtype="string")
+
+    with pytest.raises(ValueError, match="Duplicate column labels"):
+        restored_engine.report_table(
+            columns=config_with_duplicates,
+            accounts=balance_accounts,
+            staggered=False
+        )
