@@ -78,10 +78,11 @@ def _typst_row(row: list, na_value: str, bold: bool, hline: bool) -> list[str]:
     """
     cells = [na_value if pd.isna(cell) else cell for cell in list(row)]
     if bold:
-        return " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)
-    row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
+        row = ["  " + " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)]
+    else:
+        row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
     if hline:
-        row.append("  table.hline()")
+        row.append("  table.hline(),")
     return row
 
 
