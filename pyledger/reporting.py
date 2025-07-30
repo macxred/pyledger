@@ -32,12 +32,19 @@ def summarize_groups(
         leading_space (int): Number of header levels to prefix with a gap (hierarchical only).
         staggered (bool): Use cumulative totals instead of per-level totals.
 
+    Row types marked in the `level` column:
+        - 'H1', 'H2', ...: Header rows (per group level)
+        - 'S1', 'S2', ...: Totals (hierarchical mode only)
+        - 'body': Original data rows
+        - 'gap': Blank spacer rows
+
     Returns:
-        pd.DataFrame: Structured output with row types marked in the `level` column:
-            - 'H1', 'H2', ...: Headers
-            - 'S1', 'S2', ...: Totals (hierarchical)
-            - 'body': Original data rows
-            - 'gap': Blank spacer rows
+        pd.DataFrame: Structured output with the following columns:
+            - 'level' (str): One of 'H1', 'H2', ..., 'S1', 'S2', ..., 'body', or 'gap'
+            - 'group' (str): Group identifier for each row
+            - 'description' (str): Row label (e.g., header name, item label, or total label)
+            - <summary columns> (Float64): One column per key in `summarize`,
+              containing aggregated values or NA depending on row type
     """
     required_columns = [group, description] + list(summarize.keys())
     missing = set(required_columns) - set(df.columns)
@@ -98,7 +105,7 @@ def _summarize_groups(df, group, description, summarize, level=1, staggered=Fals
             child_rows = _summarize_groups(
                 subdf[subdf[group] != ''], group=group,
                 description=description, summarize=summarize,
-                level=level + 1, staggered=staggered, cumulative=cumulative
+                level=level + 1, staggered=False, cumulative=cumulative
             )
             child_rows[group] = part + "/" + child_rows[group]
             rows.extend(child_rows.to_dict('records'))
@@ -108,16 +115,16 @@ def _summarize_groups(df, group, description, summarize, level=1, staggered=Fals
         rows.extend(body_rows.assign(group=part).to_dict('records'))
 
         # Add total
-        if not staggered:
-            rows.append({
-                group: part, description: f'Total {part}',
-                **group_summary, 'level': f'S{level}'
-            })
-        else:
+        if staggered:
             cumulative += pd.DataFrame([group_summary])
             rows.append({
                 group: part, description: f'{part}',
                 **cumulative.to_dict(orient="records")[0], 'level': 'H1'
+            })
+        else:
+            rows.append({
+                group: part, description: f'Total {part}',
+                **group_summary, 'level': f'S{level}'
             })
 
         # Closing blank line

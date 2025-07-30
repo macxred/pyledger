@@ -1,4 +1,4 @@
-"""Test suit for testing helper functions for reporting."""
+"""Test suite for reporting helpers."""
 
 import pandas as pd
 from io import StringIO
@@ -69,35 +69,35 @@ def test_summarize_groups_staggered():
     level,group,                                     description,                    report_balance
     H2,   Assets/Other,                              Other,
     body, Assets/Other,                              Cash in other Bank EUR,         -22.34
-    H1,   Assets/Other,                              Other,                          -22.34
+    S2,   Assets/Other,                              Total Other,                    -22.34
     gap,  Assets/Other,                              ,
     H2,   Assets/Cash,                               Cash,
     gap,  Assets/Cash/UBS,                           ,
     H3,   Assets/Cash/UBS,                           UBS,
     body, Assets/Cash/UBS,                           Cash in Bank CHF,               100000.0
-    H1,   Assets/Cash/UBS,                           UBS,                            99977.66
+    S3,   Assets/Cash/UBS,                           Total UBS,                      100000.0
     gap,  Assets/Cash/UBS,                           ,
     H3,   Assets/Cash/Bank of America,               Bank of America,
     body, Assets/Cash/Bank of America,               Cash in Bank USD,               1076311.79
-    H1,   Assets/Cash/Bank of America,               Bank of America,               1176289.45
+    S3,   Assets/Cash/Bank of America,               Total Bank of America,          1076311.79
     gap,  Assets/Cash/Bank of America,               ,
-    H1,   Assets/Cash,                               Cash,                          2352601.24
+    S2,   Assets/Cash,                               Total Cash,                     1176311.79
     gap,  Assets/Cash,                               ,
-    H1,   Assets,                                    Assets,                        3528890.69
+    H1,   Assets,                                    Assets,                         1176289.45
     gap,  Assets,                                    ,
     H2,   Liabilities/Payables,                      Payables,
     body, Liabilities/Payables,                      Accounts Payable USD,           700.0
-    H1,   Liabilities/Payables,                      Payables,                      3529590.69
+    S2,   Liabilities/Payables,                      Total Payables,                 700.0
     gap,  Liabilities/Payables,                      ,
     H2,   Liabilities/Current Liabilities,           Current Liabilities,
     gap,  Liabilities/Current Liabilities/Accrued,   ,
     H3,   Liabilities/Current Liabilities/Accrued,   Accrued,
     body, Liabilities/Current Liabilities/Accrued,   VAT payable (output tax),       -807.94
-    H1,   Liabilities/Current Liabilities/Accrued,   Accrued,                       3528782.75
+    S3,   Liabilities/Current Liabilities/Accrued,   Total Accrued,                  -807.94
     gap,  Liabilities/Current Liabilities/Accrued,   ,
-    H1,   Liabilities/Current Liabilities,           Current Liabilities,           3527974.81
+    S2,   Liabilities/Current Liabilities,           Total Current Liabilities,      -807.94
     gap,  Liabilities/Current Liabilities,           ,
-    H1,   Liabilities,                               Liabilities,                   3527866.87
+    H1,   Liabilities,                               Liabilities,                    1176181.51
     """
     EXPECTED = pd.read_csv(StringIO(EXPECTED_OUTPUT_CSV), skipinitialspace=True)
     result = summarize_groups(BALANCE, staggered=True)
