@@ -13,11 +13,12 @@ def df_to_typst(
     colnames: bool = True,
 ) -> str:
     """
-    Converts a DataFrame into a Typst table string with customizable layout and styling.
+    Convert a pandas DataFrame to a Typst-formatted table string.
 
-    This method is intended for generating Typst-compatible table strings with control over
-    column alignment, width, missing value substitution, bold row styling, and horizontal dividers.
-    Column names can be included as a header row, and the DataFrame index is always excluded.
+    Produces a `table(...)` block for Typst with limited styling options:
+    column alignment, column width, horizontal lines, and bold rows.
+
+    Intended as a temporary utility until `.to_typst()` becomes available in pandas.
 
     Args:
         df (pd.DataFrame): The DataFrame to convert.
@@ -28,12 +29,13 @@ def df_to_typst(
         na_value (str): Replacement string for NA/NaN values. Defaults to an empty string.
         hline (list[int], optional): Row indices after which horizontal lines are inserted.
             Indices are 0-based and include the header if `colnames=True`.
-        bold (list[int], optional): Row indices to render in bold. Header is index 0
-            if `colnames=True`, followed by data rows.
+            Use -1 for a line above the header.
+        bold (list[int], optional): Row indices to render in bold.
+            Indices are 0-based and include the header if `colnames=True`.
         colnames (bool): Whether to include column names as the first row. Defaults to True.
 
     Returns:
-        str: A Typst `table(...)` string representing the formatted DataFrame.
+        str: A Typst-compatible table string.
     """
     result = ["table(", "  stroke: none,"]
 
