@@ -202,8 +202,10 @@ class StandaloneLedger(LedgerEngine):
         automated_entries = self.generate_automated_entries(
             df, target_balances=target_balances, revaluations=revaluations
         )
+        df = self.serialize_ledger(df)
+
         if not automated_entries.empty:
-            df = pd.concat([self.serialize_ledger(df), automated_entries], ignore_index=True)
+            df = pd.concat([df, automated_entries], ignore_index=True)
 
         return df
 
