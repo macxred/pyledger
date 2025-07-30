@@ -43,42 +43,46 @@ def df_to_typst(
     if columns is None:
         result.append(f"  columns: {len(df.columns)},")
     else:
-        result.append(f"  columns: ({_df_attribute_to_typst(columns)}),")
+        result.append(f"  columns: ({_typst_attribute(columns)}),")
     if align is not None:
-        result.append(f"  align: ({_df_attribute_to_typst(align)}),")
+        result.append(f"  align: ({_typst_attribute(align)}),")
 
-    current_row_idx = 0
+    row_idx = 0
+    if -1 in hline:
+        result.append("  table.hline(),")
     # Header
     if colnames:
-        result.append(
-            "  " + _df_row_to_typst(df.columns, na_value=na_value, bold=(current_row_idx in bold))
-        )
-        current_row_idx += 1
-        if (current_row_idx - 1) in hline:
-            result.append("  table.hline(),")
+        result.extend(_typst_row(
+            df.columns, na_value=na_value, bold=(row_idx in bold), hline=(row_idx in hline)
+        ))
+        row_idx += 1
     # Data rows
     for _, row in df.iterrows():
-        result.append(
-            "  " + _df_row_to_typst(row, na_value=na_value, bold=(current_row_idx in bold))
-        )
-        if current_row_idx in hline:
-            result.append("  table.hline(),")
-        current_row_idx += 1
+        result.extend(_typst_row(
+            row, na_value=na_value, bold=(row_idx in bold), hline=(row_idx in hline)
+        ))
+        row_idx += 1
     result.append(")")
     return "\n".join(result)
 
 
-def _df_attribute_to_typst(x: list) -> str:
+def _typst_attribute(x: list) -> str:
     """Convert list of column attributes into Typst-compatible comma-separated format."""
     return ", ".join(map(str, x))
 
 
-def _df_row_to_typst(row: list, na_value: str = "", bold: bool = False) -> str:
-    """Convert a data frame row to a Typst-formatted table row."""
+def _typst_row(row: list, na_value: str, bold: bool, hline: bool) -> list[str]:
+    """
+    Convert a data frame row to a Typst-formatted table row.
+    Optionally adding a horizontal line at the bottom.
+    """
     cells = [na_value if pd.isna(cell) else cell for cell in list(row)]
     if bold:
         return " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)
-    return " ".join(f"[{cell}]," for cell in cells)
+    row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
+    if hline:
+        row.append("  table.hline()")
+    return row
 
 
 def format_number(x: float) -> str:
