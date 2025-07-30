@@ -1,5 +1,6 @@
 import pandas as pd
 import textwrap
+import pytest
 from pyledger.typst import df_to_typst, format_number, format_threshold
 
 
@@ -134,20 +135,6 @@ def test_bold_and_hline_interaction():
     assert result.strip() == expected.strip()
 
 
-def test_mismatched_column_specs():
-    df = pd.DataFrame({"A": [1], "B": [2], "C": [3]})
-    result = df_to_typst(df, align=["left", "center"], columns=["1fr", "2fr", "auto"])
-    expected = textwrap.dedent("""\
-        table(
-          stroke: none,
-          columns: (1fr, 2fr, auto),
-          align: (left, center),
-          [A], [B], [C],
-          [1], [2], [3],
-        )""")
-    assert result.strip() == expected.strip()
-
-
 def test_format_number():
     assert format_number(1234567.89) == "1'234'567.89"
     assert format_number(0) == "0.00"
@@ -161,3 +148,15 @@ def test_format_threshold():
 
     expected = pd.Series(["1'000.00", "", "-2'000.00", "", ""])
     pd.testing.assert_series_equal(result, expected)
+
+
+def test_typst_table_with_mismatched_align_length():
+    df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+    with pytest.raises(ValueError, match="`align` has 1 elements but expected 2"):
+        df_to_typst(df, align=["center"], columns=["1fr", "auto"])
+
+
+def test_typst_table_with_mismatched_columns_length():
+    df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+    with pytest.raises(ValueError, match="`columns` has 1 elements but expected 2"):
+        df_to_typst(df, align=["left", "right"], columns=["1fr"])

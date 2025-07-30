@@ -36,7 +36,18 @@ def df_to_typst(
 
     Returns:
         str: A Typst-compatible table string.
+
+    Raises:
+        ValueError: If `align` or `columns` is provided and its length does not match
+        the number of DataFrame columns.
     """
+    num_columns = len(df.columns)
+    if align is not None and len(align) != num_columns:
+        raise ValueError(f"`align` has {len(align)} elements but expected {num_columns}.")
+
+    if columns is not None and len(columns) != num_columns:
+        raise ValueError(f"`columns` has {len(columns)} elements but expected {num_columns}.")
+
     result = ["table(", "  stroke: none,"]
 
     # Add layout specifiers
