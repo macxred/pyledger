@@ -2067,9 +2067,8 @@ class LedgerEngine(ABC):
                 - "typst": Formatted string for Typst rendering.
                 - "dataframe": Raw DataFrame for inspection or export.
             format_number (Callable[[float], str], optional): Function to format numeric values.
-                If None, a default formatter is constructed using the reporting currency's
-                precision. The formatter uses comma separators and the number of decimal places
-                is derived from the precision magnitude (e.g., precision 0.01 → 2 decimals).
+                If None, a default format with number of decimal places corresponding to the
+                reporting currency's precision is applied.
 
         Returns:
             str or pd.DataFrame:
@@ -2103,10 +2102,9 @@ class LedgerEngine(ABC):
         precision = self.precision_vectorized([self.reporting_currency], [None])[0]
         if format_number is None:
             decimal_places = max(0, int(-math.floor(math.log10(precision))))
-            format_str = "{{x:,.{}f}}".format(decimal_places)
 
-            def format_number(x: float) -> str:
-                return format_str.format(x=x)
+            def format_number(x):
+                return f"{x:,.{decimal_places}f}"
 
         for label in labels:
             report[label] = report[label].map(
