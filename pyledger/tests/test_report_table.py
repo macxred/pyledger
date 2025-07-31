@@ -26,12 +26,12 @@ EXPECTED_TYPST = (
     "  table.hline(),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
-    "  [Bank of America], [1'076'311.79], [],\n"
+    "  [Bank of America], [1,076,311.79], [],\n"
     "  [Other Bank], [-122.34], [],\n"
-    "  [Deutsche Bank], [11'199'809.49], [],\n"
-    "  [Mitsubishi UFJ], [380'419.75], [],\n"
-    "  [UBS], [100'000.00], [],\n"
-    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12'756'418.69]), text(weight: \"bold\", []),\n"
+    "  [Deutsche Bank], [11,199,809.49], [],\n"
+    "  [Mitsubishi UFJ], [380,419.75], [],\n"
+    "  [UBS], [100,000.00], [],\n"
+    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,756,418.69]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Current receivables], [], [],\n"
@@ -41,7 +41,7 @@ EXPECTED_TYPST = (
     "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
     "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
-    "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12'756'779.54]), text(weight: \"bold\", []),\n"
+    "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,756,779.54]), text(weight: \"bold\", []),\n"
     ")"
 )
 EXPECTED_TYPST_STAGGERED = (
@@ -135,7 +135,7 @@ def test_account_balance_typst_format(restored_engine, balance_accounts):
     balance_table = restored_engine.report_table(
         columns=COLUMNS,
         accounts=balance_accounts,
-        staggered=False
+        staggered=False,
     )
     assert balance_table == EXPECTED_TYPST, "Typst output does not match"
 
@@ -144,7 +144,8 @@ def test_account_balance_typst_format_staggered(restored_engine, balance_account
     balance_table = restored_engine.report_table(
         columns=COLUMNS,
         accounts=balance_accounts,
-        staggered=True
+        staggered=True,
+        format_number = lambda x: f"{x:,.2f}".replace(",", "'")
     )
     assert balance_table == EXPECTED_TYPST_STAGGERED, "Typst output does not match"
 
@@ -154,7 +155,8 @@ def test_account_balance_dataframe_format(restored_engine, balance_accounts):
         columns=COLUMNS,
         accounts=balance_accounts,
         staggered=False,
-        format="dataframe"
+        format="dataframe",
+        format_number = lambda x: f"{x:,.2f}".replace(",", "'")
     )
     EXPECTED_DATAFRAME.columns = balance_table.columns
     assert_frame_equal(balance_table, EXPECTED_DATAFRAME.fillna(""), check_dtype=False)
@@ -167,7 +169,7 @@ def test_duplicate_labels_raises(restored_engine, balance_accounts):
         "profit_centers": [None, None]
     }, dtype="string")
 
-    with pytest.raises(ValueError, match="Duplicate column labels"):
+    with pytest.raises(ValueError, match="Duplicate column names in"):
         restored_engine.report_table(
             columns=config_with_duplicates,
             accounts=balance_accounts,
