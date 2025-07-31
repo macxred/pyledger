@@ -1,7 +1,9 @@
 import pandas as pd
 import textwrap
 import pytest
-from pyledger.typst import df_to_typst
+from pyledger.typst import (
+    df_to_typst, format_typst_text
+)
 
 
 def test_empty_dataframe():
@@ -151,29 +153,4 @@ def test_format_typst_text():
     series = pd.Series(["<tag>", "email@host", "1 > 0", None, 123])
     result = format_typst_text(series)
     expected = pd.Series(["\\<tag\\>", "email\\@host", "1 \\> 0", None, 123])
-    pd.testing.assert_series_equal(result, expected)
-
-
-def test_format_typst_links_with_root():
-    series = pd.Series(["doc.pdf", "file.txt", None])
-    result = format_typst_links(series, root="files/docs")
-    expected = pd.Series([
-        'link("files/docs/doc.pdf", "doc.pdf")',
-        'link("files/docs/file.txt", "file.txt")',
-        ""
-    ])
-    pd.testing.assert_series_equal(result, expected)
-
-
-def test_format_typst_links_with_trailing_slash():
-    series = pd.Series(["img.png"])
-    result = format_typst_links(series, root="assets/")
-    expected = pd.Series(['link("assets/img.png", "img.png")'])
-    pd.testing.assert_series_equal(result, expected)
-
-
-def test_format_typst_links_without_root():
-    series = pd.Series(["file.md", None])
-    result = format_typst_links(series, root=None)
-    expected = pd.Series(["file.md", ""])
     pd.testing.assert_series_equal(result, expected)

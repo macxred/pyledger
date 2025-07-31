@@ -39,9 +39,7 @@ from .helpers import first_elements_as_str, prune_path, represents_integer
 from .time import parse_date_span
 from .typst import (
     df_to_typst,
-    format_threshold,
     format_typst_text,
-    format_typst_links,
 )
 
 
@@ -2035,7 +2033,8 @@ class LedgerEngine(ABC):
         config: pd.DataFrame,
         profit_centers: str | None = None,
         root_folder: str | None = None,
-        output: Literal["typst", "dataframe"] = "typst"
+        output: Literal["typst", "dataframe"] = "typst",
+        format_number: Callable[[float], str] | None = None,
     ) -> dict[str, str | pd.DataFrame]:
         """
         Generate Typst-formatted tables or formatted DataFrames with transaction history
@@ -2049,7 +2048,7 @@ class LedgerEngine(ABC):
         Args:
             period (str): Period or date range for transactions. Accepts values such as
                 a year ("2024"), month ("2024-01"), quarter ("2024-Q1"), or a full
-                start–end span. See `parse_date_span` for accepted formats.
+                start-end span. See `parse_date_span` for accepted formats.
             config (pd.DataFrame): A configuration DataFrame specifying which columns to
                 include, their labels, widths, and alignments.
             profit_centers (str | None, optional): Optional filter to include only
@@ -2058,6 +2057,9 @@ class LedgerEngine(ABC):
                 column will be rendered as Typst links using this base folder path.
             output (Literal["typst", "dataframe"]): Determines return type: either
                 rendered Typst table strings or raw formatted DataFrames. Defaults to "typst".
+            format_number (Callable[[float], str], optional): Function to format numeric values.
+                If None, a default formatter is built from the reporting currency's precision,
+                using comma separators and a number of decimals inferred from the tolerance.
 
         Returns:
             dict[str, str | pd.DataFrame]: A mapping from account numbers to either Typst
@@ -2065,8 +2067,6 @@ class LedgerEngine(ABC):
         """
         config = enforce_schema(config, ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA)
         accounts_df = self.accounts.list()
-        tolerance = self.precision_vectorized([self.reporting_currency], [None])[0] / 2
-        column_order = config["column"].tolist()
         result = {}
 
         for account in accounts_df["account"]:
@@ -2077,29 +2077,47 @@ class LedgerEngine(ABC):
                 continue
 
             df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-            df["amount"] = format_threshold(df["amount"], tolerance)
-            df["balance"] = format_threshold(df["balance"], tolerance)
             df["description"] = format_typst_text(df["description"])
-            if "report_amount" in df.columns:
-                df["report_amount"] = format_threshold(df["report_amount"], tolerance)
-            if "report_balance" in df.columns:
-                df["report_balance"] = format_threshold(df["report_balance"], tolerance)
-            if "document" in df.columns:
-                df["document"] = format_typst_links(df["document"], root_folder)
 
-            visible_cols = [col for col in column_order if col in df.columns]
+            precision = self.precision_vectorized([self.reporting_currency], [None])[0]
+            if format_number is None:
+                decimal_places = max(0, int(-math.floor(math.log10(precision))))
+
+                def format_number(x):
+                    return f"{x:,.{decimal_places}f}"
+
+            def format_threshold(x: float) -> str:
+                return "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
+
+            if "amount" in df.columns:
+                df["amount"] = df["amount"].map(format_threshold)
+            if "balance" in df.columns:
+                df["balance"] = df["balance"].map(format_threshold)
+            if "report_amount" in df.columns:
+                df["report_amount"] = df["report_amount"].map(format_threshold)
+            if "report_balance" in df.columns:
+                df["report_balance"] = df["report_balance"].map(format_threshold)
+            if "document" in df.columns:
+                df["document"] = df["document"].apply(
+                    lambda x: (
+                        f"{root_folder.rstrip('/')}/{x.lstrip('/')}"
+                        if isinstance(x, str) and x.strip() else ""
+                    )
+                )
+
+            visible_cols = [col for col in config["column"].tolist() if col in df.columns]
             df = df[visible_cols]
 
             if output == "dataframe":
                 result[account] = df
             else:
-                colspecs = config.set_index("column").loc[visible_cols]["width"].tolist()
-                align = config.set_index("column").loc[visible_cols]["align"].tolist()
-                labels = config.set_index("column").loc[visible_cols]["label"].tolist()
-                df.columns = [f"*{lbl.replace(' ', '\\-').upper()}*" for lbl in labels]
-
+                mask = config["column"].isin(visible_cols)
+                colspecs = config.loc[mask, "width"].tolist()
+                align = config.loc[mask, "align"].tolist()
+                labels = config.loc[mask, "label"].tolist()
+                df.columns = [label for label in labels]
                 result[account] = df_to_typst(
-                    df, columns=colspecs, align=align, hline=[1], colnames=True
+                    df, columns=colspecs, align=align, hline=[0], colnames=True
                 )
 
         return result
