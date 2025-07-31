@@ -8,13 +8,15 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Callable, Dict
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
 import openpyxl
 import pandas as pd
 import polars as pl
+from .reporting import summarize_groups
+from .typst import df_to_typst
 from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
@@ -2023,3 +2025,131 @@ class LedgerEngine(ABC):
             invalid_ids = invalid_ids.union(new_ids)
 
         return invalid_ids
+
+    # ----------------------------------------------------------------------
+    # Reporting
+
+    def report_table(
+        self, columns, accounts, staggered=False, prune_level=2, format="typst",
+        format_number: Callable[[float], str] = None
+    ):
+        """
+        Create a multi-period financial report from account balances.
+
+        This method builds a tabular financial report—such as a Profit & Loss or
+        Balance Sheet—by combining account balances across multiple time periods
+        or scenarios defined in the configuration.
+
+        For each row in the config (representing a reporting column like "2024", "2025 YTD",
+        or "Budget Q1"), it fetches the relevant account balances, applies any required
+        transformations (such as negating values for liability or revenue accounts),
+        and aggregates them into meaningful groups—like headings, subgroups, or
+        leaf-level accounts—based on the chart of accounts.
+
+        The result is a structured report with one column per period and rows grouped
+        according to your chart hierarchy. You can control how deep the grouping goes using
+        `prune_level`, and choose between hierarchical or flattened cumulative subtotal layout
+        using the `staggered` option.
+
+        Args:
+            columns (pd.DataFrame): One row per report column. Required:
+                - "period": Accounting period to fetch.
+                    See `parse_account_range()` for supported formats.
+                - "label": Column header.
+                - "profit_centers": Profit center filter.
+                    See `parse_profit_center_range()` for supported formats.
+            accounts (pd.DataFrame): Account definitions with:
+                - "account", "group", "description", "currency", "account_multiplier" columns.
+            staggered (bool): Show cumulative subtotals and omit group headers
+                on the first grouping level. See `summarize_groups()` for exact behavior.
+            prune_level (int): Aggregation depth; e.g. 1 = top-level groups, 3 = detailed lines.
+            format (str): Output format:
+                - "typst": Formatted string for Typst rendering.
+                - "dataframe": Raw DataFrame for inspection or export.
+            format_number (Callable[[float], str], optional): Function to format numeric values.
+                If None, a default format with number of decimal places corresponding to the
+                reporting currency's precision is applied.
+
+        Returns:
+            str or pd.DataFrame:
+                - Typst string if `format="typst"` (for PDF layout).
+                - DataFrame if `format="dataframe"` (for further processing).
+
+        Raises:
+            ValueError: If `columns["label"]` contains duplicate column names.
+        """
+        labels = columns["label"].tolist()
+        if len(set(labels)) != len(labels):
+            raise ValueError(f"Duplicate column names in `columns['labels']`: {labels}")
+
+        dfs = [
+            self._report_column(row=row, accounts=accounts, prune_level=prune_level)
+            for row in columns.to_dict("records")
+        ]
+        sheet = pd.concat(dfs, axis=1)
+        # Remove duplicate "group"/"description" columns, keeping the first instance
+        drop_columns = sheet.columns.duplicated() & sheet.columns.isin(['group', 'description'])
+        sheet = sheet.loc[:, ~drop_columns]
+        report = summarize_groups(
+            df=sheet,
+            summarize={label: "sum" for label in labels},
+            group="group",
+            description="description",
+            leading_space=1,
+            staggered=staggered
+        )
+
+        precision = self.precision_vectorized([self.reporting_currency], [None])[0]
+        if format_number is None:
+            decimal_places = max(0, int(-math.floor(math.log10(precision))))
+
+            def format_number(x):
+                return f"{x:,.{decimal_places}f}"
+
+        for label in labels:
+            report[label] = report[label].map(
+                lambda x: "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
+            )
+
+        bold = [0] + (report.index[report["level"].str.match(r"^[HS][0-9]$")] + 1).tolist()
+        hline = (report.index[report["level"] == "H1"] + 1).tolist()
+        report = report[["description"] + labels]
+        report.columns = [""] + labels
+
+        if format == "typst":
+            return df_to_typst(
+                df=report,
+                hline=hline,
+                bold=bold,
+                columns=["auto"] + ["1fr"] * len(labels),
+                align=["left"] + ["right"] * len(labels),
+                colnames=True
+            )
+
+        return report
+
+    def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
+        """Helper to compute balances for a single reporting column."""
+        balances = self.individual_account_balances(
+            accounts=accounts["account"].tolist(),
+            period=row["period"],
+            profit_centers=row.get("profit_centers")
+        ).drop(columns=["group", "description", "currency"], errors="ignore")
+
+        balances = balances.merge(
+            accounts[["account", "group", "description", "currency", "account_multiplier"]],
+            on="account", how="right"
+        )
+
+        # Apply account multiplier
+        balances["balance"] *= balances["account_multiplier"]
+        balances["report_balance"] *= balances["account_multiplier"]
+
+        aggregated = self.aggregate_account_balances(balances, n=prune_level)
+
+        # Hack: aggregate_account_balances always adds a leading slash, remove it manually
+        aggregated["group"] = aggregated["group"].str.removeprefix("/")
+
+        return aggregated[["group", "description", "report_balance"]].rename(
+            columns={"report_balance": row["label"]}
+        )

@@ -95,15 +95,3 @@ def _typst_row(row: list, na_value: str, bold: bool, hline: bool) -> list[str]:
     if hline:
         row.append("  table.hline(),")
     return row
-
-
-def format_number(x: float) -> str:
-    """Format a float with apostrophe separators and two decimal places."""
-    return f"{x:,.2f}".replace(",", "'")
-
-
-def format_threshold(series: pd.Series, threshold: float) -> pd.Series:
-    """Format values using `format_number`, or return empty string if below threshold or NaN."""
-    return series.map(
-        lambda x: "" if pd.isna(x) or abs(x) < threshold else format_number(x)
-    )
