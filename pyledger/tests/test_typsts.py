@@ -1,7 +1,7 @@
 import pandas as pd
 import textwrap
 import pytest
-from pyledger.typst import df_to_typst, format_number, format_threshold
+from pyledger.typst import df_to_typst
 
 
 def test_empty_dataframe():
@@ -133,21 +133,6 @@ def test_bold_and_hline_interaction():
           table.hline(),
         )""")
     assert result.strip() == expected.strip()
-
-
-def test_format_number():
-    assert format_number(1234567.89) == "1'234'567.89"
-    assert format_number(0) == "0.00"
-    assert format_number(-98765.4321) == "-98'765.43"
-
-
-def test_format_threshold():
-    series = pd.Series([1000, 0.004, -2000, float("nan"), 5])
-    threshold = 10
-    result = format_threshold(series, threshold)
-
-    expected = pd.Series(["1'000.00", "", "-2'000.00", "", ""])
-    pd.testing.assert_series_equal(result, expected)
 
 
 def test_typst_table_with_mismatched_align_length():

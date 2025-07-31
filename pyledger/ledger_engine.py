@@ -8,7 +8,7 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Callable, Dict
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
@@ -16,7 +16,7 @@ import openpyxl
 import pandas as pd
 import polars as pl
 from .reporting import summarize_groups
-from .typst import df_to_typst, format_threshold
+from .typst import df_to_typst
 from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
@@ -2029,7 +2029,10 @@ class LedgerEngine(ABC):
     # ----------------------------------------------------------------------
     # Reporting
 
-    def report_table(self, columns, accounts, staggered=False, prune_level=2, format="typst"):
+    def report_table(
+        self, columns, accounts, staggered=False, prune_level=2, format="typst",
+        format_number: Callable[[float], str] = None
+    ):
         """
         Create a multi-period financial report from account balances.
 
@@ -2063,6 +2066,10 @@ class LedgerEngine(ABC):
             format (str): Output format:
                 - "typst": Formatted string for Typst rendering.
                 - "dataframe": Raw DataFrame for inspection or export.
+            format_number (Callable[[float], str], optional): Function to format numeric values.
+                If None, a default formatter is constructed using the reporting currency's
+                precision. The formatter uses comma separators and the number of decimal places
+                is derived from the precision magnitude (e.g., precision 0.01 → 2 decimals).
 
         Returns:
             str or pd.DataFrame:
@@ -2081,7 +2088,9 @@ class LedgerEngine(ABC):
             for row in columns.to_dict("records")
         ]
         sheet = pd.concat(dfs, axis=1)
-        sheet = sheet.loc[:, ~sheet.columns.duplicated()]
+        # Remove duplicate "group"/"description" columns, keeping the first instance
+        drop_columns = sheet.columns.duplicated() & sheet.columns.isin(['group', 'description'])
+        sheet = sheet.loc[:, ~drop_columns]
         report = summarize_groups(
             df=sheet,
             summarize={label: "sum" for label in labels},
@@ -2091,9 +2100,18 @@ class LedgerEngine(ABC):
             staggered=staggered
         )
 
-        threshold = self.precision_vectorized([self.reporting_currency], [None])[0] / 2
+        precision = self.precision_vectorized([self.reporting_currency], [None])[0]
+        if format_number is None:
+            decimal_places = max(0, int(-math.floor(math.log10(precision))))
+            format_str = "{{x:,.{}f}}".format(decimal_places)
+
+            def format_number(x: float) -> str:
+                return format_str.format(x=x)
+
         for label in labels:
-            report[label] = format_threshold(report[label], threshold=threshold)
+            report[label] = report[label].map(
+                lambda x: "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
+            )
 
         bold = [0] + (report.index[report["level"].str.match(r"^[HS][0-9]$")] + 1).tolist()
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
