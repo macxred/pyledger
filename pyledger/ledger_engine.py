@@ -2057,9 +2057,8 @@ class LedgerEngine(ABC):
                     See `parse_profit_center_range()` for supported formats.
             accounts (pd.DataFrame): Account definitions with:
                 - "account", "group", "description", "currency", "account_multiplier" columns.
-            staggered (bool): Use cumulative subtotals and omit explicit group headers.
-                Visually reflects hierarchy by indenting child groups rather than nesting
-                under multiple heading levels. See `summarize_groups()` for exact behavior.
+            staggered (bool): Show cumulative subtotals and omit group headers
+                on the first grouping level. See `summarize_groups()` for exact behavior.
             prune_level (int): Aggregation depth; e.g. 1 = top-level groups, 3 = detailed lines.
             format (str): Output format:
                 - "typst": Formatted string for Typst rendering.
@@ -2071,12 +2070,11 @@ class LedgerEngine(ABC):
                 - DataFrame if `format="dataframe"` (for further processing).
 
         Raises:
-            ValueError: If duplicate labels are found in the `columns["label"]` config,
-                which would cause ambiguous report output.
+            ValueError: If `columns["label"]` contains duplicate column names.
         """
         labels = columns["label"].tolist()
         if len(set(labels)) != len(labels):
-            raise ValueError(f"Duplicate column labels found in 'columns': {labels}")
+            raise ValueError(f"Duplicate column names in `columns['labels']`: {labels}")
 
         dfs = [
             self._report_column(row=row, accounts=accounts, prune_level=prune_level)
