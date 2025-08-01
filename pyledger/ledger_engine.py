@@ -2051,9 +2051,10 @@ class LedgerEngine(ABC):
                 See `parse_account_range()` for accepted formats. If None, history
                 for all accounts is returned.
             period (str): Date range for transactions (e.g., "2024", "2024-01", "2024-Q1").
+                See `parse_date_span` for accepted formats.
             profit_centers (str | None, optional): Optional filter to include only
                 transactions for the specified profit center(s).
-            columns (pd.DataFrame | None): Layout config with the following fields:
+            columns (pd.DataFrame): Layout config with the following fields:
                 - "column": Name of the column in the data (e.g., "date", "amount").
                 - "label": Display name to use in the rendered output.
                 - "width": Column width (Typst units like "2cm").
