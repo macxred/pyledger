@@ -2066,8 +2066,8 @@ class LedgerEngine(ABC):
             output (Literal["typst", "dataframe"]): Determines return type: either
                 rendered Typst strings or DataFrames. Defaults to "typst".
             format_number (Callable[[float, float], str] | None): Function to format numeric values
-                with a given precision. If None, a default formatter is used with the number
-                of decimal digits matching the currency's precision.
+                with a given decimal places. If None, a default formatter is used with the number
+                of decimal places matching the currency's precision.
             drop (bool): If True, drops redundant information from the DataFrame.
                 For details, see `account_history()`.
 
