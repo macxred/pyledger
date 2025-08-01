@@ -2,7 +2,7 @@ import pandas as pd
 import textwrap
 import pytest
 from pyledger.typst import (
-    df_to_typst, escape_typst_text
+    df_to_typst, escape_typst_text, render_typst
 )
 
 
@@ -154,3 +154,27 @@ def test_escape_typst_text():
     result = escape_typst_text(series)
     expected = pd.Series(["\\<tag\\>", "email\\@host", "1 \\> 0", None, 123])
     pd.testing.assert_series_equal(result, expected)
+
+
+def test_render_typst_creates_pdf_and_removes_temp(tmp_path):
+    content = "= Hello World\nThis is a test."
+    output_pdf = tmp_path / "test_output.pdf"
+    render_typst(content, output_pdf)
+    typ_file = output_pdf.with_suffix(".typ")
+
+    assert output_pdf.exists()
+    assert not typ_file.exists()
+
+
+def test_render_typst_keep_temp(tmp_path):
+    content = "= Hello World\nThis is a test."
+    output_pdf = tmp_path / "test_output.pdf"
+    render_typst(content, output_pdf, keep_temp=True)
+    typ_file = output_pdf.with_suffix(".typ")
+
+    assert output_pdf.exists()
+    assert typ_file.exists()
+    actual_typ_content = typ_file.read_text(encoding="utf-8").strip()
+
+    assert actual_typ_content == content.strip()
+    typ_file.unlink()
