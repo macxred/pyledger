@@ -118,7 +118,7 @@ def render_typst(content: str, output_path: str | Path, keep_temp: bool = False)
     Optionally retains the intermediate `.typ` file for inspection or debugging.
 
     Args:
-        content (str): The Typst source markup to render.
+        content (str): The Typst markup to render.
         output_path (str | Path): The destination path for the generated PDF file.
         keep_temp (bool, optional): If True, the intermediate `.typ` file is preserved.
     """
