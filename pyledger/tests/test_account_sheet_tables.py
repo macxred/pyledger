@@ -75,12 +75,10 @@ def test_account_balance_typst_format(restored_engine):
 
 
 def test_account_balance_dataframe_format(restored_engine):
-    def format_number(x: float, precision: float) -> str:
-        if pd.isna(x) or pd.isna(precision):
+    def format_number(x: float, decimal_places: float) -> str:
+        if pd.isna(x) or pd.isna(decimal_places):
             return ""
-        decimal_places = max(0, int(-math.floor(math.log10(precision))))
-        s = f"{x:,.{decimal_places}f}"
-        return s.replace(",", "'")
+        return f"{x:,.{decimal_places}f}".replace(",", "'")
 
     result = restored_engine.account_sheet_tables(
         period="2025-12-31",

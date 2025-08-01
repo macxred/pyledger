@@ -2090,17 +2090,16 @@ class LedgerEngine(ABC):
             accounts = set(accounts_range["add"]) - set(accounts_range["subtract"])
 
         if format_number is None:
-            def format_number(x: float, precision: float) -> str:
-                if pd.isna(x) or pd.isna(precision):
+            def format_number(x: float, decimal_places: float) -> str:
+                if pd.isna(x) or pd.isna(decimal_places):
                     return ""
-                decimal_places = max(0, int(-math.floor(math.log10(precision))))
                 return f"{x:,.{decimal_places}f}"
 
-        def format_threshold(amount: pd.Series, precisions: pd.Series) -> pd.Series:
-            mask = amount.notna() & (amount.abs() >= precisions / 2)
-            result = pd.Series([""] * len(amount))
-            result[mask] = [format_number(x, p) for x, p in zip(amount[mask], precisions[mask])]
-            return result
+        def format_threshold(x: float, precision: float) -> str:
+            if (pd.isna(x) or pd.isna(precision)) or (abs(x) < (precision / 2)):
+                return ""
+            decimal_places = max(0, int(-math.floor(math.log10(precision))))
+            return format_number(x, decimal_places)
 
         result = {}
         for account in accounts:
@@ -2113,21 +2112,25 @@ class LedgerEngine(ABC):
             df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
             df["description"] = escape_typst_text(df["description"])
             reporting_precision = self.precision_vectorized([self.reporting_currency], [None])[0]
-            reporting_precision = pd.Series(reporting_precision, index=df.index)
-            currencies_precision = pd.Series(
-                self.precision_vectorized(
-                    currencies=df["currency"], dates=df["date"], allow_missing=True
-                ),
-                index=df.index,
+            currencies_precision = self.precision_vectorized(
+                currencies=df["currency"], dates=df["date"], allow_missing=True
             )
             if "amount" in df.columns:
-                df["amount"] = format_threshold(df["amount"], currencies_precision)
+                df["amount"] = [
+                    format_threshold(a, p) for a, p in zip(df["amount"], currencies_precision)
+                ]
             if "balance" in df.columns:
-                df["balance"] = format_threshold(df["balance"], currencies_precision)
+                df["balance"] = [
+                    format_threshold(b, p) for b, p in zip(df["balance"], currencies_precision)
+                ]
             if "report_amount" in df.columns:
-                df["report_amount"] = format_threshold(df["report_amount"], reporting_precision)
+                df["report_amount"] = [
+                    format_threshold(a, reporting_precision) for a in df["report_amount"]
+                ]
             if "report_balance" in df.columns:
-                df["report_balance"] = format_threshold(df["report_balance"], reporting_precision)
+                df["report_balance"] = [
+                    format_threshold(b, reporting_precision) for b in df["report_balance"]
+                ]
             if "document" in df.columns and output == "typst":
                 df["document"] = escape_typst_text(df["document"])
                 df["document"] = df["document"].apply(
