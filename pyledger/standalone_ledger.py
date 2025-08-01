@@ -7,10 +7,11 @@ import datetime
 import zipfile
 import numpy as np
 import pandas as pd
+from pyledger.helpers import first_elements_as_str
 from pyledger.storage_entity import AccountingEntity
 from pyledger.time import parse_date_span
 from .decorators import timed_cache
-from .constants import JOURNAL_SCHEMA
+from .constants import JOURNAL_SCHEMA, TARGET_BALANCE_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -260,7 +261,7 @@ class StandaloneLedger(LedgerEngine):
                 target_balance_entries = self.target_balance_entries(
                     ledger=target_balance_ledger, target_balance=target_balance_rows,
                 )
-                result.append(target_balance_entries)
+                result.append(self.serialize_ledger(target_balance_entries))
 
         return (
             pd.concat(result, ignore_index=True)
@@ -271,7 +272,7 @@ class StandaloneLedger(LedgerEngine):
         self, ledger: pd.DataFrame, target_balance: pd.DataFrame
     ) -> pd.DataFrame:
         """
-        Generate automated ledger entries based on target balance specifications.
+        Generate automated journal entries based on target balance specifications.
 
         In accounting, certain accounts must be periodically cleared or closed—such as
         P&L at year-end or tax accounts after filing. Defining target balance rules
@@ -282,7 +283,7 @@ class StandaloneLedger(LedgerEngine):
         generated entry may influence the balances of subsequent rules. For each rule,
         the method computes the current balance based on the specified lookup filters
         (e.g., account ranges, periods, profit centers). If the balance differs from
-        the target, it creates ledger entries that adjust the specified account to the
+        the target, it creates journal entries that adjust the specified account to the
         desired value—typically zero—offsetting the difference to a designated
         contra account.
 
@@ -292,7 +293,7 @@ class StandaloneLedger(LedgerEngine):
                 with TARGET_BALANCE_SCHEMA.
 
         Returns:
-            pd.DataFrame: A DataFrame of generated ledger entries that enforce
+            pd.DataFrame: A DataFrame of generated journal entries that enforce
                 the target balances.
         """
 
@@ -331,13 +332,6 @@ class StandaloneLedger(LedgerEngine):
                 "contra": row["contra"],
                 "amount": -report_delta,
                 "report_amount": -report_delta,
-            })
-            result.append({
-                **base_entry,
-                "account": row["contra"],
-                "contra": row["account"],
-                "amount": report_delta,
-                "report_amount": report_delta,
             })
 
         return self.journal.standardize(pd.DataFrame(result))
@@ -473,3 +467,133 @@ class StandaloneLedger(LedgerEngine):
             "reporting_currency": report_total,
             **rounded_amounts
         }
+
+    # ----------------------------------------------------------------------
+    # Target Balance
+
+    def sanitize_target_balance(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard incoherent target balance data.
+
+        This method applies the following validation rules:
+        1. The `balance` column must not be NA, otherwise discard the row.
+        2. `lookup_period` should follow formats supported by `parse_date_span()`,
+            otherwise discard the row.
+        3. `lookup_accounts` should follow the format of `parse_account_range()`,
+            otherwise discard the row.
+        4. `lookup_profit_centers` must reference valid profit centers,
+            otherwise discard the row.
+        5. Discard any row that violates journal-level integrity rules
+            (see `sanitize_journal()`), except for rules involving `tax_code`,
+            `amount`, and `report_amount`.
+
+        A warning is logged for each dropped entry with the specific reason.
+
+        Args:
+            df (pd.DataFrame): Target balance data to sanitize.
+
+        Returns:
+            pd.DataFrame: A sanitized DataFrame containing only valid target balance entries.
+        """
+
+        df = enforce_schema(df, TARGET_BALANCE_SCHEMA, keep_extra_columns=True)
+
+        invalid_ids = set()
+        invalid_ids = self._invalid_balance(df, invalid_ids)
+        invalid_ids = self._invalid_lookup_period(df, invalid_ids)
+        invalid_ids = self._invalid_accounts_range(df, invalid_ids)
+        invalid_ids = self._invalid_lookup_profit_centers(df, invalid_ids)
+        invalid_ids = self._invalid_accounts(df, invalid_ids)
+        precision = self.precision_vectorized(df["currency"], dates=df["date"], allow_missing=True)
+        invalid_ids = self._invalid_assets(df, invalid_ids, precision)
+        # TODO: validate currency and price including possible "reporting_currency" value
+        invalid_ids = self._invalid_profit_centers(df, invalid_ids)
+
+        return df.query("id not in @invalid_ids").reset_index(drop=True)
+
+    def _invalid_balance(self, df: pd.DataFrame, invalid_ids: set) -> set:
+        """Mark target balance entries with missing balance values."""
+        invalid_mask = df["balance"].isna()
+        missing_ids = set(df.loc[invalid_mask, "id"]) - invalid_ids
+
+        if missing_ids:
+            self._logger.warning(
+                f"Discarding {len(missing_ids)} target balance entries with missing 'balance': "
+                f"{first_elements_as_str(missing_ids)}"
+            )
+            invalid_ids = invalid_ids.union(missing_ids)
+
+        return invalid_ids
+
+    def _invalid_lookup_period(self, df: pd.DataFrame, invalid_ids: set) -> set:
+        """Mark target balance entries with invalid 'lookup_period' values."""
+
+        def is_invalid(span: str) -> bool:
+            if pd.isna(span):
+                return True
+            try:
+                parse_date_span(span)
+                return False
+            except Exception:
+                return True
+
+        invalid_mask = df["lookup_period"].apply(is_invalid).astype(bool)
+        new_ids = set(df.loc[invalid_mask, "id"]) - invalid_ids
+
+        if new_ids:
+            self._logger.warning(
+                f"Discarding {len(new_ids)} entries with invalid 'lookup_period': "
+                f"{first_elements_as_str(new_ids)}"
+            )
+            invalid_ids = invalid_ids.union(new_ids)
+
+        return invalid_ids
+
+    def _invalid_accounts_range(self, df: pd.DataFrame, invalid_ids: set) -> set:
+        """Mark target balance entries with unresolvable 'lookup_accounts' values."""
+
+        def is_invalid(val: str) -> bool:
+            if pd.isna(val):
+                return True
+            try:
+                accounts = self.parse_account_range(val)
+                return (len(accounts["add"]) == 0) and (len(accounts["subtract"]) == 0)
+            except Exception:
+                return True
+
+        mask = df["lookup_accounts"].apply(is_invalid).astype(bool)
+        new_ids = set(df.loc[mask, "id"]) - invalid_ids
+
+        if new_ids:
+            self._logger.warning(
+                f"Discarding {len(new_ids)} entries with unresolvable 'lookup_accounts': "
+                f"{first_elements_as_str(new_ids)}"
+            )
+            invalid_ids = invalid_ids.union(new_ids)
+
+        return invalid_ids
+
+    def _invalid_lookup_profit_centers(self, df: pd.DataFrame, invalid_ids: set) -> set:
+        """Mark target balance entries with unresolvable 'lookup_profit_centers' values."""
+
+        valid_profit_centers = set(self.profit_centers.list()["profit_center"])
+
+        if not valid_profit_centers:
+            mask = df["lookup_profit_centers"].notna()
+            reason = "assigned to a profit center, while no profit centers are defined"
+        else:
+            mask = (
+                df["lookup_profit_centers"].notna()
+                & ~df["lookup_profit_centers"].isin(valid_profit_centers)
+            )
+            reason = "unresolvable profit centers"
+
+        new_ids = set(df.loc[mask, "id"]) - invalid_ids
+
+        if new_ids:
+            self._logger.warning(
+                f"Discarding {len(new_ids)} entries with `{reason}`: "
+                f"{first_elements_as_str(new_ids)}"
+            )
+            invalid_ids = invalid_ids.union(new_ids)
+
+        return invalid_ids
