@@ -8,7 +8,7 @@ import math
 import zipfile
 import json
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Callable, Dict, Literal
 from consistent_df import enforce_schema, df_to_consistent_str, nest
 import re
 import numpy as np
@@ -16,12 +16,13 @@ import openpyxl
 import pandas as pd
 import polars as pl
 from .reporting import summarize_groups
-from .typst import df_to_typst
 from .decorators import timed_cache
 from .constants import (
     ACCOUNT_BALANCE_SCHEMA,
     ACCOUNT_SCHEMA,
     ACCOUNT_HISTORY_SCHEMA,
+    ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA,
+    ACCOUNT_SHEET_TABLE_COLUMNS,
     ASSETS_SCHEMA,
     DEFAULT_DATE,
     JOURNAL_SCHEMA,
@@ -37,6 +38,10 @@ from .storage_entity import AccountingEntity
 from . import excel
 from .helpers import first_elements_as_str, prune_path, represents_integer
 from .time import parse_date_span
+from .typst import (
+    df_to_typst,
+    escape_typst_text,
+)
 
 
 class LedgerEngine(ABC):
@@ -2022,3 +2027,134 @@ class LedgerEngine(ABC):
         return aggregated[["group", "description", "report_balance"]].rename(
             columns={"report_balance": row["label"]}
         )
+
+    def account_sheet_tables(
+        self,
+        period: str,
+        accounts: str | int | dict | None = None,
+        profit_centers: str | None = None,
+        columns: pd.DataFrame | None = ACCOUNT_SHEET_TABLE_COLUMNS,
+        root_url: str | None = None,
+        format_number: Callable[[float, float], str] | None = None,
+        output: Literal["typst", "dataframe"] = "typst",
+        drop: bool = True
+    ) -> dict[str, str | pd.DataFrame]:
+        """
+        Generate formatted tables with transaction history for each account.
+
+        Retrieves the transaction history for each account over the specified
+        period, formats the data, and returns a table for each account either
+        as Typst-formatted strings or DataFrames.
+
+        Args:
+            accounts (str | int | dict | None): The range of accounts to evaluate.
+                See `parse_account_range()` for accepted formats. If None, history
+                for all accounts is returned.
+            period (str): Date range for transactions (e.g., "2024", "2024-01", "2024-Q1").
+                See `parse_date_span` for accepted formats.
+            profit_centers (str | None, optional): Optional filter to include only
+                transactions for the specified profit center(s).
+            columns (pd.DataFrame): Layout config with the following fields:
+                - "column": Name of the column in the data (e.g., "date", "amount").
+                - "label": Display name to use in the rendered output.
+                - "width": Column width (Typst units like "2cm").
+                - "align": Alignment, one of "left", "center", or "right".
+                Defaults to `ACCOUNT_SHEET_TABLE_COLUMNS`.
+            root_url (str | None): If provided, values in the "document"
+                column will be rendered as links in Typst output, concatenating this
+                base path with the value of the document column.
+            output (Literal["typst", "dataframe"]): Determines return type: either
+                rendered Typst strings or DataFrames. Defaults to "typst".
+            format_number (Callable[[float, float], str] | None): Function to format numeric values
+                with a given precision. If None, a default formatter is used with the number
+                of decimal digits matching the currency's precision.
+            drop (bool): If True, drops redundant information from the DataFrame.
+                For details, see `account_history()`.
+
+        Returns:
+            dict[str, str | pd.DataFrame]: A mapping from account numbers to either Typst
+            table strings or formatted DataFrames, depending on `output`.
+        """
+        columns = enforce_schema(columns, ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA)
+        invalid = set(columns["column"]) - set(ACCOUNT_HISTORY_SCHEMA["column"])
+        if invalid:
+            raise ValueError(
+                "The following columns are not valid account history fields: "
+                f"{sorted(invalid)}"
+            )
+
+        if accounts is None:
+            accounts = self.accounts.list()["account"]
+        else:
+            accounts_range = self.parse_account_range(accounts)
+            accounts = set(accounts_range["add"]) - set(accounts_range["subtract"])
+
+        if format_number is None:
+            def format_number(x: float, precision: float) -> str:
+                if pd.isna(x) or pd.isna(precision):
+                    return ""
+                decimal_places = max(0, int(-math.floor(math.log10(precision))))
+                return f"{x:,.{decimal_places}f}"
+
+        def format_threshold(x: float, precision: float) -> str:
+            if (pd.isna(x) or pd.isna(precision)) or (abs(x) < (precision / 2)):
+                return ""
+            else:
+                return format_number(x, precision)
+
+        result = {}
+        for account in accounts:
+            df = self.account_history(
+                account, period=period, profit_centers=profit_centers, drop=drop
+            )
+            if df.empty:
+                df = enforce_schema(None, ACCOUNT_HISTORY_SCHEMA)
+
+            df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+            df["description"] = escape_typst_text(df["description"])
+            reporting_precision = self.precision_vectorized([self.reporting_currency], [None])[0]
+            currencies_precision = self.precision_vectorized(
+                currencies=df["currency"], dates=df["date"], allow_missing=True
+            )
+            if "amount" in df.columns:
+                df["amount"] = [
+                    format_threshold(a, p) for a, p in zip(df["amount"], currencies_precision)
+                ]
+            if "balance" in df.columns:
+                df["balance"] = [
+                    format_threshold(b, p) for b, p in zip(df["balance"], currencies_precision)
+                ]
+            if "report_amount" in df.columns:
+                df["report_amount"] = [
+                    format_threshold(a, reporting_precision) for a in df["report_amount"]
+                ]
+            if "report_balance" in df.columns:
+                df["report_balance"] = [
+                    format_threshold(b, reporting_precision) for b in df["report_balance"]
+                ]
+            if "document" in df.columns and output == "typst":
+                df["document"] = escape_typst_text(df["document"])
+                df["document"] = df["document"].apply(
+                    lambda x: (
+                        f'#link("{root_url.rstrip("/")}/{x.lstrip("/")}")[{x.strip()}]'
+                        if isinstance(x, str) and x.strip() else ""
+                    )
+                )
+
+            visible_cols = [col for col in columns["column"] if col in df.columns]
+            df = df[visible_cols]
+
+            if output == "dataframe":
+                result[account] = df
+            else:
+                mask = columns["column"].isin(visible_cols)
+                df.columns = columns.loc[mask, "label"].tolist()
+                result[account] = df_to_typst(
+                    df,
+                    columns=columns.loc[mask, "width"].tolist(),
+                    align=columns.loc[mask, "align"].tolist(),
+                    hline=[0],
+                    colnames=True,
+                )
+
+        return result

@@ -1,7 +1,9 @@
 import pandas as pd
 import textwrap
 import pytest
-from pyledger.typst import df_to_typst
+from pyledger.typst import (
+    df_to_typst, escape_typst_text
+)
 
 
 def test_empty_dataframe():
@@ -145,3 +147,10 @@ def test_typst_table_with_mismatched_columns_length():
     df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
     with pytest.raises(ValueError, match="`columns` has 1 elements but expected 2"):
         df_to_typst(df, align=["left", "right"], columns=["1fr"])
+
+
+def test_escape_typst_text():
+    series = pd.Series(["<tag>", "email@host", "1 > 0", None, 123])
+    result = escape_typst_text(series)
+    expected = pd.Series(["\\<tag\\>", "email\\@host", "1 \\> 0", None, 123])
+    pd.testing.assert_series_equal(result, expected)

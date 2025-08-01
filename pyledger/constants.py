@@ -174,3 +174,33 @@ TARGET_BALANCE_SCHEMA_CSV = """
 TARGET_BALANCE_SCHEMA = pd.read_csv(
     StringIO(TARGET_BALANCE_SCHEMA_CSV), skipinitialspace=True
 )
+
+
+ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA_CSV = """
+    column,             dtype,                mandatory,       id
+    column,             string[python],       True,          True
+    label,              string[python],       True,          False
+    width,              string[python],       True,          False
+    align,              string[python],       True,          False
+"""
+ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA = pd.read_csv(
+    StringIO(ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA_CSV), skipinitialspace=True
+)
+
+
+ACCOUNT_SHEET_TABLE_COLUMNS_CSV = """
+    column,          label,            width,   align
+    date,            Date,             auto,    left
+    contra,          Contra,           auto,    right
+    currency,        Currency,         auto,    right
+    amount,          Amount,           1.2fr,   right
+    report_amount,   Report Amount,    1.2fr,   right
+    balance,         Balance,          1.2fr,   right
+    report_balance,  Report Balance,   1.2fr,   right
+    tax_code,        Tax Code,         auto,    left
+    description,     Description,      2fr,     left
+    document,        Document,         2fr,     left
+"""
+ACCOUNT_SHEET_TABLE_COLUMNS = pd.read_csv(
+    StringIO(ACCOUNT_SHEET_TABLE_COLUMNS_CSV), skipinitialspace=True
+)
