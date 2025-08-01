@@ -2066,8 +2066,8 @@ class LedgerEngine(ABC):
             output (Literal["typst", "dataframe"]): Determines return type: either
                 rendered Typst strings or DataFrames. Defaults to "typst".
             format_number (Callable[[float, float], str] | None): Function to format numeric values
-                with a given decimal places. If None, a default formatter is used with the number
-                of decimal places matching the currency's precision.
+                with a given precision. If None, a default formatter is used with the number
+                of decimal digits matching the currency's precision.
             drop (bool): If True, drops redundant information from the DataFrame.
                 For details, see `account_history()`.
 
@@ -2090,16 +2090,17 @@ class LedgerEngine(ABC):
             accounts = set(accounts_range["add"]) - set(accounts_range["subtract"])
 
         if format_number is None:
-            def format_number(x: float, decimal_places: float) -> str:
-                if pd.isna(x) or pd.isna(decimal_places):
+            def format_number(x: float, precision: float) -> str:
+                if pd.isna(x) or pd.isna(precision):
                     return ""
+                decimal_places = max(0, int(-math.floor(math.log10(precision))))
                 return f"{x:,.{decimal_places}f}"
 
         def format_threshold(x: float, precision: float) -> str:
             if (pd.isna(x) or pd.isna(precision)) or (abs(x) < (precision / 2)):
                 return ""
-            decimal_places = max(0, int(-math.floor(math.log10(precision))))
-            return format_number(x, decimal_places)
+            else:
+                return format_number(x, precision)
 
         result = {}
         for account in accounts:
