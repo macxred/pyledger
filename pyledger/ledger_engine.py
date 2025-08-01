@@ -22,6 +22,7 @@ from .constants import (
     ACCOUNT_SCHEMA,
     ACCOUNT_HISTORY_SCHEMA,
     ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA,
+    ACCOUNT_SHEET_TABLE_COLUMNS,
     ASSETS_SCHEMA,
     DEFAULT_DATE,
     JOURNAL_SCHEMA,
@@ -39,7 +40,7 @@ from .helpers import first_elements_as_str, prune_path, represents_integer
 from .time import parse_date_span
 from .typst import (
     df_to_typst,
-    format_typst_text,
+    escape_typst_text,
 )
 
 
@@ -2030,92 +2031,125 @@ class LedgerEngine(ABC):
     def account_sheet_tables(
         self,
         period: str,
-        config: pd.DataFrame,
+        accounts: str | int | dict | None = None,
         profit_centers: str | None = None,
-        root_folder: str | None = None,
+        columns: pd.DataFrame | None = ACCOUNT_SHEET_TABLE_COLUMNS,
+        root_url: str | None = None,
+        format_number: Callable[[float, float], str] | None = None,
         output: Literal["typst", "dataframe"] = "typst",
-        format_number: Callable[[float], str] | None = None,
+        drop: bool = True
     ) -> dict[str, str | pd.DataFrame]:
         """
         Generate formatted tables with transaction history for each account.
 
-        Retrieves the transaction history For each account over the specified
+        Retrieves the transaction history for each account over the specified
         period, formats the data, and returns a table for each account either
         as Typst-formatted strings or DataFrames.
 
         Args:
-            period (str): Period or date range for transactions. Accepts values such as
-                a year ("2024"), month ("2024-01"), quarter ("2024-Q1"), or a full
-                start-end span. See `parse_date_span` for accepted formats.
-            config (pd.DataFrame): Labels, widths, and alignments of columns to include.
+            accounts (str | int | dict | None): The range of accounts to evaluate.
+                See `parse_account_range()` for accepted formats. If None, history
+                for all accounts is returned.
+            period (str): Date range for transactions (e.g., "2024", "2024-01", "2024-Q1").
             profit_centers (str | None, optional): Optional filter to include only
                 transactions for the specified profit center(s).
-            root_folder (str | None, optional): If provided, values in the 'document'
-                column will be rendered as links in Typst outout, concatenating this
+            columns (pd.DataFrame | None): Layout config with the following fields:
+                - "column": Name of the column in the data (e.g., "date", "amount").
+                - "label": Display name to use in the rendered output.
+                - "width": Column width (Typst units like "2cm").
+                - "align": Alignment, one of "left", "center", or "right".
+                Defaults to `ACCOUNT_SHEET_TABLE_COLUMNS`.
+            root_url (str | None): If provided, values in the "document"
+                column will be rendered as links in Typst output, concatenating this
                 base path with the value of the document column.
             output (Literal["typst", "dataframe"]): Determines return type: either
                 rendered Typst strings or DataFrames. Defaults to "typst".
-            format_number (Callable[[float], str], optional): Function to format numeric values.
-                If None, a default formatter is used with number of decimal digits matching
-                the reporting currency's precision.
+            format_number (Callable[[float, float], str] | None): Function to format numeric values
+                with a given precision. If None, a default formatter is used with the number
+                of decimal digits matching the currency's precision.
+            drop (bool): If True, drops redundant information from the DataFrame.
+                For details, see `account_history()`.
 
         Returns:
             dict[str, str | pd.DataFrame]: A mapping from account numbers to either Typst
             table strings or formatted DataFrames, depending on `output`.
         """
-        config = enforce_schema(config, ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA)
-        accounts_df = self.accounts.list()
-        result = {}
+        columns = enforce_schema(columns, ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA)
+        invalid = set(columns["column"]) - set(ACCOUNT_HISTORY_SCHEMA["column"])
+        if invalid:
+            raise ValueError(
+                "The following columns are not valid account history fields: "
+                f"{sorted(invalid)}"
+            )
 
-        for account in accounts_df["account"]:
+        if accounts is None:
+            accounts = self.accounts.list()["account"]
+        else:
+            accounts_range = self.parse_account_range(accounts)
+            accounts = set(accounts_range["add"]) - set(accounts_range["subtract"])
+
+        if format_number is None:
+            def format_number(x: float, precision: float) -> str:
+                if pd.isna(x) or pd.isna(precision):
+                    return ""
+                decimal_places = max(0, int(-math.floor(math.log10(precision))))
+                return f"{x:,.{decimal_places}f}"
+
+        def format_threshold(amount: pd.Series, precisions: pd.Series) -> pd.Series:
+            mask = amount.notna() & (amount.abs() >= precisions / 2)
+            result = pd.Series([""] * len(amount))
+            result[mask] = [format_number(x, p) for x, p in zip(amount[mask], precisions[mask])]
+            return result
+
+        result = {}
+        for account in accounts:
             df = self.account_history(
-                account, period=period, profit_centers=profit_centers, drop=True
+                account, period=period, profit_centers=profit_centers, drop=drop
             )
             if df.empty:
-                continue
+                df = enforce_schema(None, ACCOUNT_HISTORY_SCHEMA)
 
             df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-            df["description"] = format_typst_text(df["description"])
-
-            precision = self.precision_vectorized([self.reporting_currency], [None])[0]
-            if format_number is None:
-                decimal_places = max(0, int(-math.floor(math.log10(precision))))
-
-                def format_number(x):
-                    return f"{x:,.{decimal_places}f}"
-
-            def format_threshold(x: float) -> str:
-                return "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
-
+            df["description"] = escape_typst_text(df["description"])
+            reporting_precision = self.precision_vectorized([self.reporting_currency], [None])[0]
+            reporting_precision = pd.Series(reporting_precision, index=df.index)
+            currencies_precision = pd.Series(
+                self.precision_vectorized(
+                    currencies=df["currency"], dates=df["date"], allow_missing=True
+                ),
+                index=df.index,
+            )
             if "amount" in df.columns:
-                df["amount"] = df["amount"].map(format_threshold)
+                df["amount"] = format_threshold(df["amount"], currencies_precision)
             if "balance" in df.columns:
-                df["balance"] = df["balance"].map(format_threshold)
+                df["balance"] = format_threshold(df["balance"], currencies_precision)
             if "report_amount" in df.columns:
-                df["report_amount"] = df["report_amount"].map(format_threshold)
+                df["report_amount"] = format_threshold(df["report_amount"], reporting_precision)
             if "report_balance" in df.columns:
-                df["report_balance"] = df["report_balance"].map(format_threshold)
-            if "document" in df.columns:
+                df["report_balance"] = format_threshold(df["report_balance"], reporting_precision)
+            if "document" in df.columns and output == "typst":
+                df["document"] = escape_typst_text(df["document"])
                 df["document"] = df["document"].apply(
                     lambda x: (
-                        f"{root_folder.rstrip('/')}/{x.lstrip('/')}"
+                        f'#link("{root_url.rstrip("/")}/{x.lstrip("/")}")[{x.strip()}]'
                         if isinstance(x, str) and x.strip() else ""
                     )
                 )
 
-            visible_cols = [col for col in config["column"].tolist() if col in df.columns]
+            visible_cols = [col for col in columns["column"] if col in df.columns]
             df = df[visible_cols]
 
             if output == "dataframe":
                 result[account] = df
             else:
-                mask = config["column"].isin(visible_cols)
-                colspecs = config.loc[mask, "width"].tolist()
-                align = config.loc[mask, "align"].tolist()
-                labels = config.loc[mask, "label"].tolist()
-                df.columns = [label for label in labels]
+                mask = columns["column"].isin(visible_cols)
+                df.columns = columns.loc[mask, "label"].tolist()
                 result[account] = df_to_typst(
-                    df, columns=colspecs, align=align, hline=[0], colnames=True
+                    df,
+                    columns=columns.loc[mask, "width"].tolist(),
+                    align=columns.loc[mask, "align"].tolist(),
+                    hline=[0],
+                    colnames=True,
                 )
 
         return result

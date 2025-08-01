@@ -97,7 +97,7 @@ def _typst_row(row: list, na_value: str, bold: bool, hline: bool) -> list[str]:
     return row
 
 
-def format_typst_text(series: pd.Series) -> pd.Series:
+def escape_typst_text(series: pd.Series) -> pd.Series:
     """Escape Typst-sensitive characters: <, >, and @."""
     return series.map(
         lambda text: (
