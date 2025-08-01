@@ -1,6 +1,8 @@
 """Utilities for generating and formatting tables in the Typst typesetting engine."""
 
+from pathlib import Path
 import pandas as pd
+import typst
 
 
 def df_to_typst(
@@ -106,3 +108,25 @@ def escape_typst_text(series: pd.Series) -> pd.Series:
                 .replace("@", "\\@")
         ) if isinstance(text, str) else text
     )
+
+
+def render_typst(content: str, output_path: str | Path, keep_temp: bool = False):
+    """Generate a PDF from a Typst-formatted string, using a temporary .typ file.
+
+    Converts a Typst-formatted string into a PDF by writing it to a temporary `.typ` file,
+    running the Typst compiler, and saving the result to the specified output path.
+    Optionally retains the intermediate `.typ` file for inspection or debugging.
+
+    Args:
+        content (str): The Typst source markup to render.
+        output_path (str | Path): The destination path for the generated PDF file.
+        keep_temp (bool, optional): If True, the intermediate `.typ` file is preserved.
+    """
+    output_path = Path(output_path)
+    typst_path = output_path.with_suffix(".typ")
+    typst_path.write_text(content.strip(), encoding="utf-8")
+    try:
+        typst.compile(input=str(typst_path), output=str(output_path))
+    finally:
+        if not keep_temp:
+            typst_path.unlink(missing_ok=True)
