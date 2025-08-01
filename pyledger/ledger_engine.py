@@ -2037,29 +2037,27 @@ class LedgerEngine(ABC):
         format_number: Callable[[float], str] | None = None,
     ) -> dict[str, str | pd.DataFrame]:
         """
-        Generate Typst-formatted tables or formatted DataFrames with transaction history
-        for each account.
+        Generate formatted tables with transaction history for each account.
 
-        For each account number, this method retrieves its transaction history for the
-        specified period and optional profit centers, formats the data according to the
-        provided configuration DataFrame, and returns either Typst-formatted strings
-        or raw formatted DataFrames.
+        Retrieves the transaction history For each account over the specified
+        period, formats the data, and returns a table for each account either
+        as Typst-formatted strings or DataFrames.
 
         Args:
             period (str): Period or date range for transactions. Accepts values such as
                 a year ("2024"), month ("2024-01"), quarter ("2024-Q1"), or a full
                 start-end span. See `parse_date_span` for accepted formats.
-            config (pd.DataFrame): A configuration DataFrame specifying which columns to
-                include, their labels, widths, and alignments.
+            config (pd.DataFrame): Labels, widths, and alignments of columns to include.
             profit_centers (str | None, optional): Optional filter to include only
                 transactions for the specified profit center(s).
             root_folder (str | None, optional): If provided, values in the 'document'
-                column will be rendered as Typst links using this base folder path.
+                column will be rendered as links in Typst outout, concatenating this
+                base path with the value of the document column.
             output (Literal["typst", "dataframe"]): Determines return type: either
-                rendered Typst table strings or raw formatted DataFrames. Defaults to "typst".
+                rendered Typst strings or DataFrames. Defaults to "typst".
             format_number (Callable[[float], str], optional): Function to format numeric values.
-                If None, a default formatter is built from the reporting currency's precision,
-                using comma separators and a number of decimals inferred from the tolerance.
+                If None, a default formatter is used with number of decimal digits matching
+                the reporting currency's precision.
 
         Returns:
             dict[str, str | pd.DataFrame]: A mapping from account numbers to either Typst
