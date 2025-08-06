@@ -1726,7 +1726,7 @@ class LedgerEngine(ABC):
         self,
         df: pd.DataFrame,
         period: str | datetime.date | None = None,
-        source_pattern: str | None = None
+        file_path_pattern: str | None = None
     ) -> pd.DataFrame:
         """Enrich reconciliation data with actual account balances.
 
@@ -1734,7 +1734,7 @@ class LedgerEngine(ABC):
             df (pd.DataFrame): Expected balances compatible with RECONCILIATION_SCHEMA.
             period (datetime.date | str | None): Time period to filter reconciliation data.
                 See `parse_date_span` for possible values.
-            source_pattern (str | None): Regex for filtering the 'source' column.
+            file_path_pattern (str | None): Regex for filtering the 'file_path' column.
 
         Returns:
             pd.DataFrame: Enriched reconciliation DataFrame with added
@@ -1753,8 +1753,8 @@ class LedgerEngine(ABC):
 
             df = df[df.apply(row_within_period, axis=1)].reset_index(drop=True)
 
-        if source_pattern is not None:
-            df = df[df['source'].str.contains(source_pattern, na=False)]
+        if file_path_pattern is not None:
+            df = df[df['file_path'].str.contains(file_path_pattern, na=False)]
 
         df = self.sanitize_reconciliation(df)
         balances = self.account_balances(df)

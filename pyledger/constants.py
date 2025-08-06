@@ -140,7 +140,7 @@ RECONCILIATION_SCHEMA_CSV = """
     report_balance,     Float64,              False,           False
     tolerance,          Float64,              False,           False
     document,           string[python],       False,           False
-    source,             string[python],       False,           True
+    file_path,          string[python],       False,           True
 """
 RECONCILIATION_SCHEMA = pd.read_csv(StringIO(RECONCILIATION_SCHEMA_CSV), skipinitialspace=True)
 

@@ -12,8 +12,8 @@ class TestReconciliation(BaseTestReconciliation):
 
     @pytest.fixture
     def engine(self, tmp_path):
-        self.RECONCILIATION["source"] = "default.csv"
-        self.RECONCILIATION["source"] = self.RECONCILIATION["source"].astype("string[python]")
+        self.RECONCILIATION["file_path"] = "default.csv"
+        self.RECONCILIATION["file_path"] = self.RECONCILIATION["file_path"].astype("string[python]")
         return TextLedger(tmp_path)
 
     def test_reconciliation_without_reconciliation_folder(self, engine):
@@ -66,9 +66,9 @@ class TestReconciliation(BaseTestReconciliation):
         )
 
     def test_reconcile(self, engine):
-        # Exclude cases where a `source_pattern` is defined, because
+        # Exclude cases where a `file_path_pattern` is defined, because
         # TextLedger overrides the 'source' column with the actual file path
         self.EXPECTED_RECONCILIATION = [
-            v for v in self.EXPECTED_RECONCILIATION if v["source_pattern"] is None
+            v for v in self.EXPECTED_RECONCILIATION if v["file_path_pattern"] is None
         ]
         super().test_reconcile(engine)

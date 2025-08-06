@@ -107,7 +107,7 @@ class TextLedger(StandaloneLedger):
             schema=RECONCILIATION_SCHEMA,
             path=self.root / "reconciliation",
             write_file=self.write_reconciliation_file,
-            file_path_column="source"
+            file_path_column="file_path",
         )
         self._target_balance = CSVAccountingEntity(
             schema=TARGET_BALANCE_SCHEMA, path=self.root / "settings/target_balance.csv"
