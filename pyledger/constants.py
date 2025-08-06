@@ -6,12 +6,13 @@ from io import StringIO
 from consistent_df import enforce_schema
 
 REVALUATION_SCHEMA_CSV = """
-    column,             dtype,                mandatory,       id
-    date,               datetime64[ns],       True,          True
-    account,            string[python],       True,          True
-    credit,             Int64,                True,         False
-    debit,              Int64,                True,         False
-    description,        string[python],       True,         False
+    column,                  dtype,                mandatory,       id
+    date,                    datetime64[ns],       True,          True
+    account,                 string[python],       True,          True
+    credit,                  Int64,                True,         False
+    debit,                   Int64,                True,         False
+    description,             string[python],       True,         False
+    split_per_profit_center, bool,                False,        False
 """
 REVALUATION_SCHEMA = pd.read_csv(StringIO(REVALUATION_SCHEMA_CSV), skipinitialspace=True)
 

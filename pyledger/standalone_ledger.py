@@ -342,54 +342,76 @@ class StandaloneLedger(LedgerEngine):
         """Compute ledger entries for (currency or other) revaluations"""
         result = []
         reporting_currency = self.reporting_currency
-        for row in revaluations.to_dict("records"):
-            df = self.serialize_ledger(pd.concat([ledger, pd.DataFrame(result)]))
+        profit_centers = self.profit_centers.list()
+
+        def get_revaluation_account(row, amount, entry_id):
+            if pd.isna(row["credit"]) and pd.isna(row["debit"]):
+                raise ValueError(f"No account specified in revaluation entry {entry_id}")
+            if pd.isna(row["credit"]):
+                return row["debit"]
+            if pd.isna(row["debit"]):
+                return row["credit"]
+            return row["credit"] if amount >= 0 else row["debit"]
+
+        def compute_revaluation_entry(row, account, currency, profit_center):
+            entries = []
             date = row["date"]
+            df_result = self.serialize_ledger(pd.concat([ledger, pd.DataFrame(result)]))
+            balance = self._account_balance(
+                ledger=df_result, account=account, period=date, profit_centers=profit_center
+            )
+            fx_rate = self.price(currency, date=date, currency=reporting_currency)
+            if fx_rate[0] != reporting_currency:
+                raise ValueError(
+                    f"FX rate currency mismatch: expected {reporting_currency}, got {fx_rate[0]}"
+                )
+
+            target = balance.get(currency, 0.0) * fx_rate[1]
+            amount = target - balance.get("reporting_currency", 0.0)
+            amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
+
+            if amount != 0:
+                entry_id = f"revaluation:{date}:{account}"
+                if not pd.isna(profit_center):
+                    entry_id += f":{profit_center}"
+                revaluation_account = get_revaluation_account(row, amount, entry_id)
+                base = {
+                    "id": entry_id,
+                    "date": date,
+                    "description": row["description"],
+                    "profit_center": profit_center if not pd.isna(profit_center) else pd.NA,
+                }
+                entries.append({
+                    **base,
+                    "account": account,
+                    "currency": currency,
+                    "amount": 0,
+                    "report_amount": amount,
+                })
+                entries.append({
+                    **base,
+                    "account": revaluation_account,
+                    "currency": reporting_currency,
+                    "amount": -1 * amount,
+                    "report_amount": -1 * amount,
+                })
+            return entries
+
+        for row in revaluations.to_dict("records"):
             accounts = self.parse_account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
-
             for account in accounts:
                 currency = self.account_currency(account)
                 if currency != reporting_currency:
-                    balance = self._account_balance(ledger=df, account=account, period=date)
-                    fx_rate = self.price(currency, date=date, currency=reporting_currency)
-                    if fx_rate[0] != reporting_currency:
-                        raise ValueError(
-                            f"FX rate currency mismatch: expected {reporting_currency}, got "
-                            f"{fx_rate[0]}"
+                    if row.get("split_per_profit_center"):
+                        for profit_center in profit_centers["profit_center"]:
+                            result.extend(
+                                compute_revaluation_entry(row, account, currency, profit_center)
+                            )
+                    else:
+                        result.extend(
+                            compute_revaluation_entry(row, account, currency, None)
                         )
-                    target = balance.get(currency, 0.0) * fx_rate[1]
-                    amount = target - balance.get("reporting_currency", 0.0)
-                    amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
-                    id = f"revaluation:{date}:{account}"
-                    if amount != 0:
-                        if pd.isna(row["credit"]) and pd.isna(row["debit"]):
-                            raise ValueError("No account specified in revaluation entry {id}")
-                        elif pd.isna(row["credit"]):
-                            revaluation_account = row["debit"]
-                        elif pd.isna(row["debit"]):
-                            revaluation_account = row["credit"]
-                        else:
-                            revaluation_account = row["credit"] if amount >= 0 else row["debit"]
-                        result.append({
-                            "id": id,
-                            "date": date,
-                            "account": account,
-                            "currency": currency,
-                            "amount": 0,
-                            "report_amount": amount,
-                            "description": row["description"]
-                        })
-                        result.append({
-                            "id": id,
-                            "date": date,
-                            "account": revaluation_account,
-                            "currency": reporting_currency,
-                            "amount": -1 * amount,
-                            "report_amount": -1 * amount,
-                            "description": row["description"]
-                        })
-
         return self.journal.standardize(pd.DataFrame(result))
 
     def _account_balance(
