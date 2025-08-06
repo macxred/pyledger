@@ -155,6 +155,7 @@ DEFAULT_ASSETS = enforce_schema(
 DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
 
 DEFAULT_FILE_COLUMN = "__file__"
+DEFAULT_SOURCE_COLUMN = "__source__"
 
 
 TARGET_BALANCE_SCHEMA_CSV = """

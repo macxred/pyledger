@@ -7,7 +7,7 @@ from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
 
-from pyledger.constants import DEFAULT_FILE_COLUMN
+from pyledger.constants import DEFAULT_FILE_COLUMN, DEFAULT_SOURCE_COLUMN
 from .decorators import timed_cache
 from .helpers import save_files, write_fixed_width_csv
 
@@ -452,22 +452,35 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
     """Stores tabular accounting data in a fixed-width CSV file."""
 
     def __init__(
-        self, path: Path | str, column_shortcuts: dict = {}, *args, **kwargs
+        self, path: Path | str, source_column: str = DEFAULT_SOURCE_COLUMN,
+        column_shortcuts: dict = {}, *args, **kwargs
     ):
         """Initialize the CSVAccountingEntity.
 
         Args:
             file_path (Path | str): Path to the CSV file.
             column_shortcuts (dict, optional): Mapping of column old names to new names.
+            source_column (str, optional): Name of the column that will store
+                GitHub-style location reference (e.g., 'file.csv:L#23') for each row.
+                Defaults to DEFAULT_SOURCE_COLUMN.
         """
         super().__init__(*args, **kwargs)
         self._path = Path(path).expanduser()
         # TODO: remove once the old system is migrated
         self._column_shortcuts = column_shortcuts
+        self.source_column = source_column
 
     @timed_cache(120)
-    def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
-        return self._read_data(drop_extra_columns=drop_extra_columns)
+    def list(self, drop_extra_columns: bool = False, include_source: bool = False) -> pd.DataFrame:
+        """Retrieve all entries from the CSV file.
+
+        If `include_source` is True, each row will include an additional column
+        (`self.source_column`) indicating its file and line number of origin,
+        formatted as a GitHub-style reference (e.g., 'journal.csv:L#42').
+        """
+        return self._read_data(
+            drop_extra_columns=drop_extra_columns, include_source=include_source
+        )
 
     def _store(self, data: pd.DataFrame, path: Path | str = None):
         """
@@ -490,7 +503,9 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         self.list.cache_clear()
         self._on_change()
 
-    def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+    def _read_data(
+        self, drop_extra_columns: bool = False, include_source: bool = False
+    ) -> pd.DataFrame:
         """Read data from the CSV file.
 
         This method reads data from the file and enforces the standard
@@ -500,6 +515,9 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
         if self._path.exists():
             data = pd.read_csv(self._path, skipinitialspace=True)
             data.rename(columns=self._column_shortcuts, inplace=True)
+            if include_source:
+                source_lines = [f"{self._filename}:L#{i+2}" for i in range(len(data))]
+                data[self.source_column] = source_lines
         else:
             data = None
         return self.standardize(data, drop_extra_columns=drop_extra_columns)
@@ -537,7 +555,9 @@ class MultiCSVEntity(CSVAccountingEntity):
         self.file_path_column = file_path_column
         self._write_file = write_file
 
-    def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+    def _read_data(
+        self, drop_extra_columns: bool = False, include_source: bool = False
+    ) -> pd.DataFrame:
         """Reads data from CSV files in the root directory.
 
         Iterates through all CSV files in the root directory, reading each file
@@ -567,6 +587,10 @@ class MultiCSVEntity(CSVAccountingEntity):
                 df = self.standardize(df, drop_extra_columns=drop_extra_columns)
                 if not df.empty:
                     df[self.file_path_column] = relative_path
+                    if include_source:
+                        df[self.source_column] = [
+                            f"{relative_path}:L#{i+2}" for i in range(len(df))
+                        ]
                 result.append(df)
             except Exception as e:
                 self._logger.warning(f"Skipping {relative_path}: {e}")
@@ -652,7 +676,9 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
         """Extract numeric portion of journal id."""
         return id.str.replace("^.*:", "", regex=True).astype(int)
 
-    def _read_data(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+    def _read_data(
+        self, drop_extra_columns: bool = False, include_source: bool = False
+    ) -> pd.DataFrame:
         """Reads journal entries from CSV files in the root directory.
 
         Iterates through all CSV files in the root directory, reading each file
@@ -672,7 +698,7 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
         Returns:
             pd.DataFrame: DataFrame adhering to the entity's column schema.
         """
-        df = super()._read_data(drop_extra_columns=False)
+        df = super()._read_data(drop_extra_columns=False, include_source=include_source)
         if not df.empty:
             df["id"] = df[self.file_path_column] + ":" + df["id"]
         df = df.drop(columns=self.file_path_column)
