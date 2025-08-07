@@ -15,31 +15,33 @@ JOURNAL_CSV = """
     3, 2024-04-24, 1021,       ,      EUR,  200.00,              ,         , coll 2B,  doc2.pdf
     4, 2024-05-25, 1022,   1992,      USD,  300.00,        450.45,     In2%, single 2, doc3.pdf
 """
+# flake8: noqa: E501
 EXPECTED = {
     "1": (
         "2024-05-24\n"
-        "account,amount,contra,currency,description,document,profit_center,report_amount,tax_code\n"
-        "1023,100.0,1993,CHF,single 1,file1.txt,,,In8%"
+        "account,amount,contra,currency,description,document,profit_center,report_amount,source,tax_code\n"
+        "1023,100.0,1993,CHF,single 1,file1.txt,,,,In8%"
     ),
     "2": (
         "2024-05-24\n"
-        "account,amount,contra,currency,description,document,profit_center,report_amount,tax_code\n"
-        "1022,-100.0,,USD,coll 1,dir/file.txt,,-88.88,In5%\n"
-        "1022,1.0,,USD,coll 1,dir/file.txt,,0.89,\n"
-        "1022,99.0,,USD,coll 1,,,87.99,"
+        "account,amount,contra,currency,description,document,profit_center,report_amount,source,tax_code\n"
+        "1022,-100.0,,USD,coll 1,dir/file.txt,,-88.88,,In5%\n"
+        "1022,1.0,,USD,coll 1,dir/file.txt,,0.89,,\n"
+        "1022,99.0,,USD,coll 1,,,87.99,,"
     ),
     "3": (
         "2024-04-24\n"
-        "account,amount,contra,currency,description,document,profit_center,report_amount,tax_code\n"
-        "1021,200.0,,EUR,coll 2B,doc2.pdf,,,\n"
-        ",200.0,1021,EUR,coll 2A,doc1.pdf,,,In5%"
+        "account,amount,contra,currency,description,document,profit_center,report_amount,source,tax_code\n"
+        "1021,200.0,,EUR,coll 2B,doc2.pdf,,,,\n"
+        ",200.0,1021,EUR,coll 2A,doc1.pdf,,,,In5%"
     ),
     "4": (
         "2024-05-25\n"
-        "account,amount,contra,currency,description,document,profit_center,report_amount,tax_code\n"
-        "1022,300.0,1992,USD,single 2,doc3.pdf,,450.45,In2%"
+        "account,amount,contra,currency,description,document,profit_center,report_amount,source,tax_code\n"
+        "1022,300.0,1992,USD,single 2,doc3.pdf,,450.45,,In2%"
     )
 }
+# flake8: enable
 
 JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
 
