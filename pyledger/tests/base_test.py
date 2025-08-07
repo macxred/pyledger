@@ -131,11 +131,11 @@ PRICES_CSV = """
 PRICES = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
 
 REVALUATIONS_CSV = """
-    date,         account, debit, credit, description
-    2024-03-31, 1000:2999,  7050,   8050, FX revaluations
-    2024-06-30, 1000:2999,  7050,       , FX revaluations
-    2024-09-30, 1000:2999,  7050,       , FX revaluations
-    2024-12-31, 1000:2999,      ,   7050, FX revaluations
+    date,         account, debit, credit, description,     split_per_profit_center
+    2024-03-31, 1000:2999,  7050,   8050, FX revaluations, False
+    2024-06-30, 1000:2999,  7050,       , FX revaluations, False
+    2024-09-30, 1000:2999,  7050,       , FX revaluations, True
+    2024-12-31, 1000:2999,      ,   7050, FX revaluations, True
 """
 REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 
@@ -186,18 +186,18 @@ EXPECTED_BALANCES_CSV = """
     2024-01-24,      2200,                         ,        -200.00,   "{USD:     -200.00}"
     2024-03-30, 1000:1999,                         ,     1099532.82,   "{USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
     2024-03-31, 1000:1999,                         ,     1078529.53,   "{USD:   801200.00, EUR: 120.0, JPY: 42000000.0, CHF: 0.0}"
-    2024-03-31,      7050,                         ,       21003.29,   "{USD:    21003.29}"
+    2024-03-31,      7050,                         ,       21003.29,   "{USD:   0.00}"
     2024-03-31,      8050,                         ,           0.00,   "{USD:        0.00}"
     2024-12-31,      4001,                         ,       -1198.26,   "{EUR:    -1119.04}"
-    2024-Q4,    1000:1999,                         ,    11655805.63,   "{USD: 300200.00, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
-    2024,       1000:1999,                         ,    12756979.54,   "{USD: 1076628.72, EUR: 10026800.43, JPY: 54345678.0, CHF: 14285714.3}"
+    2024-Q4,    1000:1999,                         ,    11651568.10,   "{USD: 300200.00, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
+    2024,       1000:1999,                         ,    12736075.61,   "{USD: 1076628.72, EUR: 10026800.43, JPY: 54345678.0, CHF: 14285714.3}"
     2024-08,    1000:1999,                         ,         -700.0,   "{USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
     2024-12-31,      2970,                         ,           0.00,   "{USD:    0.00}"
-    2024-12-31,      9200,                         ,    12756871.60,   "{USD: 12756871.60}"
-    2024-12-31,      2979,                         ,   -12756871.60,   "{USD: -12756871.60}"
-    2025-01-02,      2979,                         ,   -38270614.80,   "{USD: -38270614.80}"
-    2025-01-02,      2970,                         ,    25513743.20,   "{USD: 25513743.20}"
-    2025-01-02,      9200,                         ,    12756871.60,   "{USD: 12756871.60}"
+    2024-12-31,      9200,                         ,    12723538.80,   "{USD: 12723538.80}"
+    2024-12-31,      2979,                         ,   -12723538.80,   "{USD: -12723538.80}"
+    2025-01-02,      2979,                         ,   -38170616.40,   "{USD: -38170616.40}"
+    2025-01-02,      2970,                         ,    25447077.60,   "{USD: 25447077.60}"
+    2025-01-02,      9200,                         ,    12723538.80,   "{USD: 12723538.80}"
     2024-12-31,      1170,                         ,           0.00,   "{USD: 0.00}"
     2024-12-31,      1171,                         ,           0.00,   "{USD: 0.00}"
     2024-12-31,      1175,                         ,         200.00,   "{USD: 200.00}"
@@ -233,21 +233,21 @@ EXPECTED_INDIVIDUAL_BALANCES_CSV = """
     2024-01-01,      1000,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
        2024-Q4, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11255605.63
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,        0.00, 0.00
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11257194.10
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 1.84
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,        0.00, -5827.84
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
           2024, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,  1076311.79, 1076311.79
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,     -100.00, -100.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10026687.10, 11199809.49
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,     -20.00, -22.34
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 54345678.00, 380419.75
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10026687.10, 11201532.48
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,     -20.00,  -21.42
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 54345678.00, 357791.91
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
        2024-12, 1000:1025,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11255605.63
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,        0.00, 0.00
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11257194.10
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 1.84
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,        0.00, -5827.84
               ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
     2023-12-31, 1000:1015,                "General", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,        0.00, 0.00
               ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
@@ -293,18 +293,17 @@ EXPECTED_HISTORY = [{
             2024-01-01,    1010,       ,      EUR,      120.00,   800120.00,        132.82,      800132.82,         , Opening balance, 2023/financials/balance_sheet.pdf
             2024-01-01,    1020,       ,      JPY, 42000000.00, 42800120.00,     298200.00,     1098332.82,         , Opening balance, 2023/financials/balance_sheet.pdf
             2024-01-24,    1000,   4000,      USD,     1200.00, 42801320.00,       1200.00,     1099532.82,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
-            2024-03-31,    1010,       ,      EUR,        0.00, 42801320.00,         -3.29,     1099529.53,         , FX revaluations,
-            2024-03-31,    1020,       ,      JPY,        0.00, 42801320.00,     -21000.00,     1078529.53,         , FX revaluations,"""
+            2024-03-31,    1010,   7050,      EUR,        0.00, 42801320.00,         -3.29,     1099529.53,         , FX revaluations,
+            2024-03-31,    1020,   7050,      JPY,        0.00, 42801320.00,     -21000.00,     1078529.53,         , FX revaluations,"""
     }, {
         "period": "2024", "account": "1020", "profit_centers": None, "drop": True, "account_history":
             """
-                  date, currency,       amount,     balance, report_amount, report_balance, description, document
-            2024-01-01,      JPY,  42000000.00, 42000000.00,     298200.00,      298200.00, Opening balance, 2023/financials/balance_sheet.pdf
-            2024-03-31,      JPY,         0.00, 42000000.00,     -21000.00,      277200.00, FX revaluations,
-            2024-06-30,      JPY,         0.00, 42000000.00,     -16800.00,      260400.00, FX revaluations,
-            2024-07-04,      JPY,  12345678.00, 54345678.00,      76386.36,      336786.36, Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
-            2024-09-10,      JPY,         0.00, 54345678.00,          5.55,      336791.91, Manual Foreign currency adjustment,
-            2024-09-30,      JPY,         0.00, 54345678.00,      43627.84,      380419.75, FX revaluations,"""
+                  date, contra, currency,       amount,     balance, report_amount, report_balance, description, document
+            2024-01-01,       ,      JPY,  42000000.00, 42000000.00,     298200.00,      298200.00, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-03-31,   7050,      JPY,         0.00, 42000000.00,     -21000.00,      277200.00, FX revaluations,
+            2024-06-30,   7050,      JPY,         0.00, 42000000.00,       4200.00,      281400.00, FX revaluations,
+            2024-07-04,       ,      JPY,  12345678.00, 54345678.00,      76386.36,      357786.36, Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+            2024-09-10,       ,      JPY,         0.00, 54345678.00,          5.55,      357791.91, Manual Foreign currency adjustment,"""
     }, {
         "period": "2024-Q4", "account": "1000", "profit_centers": None, "drop": True, "account_history":
             """
@@ -377,7 +376,7 @@ EXPECTED_RECONCILIATION = [{
         2024-01-23,  1000:2999,      EUR,              ,      120.00,      1098332.82,       0.01,  2024/reconciliation/2024-01-23.pdf,         120.00,            1098332.82
            2024-08,  1000:2999,      CHF,        Bakery,         0.0,             0.0,       0.01,                                    ,           0.00,                  0.00
         2024-09-25,       1000,      USD,              ,   776311.79,       776311.79,        1.0,                                    ,      776311.79,             776311.79
-           2024-Q4,  1000:2999,      EUR,              , 10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,    10076638.88,           11655605.63"""
+           2024-Q4,  1000:2999,      EUR,              , 10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,    10076638.88,           11651368.10"""
     }, {
         "period": "2024", "source_pattern": None, "reconciliation":
         """
@@ -387,7 +386,7 @@ EXPECTED_RECONCILIATION = [{
         2024-01-23,  1000:2999,      EUR,              ,        120.00,      1098332.82,       0.01,  2024/reconciliation/2024-01-23.pdf,         120.00,             1098332.82
            2024-08,  1000:2999,      CHF,        Bakery,           0.0,             0.0,       0.01,                                    ,           0.00,                   0.00
         2024-09-25,       1000,      USD,              ,     776311.79,       776311.79,        1.0,                                    ,      776311.79,              776311.79
-           2024-Q4,  1000:2999,      EUR,              ,   10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,    10076638.88,            11655605.63"""
+           2024-Q4,  1000:2999,      EUR,              ,   10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,    10076638.88,            11651368.10"""
     }, {
         "period": "2024-Q3", "source_pattern": None, "reconciliation":
         """
@@ -412,7 +411,7 @@ EXPECTED_RECONCILIATION = [{
               2024,  1000:9999,      USD,       General,  -498332.82,             0.0,       0.01,        2024/reconciliation/2024.pdf,          2024/financial/all.pdf,     -498332.82,                   0.00
            2024-08,  1000:2999,      CHF,        Bakery,         0.0,             0.0,       0.01,                                    ,  2024/financial/custom/data.pdf,           0.00,                   0.00
         2024-09-25,       1000,      USD,              ,   776311.79,       776311.79,        1.0,                                    ,         2024/financial/data.pdf,      776311.79,              776311.79
-           2024-Q4,  1000:2999,      EUR,              , 10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,         2024/financial/data.pdf,    10076638.88,            11655605.63"""
+           2024-Q4,  1000:2999,      EUR,              , 10076638.88,     11655605.63,       0.01,     2024/reconciliation/2024-Q4.pdf,         2024/financial/data.pdf,    10076638.88,            11651368.10"""
     }, {
         "period": "2024", "source_pattern": r"/custom/.*\.pdf$", "reconciliation":
         """
@@ -431,9 +430,9 @@ EXPECTED_RECONCILIATION = [{
 EXPECTED_AGGREGATED_BALANCES_CSV = """
     group,                                       description,                   report_balance
     /Assets/Cash,                                Bank of America,               1076311.79
-    /Assets/Cash,                                Other Bank,                    -122.34
-    /Assets/Cash,                                Deutsche Bank,                 11199809.49
-    /Assets/Cash,                                Mitsubishi UFJ,                380419.75
+    /Assets/Cash,                                Other Bank,                    -121.42
+    /Assets/Cash,                                Deutsche Bank,                 11201532.48
+    /Assets/Cash,                                Mitsubishi UFJ,                357791.91
     /Assets/Cash,                                UBS,                           100000.0
     /Assets/Current Assets,                      Current receivables,           0.0
     /Assets/Tax Recoverable,                     VAT Recoverable (Input VAT),   360.85
@@ -446,9 +445,9 @@ EXPECTED_AGGREGATED_BALANCES_CSV = """
     /Revenue/Sales,                              Sales Revenue - USD,           -1000.0
     /Revenue/Sales,                              Sales Revenue - EUR,           -1198.26
     /Expenses/Cost of Goods Sold,                Purchases,                     3502.64
-    /Expenses/Other,                             Financial,                     -1659837.61
+    /Expenses/Other,                             Financial,                     -1638933.68
     /Revenue/Other,                              Financial,                     -5.55
-    /Revenue/Balance,                                    Net Profit/Loss for the Year,  0.0
+    /Revenue/Balance,                            Net Profit/Loss for the Year,  0.0
 """
 EXPECTED_AGGREGATED_BALANCES = pd.read_csv(StringIO(EXPECTED_AGGREGATED_BALANCES_CSV), skipinitialspace=True)
 # flake8: enable

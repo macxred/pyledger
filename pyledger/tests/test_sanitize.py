@@ -103,22 +103,22 @@ def test_sanitize_revaluations(engine, capture_logs):
         2023-12-28,    EUR, 1.1068, USD
     """
     REVALUATIONS_CSV = """
-        date,         account, debit, credit, description
-                  , 1000:1300,  7050,   8050, Invalid date
-        2023-12-29, 1000:1300,      ,       , No credit nor debit specified
-        2023-12-29, 1000:1300,  7777,       , Not valid debit
-        2023-12-29, 1000:1300,      ,   8888, Not valid credit
-        2023-12-29, 1000:1310,      ,   8050, Invalid currency
-        2020-12-29, 1000:1300,      ,   8050, No price definition
-        2023-12-29, 1000:1300,      ,   8050, Correct revaluation
-        2023-12-29, 1000:1300,  7050,       , Correct revaluation
-        2023-12-29, 1000:1300,  7050,   8050, Correct revaluation
+    date,         account,     debit, credit, description,                  split_per_profit_center
+    ,             1000:1300,   7050,  8050,   Invalid date,                      False
+    2023-12-29,   1000:1300,         ,       , No credit nor debit specified,    True
+    2023-12-29,   1000:1300,   7777,         , Not valid debit,                  False
+    2023-12-29,   1000:1300,         ,  8888, Not valid credit,                  True
+    2023-12-29,   1000:1310,         ,  8050, Invalid currency,                  False
+    2020-12-29,   1000:1300,         ,  8050, No price definition,               True
+    2023-12-29,   1000:1300,         ,  8050, Correct revaluation,               True
+    2023-12-29,   1000:1300,   7050,         , Correct revaluation,              False
+    2023-12-29,   1000:1300,   7050,  8050,  Correct revaluation,                True
     """
     EXPECTED_REVALUATIONS_CSV = """
-        date,         account, debit, credit, description
-        2023-12-29, 1000:1300,      ,   8050, Correct revaluation
-        2023-12-29, 1000:1300,  7050,       , Correct revaluation
-        2023-12-29, 1000:1300,  7050,   8050, Correct revaluation
+    date,         account,     debit, credit, description,          split_per_profit_center
+    2023-12-29,   1000:1300,         ,  8050,  Correct revaluation, True
+    2023-12-29,   1000:1300,     7050,      , Correct revaluation,  False
+    2023-12-29,   1000:1300,     7050,  8050,  Correct revaluation, True
     """
 
     prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)

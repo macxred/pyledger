@@ -1,6 +1,7 @@
 """Test suite for testing account_sheet_tables() method."""
 
 import math
+import numpy as np
 import pytest
 import pandas as pd
 from pyledger.memory_ledger import MemoryLedger
@@ -28,26 +29,32 @@ COLUMNS = pd.read_csv(StringIO(COLUMNS_CSV), skipinitialspace=True)
 EXPECTED_TYPST = (
     "table(\n"
     "  stroke: none,\n"
-    "  columns: (1.2fr, auto, 1.2fr, 1.2fr, 1.2fr, 1.2fr, 2fr, 2fr),\n"
-    "  align: (left, right, right, right, right, right, left, left),\n"
-    "  [Date], [Currency], [Amount], [Report Amount], [Balance], [Report Balance], [Description], [Document],\n"
+    "  columns: (1.2fr, 1.2fr, auto, 1.2fr, 1.2fr, 1.2fr, 1.2fr, 2fr, 2fr),\n"
+    "  align: (left, right, right, right, right, right, right, left, left),\n"
+    "  [Date], [Contra], [Currency], [Amount], [Report Amount], [Balance], [Report Balance], [Description], [Document],\n"
     "  table.hline(),\n"
-    "  [2024-01-01], [JPY], [42,000,000], [298,200.00], [42,000,000], [298,200.00], [Opening balance], [#link(\"test/test/2023/financials/balance_sheet.pdf\")[2023/financials/balance_sheet.pdf]],\n"
-    "  [2024-03-31], [JPY], [], [-21,000.00], [42,000,000], [277,200.00], [FX revaluations], [],\n"
-    "  [2024-06-30], [JPY], [], [-16,800.00], [42,000,000], [260,400.00], [FX revaluations], [],\n"
-    "  [2024-07-04], [JPY], [12,345,678], [76,386.36], [54,345,678], [336,786.36], [Convert JPY to EUR], [#link(\"test/test/2024/transfers/2024-07-05_JPY-EUR.pdf\")[2024/transfers/2024-07-05_JPY-EUR.pdf]],\n"
-    "  [2024-09-10], [JPY], [], [5.55], [54,345,678], [336,791.91], [Manual Foreign currency adjustment], [],\n"
-    "  [2024-09-30], [JPY], [], [43,627.84], [54,345,678], [380,419.75], [FX revaluations], [],\n"
+    "  [2024-01-01], [], [JPY], [42,000,000], [298,200.00], [42,000,000], [298,200.00], [Opening balance], [#link(\"test/test/2023/financials/balance_sheet.pdf\")[2023/financials/balance_sheet.pdf]],\n"
+    "  [2024-03-31], [7050], [JPY], [], [-21,000.00], [42,000,000], [277,200.00], [FX revaluations], [],\n"
+    "  [2024-06-30], [7050], [JPY], [], [4,200.00], [42,000,000], [281,400.00], [FX revaluations], [],\n"
+    "  [2024-07-04], [], [JPY], [12,345,678], [76,386.36], [54,345,678], [357,786.36], [Convert JPY to EUR], [#link(\"test/test/2024/transfers/2024-07-05_JPY-EUR.pdf\")[2024/transfers/2024-07-05_JPY-EUR.pdf]],\n"
+    "  [2024-09-10], [], [JPY], [], [5.55], [54,345,678], [357,791.91], [Manual Foreign currency adjustment], [],\n"
+    "  [2024-09-30], [7050], [JPY], [], [5,833.39], [54,345,678], [363,625.30], [FX revaluations], [],\n"
+    "  [2024-09-30], [7050], [JPY], [], [-5.55], [54,345,678], [363,619.75], [FX revaluations], [],\n"
+    "  [2024-12-31], [7050], [JPY], [], [-5,833.39], [54,345,678], [357,786.36], [FX revaluations], [],\n"
+    "  [2024-12-31], [7050], [JPY], [], [5.55], [54,345,678], [357,791.91], [FX revaluations], [],\n"
     ")"
 )
 EXPECTED_DATAFRAME_CSV = """
-date,         currency,   amount,          report_amount,   balance,      report_balance,   description,                          document
-2024-01-01,   JPY,        42'000'000,      298'200.00,      42'000'000,   298'200.00,       Opening balance,                      2023/financials/balance_sheet.pdf
-2024-03-31,   JPY,        ,                -21'000.00,      42'000'000,   277'200.00,       FX revaluations,
-2024-06-30,   JPY,        ,                -16'800.00,      42'000'000,   260'400.00,       FX revaluations,
-2024-07-04,   JPY,        12'345'678,      76'386.36,       54'345'678,   336'786.36,       Convert JPY to EUR,                   2024/transfers/2024-07-05_JPY-EUR.pdf
-2024-09-10,   JPY,        ,                5.55,            54'345'678,   336'791.91,       Manual Foreign currency adjustment,
-2024-09-30,   JPY,        ,                43'627.84,       54'345'678,   380'419.75,       FX revaluations,
+date,         contra,   currency,   amount,          report_amount,   balance,      report_balance,   description,                          document
+2024-01-01,   ,         JPY,        42'000'000,      298'200.00,      42'000'000,   298'200.00,       Opening balance,                      2023/financials/balance_sheet.pdf
+2024-03-31,   7050,     JPY,        ,                -21'000.00,      42'000'000,   277'200.00,       FX revaluations,
+2024-06-30,   7050,     JPY,        ,                4'200.00,        42'000'000,   281'400.00,       FX revaluations,
+2024-07-04,   ,         JPY,        12'345'678,      76'386.36,       54'345'678,   357'786.36,       Convert JPY to EUR,                   2024/transfers/2024-07-05_JPY-EUR.pdf
+2024-09-10,   ,         JPY,        ,                5.55,            54'345'678,   357'791.91,       Manual Foreign currency adjustment,
+2024-09-30,   7050,     JPY,        ,                5'833.39,        54'345'678,   363'625.30,       FX revaluations,
+2024-09-30,   7050,     JPY,        ,                -5.55,           54'345'678,   363'619.75,       FX revaluations,
+2024-12-31,   7050,     JPY,        ,                -5'833.39,       54'345'678,   357'786.36,       FX revaluations,
+2024-12-31,   7050,     JPY,        ,                5.55,            54'345'678,   357'791.91,       FX revaluations,
 """
 EXPECTED_DATAFRAME = pd.read_csv(StringIO(EXPECTED_DATAFRAME_CSV), index_col=False, skipinitialspace=True)
 # flake8: enable
@@ -90,7 +97,10 @@ def test_account_balance_dataframe_format(restored_engine):
     )
     EXPECTED = EXPECTED_DATAFRAME.fillna("")
     EXPECTED["document"] = EXPECTED["document"].replace("", pd.NA).fillna(pd.NA)
-    assert_frame_equal(result[1020], EXPECTED, check_dtype=False)
+    EXPECTED["contra"] = EXPECTED["contra"].replace("", pd.NA).astype("Int64")
+    result = result[1020].copy()
+    result["contra"] = result["contra"].astype("Int64")
+    assert_frame_equal(result, EXPECTED, check_dtype=False)
 
 def test_invalid_columns_raises_value_error(restored_engine):
     bad_cols = COLUMNS.copy()
