@@ -339,7 +339,30 @@ class StandaloneLedger(LedgerEngine):
     def revaluation_entries(
         self, ledger: pd.DataFrame, revaluations: pd.DataFrame
     ) -> pd.DataFrame:
-        """Compute ledger entries for (currency or other) revaluations"""
+        """Compute journal entries for (currency or other) revaluations
+
+        For each instruction in `revaluations`, this method generates one or more journal entries
+        that adjust the reporting currency value of foreign currency accounts based on the latest
+        FX rate, without altering the actual amount of foreign currency held.
+
+        Each resulting journal entry:
+        - Has `amount = 0`, since no movement occurs in the foreign currency.
+        - Has a non-zero `report_amount`, reflecting the change in value in reporting currency.
+        - Uses the specified revaluation account (credit or debit) as the offset (`contra`).
+        - Is tagged with a profit center if `split_per_profit_center` is set.
+
+        If `split_per_profit_center` is True in a revaluation row, entries are generated
+        separately for each defined profit center and assigned accordingly.
+
+        Args:
+            ledger (pd.DataFrame): The current ledger in serialized format (long form).
+            revaluations (pd.DataFrame): A DataFrame with revaluation instructions following
+                the `REVALUATION_SCHEMA` format.
+
+        Returns:
+            pd.DataFrame: A DataFrame of journal entries in wide format, suitable for
+            conversion to ledger format using `serialize_ledger()`.
+        """
         result = []
         reporting_currency = self.reporting_currency
         profit_centers = self.profit_centers.list()
