@@ -249,7 +249,7 @@ class StandaloneLedger(LedgerEngine):
                 revaluation_entries = self.revaluation_entries(
                     ledger=combined, revaluations=revaluation_rows,
                 )
-                result.append(revaluation_entries)
+                result.append(self.serialize_ledger(revaluation_entries))
 
             # Calculate target balance entries
             target_balance_rows = target_balances.query("date == @date")
@@ -384,16 +384,10 @@ class StandaloneLedger(LedgerEngine):
                 entries.append({
                     **base,
                     "account": account,
+                    "contra": revaluation_account,
                     "currency": currency,
-                    "amount": 0,
+                    "amount": 0.0,
                     "report_amount": amount,
-                })
-                entries.append({
-                    **base,
-                    "account": revaluation_account,
-                    "currency": reporting_currency,
-                    "amount": -1 * amount,
-                    "report_amount": -1 * amount,
                 })
             return entries
 
