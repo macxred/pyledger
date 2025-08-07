@@ -379,9 +379,10 @@ class StandaloneLedger(LedgerEngine):
         def compute_revaluation_entry(row, account, currency, profit_center):
             entries = []
             date = row["date"]
-            df_result = self.serialize_ledger(pd.concat([ledger, pd.DataFrame(result)]))
+            df = enforce_schema(pd.DataFrame(result), JOURNAL_SCHEMA)
+            df = self.serialize_ledger(pd.concat([ledger, df]))
             balance = self._account_balance(
-                ledger=df_result, account=account, period=date, profit_centers=profit_center
+                ledger=df, account=account, period=date, profit_centers=profit_center
             )
             fx_rate = self.price(currency, date=date, currency=reporting_currency)
             if fx_rate[0] != reporting_currency:
@@ -394,18 +395,15 @@ class StandaloneLedger(LedgerEngine):
             amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
 
             if amount != 0:
-                entry_id = f"revaluation:{date}:{account}"
+                id = f"revaluation:{date}:{account}"
                 if not pd.isna(profit_center):
-                    entry_id += f":{profit_center}"
-                revaluation_account = get_revaluation_account(row, amount, entry_id)
-                base = {
-                    "id": entry_id,
+                    id += f":{profit_center}"
+                revaluation_account = get_revaluation_account(row, amount, id)
+                entries.append({
+                    "id": id,
                     "date": date,
                     "description": row["description"],
                     "profit_center": profit_center if not pd.isna(profit_center) else pd.NA,
-                }
-                entries.append({
-                    **base,
                     "account": account,
                     "contra": revaluation_account,
                     "currency": currency,
