@@ -77,7 +77,7 @@ class AccountingEntity(ABC):
         return df
 
     @abstractmethod
-    def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+    def list(self, drop_extra_columns: bool = False, include_source: bool = False) -> pd.DataFrame:
         """
         Retrieve all entries.
 
@@ -417,7 +417,7 @@ class DataFrameEntity(StandaloneAccountingEntity):
         super().__init__(*args, **kwargs)
         self._df = self.standardize(None)
 
-    def list(self, drop_extra_columns: bool = False) -> pd.DataFrame:
+    def list(self, drop_extra_columns: bool = False, include_source: bool = False) -> pd.DataFrame:
         return self.standardize(self._df.copy(), drop_extra_columns=drop_extra_columns)
 
     def _store(self, data: pd.DataFrame):
@@ -516,7 +516,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
             data = pd.read_csv(self._path, skipinitialspace=True)
             data.rename(columns=self._column_shortcuts, inplace=True)
             if include_source:
-                source_lines = [f"{self._filename}:L#{i+2}" for i in range(len(data))]
+                source_lines = [f"{self._path.name}:L#{i+2}" for i in range(len(data))]
                 data[self.source_column] = source_lines
         else:
             data = None

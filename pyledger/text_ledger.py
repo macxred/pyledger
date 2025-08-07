@@ -90,7 +90,8 @@ class TextLedger(StandaloneLedger):
             on_change=self.price.cache_clear
         )
         self._revaluations = CSVAccountingEntity(
-            schema=REVALUATION_SCHEMA, path=self.root / "settings/revaluations.csv"
+            schema=REVALUATION_SCHEMA, path=self.root / "settings/revaluations.csv",
+            source_column="source",
         )
         self._journal = CSVJournalEntity(
             schema=JOURNAL_SCHEMA,
@@ -99,6 +100,7 @@ class TextLedger(StandaloneLedger):
             column_shortcuts=JOURNAL_COLUMN_SHORTCUTS,
             prepare_for_mirroring=self.sanitize_journal,
             on_change=self.serialized_ledger.cache_clear,
+            source_column="source"
         )
         self._profit_centers = CSVAccountingEntity(
             schema=PROFIT_CENTER_SCHEMA, path=self.root / "settings/profit_centers.csv"
@@ -110,7 +112,8 @@ class TextLedger(StandaloneLedger):
             file_path_column="file",
         )
         self._target_balance = CSVAccountingEntity(
-            schema=TARGET_BALANCE_SCHEMA, path=self.root / "settings/target_balance.csv"
+            schema=TARGET_BALANCE_SCHEMA, path=self.root / "settings/target_balance.csv",
+            source_column="source",
         )
 
     # ----------------------------------------------------------------------
