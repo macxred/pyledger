@@ -83,7 +83,10 @@ class AccountingEntity(ABC):
 
         Args:
             drop_extra_columns (bool, optional): If True, drop columns
-                                                 outside the defined schema.
+                outside the defined schema.
+            include_source (bool, optional): If True, include an additional column
+                indicating the source of each row, such as its file of origin or
+                line reference, depending on the concrete implementation.
 
         Returns:
             pd.DataFrame: DataFrame adhering to the entity's column schema.
@@ -418,6 +421,8 @@ class DataFrameEntity(StandaloneAccountingEntity):
         self._df = self.standardize(None)
 
     def list(self, drop_extra_columns: bool = False, include_source: bool = False) -> pd.DataFrame:
+        # This entity holds all data in memory and does not associate rows with external sources.
+        # The `include_source` flag is accepted to satisfy the interface but has no effect here.
         return self.standardize(self._df.copy(), drop_extra_columns=drop_extra_columns)
 
     def _store(self, data: pd.DataFrame):
@@ -474,8 +479,8 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
     def list(self, drop_extra_columns: bool = False, include_source: bool = False) -> pd.DataFrame:
         """Retrieve all entries from the CSV file.
 
-        If `include_source` is True, each row will include an additional column
-        (`self.source_column`) indicating its file and line number of origin,
+        If `include_source` is True, each row will include an additional column (defined by
+        `self.source_column`) indicating the file and line number where the row was read from,
         formatted as a GitHub-style reference (e.g., 'journal.csv:L#42').
         """
         return self._read_data(
@@ -516,7 +521,7 @@ class CSVAccountingEntity(StandaloneAccountingEntity):
             data = pd.read_csv(self._path, skipinitialspace=True)
             data.rename(columns=self._column_shortcuts, inplace=True)
             if include_source:
-                source_lines = [f"{self._path.name}:L#{i+2}" for i in range(len(data))]
+                source_lines = [f"{self._path.name}:L#{i + 2}" for i in range(len(data))]
                 data[self.source_column] = source_lines
         else:
             data = None
@@ -565,10 +570,14 @@ class MultiCSVEntity(CSVAccountingEntity):
         Files that cannot be processed are skipped with a warning. The Data
         from all valid files is then combined into a single DataFrame.
 
+        For each row, the relative file path is stored in the configured `file_path_column`.
+
+        If `include_source` is True, an additional column (`self.source_column`) is added with a
+        GitHub-style file and line reference (e.g., 'journal/2025.csv:L#42'), where the file path
+        is the same as the value in `file_path_column` (i.e. relative to the root directory).
+
         Returns:
             pd.DataFrame: DataFrame adhering to the entity's column schema.
-                          Relative paths to the root directory are stored in an
-                          in an additional configurable `file_path_column`.
         """
         if not self._path.exists():
             df = self.standardize(None)
@@ -589,7 +598,7 @@ class MultiCSVEntity(CSVAccountingEntity):
                     df[self.file_path_column] = relative_path
                     if include_source:
                         df[self.source_column] = [
-                            f"{relative_path}:L#{i+2}" for i in range(len(df))
+                            f"{relative_path}:L#{i + 2}" for i in range(len(df))
                         ]
                 result.append(df)
             except Exception as e:
