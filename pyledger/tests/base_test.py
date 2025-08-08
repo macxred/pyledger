@@ -131,11 +131,11 @@ PRICES_CSV = """
 PRICES = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)
 
 REVALUATIONS_CSV = """
-    date,         account, debit, credit, description
-    2024-03-31, 1000:2999,  7050,   8050, FX revaluations
-    2024-06-30, 1000:2999,  7050,       , FX revaluations
-    2024-09-30, 1000:2999,  7050,       , FX revaluations
-    2024-12-31, 1000:2999,      ,   7050, FX revaluations
+    date,         account, debit, credit, description,     split_per_profit_center
+    2024-03-31, 1000:2999,  7050,   8050, FX revaluations, False
+    2024-06-30, 1000:2999,  7050,       , FX revaluations, False
+    2024-09-30, 1000:2999,  7050,       , FX revaluations, True
+    2024-12-31, 1000:2999,      ,   7050, FX revaluations, True
 """
 REVALUATIONS = pd.read_csv(StringIO(REVALUATIONS_CSV), skipinitialspace=True)
 
