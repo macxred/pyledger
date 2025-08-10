@@ -164,7 +164,7 @@ RECONCILIATION = pd.read_csv(StringIO(RECONCILIATION_CSV), skipinitialspace=True
 TARGET_BALANCE_CSV = """
     id, date,       account, contra,            currency, profit_center,                                  description, lookup_period, lookup_accounts,     balance
     1,  2024-12-31,    2979,   9200,  reporting_currency,       General,                        P&L for the year 2024,          2024,       3000:9999,           0
-    2,  2025-01-02,    2979,   2970,  reporting_currency,       General, Move P&L for the year to P&L Carried Forward,          2024,            2979,           0
+    2,  2025-01-02,    2970,   2979,  reporting_currency,       General, Move P&L for the year to P&L Carried Forward,          2024,            2979,           0
     3,  2024-12-31,    1170,   1175,                 USD,       General,                    VAT return 2024 input tax,          2024,            1170,           0
     4,  2024-12-31,    1171,   1175,                 USD,       General,                    VAT return 2024 input tax,          2024,            1171,           0
     5,  2024-12-31,    2200,   1175,                 USD,       General,                    VAT return 2024 sales tax,          2024,            2200,           0
@@ -192,11 +192,12 @@ EXPECTED_BALANCES_CSV = """
     2024-Q4,    1000:1999,                         ,    11655805.63,   "{USD: 300200.00, EUR: 10076638.88, JPY: 0.0, CHF: 14285714.3}"
     2024,       1000:1999,                         ,    12756979.54,   "{USD: 1076628.72, EUR: 10026800.43, JPY: 54345678.0, CHF: 14285714.3}"
     2024-08,    1000:1999,                         ,         -700.0,   "{USD: -700.0, EUR: 0.0, JPY: 0.0, CHF: 0.0}"
+    2024-12-31, 3000:9999,                         ,           0.00,   "{USD: 473.11, EUR: -452.37}"
     2024-12-31,      2970,                         ,           0.00,   "{USD:    0.00}"
     2024-12-31,      9200,                         ,    12756871.60,   "{USD: 12756871.60}"
     2024-12-31,      2979,                         ,   -12756871.60,   "{USD: -12756871.60}"
-    2025-01-02,      2979,                         ,   -25513743.20,   "{USD: -25513743.20}"
-    2025-01-02,      2970,                         ,    12756871.60,   "{USD: 12756871.60}"
+    2025-01-02,      2970,                         ,   -12756871.60,   "{USD: -12756871.60}"
+    2025-01-02,      2979,                         ,           0.00,   "{USD: 0.00}"
     2025-01-02,      9200,                         ,    12756871.60,   "{USD: 12756871.60}"
     2024-12-31,      1170,                         ,           0.00,   "{USD: 0.00}"
     2024-12-31,      1171,                         ,           0.00,   "{USD: 0.00}"
