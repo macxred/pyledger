@@ -219,7 +219,7 @@ class StandaloneLedger(LedgerEngine):
             # Compute revaluations entries first
             mask = revaluations["date"] == date
             if mask.any:
-                reval_journal = self.revaluation_entries(
+                reval_journal = self._revaluation_entries(
                     ledger=ledger, revaluations=revaluations[mask]
                 )
                 if not reval_journal.empty:
@@ -233,7 +233,7 @@ class StandaloneLedger(LedgerEngine):
             # Calculate target balance entries second
             mask = target_balances["date"] == date
             if mask.any:
-                target_journal = self.target_balance_entries(
+                target_journal = self._target_balance_entries(
                     ledger=ledger, target_balance=target_balances[mask],
                 )
                 if not target_journal.empty:
@@ -250,7 +250,7 @@ class StandaloneLedger(LedgerEngine):
         ledger = ledger.sort_values("date").reset_index(drop=True)
         return complete_journal, ledger
 
-    def target_balance_entries(
+    def _target_balance_entries(
         self, ledger: pd.DataFrame, target_balance: pd.DataFrame
     ) -> pd.DataFrame:
         """
@@ -317,61 +317,110 @@ class StandaloneLedger(LedgerEngine):
 
         return self.journal.standardize(pd.DataFrame(result))
 
-    def revaluation_entries(
-        self, ledger: pd.DataFrame, revaluations: pd.DataFrame
+    def _revaluation_entries(
+            self, ledger: pd.DataFrame, revaluations: pd.DataFrame
     ) -> pd.DataFrame:
-        """Compute ledger entries for (currency or other) revaluations"""
-        result = []
+        """
+        Compute journal entries for currency (or other) revaluations.
+
+        For each instruction in `revaluations`, this method generates one or more journal entries
+        that adjust the reporting currency value of foreign currency accounts based on the latest
+        FX rate, without altering the actual amount of foreign currency held.
+
+        Each resulting journal entry:
+        - Has `amount = 0`, since no movement occurs in the foreign currency.
+        - Has a non-zero `report_amount`, reflecting the change in value in reporting currency.
+        - Uses the specified revaluation account (credit or debit) as the offset (`contra`).
+        - Is tagged with a profit center if `split_per_profit_center` is set.
+
+        If `split_per_profit_center` is True in a revaluation row, entries are generated
+        separately for each defined profit center and assigned accordingly.
+
+        Args:
+            ledger (pd.DataFrame): The current ledger in serialized format (long form).
+            revaluations (pd.DataFrame): A DataFrame with revaluation instructions following
+                the `REVALUATION_SCHEMA` format.
+
+        Returns:
+            pd.DataFrame: A DataFrame of journal entries in wide format, suitable for
+            conversion to ledger format using `serialize_ledger()`.
+        """
+        def choose_revaluation_account(credit, debit, amount, id):
+            if pd.isna(credit) and pd.isna(debit):
+                raise ValueError(f"No account specified in revaluation entry {id}")
+            if pd.isna(credit):
+                return debit
+            if pd.isna(debit):
+                return credit
+            return credit if amount >= 0 else debit
         reporting_currency = self.reporting_currency
-        for row in revaluations.to_dict("records"):
-            df = pd.concat([ledger, pd.DataFrame(result)])
-            date = row["date"]
-            accounts = self.parse_account_range(row["account"])
-            accounts = set(accounts["add"]) - set(accounts["subtract"])
+        expanded_revaluations = self._expand_revaluations(revaluations).reset_index(drop=True)
+        if expanded_revaluations.empty:
+            return expanded_revaluations
+        balance = self.account_balances(
+            expanded_revaluations.rename(columns={"date": "period"}),
+            ledger=ledger
+        )
+        df = pd.concat([expanded_revaluations, balance.reset_index(drop=True)], axis=1)
+        df["fx_rate"] = [
+            self.price(currency, date=date, currency=reporting_currency)[1]
+            for currency, date in zip(df["currency"], df["date"])
+        ]
+        df["account_currency_balance"] = [
+            balance.get(currency, 0) for balance, currency in zip(df["balance"], df["currency"])
+        ]
+        # TODO: round target to precision?
+        df["target"] = df["account_currency_balance"] * df["fx_rate"]
+        df["amount"] = self.round_to_precision(
+            df["target"] - df["report_balance"],
+            ticker=reporting_currency,
+            # TODO: Find safer way to extract the unique date as datetime.date
+            date=df["date"].unique()[0].date()
+        )
+        df = df.query("amount != 0.0")
 
-            for account in accounts:
-                currency = self.account_currency(account)
-                if currency != reporting_currency:
-                    balance = self._account_balance(ledger=df, account=account, period=date)
-                    fx_rate = self.price(currency, date=date, currency=reporting_currency)
-                    if fx_rate[0] != reporting_currency:
-                        raise ValueError(
-                            f"FX rate currency mismatch: expected {reporting_currency}, got "
-                            f"{fx_rate[0]}"
-                        )
-                    target = balance.get(currency, 0.0) * fx_rate[1]
-                    amount = target - balance.get("reporting_currency", 0.0)
-                    amount = self.round_to_precision(amount, ticker=reporting_currency, date=date)
-                    id = f"revaluation:{date}:{account}"
-                    if amount != 0:
-                        if pd.isna(row["credit"]) and pd.isna(row["debit"]):
-                            raise ValueError("No account specified in revaluation entry {id}")
-                        elif pd.isna(row["credit"]):
-                            revaluation_account = row["debit"]
-                        elif pd.isna(row["debit"]):
-                            revaluation_account = row["credit"]
-                        else:
-                            revaluation_account = row["credit"] if amount >= 0 else row["debit"]
-                        result.append({
-                            "id": id,
-                            "date": date,
-                            "account": account,
-                            "currency": currency,
-                            "amount": 0,
-                            "report_amount": amount,
-                            "description": row["description"]
-                        })
-                        result.append({
-                            "id": id,
-                            "date": date,
-                            "account": revaluation_account,
-                            "currency": reporting_currency,
-                            "amount": -1 * amount,
-                            "report_amount": -1 * amount,
-                            "description": row["description"]
-                        })
+        # Build collective transactions with two legs
+        leg1 = df[["date", "currency", "account", "description"]].assign(
+            id=[f"revaluation:{d.date()}:{a}" for d, a in zip(df["date"], df["account"])],
+            amount=0,
+            report_amount=df["amount"]
+        )
+        leg2 = leg1.assign(
+            currency=reporting_currency,
+            account=[
+                choose_revaluation_account(credit=c, debit=d, amount=a, id=i)
+                for c, d, a, i in zip(df["credit"], df["debit"], df["amount"], leg1["id"])
+            ],
+            amount=-df["amount"],
+            report_amount=-df["amount"],
+        )
+        result = pd.concat([leg1, leg2], ignore_index=True)
+        return self.journal.standardize(result)
 
-        return self.journal.standardize(pd.DataFrame(result))
+    def _expand_revaluations(self, revaluations):
+        if revaluations.empty:
+            return revaluations
+
+        def _account_list(account_range: str) -> pd.DataFrame:
+            parsed = self.parse_account_range(account_range)
+            accounts = sorted(set(parsed["add"]) - set(parsed["subtract"]))
+            return pd.DataFrame({"account_range": account_range, "account": accounts})
+
+        # Expand revaluation entries for single accounts
+        account_ranges = pd.concat(
+            [_account_list(rng) for rng in revaluations["account"].unique()],
+            ignore_index=True
+        )
+        result = (
+            revaluations
+            .rename(columns={"account": "account_range"})
+            .merge(account_ranges, on="account_range", how="left")
+        )
+
+        # Drop accounts denominated in reporting currency (no revaluation need)
+        result["currency"] = [self.account_currency(account) for account in result["account"]]
+        result = result.query("currency != @self.reporting_currency")
+        return result
 
     def _account_balance(
         self, account: str | int | dict | list, ledger: pd.DataFrame = None,
