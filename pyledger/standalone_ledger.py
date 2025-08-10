@@ -197,14 +197,16 @@ class StandaloneLedger(LedgerEngine):
         df = self.sanitize_journal(df)
         df = df.sort_values(["date", "id"])
 
-        # Add ledger entries for tax
+        # Append tax journal entries
         df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
 
+        # Convert journal to ledger: Split `account`/`contra` rows into two ledger rows
+        df = self.serialize_ledger(df)
+
+        # Append auto-generated target-balance and revaluation ledger entries
         automated_entries = self.generate_automated_entries(
             df, target_balances=target_balances, revaluations=revaluations
         )
-        df = self.serialize_ledger(df)
-
         if not automated_entries.empty:
             df = pd.concat([df, automated_entries], ignore_index=True)
 
@@ -299,11 +301,10 @@ class StandaloneLedger(LedgerEngine):
 
         result = []
         reporting_currency = self.reporting_currency
-        df = self.serialize_ledger(ledger)
 
         for idx, row in enumerate(target_balance.to_dict("records")):
             balance = self._account_balance(
-                ledger=df, account=row["lookup_accounts"],
+                ledger=ledger, account=row["lookup_accounts"],
                 period=row["lookup_period"], profit_centers=row["lookup_profit_centers"]
             )
             current_balance = balance.get(row["currency"], 0.0)
@@ -343,7 +344,7 @@ class StandaloneLedger(LedgerEngine):
         result = []
         reporting_currency = self.reporting_currency
         for row in revaluations.to_dict("records"):
-            df = self.serialize_ledger(pd.concat([ledger, pd.DataFrame(result)]))
+            df = pd.concat([ledger, pd.DataFrame(result)])
             date = row["date"]
             accounts = self.parse_account_range(row["account"])
             accounts = set(accounts["add"]) - set(accounts["subtract"])
