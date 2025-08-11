@@ -380,8 +380,11 @@ class StandaloneLedger(LedgerEngine):
         df = df.query("amount != 0.0")
 
         # Build collective transactions with two legs
-        leg1 = df[["date", "currency", "account", "description"]].assign(
-            id=[f"revaluation:{d.date()}:{a}" for d, a in zip(df["date"], df["account"])],
+        leg1 = df[["date", "currency", "account", "description", "profit_center"]].assign(
+            id=[
+                f"revaluation:{d.date()}:{a}{'' if pd.isna(pc) else f':{pc}'}"
+                for d, a, pc in zip(df["date"], df["account"], df["profit_center"])
+            ],
             amount=0,
             report_amount=df["amount"]
         )
@@ -420,7 +423,14 @@ class StandaloneLedger(LedgerEngine):
         # Drop accounts denominated in reporting currency (no revaluation need)
         result["currency"] = [self.account_currency(account) for account in result["account"]]
         result = result.query("currency != @self.reporting_currency")
-        return result
+
+        # Expand revaluation entries with `split_per_profit_center=True` for each profit center
+        mask = result["split_per_profit_center"].fillna(False)
+        by_profit_center = result.loc[mask].merge(self.profit_centers.list(), how="cross")
+        no_profit_center = result.loc[~mask]
+        no_profit_center["profit_center"] = pd.Series(dtype="string")
+        by_profit_center["profit_center"] = by_profit_center["profit_center"].astype("string")
+        return pd.concat([no_profit_center, by_profit_center], ignore_index=True)
 
     def _account_balance(
         self, account: str | int | dict | list, ledger: pd.DataFrame = None,
