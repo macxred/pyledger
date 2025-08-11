@@ -294,8 +294,9 @@ EXPECTED_HISTORY = [{
             2024-01-01,    1010,       ,      EUR,      120.00,   800120.00,        132.82,      800132.82,         , Opening balance, 2023/financials/balance_sheet.pdf
             2024-01-01,    1020,       ,      JPY, 42000000.00, 42800120.00,     298200.00,     1098332.82,         , Opening balance, 2023/financials/balance_sheet.pdf
             2024-01-24,    1000,   4000,      USD,     1200.00, 42801320.00,       1200.00,     1099532.82,  OUT_STD, Sell cakes, 2024/receivables/2024-01-24.pdf
-            2024-03-31,    1010,       ,      EUR,        0.00, 42801320.00,         -3.29,     1099529.53,         , FX revaluations,
-            2024-03-31,    1020,       ,      JPY,        0.00, 42801320.00,     -21000.00,     1078529.53,         , FX revaluations,"""
+            2024-03-31,    1020,       ,      JPY,        0.00, 42801320.00,     -21000.00,     1078532.82,         , FX revaluations,
+            2024-03-31,    1010,       ,      EUR,        0.00, 42801320.00,         -3.29,     1078529.53,         , FX revaluations,
+            """
     }, {
         "period": "2024", "account": "1020", "profit_centers": None, "drop": True, "account_history":
             """
@@ -321,14 +322,15 @@ EXPECTED_HISTORY = [{
             2024-05-06,    1000,   5000,      USD, -666.66, 42798809.55,       -666.66,     1077307.32,   IN_RED,              , Purchase at reduced tax, 2024/payables/2024-05-06.pdf
             2024-05-07,    1000,   5000,      USD, -777.77, 42798031.78,       -777.77,     1076529.55,   EXEMPT,              , Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
             2024-05-08,    1000,       ,      USD, -999.99, 42797031.79,       -999.99,     1075529.56,         ,              , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
-            2024-05-24,    1000,       ,      USD, -100.00, 42797051.79,       -100.00,     1075429.56,         ,              , Collective transaction with zero amount,
-            2024-05-24,    1000,       ,      USD,    0.00, 42797151.79,          0.00,     1075429.56,         ,              , Collective transaction with zero amount,
-            2024-05-24,    1000,   1005,      USD,  100.00, 42797151.79,        100.00,     1075529.56,         ,              , Collective transaction - leg with debit and credit account,
-            2024-05-24,    1010,       ,      EUR,   20.00, 42797051.79,          20.5,     1075550.06,         ,              , Collective transaction - leg with credit account,
-            2024-05-24,    1005,   1000,      USD, -100.00, 42796951.79,       -100.00,     1075450.06,         ,              , Collective transaction - leg with debit and credit account,
-            2024-05-24,    1015,       ,      EUR,  -20.00, 42797031.79,        -20.50,     1075429.56,         ,              , Collective transaction - leg with debit account,
-            2024-05-24,    1000,       ,      USD,  100.00, 42797051.79,        100.00,     1075529.56,         ,              , Collective transaction with zero amount,
-            2024-05-25,    1010,   5000,      EUR, -800.00, 42796231.79,       -863.52,     1074666.04,   IN_STD,              , Purchase goods, 2024/payables/2024-05-25.pdf"""
+            2024-05-24,    1010,       ,      EUR,    20.0, 42797051.79,          20.5,     1075550.06,         ,              , Collective transaction - leg with credit account,
+            2024-05-24,    1000,   1005,      USD,   100.0, 42797151.79,         100.0,     1075650.06,         ,              , Collective transaction - leg with debit and credit account,
+            2024-05-24,    1000,       ,      USD,     0.0, 42797151.79,           0.0,     1075650.06,         ,              , Collective transaction with zero amount,
+            2024-05-24,    1000,       ,      USD,  -100.0, 42797051.79,        -100.0,     1075550.06,         ,              , Collective transaction with zero amount,
+            2024-05-24,    1000,       ,      USD,   100.0, 42797151.79,         100.0,     1075650.06,         ,              , Collective transaction with zero amount,
+            2024-05-24,    1015,       ,      EUR,   -20.0, 42797131.79,         -20.5,     1075629.56,         ,              , Collective transaction - leg with debit account,
+            2024-05-24,    1005,   1000,      USD,  -100.0, 42797031.79,        -100.0,     1075529.56,         ,              , Collective transaction - leg with debit and credit account,
+            2024-05-25,    1010,   5000,      EUR,  -800.0, 42796231.79,       -863.52,     1074666.04,   IN_STD,              , Purchase goods, 2024/payables/2024-05-25.pdf
+            """
     }, {
         "period": "2024-12-31", "account": "1000", "profit_centers": "General", "drop": True, "account_history":
             """
