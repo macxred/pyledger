@@ -282,8 +282,8 @@ EXPECTED_HISTORY = [{
             """
                   date, contra, currency,  amount, balance, tax_code, description, document
             2024-01-24,   4000,      USD, -200.00, -200.00,  OUT_STD, TAX: Sell cakes, 2024/receivables/2024-01-24.pdf
-            2024-07-01,       ,      EUR, -166.67, -366.67,         , Shop sale,
-            2024-07-01,       ,      EUR,  -23.81, -390.48,         , Shop sale,
+            2024-07-01,       ,      EUR,  -23.81, -223.81,         , Shop sale,
+            2024-07-01,       ,      EUR, -166.67, -390.48,         , Shop sale,
             2024-07-01,   4001,      EUR, -166.67, -557.15,  OUT_STD, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf
             2024-07-01,   4001,      EUR,  -23.81, -580.96,  OUT_RED, TAX: Sale at mixed VAT rate, /invoices/invoice_002.pdf"""
     }, {
@@ -323,12 +323,12 @@ EXPECTED_HISTORY = [{
             2024-05-07,    1000,   5000,      USD, -777.77, 42798031.78,       -777.77,     1076529.55,   EXEMPT,              , Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
             2024-05-08,    1000,       ,      USD, -999.99, 42797031.79,       -999.99,     1075529.56,         ,              , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
             2024-05-24,    1010,       ,      EUR,    20.0, 42797051.79,          20.5,     1075550.06,         ,              , Collective transaction - leg with credit account,
+            2024-05-24,    1005,   1000,      USD,  -100.0, 42797031.79,        -100.0,     1075450.06,         ,              , Collective transaction - leg with debit and credit account,
+            2024-05-24,    1000,       ,      USD,   100.0, 42797151.79,         100.0,     1075550.06,         ,              , Collective transaction with zero amount,
             2024-05-24,    1000,   1005,      USD,   100.0, 42797151.79,         100.0,     1075650.06,         ,              , Collective transaction - leg with debit and credit account,
-            2024-05-24,    1000,       ,      USD,     0.0, 42797151.79,           0.0,     1075650.06,         ,              , Collective transaction with zero amount,
             2024-05-24,    1000,       ,      USD,  -100.0, 42797051.79,        -100.0,     1075550.06,         ,              , Collective transaction with zero amount,
-            2024-05-24,    1000,       ,      USD,   100.0, 42797151.79,         100.0,     1075650.06,         ,              , Collective transaction with zero amount,
-            2024-05-24,    1015,       ,      EUR,   -20.0, 42797131.79,         -20.5,     1075629.56,         ,              , Collective transaction - leg with debit account,
-            2024-05-24,    1005,   1000,      USD,  -100.0, 42797031.79,        -100.0,     1075529.56,         ,              , Collective transaction - leg with debit and credit account,
+            2024-05-24,    1000,       ,      USD,     0.0, 42797151.79,           0.0,     1075550.06,         ,              , Collective transaction with zero amount,
+            2024-05-24,    1015,       ,      EUR,   -20.0, 42797131.79,         -20.5,     1075529.60,         ,              , Collective transaction - leg with debit account,
             2024-05-25,    1010,   5000,      EUR,  -800.0, 42796231.79,       -863.52,     1074666.04,   IN_STD,              , Purchase goods, 2024/payables/2024-05-25.pdf
             """
     }, {
@@ -349,8 +349,8 @@ EXPECTED_HISTORY = [{
             2024-01-01,    1010,       ,      EUR,       120.00,    800120.00,        132.82,      800132.82,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
             2024-01-01,    1020,       ,      JPY,  42000000.00,  42800120.00,     298200.00,     1098332.82,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
             2024-01-24,    1000,   4000,      USD,      1200.00,  42801320.00,       1200.00,     1099532.82,  OUT_STD,        Bakery, Sell cakes, 2024/receivables/2024-01-24.pdf
-            2024-04-12,    1010,       ,      EUR,     20000.00,  42821320.00,      21288.24,     1120821.06,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
-            2024-04-12,    1000,       ,      USD,    -21288.24,  42800031.76,     -21288.24,     1099532.82,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+            2024-04-12,    1000,       ,      USD,    -21288.24,  42780031.76,     -21288.24,     1078244.58,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
+            2024-04-12,    1010,       ,      EUR,     20000.00,  42800031.76,      21288.24,     1099532.82,         ,          Shop, Convert USD to EUR, 2024/transfers/2024-04-12_USD-EUR.pdf
             2024-05-07,    1000,   5000,      USD,      -777.77,  42799253.99,       -777.77,     1098755.05,   EXEMPT,        Bakery, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
             2024-05-08,    1000,       ,      USD,      -999.99,  42798254.00,       -999.99,     1097755.06,         ,        Bakery, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf"""
     }, {
