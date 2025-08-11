@@ -164,111 +164,91 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        return self.accounting_ledger(
+        _, ledger = self.complete_journal(
             journal=self.journal.list(), target_balances=self.target_balance.list(),
             revaluations=self.revaluations.list()
         )
+        return ledger
 
-    def accounting_ledger(
+    def complete_journal(
         self, journal: pd.DataFrame, target_balances: pd.DataFrame, revaluations: pd.DataFrame
-    ) -> pd.DataFrame:
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Compute the full accounting ledger.
+        Generate complete journal with explicit tax, target-balance, revaluation entries.
 
-        Generate a fully processed ledger from sanitized journal entries, target balance
-        definitions, and revaluation instructions. The journal is first converted into
-        ledger entries with taxes applied. Then, revaluation and target balance entries
-        are automatically and recursively generated and inserted in chronological order.
-
-        The final result is a complete, date-ordered ledger with all adjustments applied,
-        suitable for accurate financial reporting.
+        Generate a fully processed journal from sanitized journal entries,
+        target-balance definitions, and revaluation instructions. Tax entries
+        are first generated and applied to the journal. Then, revaluation and
+        target balance entries are automatically and recursively generated and
+        inserted in chronological order.
 
         Args:
             journal (pd.DataFrame): The raw journal entries.
-            target_balance (pd.DataFrame): A DataFrame defining target balance rules,
+            target_balances (pd.DataFrame): A DataFrame defining target balance rules,
                 with TARGET_BALANCE_SCHEMA.
             revaluations (pd.DataFrame): A DataFrame defining revaluation rules,
                 with REVALUATIONS_SCHEMA.
 
         Returns:
-            pd.DataFrame: The completed ledger, fully adjusted and ordered by date.
+            tuple[pd.DataFrame, pd.DataFrame]: A tuple containing:
+                - Complete journal entries with an 'origin' column indicating the
+                source of each entry ('journal', 'tax', 'revaluation', or 'target_balance'),
+                ordered chronologically.
+                - Corresponding ledger DataFrame with all transactions in long format.
         """
-        df = self.journal.standardize(journal)
-        df = self.sanitize_journal(df)
-        df = df.sort_values(["date", "id"])
-
-        # Append tax journal entries
-        df = pd.concat([df, self.tax_entries(df)], ignore_index=True)
-
-        # Convert journal to ledger: Split `account`/`contra` rows into two ledger rows
-        df = self.serialize_ledger(df)
-
-        # Append auto-generated target-balance and revaluation ledger entries
-        automated_entries = self.generate_automated_entries(
-            df, target_balances=target_balances, revaluations=revaluations
-        )
-        if not automated_entries.empty:
-            df = pd.concat([df, automated_entries], ignore_index=True)
-
-        return df
-
-    def generate_automated_entries(
-        self, ledger: pd.DataFrame, target_balances: pd.DataFrame, revaluations: pd.DataFrame
-    ) -> pd.DataFrame:
-        """
-        Generate all automated ledger entries, including target balance adjustments
-        and currency revaluations, applied in strict historical order.
-
-        For each unique date, this method generates:
-        1. Revaluation entries to reflect updated reporting currency values for foreign
-        currency balances.
-        2. Target balance entries to adjust specified accounts to configured target values.
-
-        Revaluation entries are always applied before target balance entries on the same date,
-        as they may influence account balances that require revaluation. The resulting
-        corrections are suitable for appending to the original ledger to achieve a
-        fully adjusted view.
-
-        Args:
-            ledger (pd.DataFrame): The initial ledger with JOURNAL_SCHEMA.
-
-        Returns:
-            pd.DataFrame: A DataFrame of all generated entries, in chronological order.
-        """
+        journal = self.sanitize_journal(self.journal.standardize(journal))
         revaluations = self.sanitize_revaluations(revaluations)
         target_balances = self.sanitize_target_balance(target_balances)
-        dates = pd.Series(
-            list(revaluations["date"]) + list(target_balances["date"])
-        ).dropna().drop_duplicates().sort_values()
-        result = []
 
+        # Add origin column and collect initial entries
+        tax_entries = self.tax_entries(journal)
+
+        # Convert journal to ledger: Split `account`/`contra` into two ledger rows
+        initial_journal = pd.concat([journal, tax_entries], ignore_index=True)
+        ledger = self.serialize_ledger(initial_journal)
+
+        # Collect all journal entries
+        journal["origin"] = "journal"
+        tax_entries["origin"] = "tax"
+        all_entries = [journal, tax_entries]
+
+        # Recursively generate automated journal entries in chronological order
+        dates = pd.concat([revaluations["date"], target_balances["date"]])
+        dates = dates.dropna().drop_duplicates().sort_values()
         for date in dates:
-            combined = pd.concat([ledger] + result)
-
-            # Calculate revaluation entries
-            revaluation_rows = revaluations.query("date == @date")
-            if not revaluation_rows.empty:
-                revaluation_entries = self.revaluation_entries(
-                    ledger=combined, revaluations=revaluation_rows,
+            # Compute revaluations entries first
+            mask = revaluations["date"] == date
+            if mask.any:
+                reval_journal = self.revaluation_entries(
+                    ledger=ledger, revaluations=revaluations[mask]
                 )
-                result.append(revaluation_entries)
+                if not reval_journal.empty:
+                    reval_journal["origin"] = "revaluation"
+                    all_entries.append(reval_journal)
+                    ledger = pd.concat(
+                        [ledger, self.serialize_ledger(reval_journal)],
+                        ignore_index=True
+                    )
 
-            # Calculate target balance entries
-            target_balance_rows = target_balances.query("date == @date")
-            if not target_balance_rows.empty:
-                target_balance_ledger = (
-                    pd.concat([combined, revaluation_entries])
-                    if not revaluation_rows.empty else combined
+            # Calculate target balance entries second
+            mask = target_balances["date"] == date
+            if mask.any:
+                target_journal = self.target_balance_entries(
+                    ledger=ledger, target_balance=target_balances[mask],
                 )
-                target_balance_entries = self.target_balance_entries(
-                    ledger=target_balance_ledger, target_balance=target_balance_rows,
-                )
-                result.append(self.serialize_ledger(target_balance_entries))
+                if not target_journal.empty:
+                    target_journal["origin"] = "target_balance"
+                    all_entries.append(target_journal)
+                    ledger = pd.concat(
+                        [ledger, self.serialize_ledger(target_journal)],
+                        ignore_index=True
+                    )
 
-        return (
-            pd.concat(result, ignore_index=True)
-            if result else pd.DataFrame(columns=ledger.columns)
-        )
+        # Combine all journal entries and sort by date
+        complete_journal = pd.concat(all_entries, ignore_index=True)
+        complete_journal = complete_journal.sort_values("date").reset_index(drop=True)
+        ledger = ledger.sort_values("date").reset_index(drop=True)
+        return complete_journal, ledger
 
     def target_balance_entries(
         self, ledger: pd.DataFrame, target_balance: pd.DataFrame
