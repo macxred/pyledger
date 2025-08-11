@@ -164,15 +164,15 @@ class StandaloneLedger(LedgerEngine):
         Returns:
             pd.DataFrame: Combined DataFrame with ledger data.
         """
-        full_journal = self.complete_journal(
+        _, ledger = self.complete_journal(
             journal=self.journal.list(), target_balances=self.target_balance.list(),
             revaluations=self.revaluations.list()
         )
-        return self.serialize_ledger(full_journal)
+        return ledger
 
     def complete_journal(
         self, journal: pd.DataFrame, target_balances: pd.DataFrame, revaluations: pd.DataFrame
-    ) -> pd.DataFrame:
+    ) -> tuple[pd.DataFrame, pd.DataFrame]:
         """
         Generate complete journal with explicit tax, target-balance, revaluation entries.
 
@@ -190,9 +190,11 @@ class StandaloneLedger(LedgerEngine):
                 with REVALUATIONS_SCHEMA.
 
         Returns:
-            pd.DataFrame: Complete journal entries with an 'origin' column indicating the
+            tuple[pd.DataFrame, pd.DataFrame]: A tuple containing:
+                - Complete journal entries with an 'origin' column indicating the
                 source of each entry ('journal', 'tax', 'revaluation', or 'target_balance'),
                 ordered chronologically.
+                - Corresponding ledger DataFrame with all transactions in long format.
         """
         journal = self.sanitize_journal(self.journal.standardize(journal))
         revaluations = self.sanitize_revaluations(revaluations)
@@ -244,7 +246,9 @@ class StandaloneLedger(LedgerEngine):
 
         # Combine all journal entries and sort by date
         complete_journal = pd.concat(all_entries, ignore_index=True)
-        return complete_journal.sort_values('date').reset_index(drop=True)
+        complete_journal = complete_journal.sort_values('date').reset_index(drop=True)
+        ledger = ledger.sort_values('date').reset_index(drop=True)
+        return complete_journal, ledger
 
     def target_balance_entries(
         self, ledger: pd.DataFrame, target_balance: pd.DataFrame
