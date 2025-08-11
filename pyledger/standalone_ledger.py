@@ -208,8 +208,8 @@ class StandaloneLedger(LedgerEngine):
         ledger = self.serialize_ledger(initial_journal)
 
         # Collect all journal entries
-        journal['origin'] = 'journal'
-        tax_entries['origin'] = 'tax'
+        journal["origin"] = "journal"
+        tax_entries["origin"] = "tax"
         all_entries = [journal, tax_entries]
 
         # Recursively generate automated journal entries in chronological order
@@ -223,7 +223,7 @@ class StandaloneLedger(LedgerEngine):
                     ledger=ledger, revaluations=revaluations[mask]
                 )
                 if not reval_journal.empty:
-                    reval_journal['origin'] = 'revaluation'
+                    reval_journal["origin"] = "revaluation"
                     all_entries.append(reval_journal)
                     ledger = pd.concat(
                         [ledger, self.serialize_ledger(reval_journal)],
@@ -237,7 +237,7 @@ class StandaloneLedger(LedgerEngine):
                     ledger=ledger, target_balance=target_balances[mask],
                 )
                 if not target_journal.empty:
-                    target_journal['origin'] = 'target_balance'
+                    target_journal["origin"] = "target_balance"
                     all_entries.append(target_journal)
                     ledger = pd.concat(
                         [ledger, self.serialize_ledger(target_journal)],
@@ -246,8 +246,8 @@ class StandaloneLedger(LedgerEngine):
 
         # Combine all journal entries and sort by date
         complete_journal = pd.concat(all_entries, ignore_index=True)
-        complete_journal = complete_journal.sort_values('date').reset_index(drop=True)
-        ledger = ledger.sort_values('date').reset_index(drop=True)
+        complete_journal = complete_journal.sort_values("date").reset_index(drop=True)
+        ledger = ledger.sort_values("date").reset_index(drop=True)
         return complete_journal, ledger
 
     def target_balance_entries(
