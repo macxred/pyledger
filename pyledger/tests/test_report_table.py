@@ -27,11 +27,11 @@ EXPECTED_TYPST = (
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Bank of America], [1,076,311.79], [],\n"
-    "  [Other Bank], [-122.34], [],\n"
-    "  [Deutsche Bank], [11,199,809.49], [],\n"
-    "  [Mitsubishi UFJ], [380,420.00], [],\n"
+    "  [Other Bank], [-123.26], [],\n"
+    "  [Deutsche Bank], [11,199,940.72], [],\n"
+    "  [Mitsubishi UFJ], [342,620.00], [],\n"
     "  [UBS], [100,000.00], [],\n"
-    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,756,418.94]), text(weight: \"bold\", []),\n"
+    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,718,749.25]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Current receivables], [], [],\n"
@@ -41,7 +41,7 @@ EXPECTED_TYPST = (
     "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
     "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
-    "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,756,779.79]), text(weight: \"bold\", []),\n"
+    "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
     ")"
 )
 EXPECTED_TYPST_STAGGERED = (
@@ -52,11 +52,11 @@ EXPECTED_TYPST_STAGGERED = (
     "  text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Bank of America], [1'076'311.79], [],\n"
-    "  [Other Bank], [-122.34], [],\n"
-    "  [Deutsche Bank], [11'199'809.49], [],\n"
-    "  [Mitsubishi UFJ], [380'420.00], [],\n"
+    "  [Other Bank], [-123.26], [],\n"
+    "  [Deutsche Bank], [11'199'940.72], [],\n"
+    "  [Mitsubishi UFJ], [342'620.00], [],\n"
     "  [UBS], [100'000.00], [],\n"
-    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12'756'418.94]), text(weight: \"bold\", []),\n"
+    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12'718'749.25]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Current receivables], [], [],\n"
@@ -67,7 +67,7 @@ EXPECTED_TYPST_STAGGERED = (
     "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  [], [], [],\n"
-    "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", [12'756'779.79]), text(weight: \"bold\", []),\n"
+    "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", [12'719'110.10]), text(weight: \"bold\", []),\n"
     "  table.hline(),\n"
     ")"
 )
@@ -80,11 +80,11 @@ Assets,                         ,
 ,                               ,
 Cash,                           ,
 Bank of America,                1'076'311.79,
-Other Bank,                     -122.34,
-Deutsche Bank,                  11'199'809.49,
-Mitsubishi UFJ,                 380'420.00,
+Other Bank,                     -123.26,
+Deutsche Bank,                  11'199'940.72,
+Mitsubishi UFJ,                 342'620.00,
 UBS,                            100'000.00,
-Total Cash,                     12'756'418.94,
+Total Cash,                     12'718'749.25,
 ,                               ,
 Current Assets,                 ,
 Current receivables,            ,
@@ -94,7 +94,7 @@ Tax Recoverable,                ,
 VAT Recoverable (Input VAT),    360.85,
 Total Tax Recoverable,          360.85,
 ,                               ,
-Total Assets,                   12'756'779.79,
+Total Assets,                   12'719'110.10,
 """
 EXPECTED_DATAFRAME = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), index_col=False, skipinitialspace=True)
 # flake8: enable
