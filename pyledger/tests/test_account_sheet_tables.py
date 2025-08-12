@@ -37,7 +37,8 @@ EXPECTED_TYPST = (
     "  [2024-06-30], [JPY], [], [-16,800.00], [42,000,000], [260,400.00], [FX revaluations], [],\n"
     "  [2024-07-04], [JPY], [12,345,678], [76,386.36], [54,345,678], [336,786.36], [Convert JPY to EUR], [#link(\"test/test/2024/transfers/2024-07-05_JPY-EUR.pdf\")[2024/transfers/2024-07-05_JPY-EUR.pdf]],\n"
     "  [2024-09-10], [JPY], [], [5.55], [54,345,678], [336,791.91], [Manual Foreign currency adjustment], [],\n"
-    "  [2024-09-30], [JPY], [], [43,627.84], [54,345,678], [380,419.75], [FX revaluations], [],\n"
+    "  [2024-09-30], [JPY], [], [5,833.64], [54,345,678], [342,625.55], [FX revaluations], [],\n"
+    "  [2024-09-30], [JPY], [], [-5.55], [54,345,678], [342,620.00], [FX revaluations], [],\n"
     ")"
 )
 EXPECTED_DATAFRAME_CSV = """
@@ -47,7 +48,8 @@ date,         currency,   amount,          report_amount,   balance,      report
 2024-06-30,   JPY,        ,                -16'800.00,      42'000'000,   260'400.00,       FX revaluations,
 2024-07-04,   JPY,        12'345'678,      76'386.36,       54'345'678,   336'786.36,       Convert JPY to EUR,                   2024/transfers/2024-07-05_JPY-EUR.pdf
 2024-09-10,   JPY,        ,                5.55,            54'345'678,   336'791.91,       Manual Foreign currency adjustment,
-2024-09-30,   JPY,        ,                43'627.84,       54'345'678,   380'419.75,       FX revaluations,
+2024-09-30,   JPY,        ,                5'833.64,        54'345'678,   342'625.55,       FX revaluations,
+2024-09-30,   JPY,        ,                -5.55,           54'345'678,   342'620.00,       FX revaluations,
 """
 EXPECTED_DATAFRAME = pd.read_csv(StringIO(EXPECTED_DATAFRAME_CSV), index_col=False, skipinitialspace=True)
 # flake8: enable

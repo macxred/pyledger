@@ -323,6 +323,7 @@ class LedgerEngine(ABC):
             pd.DataFrame: The sanitized DataFrame with valid tax code entries.
         """
         df = enforce_schema(df, schema=TAX_CODE_SCHEMA, keep_extra_columns=True)
+        df["is_inclusive"] = df["is_inclusive"].fillna(False)
 
         # Validate rates (must be between 0 and 1)
         invalid_rates = (df["rate"] < 0) | (df["rate"] > 1)
@@ -510,7 +511,7 @@ class LedgerEngine(ABC):
         return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
 
     def account_balances(
-        self, df: pd.DataFrame, reporting_currency_only: bool = False
+        self, df: pd.DataFrame, reporting_currency_only: bool = False, **kwargs
     ) -> pd.DataFrame:
         """Calculate account balances from a DataFrame of flexible query specifications,
         returning a result of the same length with the most efficient method.
@@ -532,6 +533,8 @@ class LedgerEngine(ABC):
                 See `parse_profit_center_range()` for supported formats.
             reporting_currency_only (bool, optional): If True, omits the `balance` column
                 and includes only the `report_balance` column. Defaults to False.
+            **kwargs: Additional keyword arguments passed to `_account_balance`.
+                Useful for customizing behavior in derived classes.
 
         Returns:
             pd.DataFrame: A DataFrame of the same length, enriched with:
@@ -539,8 +542,11 @@ class LedgerEngine(ABC):
                 - 'balance': Dictionary of currency-wise balances
                 (excluded if `reporting_currency_only` is True).
         """
+        # TODO: Define and enforce data frame schema. Replace below if ... block. Issue: #211
+        if "profit_center" not in df:
+            df["profit_center"] = pd.NA
         balances = [
-            self._account_balance(account=acct, period=prd, profit_centers=pc)
+            self._account_balance(account=acct, period=prd, profit_centers=pc, **kwargs)
             for prd, acct, pc in zip(df["period"], df["account"], df["profit_center"])
         ]
         report_balances = [r.pop("reporting_currency", 0.0) for r in balances]
@@ -1501,6 +1507,7 @@ class LedgerEngine(ABC):
         """
         # Enforce schema
         df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=True)
+        df["split_per_profit_center"] = df["split_per_profit_center"].fillna(False)
         id_columns = REVALUATION_SCHEMA.query("id == True")["column"].tolist()
 
         # Validate date: discard rows with invalid dates (NaT)
