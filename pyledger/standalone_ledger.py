@@ -318,7 +318,7 @@ class StandaloneLedger(LedgerEngine):
         return self.journal.standardize(pd.DataFrame(result))
 
     def _revaluation_entries(
-            self, ledger: pd.DataFrame, revaluations: pd.DataFrame
+        self, ledger: pd.DataFrame, revaluations: pd.DataFrame
     ) -> pd.DataFrame:
         """
         Compute journal entries for currency (or other) revaluations.
@@ -345,7 +345,7 @@ class StandaloneLedger(LedgerEngine):
             pd.DataFrame: A DataFrame of journal entries in wide format, suitable for
             conversion to ledger format using `serialize_ledger()`.
         """
-        def choose_revaluation_account(credit, debit, amount, id):
+        def revaluation_account(credit, debit, amount, id):
             if pd.isna(credit) and pd.isna(debit):
                 raise ValueError(f"No account specified in revaluation entry {id}")
             if pd.isna(credit):
@@ -353,15 +353,20 @@ class StandaloneLedger(LedgerEngine):
             if pd.isna(debit):
                 return credit
             return credit if amount >= 0 else debit
+
+        def revaluation_id(d, account, pc):
+            pc_part = "" if pd.isna(pc) else f":{pc}"
+            return f"revaluation:{d.date()}:{account}{pc_part}"
+
         reporting_currency = self.reporting_currency
-        expanded_revaluations = self._expand_revaluations(revaluations).reset_index(drop=True)
-        if expanded_revaluations.empty:
-            return expanded_revaluations
-        balance = self.account_balances(
-            expanded_revaluations.rename(columns={"date": "period"}),
-            ledger=ledger
+        expanded = self._expand_revaluations(revaluations).reset_index(drop=True)
+        if expanded.empty:
+            return expanded
+
+        balances = self.account_balances(
+            expanded.rename(columns={"date": "period"}), ledger=ledger
         )
-        df = pd.concat([expanded_revaluations, balance.reset_index(drop=True)], axis=1)
+        df = pd.concat([expanded, balances.reset_index(drop=True)], axis=1)
         df["fx_rate"] = [
             self.price(currency, date=date, currency=reporting_currency)[1]
             for currency, date in zip(df["currency"], df["date"])
@@ -371,31 +376,32 @@ class StandaloneLedger(LedgerEngine):
         ]
         # TODO: round target to precision?
         df["target"] = df["account_currency_balance"] * df["fx_rate"]
+        round_date = pd.to_datetime(df["date"]).dt.date.max()
         df["amount"] = self.round_to_precision(
-            df["target"] - df["report_balance"],
-            ticker=reporting_currency,
-            # TODO: Find safer way to extract the unique date as datetime.date
-            date=df["date"].unique()[0].date()
+            df["target"] - df["report_balance"], ticker=reporting_currency, date=round_date,
         )
-        df = df.query("amount != 0.0")
 
-        # Build collective transactions with two legs
+        df = df.query("amount != 0.0")
+        if df.empty:
+            return df
+
+        # Leg 1: keep original currency/account; amount=0, report_amount=delta.
         leg1 = df[["date", "currency", "account", "description", "profit_center"]].assign(
-            id=[
-                f"revaluation:{d.date()}:{a}{'' if pd.isna(pc) else f':{pc}'}"
-                for d, a, pc in zip(df["date"], df["account"], df["profit_center"])
-            ],
+            id=[revaluation_id(d, a, pc) for d, a, pc in zip(
+                df["date"], df["account"], df["profit_center"]
+            )],
             amount=0,
-            report_amount=df["amount"]
+            report_amount=df["amount"],
         )
+        # Leg 2: contra in reporting currency; both amount and report_amount are -delta.
+        contra_accounts = [
+            revaluation_account(c, d, a, i) for c, d, a, i in zip(
+                df["credit"], df["debit"], df["amount"], leg1["id"]
+            )
+        ]
         leg2 = leg1.assign(
-            currency=reporting_currency,
-            account=[
-                choose_revaluation_account(credit=c, debit=d, amount=a, id=i)
-                for c, d, a, i in zip(df["credit"], df["debit"], df["amount"], leg1["id"])
-            ],
-            amount=-df["amount"],
-            report_amount=-df["amount"],
+            currency=reporting_currency, account=contra_accounts,
+            amount=-df["amount"], report_amount=-df["amount"],
         )
         result = pd.concat([leg1, leg2], ignore_index=True)
         return self.journal.standardize(result)
@@ -412,8 +418,7 @@ class StandaloneLedger(LedgerEngine):
         # Expand account ranges into individual accounts
         account_ranges = pd.concat(_account_list(rng) for rng in revaluations["account"].unique())
         result = (
-            revaluations
-            .rename(columns={"account": "account_range"})
+            revaluations.rename(columns={"account": "account_range"})
             .merge(account_ranges, on="account_range", how="left")
         )
 
@@ -421,7 +426,7 @@ class StandaloneLedger(LedgerEngine):
         result["currency"] = [self.account_currency(acc) for acc in result["account"]]
         result = result.query("currency != @self.reporting_currency")
 
-        # Expand revaluation entries with `split_per_profit_center=True` for each profit center
+        # Expand entries with split_per_profit_center=True across all profit centers
         mask = result["split_per_profit_center"].fillna(False)
         no_profit_center = result.loc[~mask].assign(profit_center=pd.Series(dtype="string"))
         by_profit_center = result.loc[mask].merge(self.profit_centers.list(), how="cross")
