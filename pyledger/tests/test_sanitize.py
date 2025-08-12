@@ -115,10 +115,10 @@ def test_sanitize_revaluations(engine, capture_logs):
         2023-12-29, 1000:1300,  7050,   8050, Correct revaluation
     """
     EXPECTED_REVALUATIONS_CSV = """
-        date,         account, debit, credit, description
-        2023-12-29, 1000:1300,      ,   8050, Correct revaluation
-        2023-12-29, 1000:1300,  7050,       , Correct revaluation
-        2023-12-29, 1000:1300,  7050,   8050, Correct revaluation
+        date,         account, debit, credit,         description, split_per_profit_center
+        2023-12-29, 1000:1300,      ,   8050, Correct revaluation,                   False
+        2023-12-29, 1000:1300,  7050,       , Correct revaluation,                   False
+        2023-12-29, 1000:1300,  7050,   8050, Correct revaluation,                   False
     """
 
     prices = pd.read_csv(StringIO(PRICES_CSV), skipinitialspace=True)

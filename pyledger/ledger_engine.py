@@ -323,6 +323,7 @@ class LedgerEngine(ABC):
             pd.DataFrame: The sanitized DataFrame with valid tax code entries.
         """
         df = enforce_schema(df, schema=TAX_CODE_SCHEMA, keep_extra_columns=True)
+        df["is_inclusive"] = df["is_inclusive"].fillna(False)
 
         # Validate rates (must be between 0 and 1)
         invalid_rates = (df["rate"] < 0) | (df["rate"] > 1)
@@ -1506,6 +1507,7 @@ class LedgerEngine(ABC):
         """
         # Enforce schema
         df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=True)
+        df["split_per_profit_center"] = df["split_per_profit_center"].fillna(False)
         id_columns = REVALUATION_SCHEMA.query("id == True")["column"].tolist()
 
         # Validate date: discard rows with invalid dates (NaT)

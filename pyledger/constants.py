@@ -12,7 +12,7 @@ REVALUATION_SCHEMA_CSV = """
     credit,                  Int64,            True,         False
     debit,                   Int64,            True,         False
     description,             string[python],   True,         False
-    split_per_profit_center, bool,             False,        False
+    split_per_profit_center, boolean,          False,        False
 """
 REVALUATION_SCHEMA = pd.read_csv(StringIO(REVALUATION_SCHEMA_CSV), skipinitialspace=True)
 
@@ -21,7 +21,7 @@ TAX_CODE_SCHEMA_CSV = """
     id,                 string[python],       True,          True
     account,            Int64,                True,         False
     rate,               Float64,              True,         False
-    is_inclusive,       bool,                 True,         False
+    is_inclusive,       boolean,              True,         False
     description,        string[python],       True,         False
     contra,             Int64,                False,        False
 """
