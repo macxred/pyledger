@@ -140,7 +140,7 @@ RECONCILIATION_SCHEMA_CSV = """
     report_balance,     Float64,              False,           False
     tolerance,          Float64,              False,           False
     document,           string[python],       False,           False
-    source,             string[python],       False,           True
+    file,               string[python],       False,           True
 """
 RECONCILIATION_SCHEMA = pd.read_csv(StringIO(RECONCILIATION_SCHEMA_CSV), skipinitialspace=True)
 
@@ -154,7 +154,7 @@ DEFAULT_ASSETS = enforce_schema(
 
 DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
 
-DEFAULT_FILE_PATH_COLUMN = "__path__"
+DEFAULT_FILE_COLUMN = "__file__"
 
 
 TARGET_BALANCE_SCHEMA_CSV = """

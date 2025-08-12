@@ -7,7 +7,7 @@ from typing import Callable, Dict, Any
 import pandas as pd
 from consistent_df import enforce_schema, df_to_consistent_str, nest, unnest
 
-from pyledger.constants import DEFAULT_FILE_PATH_COLUMN
+from pyledger.constants import DEFAULT_FILE_COLUMN
 from .decorators import timed_cache
 from .helpers import save_files, write_fixed_width_csv
 
@@ -529,7 +529,7 @@ class MultiCSVEntity(CSVAccountingEntity):
     def __init__(
         self,
         write_file: Callable[[pd.DataFrame, Path], None] = None,
-        file_path_column: str = DEFAULT_FILE_PATH_COLUMN,
+        file_path_column: str = DEFAULT_FILE_COLUMN,
         *args,
         **kwargs
     ):

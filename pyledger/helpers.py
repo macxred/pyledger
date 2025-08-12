@@ -7,7 +7,7 @@ from pathlib import Path, PurePosixPath
 import numpy as np
 import pandas as pd
 
-from pyledger.constants import DEFAULT_FILE_PATH_COLUMN
+from pyledger.constants import DEFAULT_FILE_COLUMN
 
 
 def represents_integer(x: Any) -> bool:
@@ -111,7 +111,7 @@ def write_fixed_width_csv(
 def save_files(
     df: pd.DataFrame,
     root: Path | str,
-    file_path_column: str = DEFAULT_FILE_PATH_COLUMN,
+    file_path_column: str = DEFAULT_FILE_COLUMN,
     func=write_fixed_width_csv
 ):
     """Save DataFrame entries to multiple files within a root folder.

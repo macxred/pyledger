@@ -30,7 +30,7 @@ class BaseTestReconciliation(BaseTest):
         # Modify only a single column in a specific row
         reconciliation.loc[0, "tolerance"] = 0.0001
         engine.reconciliation.modify([{
-            "source": reconciliation.loc[0, "source"],
+            "file": reconciliation.loc[0, "file"],
             "period": reconciliation.loc[0, "period"],
             "account": reconciliation.loc[0, "account"],
             "currency": reconciliation.loc[0, "currency"],
@@ -60,7 +60,7 @@ class BaseTestReconciliation(BaseTest):
 
         # Delete a single row
         engine.reconciliation.delete([{
-            "source": reconciliation["source"].iloc[0],
+            "file": reconciliation["file"].iloc[0],
             "period": reconciliation["period"].iloc[0],
             "account": reconciliation["account"].iloc[0],
             "currency": reconciliation["currency"].iloc[0],
@@ -162,12 +162,12 @@ class BaseTestReconciliation(BaseTest):
         for case in self.EXPECTED_RECONCILIATION:
             df = engine.reconcile(
                 df=engine.reconciliation.list(),
-                period=case["period"], source_pattern=case["source_pattern"]
+                period=case["period"], file_pattern=case["file_pattern"]
             )
             expected = pd.read_csv(StringIO(case["reconciliation"]), skipinitialspace=True)
             assert_frame_equal(
                 df, engine.reconciliation.standardize(expected),
-                ignore_columns=["source", "tolerance"],
+                ignore_columns=["file", "tolerance"],
             )
 
     def test_reconcile_summary(self, engine):
@@ -180,7 +180,7 @@ class BaseTestReconciliation(BaseTest):
 
         # flake8: noqa: E501
         RECONCILIATION_CSV = """
-            period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document,                           source,                           actual_balance, actual_report_balance
+            period,         account, currency,          profit_center,       balance,  report_balance, tolerance, document,                           file,                           actual_balance, actual_report_balance
             2023-12-31,   1000:2999,      CHF,                       ,          0.00,            0.00,          , 2023/reconciliation/2023-12-31.pdf, 2023/financial/all.pdf,                   0.00,                    0.00
             2024-01-23,   1000:2999,      EUR,                       ,        120.00,      1098332.82,      0.01, 2024/reconciliation/2024-01-23.pdf, 2024/start/all.pdf,                     120.02,              1098332.82
             2024-09-25,        1000,      USD,                       ,     776311.79,       776311.79,         1,                                   , 2024/financial/data.pdf,             776312.80,               776312.90
