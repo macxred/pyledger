@@ -400,7 +400,7 @@ class StandaloneLedger(LedgerEngine):
         result = pd.concat([leg1, leg2], ignore_index=True)
         return self.journal.standardize(result)
 
-    def _expand_revaluations(self, revaluations):
+    def _expand_revaluations(self, revaluations: pd.DataFrame) -> pd.DataFrame:
         if revaluations.empty:
             return revaluations
 
@@ -409,11 +409,8 @@ class StandaloneLedger(LedgerEngine):
             accounts = sorted(set(parsed["add"]) - set(parsed["subtract"]))
             return pd.DataFrame({"account_range": account_range, "account": accounts})
 
-        # Expand revaluation entries for single accounts
-        account_ranges = pd.concat(
-            [_account_list(rng) for rng in revaluations["account"].unique()],
-            ignore_index=True
-        )
+        # Expand account ranges into individual accounts
+        account_ranges = pd.concat(_account_list(rng) for rng in revaluations["account"].unique())
         result = (
             revaluations
             .rename(columns={"account": "account_range"})
@@ -421,14 +418,13 @@ class StandaloneLedger(LedgerEngine):
         )
 
         # Drop accounts denominated in reporting currency (no revaluation need)
-        result["currency"] = [self.account_currency(account) for account in result["account"]]
+        result["currency"] = [self.account_currency(acc) for acc in result["account"]]
         result = result.query("currency != @self.reporting_currency")
 
         # Expand revaluation entries with `split_per_profit_center=True` for each profit center
         mask = result["split_per_profit_center"].fillna(False)
+        no_profit_center = result.loc[~mask].assign(profit_center=pd.Series(dtype="string"))
         by_profit_center = result.loc[mask].merge(self.profit_centers.list(), how="cross")
-        no_profit_center = result.loc[~mask]
-        no_profit_center["profit_center"] = pd.Series(dtype="string")
         by_profit_center["profit_center"] = by_profit_center["profit_center"].astype("string")
         return pd.concat([no_profit_center, by_profit_center], ignore_index=True)
 
