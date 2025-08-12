@@ -11,6 +11,6 @@ class TestDumpAndRestore(BaseTestStandaloneLedgerDumpRestoreClear):
 
     @pytest.fixture
     def engine(self, tmp_path):
-        self.RECONCILIATION["file_path"] = "default.csv"
-        self.RECONCILIATION["file_path"] = self.RECONCILIATION["file_path"].astype("string[python]")
+        self.RECONCILIATION["file"] = "default.csv"
+        self.RECONCILIATION["file"] = self.RECONCILIATION["file"].astype("string[python]")
         return TextLedger(tmp_path)
