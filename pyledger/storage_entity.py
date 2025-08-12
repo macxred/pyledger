@@ -546,18 +546,18 @@ class MultiCSVEntity(CSVAccountingEntity):
     """
     Stores tabular data in multiple CSV files within a root directory.
 
-    Paths relative to the root directory are stored in a specified `file_path_column`.
+    Paths relative to the root directory are stored in a specified `file_column`.
     """
 
     def __init__(
         self,
         write_file: Callable[[pd.DataFrame, Path], None] = None,
-        file_path_column: str = DEFAULT_FILE_COLUMN,
+        file_column: str = DEFAULT_FILE_COLUMN,
         *args,
         **kwargs
     ):
         super().__init__(*args, **kwargs)
-        self.file_path_column = file_path_column
+        self.file_column = file_column
         self._write_file = write_file
 
     def _read_data(
@@ -570,18 +570,18 @@ class MultiCSVEntity(CSVAccountingEntity):
         Files that cannot be processed are skipped with a warning. The Data
         from all valid files is then combined into a single DataFrame.
 
-        For each row, the relative file path is stored in the configured `file_path_column`.
+        For each row, the relative file path is stored in the configured `file_column`.
 
         If `include_source` is True, an additional column (`self.source_column`) is added with a
         GitHub-style file and line reference (e.g., 'journal/2025.csv:L#42'), where the file path
-        is the same as the value in `file_path_column` (i.e. relative to the root directory).
+        is the same as the value in `file_column` (i.e. relative to the root directory).
 
         Returns:
             pd.DataFrame: DataFrame adhering to the entity's column schema.
         """
         if not self._path.exists():
             df = self.standardize(None)
-            df[self.file_path_column] = pd.Series(dtype=pd.StringDtype())
+            df[self.file_column] = pd.Series(dtype=pd.StringDtype())
             return df
         if not self._path.is_dir():
             raise NotADirectoryError(f"Root folder is not a directory: {self._path}")
@@ -595,7 +595,7 @@ class MultiCSVEntity(CSVAccountingEntity):
                 df = df.rename(columns=self._column_shortcuts)
                 df = self.standardize(df, drop_extra_columns=drop_extra_columns)
                 if not df.empty:
-                    df[self.file_path_column] = relative_path
+                    df[self.file_column] = relative_path
                     if include_source:
                         df[self.source_column] = [
                             f"{relative_path}:L#{i + 2}" for i in range(len(df))
@@ -610,7 +610,7 @@ class MultiCSVEntity(CSVAccountingEntity):
                                     sort_columns=True, keep_extra_columns=not drop_extra_columns)
         else:
             result = self.standardize(None)
-            result[self.file_path_column] = pd.Series(dtype=pd.StringDtype())
+            result[self.file_column] = pd.Series(dtype=pd.StringDtype())
 
         return self.standardize(result, drop_extra_columns=drop_extra_columns)
 
@@ -621,13 +621,13 @@ class MultiCSVEntity(CSVAccountingEntity):
             data (pd.DataFrame): DataFrame containing new entries to add,
                                 compatible with the entity's DataFrame schema.
             default_path (str, optional): The file where data with missing (NA)
-                                        `file_path_column` values will be stored.
+                                        `file_column` values will be stored.
 
         Returns:
             pd.DataFrame: A list containing the unique identifiers of the added data.
         """
         incoming = pd.DataFrame(data)
-        col = self.file_path_column
+        col = self.file_column
         if col in incoming.columns:
             incoming[col] = incoming[col].astype(pd.StringDtype())
             incoming[col] = incoming[col].fillna(default_path)
@@ -647,7 +647,7 @@ class MultiCSVEntity(CSVAccountingEntity):
         return incoming[self._id_columns].to_dict()
 
     def modify(self, data: pd.DataFrame):
-        col = self.file_path_column
+        col = self.file_column
         incoming, replaced, new = self._prepare_modification(data)
         paths_to_update = set(incoming[col]).union(set(replaced[col]))
         for path in paths_to_update:
@@ -658,7 +658,7 @@ class MultiCSVEntity(CSVAccountingEntity):
             self._store(df, full_path)
 
     def delete(self, id: pd.DataFrame, allow_missing: bool = False):
-        col = self.file_path_column
+        col = self.file_column
         drop, new = self._prepare_deletion(id, allow_missing=allow_missing)
         paths_to_update = drop[col].unique()
         for path in paths_to_update:
@@ -709,8 +709,8 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
         """
         df = super()._read_data(drop_extra_columns=False, include_source=include_source)
         if not df.empty:
-            df["id"] = df[self.file_path_column] + ":" + df["id"]
-        df = df.drop(columns=self.file_path_column)
+            df["id"] = df[self.file_column] + ":" + df["id"]
+        df = df.drop(columns=self.file_column)
         return self.standardize(df, drop_extra_columns=drop_extra_columns)
 
     def write_directory(self, df: pd.DataFrame | None = None):
@@ -729,9 +729,9 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
             df = self.list()
 
         df = self.standardize(df).copy()
-        df[self.file_path_column] = self._csv_path(df["id"])
+        df[self.file_column] = self._csv_path(df["id"])
         save_files(
-            df, root=self._path, file_path_column=self.file_path_column, func=self._write_file
+            df, root=self._path, file_column=self.file_column, func=self._write_file
         )
         self.list.cache_clear()
         self._on_change()

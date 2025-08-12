@@ -38,10 +38,10 @@ def test_save_files(tmp_path):
     )
 
 
-def test_save_files_configurable_file_path_column(tmp_path):
+def test_save_files_configurable_file_column(tmp_path):
     new_file_path = "__configurable_path__"
     df = SAMPLE_DF.rename(columns={"__file__": new_file_path})
-    save_files(df, tmp_path, file_path_column=new_file_path)
+    save_files(df, tmp_path, file_column=new_file_path)
     expected = df.query(f"{new_file_path} == 'file1.csv'")
     output = pd.read_csv(tmp_path / "file1.csv", skipinitialspace=True)
     assert_frame_equal(
@@ -61,7 +61,7 @@ def test_save_files_remove_empty_files(tmp_path):
     assert not empty_file2.exists(), "The 'empty_file2.csv' should be removed."
 
 
-def test_save_files_no_file_path_column_raise_error(tmp_path):
+def test_save_files_no_file_column_raise_error(tmp_path):
     with pytest.raises(ValueError, match="The DataFrame must contain a '__file__' column."):
         save_files(pd.DataFrame({}), tmp_path)
 
