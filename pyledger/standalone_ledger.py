@@ -374,9 +374,10 @@ class StandaloneLedger(LedgerEngine):
         df["account_currency_balance"] = [
             balance.get(currency, 0) for balance, currency in zip(df["balance"], df["currency"])
         ]
-        # TODO: round target to precision?
-        df["target"] = df["account_currency_balance"] * df["fx_rate"]
         round_date = pd.to_datetime(df["date"]).dt.date.max()
+        df["target"] = self.round_to_precision(
+            df["account_currency_balance"] * df["fx_rate"], ticker=df["currency"], date=round_date,
+        )
         df["amount"] = self.round_to_precision(
             df["target"] - df["report_balance"], ticker=reporting_currency, date=round_date,
         )
