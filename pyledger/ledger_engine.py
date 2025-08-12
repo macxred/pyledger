@@ -542,7 +542,7 @@ class LedgerEngine(ABC):
                 - 'balance': Dictionary of currency-wise balances
                 (excluded if `reporting_currency_only` is True).
         """
-        # TODO: Define and enforce data frame schema. Replace below if ... block.
+        # TODO: Define and enforce data frame schema. Replace below if ... block. Issue: #211
         if "profit_center" not in df:
             df["profit_center"] = pd.NA
         balances = [
