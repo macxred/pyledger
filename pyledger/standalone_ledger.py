@@ -24,6 +24,20 @@ class StandaloneLedger(LedgerEngine):
     with a specific data storage choice.
     """
 
+    # ----------------------------------------------------------------------
+    # Storage entities
+
+    @property
+    def reconciliation(self) -> AccountingEntity:
+        return self._reconciliation
+
+    @property
+    def target_balance(self) -> AccountingEntity:
+        return self._target_balance
+
+    # ----------------------------------------------------------------------
+    # File Operations
+
     def dump_to_zip(self, archive_path: str):
         """Extend dump_to_zip to include reconciliation and target balance data in the archive."""
         super().dump_to_zip(archive_path)
@@ -56,17 +70,6 @@ class StandaloneLedger(LedgerEngine):
         super().clear()
         self.reconciliation.mirror(None, delete=True)
         self.target_balance.mirror(None, delete=True)
-
-    # ----------------------------------------------------------------------
-    # Storage entities
-
-    @property
-    def reconciliation(self) -> AccountingEntity:
-        return self._reconciliation
-
-    @property
-    def target_balance(self) -> AccountingEntity:
-        return self._target_balance
 
     # ----------------------------------------------------------------------
     # Tax Codes
