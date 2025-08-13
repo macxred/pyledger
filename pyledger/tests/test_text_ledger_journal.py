@@ -102,3 +102,24 @@ class TestLedger(BaseTestJournal):
             engine.journal.list(drop_extra_columns=True), expected_without_extra_cols,
             ignore_columns=["id"]
         )
+
+    def test_journal_list_include_source(self, engine):
+        # Define journal entries with different nesting level
+        file_1 = self.JOURNAL.query("id in ['1', '2']").copy()
+        file_1["id"] = "level1/level2/file1.csv:" + file_1["id"]
+        file_2 = self.JOURNAL.query("id in ['3', '4']").copy()
+        id = file_2["id"].astype(int)
+        file_2["id"] = "file2.csv:" + (id - min(id) + 1).astype(str)
+        expected = pd.concat([file_1, file_2], ignore_index=True)
+        engine.journal.write_directory(expected)
+
+        expected = engine.journal.standardize(expected)
+        source_column = [
+            "level1/level2/file1.csv:L#2", "level1/level2/file1.csv:L#3",
+            "level1/level2/file1.csv:L#4", "level1/level2/file1.csv:L#5",
+            "level1/level2/file1.csv:L#6", "file2.csv:L#2", "file2.csv:L#3", "file2.csv:L#4",
+        ]
+        expected["source"] = pd.Series(source_column, dtype="string[python]")
+        assert_frame_equal(
+            expected, engine.journal.list(include_source=True), ignore_row_order=True
+        )

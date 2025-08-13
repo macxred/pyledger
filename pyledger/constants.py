@@ -13,6 +13,7 @@ REVALUATION_SCHEMA_CSV = """
     debit,                   Int64,            True,         False
     description,             string[python],   True,         False
     split_per_profit_center, boolean,          False,        False
+    source,                  string[python],   False,        False
 """
 REVALUATION_SCHEMA = pd.read_csv(StringIO(REVALUATION_SCHEMA_CSV), skipinitialspace=True)
 
@@ -59,6 +60,7 @@ JOURNAL_SCHEMA_CSV = """
     profit_center,       string[python],       False,        False
     description,         string[python],       True,         False
     document,            string[python],       False,        False
+    source,              string[python],       False,        False
 """
 JOURNAL_SCHEMA = pd.read_csv(StringIO(JOURNAL_SCHEMA_CSV), skipinitialspace=True)
 
@@ -127,6 +129,7 @@ ACCOUNT_HISTORY_SCHEMA_CSV = """
     profit_center,       string[python],       False,        False
     description,         string[python],       False,        False
     document,            string[python],       False,        False
+    source,              string[python],       False,        False
 """
 ACCOUNT_HISTORY_SCHEMA = pd.read_csv(StringIO(ACCOUNT_HISTORY_SCHEMA_CSV), skipinitialspace=True)
 
@@ -155,6 +158,7 @@ DEFAULT_ASSETS = enforce_schema(
 DEFAULT_CONFIGURATION = {"reporting_currency": "USD"}
 
 DEFAULT_FILE_COLUMN = "__file__"
+DEFAULT_SOURCE_COLUMN = "__source__"
 
 
 TARGET_BALANCE_SCHEMA_CSV = """
@@ -171,6 +175,7 @@ TARGET_BALANCE_SCHEMA_CSV = """
     lookup_accounts,       string[python],       False,        False
     lookup_profit_centers, string[python],       False,        False
     balance,               Float64,              True,         True
+    source,                string[python],       False,        False
 """
 TARGET_BALANCE_SCHEMA = pd.read_csv(
     StringIO(TARGET_BALANCE_SCHEMA_CSV), skipinitialspace=True

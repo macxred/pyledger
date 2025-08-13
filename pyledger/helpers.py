@@ -111,43 +111,43 @@ def write_fixed_width_csv(
 def save_files(
     df: pd.DataFrame,
     root: Path | str,
-    file_path_column: str = DEFAULT_FILE_COLUMN,
+    file_column: str = DEFAULT_FILE_COLUMN,
     func=write_fixed_width_csv
 ):
     """Save DataFrame entries to multiple files within a root folder.
 
     Saves a DataFrame to multiple files in the specified `root` folder, with
-    file paths within the root folder determined by a given `file_path_column`.
+    file paths within the root folder determined by a given `file_column`.
     Any existing files in the root directory that are not referenced in the
-    `file_path_column` are deleted.
+    `file_column` are deleted.
 
     Args:
-        df (pd.DataFrame): DataFrame to save, with a `file_path_column`.
+        df (pd.DataFrame): DataFrame to save, with a `file_column`.
         root (Path | str): Root directory where the files will be stored.
-        file_path_column (str): Name of the column containing relative file paths.
+        file_column (str): Name of the column containing relative file paths.
         func (callable): Function to save each DataFrame group to a file.
                          Defaults to `write_fixed_width_csv`.
 
     Raises:
-        ValueError: If the DataFrame does not contain a `file_path_column`.
+        ValueError: If the DataFrame does not contain a `file_column`.
     """
-    if file_path_column not in df.columns:
-        raise ValueError(f"The DataFrame must contain a '{file_path_column}' column.")
+    if file_column not in df.columns:
+        raise ValueError(f"The DataFrame must contain a '{file_column}' column.")
 
     root = Path(root).expanduser()
     root.mkdir(parents=True, exist_ok=True)
 
     # Delete unreferenced files
     current_files = set(root.rglob("*.csv"))
-    referenced_files = set(root / path for path in df[file_path_column].unique())
+    referenced_files = set(root / path for path in df[file_column].unique())
     for file in current_files - referenced_files:
         file.unlink()
 
     # Save DataFrame entries to their respective files
-    for path, group in df.groupby(file_path_column):
+    for path, group in df.groupby(file_column):
         full_path = root / path
         full_path.parent.mkdir(parents=True, exist_ok=True)
-        func(group.drop(columns=file_path_column), full_path)
+        func(group.drop(columns=file_column), full_path)
 
 
 def first_elements_as_str(x: List[Any], n: int = 5) -> str:
