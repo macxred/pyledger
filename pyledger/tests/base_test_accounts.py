@@ -291,14 +291,16 @@ class BaseTestAccounts(BaseTest):
             /Revenue/Sales,          4001,      USD,         , Sales Revenue - EUR
         """
         ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
-
+        accounts = pd.concat(
+            [ACCOUNTS, engine.accounts.list()], ignore_index=True
+        ).drop_duplicates(["account"])
         JOURNAL_CSV = """
         id,       date, account, contra, currency,    amount, report_amount, tax_code, description,
         1, 2024-07-01,    4001,   2200,      USD,       100,              ,         ,    2024 txn,
         """
         JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
         engine.restore(
-            configuration={"REPORTING_CURRENCY": "USD"}, accounts=ACCOUNTS, journal=JOURNAL
+            configuration={"REPORTING_CURRENCY": "USD"}, accounts=accounts, journal=JOURNAL
         )
 
         assert not engine.account_history(2200).empty, (
