@@ -21,7 +21,6 @@ class BaseTestDumpRestoreClear(BaseTest):
             journal=self.JOURNAL,
             assets=self.ASSETS,
             price_history=self.PRICES,
-            revaluations=self.REVALUATIONS,
             profit_centers=self.PROFIT_CENTERS,
         )
         assert engine.reporting_currency == self.CONFIGURATION["REPORTING_CURRENCY"], (
@@ -35,9 +34,6 @@ class BaseTestDumpRestoreClear(BaseTest):
         )
         assert_frame_equal(
             self.PRICES, engine.price_history.list(), ignore_row_order=True, check_like=True
-        )
-        assert_frame_equal(
-            self.REVALUATIONS, engine.revaluations.list(), ignore_row_order=True, check_like=True
         )
         assert_frame_equal(self.ASSETS, engine.assets.list(), ignore_row_order=True)
         assert_frame_equal(self.PROFIT_CENTERS, engine.profit_centers.list(), ignore_row_order=True)
@@ -53,7 +49,6 @@ class BaseTestDumpRestoreClear(BaseTest):
         engine.journal.mirror(self.JOURNAL)
         engine.assets.mirror(self.ASSETS)
         engine.price_history.mirror(self.PRICES)
-        engine.revaluations.mirror(self.REVALUATIONS)
         engine.profit_centers.mirror(self.PROFIT_CENTERS)
 
         # Dumping current state
@@ -62,7 +57,6 @@ class BaseTestDumpRestoreClear(BaseTest):
         journal_entries = engine.journal.list()
         assets = engine.assets.list()
         price_history = engine.price_history.list()
-        revaluations = engine.revaluations.list()
         profit_centers = engine.profit_centers.list()
         engine.dump_to_zip(tmp_path / "ledger.zip")
 
@@ -78,9 +72,6 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert_frame_equal(assets, engine.assets.list(), ignore_row_order=True, ignore_index=True)
         assert_frame_equal(
             price_history, engine.price_history.list(), ignore_row_order=True, ignore_index=True
-        )
-        assert_frame_equal(
-            revaluations, engine.revaluations.list(), ignore_row_order=True, ignore_index=True
         )
         assert_frame_equal(
             tax_codes, engine.tax_codes.list(), ignore_row_order=True, ignore_index=True
@@ -102,7 +93,6 @@ class BaseTestDumpRestoreClear(BaseTest):
             journal=self.JOURNAL,
             assets=self.ASSETS,
             price_history=self.PRICES,
-            revaluations=self.REVALUATIONS,
             profit_centers=self.PROFIT_CENTERS,
         )
         engine.clear()
@@ -111,5 +101,4 @@ class BaseTestDumpRestoreClear(BaseTest):
         assert engine.assets.list().empty, "Assets was not cleared"
         assert engine.accounts.list().empty, "Accounts was not cleared"
         assert engine.price_history.list().empty, "Price history was not cleared"
-        assert engine.revaluations.list().empty, "Revaluations was not cleared"
         assert engine.profit_centers.list().empty, "Profit centers was not cleared"

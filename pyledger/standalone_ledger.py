@@ -11,7 +11,7 @@ from pyledger.helpers import first_elements_as_str
 from pyledger.storage_entity import AccountingEntity
 from pyledger.time import parse_date_span
 from .decorators import timed_cache
-from .constants import JOURNAL_SCHEMA, TARGET_BALANCE_SCHEMA
+from .constants import JOURNAL_SCHEMA, REVALUATION_SCHEMA, TARGET_BALANCE_SCHEMA
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -24,39 +24,6 @@ class StandaloneLedger(LedgerEngine):
     with a specific data storage choice.
     """
 
-    def dump_to_zip(self, archive_path: str):
-        """Extend dump_to_zip to include reconciliation and target balance data in the archive."""
-        super().dump_to_zip(archive_path)
-        with zipfile.ZipFile(archive_path, 'a') as archive:
-            archive.writestr('reconciliation.csv', self.reconciliation.list().to_csv(index=False))
-            archive.writestr('target_balance.csv', self.target_balance.list().to_csv(index=False))
-
-    def restore_from_zip(self, archive_path: str):
-        """Extend restore_from_zip to also restore reconciliation and target balance data."""
-        super().restore_from_zip(archive_path)
-        with zipfile.ZipFile(archive_path, 'r') as archive:
-            if 'reconciliation.csv' in archive.namelist():
-                self.restore(reconciliation=pd.read_csv(archive.open('reconciliation.csv')))
-            if 'target_balance.csv' in archive.namelist():
-                self.restore(target_balance=pd.read_csv(archive.open('target_balance.csv')))
-
-    def restore(
-        self, *args, reconciliation: pd.DataFrame | None = None,
-        target_balance: pd.DataFrame | None = None, **kwargs
-    ):
-        """Extend restore to reconciliation and target balance data after base restoration."""
-        super().restore(*args, **kwargs)
-        if reconciliation is not None:
-            self.reconciliation.mirror(reconciliation, delete=True)
-        if target_balance is not None:
-            self.target_balance.mirror(target_balance, delete=True)
-
-    def clear(self):
-        """Extend clear() to also delete reconciliation and target balance records."""
-        super().clear()
-        self.reconciliation.mirror(None, delete=True)
-        self.target_balance.mirror(None, delete=True)
-
     # ----------------------------------------------------------------------
     # Storage entities
 
@@ -67,6 +34,60 @@ class StandaloneLedger(LedgerEngine):
     @property
     def target_balance(self) -> AccountingEntity:
         return self._target_balance
+
+    @property
+    def revaluations(self) -> AccountingEntity:
+        return self._revaluations
+
+    # ----------------------------------------------------------------------
+    # File Operations
+
+    def dump_to_zip(self, archive_path: str):
+        """Extend dump_to_zip() to include reconciliation,
+        target balance, and revaluations data in the same archive."""
+        super().dump_to_zip(archive_path)
+        with zipfile.ZipFile(archive_path, 'a') as archive:
+            archive.writestr('reconciliation.csv', self.reconciliation.list().to_csv(index=False))
+            archive.writestr('target_balance.csv', self.target_balance.list().to_csv(index=False))
+            archive.writestr('revaluations.csv', self.revaluations.list().to_csv(index=False))
+
+    def restore_from_zip(self, archive_path: str):
+        """Extend restore_from_zip() to restore reconciliation,
+        target balance, and revaluations data after base restoration."""
+        super().restore_from_zip(archive_path)
+        with zipfile.ZipFile(archive_path, 'r') as archive:
+            if 'reconciliation.csv' in archive.namelist():
+                self.restore(reconciliation=pd.read_csv(archive.open('reconciliation.csv')))
+            if 'target_balance.csv' in archive.namelist():
+                self.restore(target_balance=pd.read_csv(archive.open('target_balance.csv')))
+            if 'revaluations.csv' in archive.namelist():
+                self.restore(revaluations=pd.read_csv(archive.open('revaluations.csv')))
+
+    def restore(
+        self, *args,
+        reconciliation: pd.DataFrame | None = None,
+        target_balance: pd.DataFrame | None = None,
+        revaluations: pd.DataFrame | None = None,
+        **kwargs
+    ):
+        """Extend restore() to restore reconciliation,
+        target balance, and revaluations data after base restoration.
+        """
+        super().restore(*args, **kwargs)
+        if reconciliation is not None:
+            self.reconciliation.mirror(reconciliation, delete=True)
+        if target_balance is not None:
+            self.target_balance.mirror(target_balance, delete=True)
+        if revaluations is not None:
+            self.revaluations.mirror(revaluations, delete=True)
+
+    def clear(self):
+        """Extend clear() to delete reconciliation,
+        target balance, and revaluations records after base deletion."""
+        super().clear()
+        self.reconciliation.mirror(None, delete=True)
+        self.target_balance.mirror(None, delete=True)
+        self.revaluations.mirror(None, delete=True)
 
     # ----------------------------------------------------------------------
     # Tax Codes
@@ -644,3 +665,97 @@ class StandaloneLedger(LedgerEngine):
             invalid_ids = invalid_ids.union(new_ids)
 
         return invalid_ids
+
+    # ----------------------------------------------------------------------
+    # Revaluations
+
+    def sanitize_revaluations(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Discard incoherent revaluation data.
+
+        Discard revaluation entries with invalid dates, missing credit/debit fields,
+        invalid accounts, or missing price definitions for required currencies.
+        Removed entries are logged as warnings.
+
+        Args:
+            df (pd.DataFrame): The input DataFrame with revaluation data to validate.
+
+        Returns:
+            pd.DataFrame: The sanitized DataFrame with valid revaluation entries.
+        """
+        # Enforce schema
+        df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=True)
+        df["split_per_profit_center"] = df["split_per_profit_center"].fillna(False)
+        id_columns = REVALUATION_SCHEMA.query("id == True")["column"].tolist()
+
+        # Validate date: discard rows with invalid dates (NaT)
+        invalid_date_mask = df["date"].isna()
+        if invalid_date_mask.any():
+            invalid = df.loc[invalid_date_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {len(invalid)} revaluation rows with invalid dates: "
+                f"{first_elements_as_str(invalid)}"
+            )
+            df = df.loc[~invalid_date_mask]
+
+        # TODO: use sanitized accounts
+        valid_accounts = set(self.accounts.list()["account"])
+
+        # Ensure at least one of credit or debit is specified
+        both_missing_mask = df["credit"].isna() & df["debit"].isna()
+        if both_missing_mask.any():
+            invalid = df.loc[both_missing_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {len(invalid)} revaluations with no credit nor debit specified: "
+                f"{first_elements_as_str(invalid)}"
+            )
+            df = df.loc[~both_missing_mask]
+
+        # Ensure non-missing credit and debit accounts exist in the accounts entity
+        invalid_credit_mask = ~df["credit"].isna() & ~df["credit"].isin(valid_accounts)
+        invalid_debit_mask = ~df["debit"].isna() & ~df["debit"].isin(valid_accounts)
+        invalid_account_mask = invalid_credit_mask | invalid_debit_mask
+        if invalid_account_mask.any():
+            invalid = df.loc[invalid_account_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {len(invalid)} revaluations with non-existent "
+                f"credit or debit accounts: {first_elements_as_str(invalid)}"
+            )
+            df = df.loc[~invalid_account_mask]
+
+        def validate_account_prices(accounts: pd.Series, dates: pd.Series) -> pd.Series:
+            """
+            Validate that for each row's accounts, all required price definitions are available.
+
+            For each row, this checks all associated accounts and uses `price()` to ensure
+            that a conversion rate exists for their currencies. Rows lacking a required
+            price definition are marked invalid.
+            """
+            valid_list = []
+            for acc, d in zip(accounts, dates):
+                accounts_range = self.parse_account_range(acc)
+                accounts_set = set(accounts_range["add"]) - set(accounts_range["subtract"])
+                # Assume this row is valid until a missing price definition is found
+                all_valid = True
+                for a in accounts_set:
+                    acc_curr = self.account_currency(a)
+                    if acc_curr != self.reporting_currency:
+                        try:
+                            self.price(ticker=acc_curr, date=d, currency=self.reporting_currency)
+                        except Exception:
+                            # If a price definition is missing or any error occurs, mark invalid
+                            all_valid = False
+                            break
+                valid_list.append(all_valid)
+            return pd.Series(valid_list, index=accounts.index)
+
+        currency_validation_mask = validate_account_prices(df["account"], df["date"])
+        if not currency_validation_mask.all():
+            invalid = df.loc[~currency_validation_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {len(invalid)} revaluation rows with no price definition "
+                f"for required currencies: {first_elements_as_str(invalid)}"
+            )
+            df = df.loc[currency_validation_mask]
+
+        return df.reset_index(drop=True)

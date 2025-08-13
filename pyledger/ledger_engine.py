@@ -29,7 +29,6 @@ from .constants import (
     PRICE_SCHEMA,
     PROFIT_CENTER_SCHEMA,
     RECONCILIATION_SCHEMA,
-    REVALUATION_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
     AGGREGATED_BALANCE_SCHEMA
@@ -73,10 +72,6 @@ class LedgerEngine(ABC):
     @property
     def journal(self) -> AccountingEntity:
         return self._journal
-
-    @property
-    def revaluations(self) -> AccountingEntity:
-        return self._revaluations
 
     @property
     def tax_codes(self) -> AccountingEntity:
@@ -140,7 +135,6 @@ class LedgerEngine(ABC):
             archive.writestr('assets.csv', self.assets.list().to_csv(index=False))
             archive.writestr('accounts.csv', self.accounts.list().to_csv(index=False))
             archive.writestr('tax_codes.csv', self.tax_codes.list().to_csv(index=False))
-            archive.writestr('revaluations.csv', self.revaluations.list().to_csv(index=False))
             archive.writestr('price_history.csv', self.price_history.list().to_csv(index=False))
             archive.writestr('profit_centers.csv', self.profit_centers.list().to_csv(index=False))
 
@@ -156,7 +150,7 @@ class LedgerEngine(ABC):
         """
         required_files = {
             'journal.csv', 'tax_codes.csv', 'accounts.csv', 'configuration.json', 'assets.csv',
-            'price_history.csv', 'revaluations.csv', 'profit_centers.csv'
+            'price_history.csv', 'profit_centers.csv'
         }
 
         with zipfile.ZipFile(archive_path, 'r') as archive:
@@ -173,7 +167,6 @@ class LedgerEngine(ABC):
             tax_codes = pd.read_csv(archive.open('tax_codes.csv'))
             assets = pd.read_csv(archive.open('assets.csv'))
             price_history = pd.read_csv(archive.open('price_history.csv'))
-            revaluations = pd.read_csv(archive.open('revaluations.csv'))
             profit_centers = pd.read_csv(archive.open('profit_centers.csv'))
             self.restore(
                 configuration=configuration,
@@ -182,7 +175,6 @@ class LedgerEngine(ABC):
                 accounts=accounts,
                 assets=assets,
                 price_history=price_history,
-                revaluations=revaluations,
                 profit_centers=profit_centers
             )
 
@@ -194,7 +186,6 @@ class LedgerEngine(ABC):
         journal: pd.DataFrame | None = None,
         assets: pd.DataFrame | None = None,
         price_history: pd.DataFrame | None = None,
-        revaluations: pd.DataFrame | None = None,
         profit_centers: pd.DataFrame | None = None,
     ):
         """Replaces the entire ledger system with data provided as arguments.
@@ -212,8 +203,6 @@ class LedgerEngine(ABC):
                 If `None`, assets remain unchanged.
             price_history (pd.DataFrame | None): Price history of the restored system.
                 If `None`, price history remains unchanged.
-            revaluations (pd.DataFrame | None): Revaluations of the restored system.
-                If `None`, revaluations remain unchanged.
             profit_centers (pd.DataFrame | None): Profit centers of the restored system.
                 If `None`, profit centers remain unchanged.
         """
@@ -223,8 +212,6 @@ class LedgerEngine(ABC):
             self.assets.mirror(assets, delete=True)
         if price_history is not None:
             self.price_history.mirror(price_history, delete=True)
-        if revaluations is not None:
-            self.revaluations.mirror(revaluations, delete=True)
         if tax_codes is not None:
             self.tax_codes.mirror(tax_codes, delete=True)
         if accounts is not None:
@@ -245,7 +232,6 @@ class LedgerEngine(ABC):
         self.accounts.mirror(None, delete=True)
         self.assets.mirror(None, delete=True)
         self.price_history.mirror(None, delete=True)
-        self.revaluations.mirror(None, delete=True)
         self.profit_centers.mirror(None, delete=True)
 
     # ----------------------------------------------------------------------
@@ -1487,100 +1473,6 @@ class LedgerEngine(ABC):
                 )
 
         return joined["increment"]
-
-    # ----------------------------------------------------------------------
-    # Revaluations
-
-    def sanitize_revaluations(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Discard incoherent revaluation data.
-
-        Discard revaluation entries with invalid dates, missing credit/debit fields,
-        invalid accounts, or missing price definitions for required currencies.
-        Removed entries are logged as warnings.
-
-        Args:
-            df (pd.DataFrame): The input DataFrame with revaluation data to validate.
-
-        Returns:
-            pd.DataFrame: The sanitized DataFrame with valid revaluation entries.
-        """
-        # Enforce schema
-        df = enforce_schema(df, REVALUATION_SCHEMA, keep_extra_columns=True)
-        df["split_per_profit_center"] = df["split_per_profit_center"].fillna(False)
-        id_columns = REVALUATION_SCHEMA.query("id == True")["column"].tolist()
-
-        # Validate date: discard rows with invalid dates (NaT)
-        invalid_date_mask = df["date"].isna()
-        if invalid_date_mask.any():
-            invalid = df.loc[invalid_date_mask, id_columns].to_dict(orient='records')
-            self._logger.warning(
-                f"Discarding {len(invalid)} revaluation rows with invalid dates: "
-                f"{first_elements_as_str(invalid)}"
-            )
-            df = df.loc[~invalid_date_mask]
-
-        # TODO: use sanitized accounts
-        valid_accounts = set(self.accounts.list()["account"])
-
-        # Ensure at least one of credit or debit is specified
-        both_missing_mask = df["credit"].isna() & df["debit"].isna()
-        if both_missing_mask.any():
-            invalid = df.loc[both_missing_mask, id_columns].to_dict(orient='records')
-            self._logger.warning(
-                f"Discarding {len(invalid)} revaluations with no credit nor debit specified: "
-                f"{first_elements_as_str(invalid)}"
-            )
-            df = df.loc[~both_missing_mask]
-
-        # Ensure non-missing credit and debit accounts exist in the accounts entity
-        invalid_credit_mask = ~df["credit"].isna() & ~df["credit"].isin(valid_accounts)
-        invalid_debit_mask = ~df["debit"].isna() & ~df["debit"].isin(valid_accounts)
-        invalid_account_mask = invalid_credit_mask | invalid_debit_mask
-        if invalid_account_mask.any():
-            invalid = df.loc[invalid_account_mask, id_columns].to_dict(orient='records')
-            self._logger.warning(
-                f"Discarding {len(invalid)} revaluations with non-existent "
-                f"credit or debit accounts: {first_elements_as_str(invalid)}"
-            )
-            df = df.loc[~invalid_account_mask]
-
-        def validate_account_prices(accounts: pd.Series, dates: pd.Series) -> pd.Series:
-            """
-            Validate that for each row's accounts, all required price definitions are available.
-
-            For each row, this checks all associated accounts and uses `price()` to ensure
-            that a conversion rate exists for their currencies. Rows lacking a required
-            price definition are marked invalid.
-            """
-            valid_list = []
-            for acc, d in zip(accounts, dates):
-                accounts_range = self.parse_account_range(acc)
-                accounts_set = set(accounts_range["add"]) - set(accounts_range["subtract"])
-                # Assume this row is valid until a missing price definition is found
-                all_valid = True
-                for a in accounts_set:
-                    acc_curr = self.account_currency(a)
-                    if acc_curr != self.reporting_currency:
-                        try:
-                            self.price(ticker=acc_curr, date=d, currency=self.reporting_currency)
-                        except Exception:
-                            # If a price definition is missing or any error occurs, mark invalid
-                            all_valid = False
-                            break
-                valid_list.append(all_valid)
-            return pd.Series(valid_list, index=accounts.index)
-
-        currency_validation_mask = validate_account_prices(df["account"], df["date"])
-        if not currency_validation_mask.all():
-            invalid = df.loc[~currency_validation_mask, id_columns].to_dict(orient='records')
-            self._logger.warning(
-                f"Discarding {len(invalid)} revaluation rows with no price definition "
-                f"for required currencies: {first_elements_as_str(invalid)}"
-            )
-            df = df.loc[currency_validation_mask]
-
-        return df.reset_index(drop=True)
 
     # ----------------------------------------------------------------------
     # Reconciliation
