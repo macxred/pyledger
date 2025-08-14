@@ -321,13 +321,8 @@ class StandaloneLedger(LedgerEngine):
             if delta == 0 and report_delta == 0:
                 continue
 
-            if pd.notna(row["source"]):
-                id = f"target_balance:{row['source']}{idx}"
-            else:
-                id = f"target_balance:{idx}"
-
             base_entry = {
-                "id": id,
+                "id": f"target_balance:{row["date"]}:{idx}",
                 "date": row["date"],
                 "currency": currency,
                 "description": row["description"],
