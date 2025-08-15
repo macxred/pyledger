@@ -91,7 +91,8 @@ def _summarize_groups(df, group, description, summarize, level=1, staggered=Fals
     next_level = df[group].apply(lambda x: x.split('/', 1)[0] if '/' in x else x)
     for part, subdf in df.groupby(next_level, sort=False):
         subdf = subdf.copy()
-        subdf[group] = subdf[group].str.replace(f'^{part}/?', '', regex=True)
+        # Remove current group level and optional slash from the group column
+        subdf[group] = subdf[group].str.removeprefix(part).str.removeprefix("/")
         group_summary = subdf.agg(summarize).to_dict()
 
         # Blank line
