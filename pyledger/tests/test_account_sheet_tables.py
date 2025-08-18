@@ -42,14 +42,14 @@ EXPECTED_TYPST = (
     ")"
 )
 EXPECTED_DATAFRAME_CSV = """
-date,         currency,   amount,          report_amount,   balance,      report_balance,   description,                          document
-2024-01-01,   JPY,        42'000'000,      298'200.00,      42'000'000,   298'200.00,       Opening balance,                      2023/financials/balance_sheet.pdf
-2024-03-31,   JPY,        ,                -21'000.00,      42'000'000,   277'200.00,       FX revaluations,
-2024-06-30,   JPY,        ,                -16'800.00,      42'000'000,   260'400.00,       FX revaluations,
-2024-07-04,   JPY,        12'345'678,      76'386.36,       54'345'678,   336'786.36,       Convert JPY to EUR,                   2024/transfers/2024-07-05_JPY-EUR.pdf
-2024-09-10,   JPY,        ,                5.55,            54'345'678,   336'791.91,       Manual Foreign currency adjustment,
-2024-09-30,   JPY,        ,                5'833.64,        54'345'678,   342'625.55,       FX revaluations,
-2024-09-30,   JPY,        ,                -5.55,           54'345'678,   342'620.00,       FX revaluations,
+date,       profit_center, currency,     amount,   report_amount,      balance,  report_balance,  description,                          document
+2024-01-01,       General,      JPY, 42'000'000,      298'200.00,   42'000'000,      298'200.00,  Opening balance,                      2023/financials/balance_sheet.pdf
+2024-03-31,              ,      JPY,           ,      -21'000.00,   42'000'000,      277'200.00,  FX revaluations,
+2024-06-30,              ,      JPY,           ,      -16'800.00,   42'000'000,      260'400.00,  FX revaluations,
+2024-07-04,       General,      JPY, 12'345'678,       76'386.36,   54'345'678,      336'786.36,  Convert JPY to EUR,                   2024/transfers/2024-07-05_JPY-EUR.pdf
+2024-09-10,    Restaurant,      JPY,           ,            5.55,   54'345'678,      336'791.91,  Manual Foreign currency adjustment,
+2024-09-30,       General,      JPY,           ,        5'833.64,   54'345'678,      342'625.55,  FX revaluations,
+2024-09-30,    Restaurant,      JPY,           ,           -5.55,   54'345'678,      342'620.00,  FX revaluations,
 """
 EXPECTED_DATAFRAME = pd.read_csv(StringIO(EXPECTED_DATAFRAME_CSV), index_col=False, skipinitialspace=True)
 # flake8: enable
@@ -92,7 +92,8 @@ def test_account_balance_dataframe_format(restored_engine):
     )
     EXPECTED = EXPECTED_DATAFRAME.fillna("")
     EXPECTED["document"] = EXPECTED["document"].replace("", pd.NA).fillna(pd.NA)
-    assert_frame_equal(result[1020], EXPECTED, check_dtype=False)
+    EXPECTED["profit_center"] = EXPECTED["profit_center"].replace("", pd.NA).fillna(pd.NA)
+    assert_frame_equal(result[1020], EXPECTED, check_dtype=False, check_like=True)
 
 def test_invalid_columns_raises_value_error(restored_engine):
     bad_cols = COLUMNS.copy()
