@@ -195,17 +195,18 @@ ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA = pd.read_csv(
 
 
 ACCOUNT_SHEET_TABLE_COLUMNS_CSV = """
-    column,          label,            width,   align
-    date,            Date,             auto,    left
-    contra,          Contra,           auto,    right
-    currency,        Currency,         auto,    right
-    amount,          Amount,           1.2fr,   right
-    report_amount,   Report Amount,    1.2fr,   right
-    balance,         Balance,          1.2fr,   right
-    report_balance,  Report Balance,   1.2fr,   right
-    tax_code,        Tax Code,         auto,    left
-    description,     Description,      2fr,     left
-    document,        Document,         2fr,     left
+    column,          label,                     width,   align
+    date,            Date,                      auto,    left
+    contra,          Contra,                    auto,   right
+    profit_center,   Profit Ctr,                auto,    left
+    description,     Description,               1fr,     left
+    currency,        Curr,                      auto,   right
+    tax_code,        Tax,                       auto,    left
+    amount,          Amount,                    auto,   right
+    balance,         Balance,                   auto,   right
+    report_amount,   Rpt Amount,                auto,   right
+    report_balance,  Rpt Balance,               auto,   right
+    document,        Document, auto,    left
 """
 ACCOUNT_SHEET_TABLE_COLUMNS = pd.read_csv(
     StringIO(ACCOUNT_SHEET_TABLE_COLUMNS_CSV), skipinitialspace=True
