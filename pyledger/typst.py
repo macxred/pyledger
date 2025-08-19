@@ -13,6 +13,7 @@ def df_to_typst(
     hline: list[int] = [],
     bold: list[int] = [],
     colnames: bool = True,
+    repeat_colnames: bool = True,
 ) -> str:
     """
     Convert a pandas DataFrame to a Typst-formatted table string.
@@ -35,6 +36,8 @@ def df_to_typst(
         bold (list[int], optional): Row indices to render in bold.
             Indices are 0-based and include the header if `colnames=True`.
         colnames (bool): Whether to include column names as the first row. Defaults to True.
+        repeat_colnames (bool): Whether the header should repeat across pages when `colnames=True`.
+            Defaults to True (matches Typst's `table.header(repeat: true)` default).
 
     Returns:
         str: A Typst-compatible table string.
@@ -65,8 +68,9 @@ def df_to_typst(
         result.append("  table.hline(),")
     # Header
     if colnames:
-        result.extend(_typst_row(
-            df.columns, na_value=na_value, bold=(row_idx in bold), hline=(row_idx in hline)
+        result.extend(_typst_header_row(
+            df.columns, na_value=na_value, bold=(row_idx in bold), hline=(row_idx in hline),
+            repeat=repeat_colnames,
         ))
         row_idx += 1
     # Data rows
@@ -94,6 +98,21 @@ def _typst_row(row: list, na_value: str, bold: bool, hline: bool) -> list[str]:
         row = ["  " + " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)]
     else:
         row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
+    if hline:
+        row.append("  table.hline(),")
+    return row
+
+
+def _typst_header_row(
+    row: list, na_value: str, bold: bool, repeat: bool, hline: bool
+) -> list[str]:
+    """
+    Wrap a header row inside a Typst table.header(...) block.
+    Reuses _typst_row for cell rendering. Optionally adds a horizontal line after the header.
+    """
+    inner = "  " + _typst_row(row, na_value=na_value, bold=bold, hline=False)[0]
+    repeat = "true" if repeat else "false"
+    row = [f"  table.header(repeat: {repeat},", inner, "  ),"]
     if hline:
         row.append("  table.hline(),")
     return row
