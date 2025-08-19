@@ -570,7 +570,7 @@ class LedgerEngine(ABC):
         self,
         account: int | str | dict,
         period: datetime.date = None,
-        profit_centers: str = None,
+        profit_centers: str | list[str] | set[str] = None,
         drop: bool = False
     ) -> pd.DataFrame:
         """
@@ -592,7 +592,7 @@ class LedgerEngine(ABC):
                 transactions. Can be specified as a year ("2024"), month ("2024-01"),
                 quarter ("2024-Q1"), or start-end tuple. Defaults to None.
                 See `parse_date_span` for details.
-            profit_center (str, optional): Profit center filter.
+            profit_center ((str | list[str] | set[str], optional): Profit center filter.
                 See `parse_profit_centers()` for supported formats.
             drop (bool, optional): If True, drops redundant information:
                 - Columns containing only NA values
