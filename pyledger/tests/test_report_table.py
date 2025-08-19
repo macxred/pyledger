@@ -19,7 +19,7 @@ COLUMNS = pd.read_csv(StringIO(COLUMNS_CSV), skipinitialspace=True, dtype="strin
 EXPECTED_TYPST = (
     "table(\n"
     "  stroke: none,\n"
-    "  columns: (auto, 1fr, 1fr),\n"
+    "  columns: (1fr, auto, auto),\n"
     "  align: (left, right, right),\n"
     "  text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
     "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
@@ -47,7 +47,7 @@ EXPECTED_TYPST = (
 EXPECTED_TYPST_STAGGERED = (
     "table(\n"
     "  stroke: none,\n"
-    "  columns: (auto, 1fr, 1fr),\n"
+    "  columns: (1fr, auto, auto),\n"
     "  align: (left, right, right),\n"
     "  text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"

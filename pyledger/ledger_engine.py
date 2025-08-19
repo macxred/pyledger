@@ -1896,7 +1896,7 @@ class LedgerEngine(ABC):
                 df=report,
                 hline=hline,
                 bold=bold,
-                columns=["auto"] + ["1fr"] * len(labels),
+                columns=["1fr"] + ["auto"] * len(labels),
                 align=["left"] + ["right"] * len(labels),
                 colnames=True
             )
