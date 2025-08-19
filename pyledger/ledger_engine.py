@@ -570,7 +570,7 @@ class LedgerEngine(ABC):
         self,
         account: int | str | dict,
         period: datetime.date = None,
-        profit_centers: list[str] | str = None,
+        profit_centers: str | list[str] | set[str] = None,
         drop: bool = False
     ) -> pd.DataFrame:
         """
@@ -592,8 +592,8 @@ class LedgerEngine(ABC):
                 transactions. Can be specified as a year ("2024"), month ("2024-01"),
                 quarter ("2024-Q1"), or start-end tuple. Defaults to None.
                 See `parse_date_span` for details.
-            profit_centers (list[str] | str, optional): Filter results by these
-                profit center(s). Defaults to None.
+            profit_center ((str | list[str] | set[str], optional): Profit center filter.
+                See `parse_profit_centers()` for supported formats.
             drop (bool, optional): If True, drops redundant information:
                 - Columns containing only NA values
                 - The "account" column if a single account is queried
@@ -609,6 +609,8 @@ class LedgerEngine(ABC):
         start, end = parse_date_span(period)
         accounts = self.parse_account_range(account)
         accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
+        if profit_centers is not None:
+            profit_centers = self.parse_profit_centers(profit_centers)
         df = self._fetch_account_history(
             accounts, start=start, end=end, profit_centers=profit_centers
         )
