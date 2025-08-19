@@ -21,7 +21,9 @@ EXPECTED_TYPST = (
     "  stroke: none,\n"
     "  columns: (auto, 1fr, 1fr),\n"
     "  align: (left, right, right),\n"
-    "  text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+    "  table.header(repeat: true,\n"
+    "    text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+    "  ),\n"
     "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  table.hline(),\n"
     "  [], [], [],\n"
@@ -44,12 +46,15 @@ EXPECTED_TYPST = (
     "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
     ")"
 )
+
 EXPECTED_TYPST_STAGGERED = (
     "table(\n"
     "  stroke: none,\n"
     "  columns: (auto, 1fr, 1fr),\n"
     "  align: (left, right, right),\n"
-    "  text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+    "  table.header(repeat: true,\n"
+    "    text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+    "  ),\n"
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Bank of America], [1'076'311.79], [],\n"
     "  [Other Bank], [-123.26], [],\n"
