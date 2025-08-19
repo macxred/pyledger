@@ -260,10 +260,9 @@ class BaseTestAccounts(BaseTest):
 
         # Test cases with profit centers
         for case in filter(lambda c: c["profit_centers"] is not None, self.EXPECTED_HISTORY):
-            profit_centers = [pc.strip() for pc in case["profit_centers"].split(",")]
             df = restored_engine.account_history(
                 account=case["account"], period=case["period"],
-                profit_centers=profit_centers, drop=case["drop"]
+                profit_centers=case["profit_centers"], drop=case["drop"]
             )
             expected_df = format_expected_df(case["account_history"], drop=case["drop"])
             assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])

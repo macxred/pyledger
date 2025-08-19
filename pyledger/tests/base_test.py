@@ -344,7 +344,7 @@ EXPECTED_HISTORY = [{
             2024-12-01,   3000,      USD, 10000000.00, 10799300.00,       General, Capital Increase,
             2024-12-05,       ,      USD,  -200000.00, 10599300.00,       General, Convert USD to EUR and CHF,"""
     }, {
-        "period": "2024-05-30", "account": "1000:1020", "profit_centers": "General, Shop, Bakery", "drop": True, "account_history":
+        "period": "2024-05-30", "account": "1000:1020", "profit_centers": "General+Shop+Bakery", "drop": True, "account_history":
             """
                   date, account, contra, currency,       amount,      balance, report_amount, report_balance, tax_code, profit_center, description, document
             2024-01-01,    1000,       ,      USD,    800000.00,    800000.00,     800000.00,      800000.00,         ,       General, Opening balance, 2023/financials/balance_sheet.pdf
@@ -356,7 +356,7 @@ EXPECTED_HISTORY = [{
             2024-05-07,    1000,   5000,      USD,      -777.77,  42799253.99,       -777.77,     1098755.05,   EXEMPT,        Bakery, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
             2024-05-08,    1000,       ,      USD,      -999.99,  42798254.00,       -999.99,     1097755.06,         ,        Bakery, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf"""
     }, {
-        "period": "2024-05", "account": "1000:1020", "profit_centers": "Cafe, Bakery", "drop": False, "account_history":
+        "period": "2024-05", "account": "1000:1020", "profit_centers": "Cafe+Bakery", "drop": False, "account_history":
             """
                 date, account, contra, currency,  amount,     balance, report_amount, report_balance, tax_code, profit_center, description, document
             2024-05-05,    1000,   5000,      USD, -555.55,    644.45,       -555.55,         644.45,   IN_STD,          Cafe, Purchase with tax, 2024/payables/2024-05-05.pdf
