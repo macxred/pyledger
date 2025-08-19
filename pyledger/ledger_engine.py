@@ -451,10 +451,19 @@ class LedgerEngine(ABC):
 
     @timed_cache(120)
     def account_currency(self, account: int) -> str:
+        """Return a given account's currency."""
         accounts = self.accounts.list()
         if not int(account) in accounts["account"].values:
             raise ValueError(f"Account {account} is not defined.")
-        return accounts.loc[accounts["account"] == account, "currency"].values[0]
+        return accounts.loc[accounts["account"] == account, "currency"].item()
+
+    @timed_cache(120)
+    def account_description(self, account: int) -> str:
+        """Return the text describing a given account."""
+        accounts = self.accounts.list()
+        if not int(account) in accounts["account"].values:
+            raise ValueError(f"Account {account} is not defined.")
+        return accounts.loc[accounts["account"] == account, "description"].item()
 
     def individual_account_balances(
         self,
@@ -1676,13 +1685,6 @@ class LedgerEngine(ABC):
         Returns:
             list[str]: Formatted error messages for each mismatch that exceeds tolerance.
         """
-        def account_description(account):
-            """Return the text describing a given account."""
-            acc_df = self.accounts.list().query("account == @account")
-            if len(acc_df) != 1:
-                raise ValueError(f"Account {account} not found.")
-            return acc_df["description"].item()
-
         messages = []
 
         if not df.empty:
@@ -1696,7 +1698,7 @@ class LedgerEngine(ABC):
                 (df["delta"].abs() > df["tolerance"] + df["precision"] / 2) & df["balance"].notna()
             for row in df.loc[failed_delta].to_dict("records"):
                 if str(row["account"]).isdigit():
-                    desc = account_description(int(row["account"]))
+                    desc = self.account_description(int(row["account"]))
                     msg = f"Account {row['account']} '{desc}'"
                 else:
                     msg = f"Account {row['account']}"
@@ -1714,7 +1716,7 @@ class LedgerEngine(ABC):
             )
             for row in df.loc[failed_report_delta].to_dict("records"):
                 if str(row["account"]).isdigit():
-                    desc = account_description(int(row["account"]))
+                    desc = self.account_description(int(row["account"]))
                     msg = f"Account {row['account']} '{desc}'"
                 else:
                     msg = f"Account {row['account']}"
