@@ -13,7 +13,9 @@ def test_empty_dataframe():
         "table(\n"
         "  stroke: none,\n"
         "  columns: 0,\n"
-        "  \n"
+        "  table.header(repeat: true,\n"
+        "    \n"
+        "  ),\n"
         ")"
     )
     assert result.strip() == expected.strip()
@@ -26,7 +28,9 @@ def test_dataframe_with_only_headers():
         table(
           stroke: none,
           columns: 3,
-          [A], [B], [C],
+          table.header(repeat: true,
+            [A], [B], [C],
+          ),
         )""")
     assert result.strip() == expected.strip()
 
@@ -38,7 +42,9 @@ def test_na_value_handling():
         table(
           stroke: none,
           columns: 2,
-          [A], [B],
+          table.header(repeat: true,
+            [A], [B],
+          ),
           [1.0], [NA],
           [NA], [2.0],
         )""")
@@ -53,7 +59,9 @@ def test_column_alignments_and_widths():
           stroke: none,
           columns: (1fr, 2fr),
           align: (left, right),
-          [A], [B],
+          table.header(repeat: true,
+            [A], [B],
+          ),
           [1], [2],
         )""")
     assert result.strip() == expected.strip()
@@ -66,7 +74,9 @@ def test_bold_rows():
         table(
           stroke: none,
           columns: 2,
-          text(weight: "bold", [A]), text(weight: "bold", [B]),
+          table.header(repeat: true,
+            text(weight: "bold", [A]), text(weight: "bold", [B]),
+          ),
           [1], [3],
           text(weight: "bold", [2]), text(weight: "bold", [4]),
         )""")
@@ -80,24 +90,13 @@ def test_hline_rows():
         table(
           stroke: none,
           columns: 2,
-          [A], [B],
+          table.header(repeat: true,
+            [A], [B],
+          ),
           table.hline(),
           [1], [3],
           table.hline(),
           [2], [4],
-        )""")
-    assert result.strip() == expected.strip()
-
-
-def test_without_colnames():
-    df = pd.DataFrame({"X": [10, 20], "Y": [30, 40]})
-    result = df_to_typst(df, colnames=False)
-    expected = textwrap.dedent("""\
-        table(
-          stroke: none,
-          columns: 2,
-          [10], [30],
-          [20], [40],
         )""")
     assert result.strip() == expected.strip()
 
@@ -115,7 +114,9 @@ def test_various_data_types():
         table(
           stroke: none,
           columns: 5,
-          [Int], [Float], [Bool], [Str], [Date],
+          table.header(repeat: true,
+            [Int], [Float], [Bool], [Str], [Date],
+          ),
           [1], [2.5], [True], [text], [{df['Date'][0]}],
         )""")
     assert result.strip() == expected.strip()
@@ -128,11 +129,28 @@ def test_bold_and_hline_interaction():
         table(
           stroke: none,
           columns: 2,
-          text(weight: "bold", [A]), text(weight: "bold", [B]),
+          table.header(repeat: true,
+            text(weight: "bold", [A]), text(weight: "bold", [B]),
+          ),
           table.hline(),
           [1], [3],
           text(weight: "bold", [2]), text(weight: "bold", [4]),
           table.hline(),
+        )""")
+    assert result.strip() == expected.strip()
+
+
+def test_repeat_colnames_false():
+    df = pd.DataFrame({"A": [1], "B": [2]})
+    result = df_to_typst(df, repeat_colnames=False)
+    expected = textwrap.dedent("""\
+        table(
+          stroke: none,
+          columns: 2,
+          table.header(repeat: false,
+            [A], [B],
+          ),
+          [1], [2],
         )""")
     assert result.strip() == expected.strip()
 
