@@ -103,14 +103,12 @@ def _typst_row(row: list, na_value: str, bold: bool, hline: bool) -> list[str]:
     return row
 
 
-def _typst_header_row(
-    row: list, na_value: str, bold: bool, repeat: bool, hline: bool
-) -> list[str]:
+def _typst_header_row(row: list, repeat: bool, hline: bool, **kwargs) -> list[str]:
     """
     Wrap a header row inside a Typst table.header(...) block.
     Reuses _typst_row for cell rendering. Optionally adds a horizontal line after the header.
     """
-    inner = "  " + _typst_row(row, na_value=na_value, bold=bold, hline=False)[0]
+    inner = "  " + _typst_row(row, hline=False, **kwargs)[0]
     repeat = "true" if repeat else "false"
     row = [f"  table.header(repeat: {repeat},", inner, "  ),"]
     if hline:
