@@ -327,6 +327,7 @@ class StandaloneLedger(LedgerEngine):
                 "currency": currency,
                 "description": row["description"],
                 "document": row["document"],
+                "profit_center": row["profit_center"],
             }
             result.append({
                 **base_entry,
