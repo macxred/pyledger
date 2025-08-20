@@ -36,8 +36,8 @@ def df_to_typst(
         bold (list[int], optional): Row indices to render in bold.
             Indices are 0-based and include the header if `colnames=True`.
         colnames (bool): Whether to include column names as the first row. Defaults to True.
-        repeat_colnames (bool): Whether the header should repeat across pages when `colnames=True`.
-            Defaults to True (matches Typst's `table.header(repeat: true)` default).
+        repeat_colnames (bool): Whether the header repeats on each page if the table spans multiple
+            pages. Defaults to True, matching Typst's `table.header(repeat: true)` default.
 
     Returns:
         str: A Typst-compatible table string.
