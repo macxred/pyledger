@@ -112,21 +112,23 @@ def save_files(
     df: pd.DataFrame,
     root: Path | str,
     file_column: str = DEFAULT_FILE_COLUMN,
-    func=write_fixed_width_csv
+    func=write_fixed_width_csv,
+    keep_unreferenced: bool = False,
 ):
     """Save DataFrame entries to multiple files within a root folder.
 
     Saves a DataFrame to multiple files in the specified `root` folder, with
     file paths within the root folder determined by a given `file_column`.
-    Any existing files in the root directory that are not referenced in the
-    `file_column` are deleted.
+    By default, files in `root` that are not referenced in `file_column`
+    are deleted unless `keep_unreferenced` is True.
 
     Args:
         df (pd.DataFrame): DataFrame to save, with a `file_column`.
         root (Path | str): Root directory where the files will be stored.
         file_column (str): Name of the column containing relative file paths.
         func (callable): Function to save each DataFrame group to a file.
-                         Defaults to `write_fixed_width_csv`.
+        keep_unreferenced (bool): Keep files in `root` not referenced in `file_column`.
+            Defaults to False (delete them).
 
     Raises:
         ValueError: If the DataFrame does not contain a `file_column`.
@@ -137,11 +139,12 @@ def save_files(
     root = Path(root).expanduser()
     root.mkdir(parents=True, exist_ok=True)
 
-    # Delete unreferenced files
-    current_files = set(root.rglob("*.csv"))
-    referenced_files = set(root / path for path in df[file_column].unique())
-    for file in current_files - referenced_files:
-        file.unlink()
+    # Delete unreferenced files (unless keeping them)
+    if not keep_unreferenced:
+        current_files = set(root.rglob("*.csv"))
+        referenced_files = set(root / path for path in df[file_column].unique())
+        for file in current_files - referenced_files:
+            file.unlink()
 
     # Save DataFrame entries to their respective files
     for path, group in df.groupby(file_column):

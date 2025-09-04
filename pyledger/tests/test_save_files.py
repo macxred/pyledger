@@ -49,7 +49,7 @@ def test_save_files_configurable_file_column(tmp_path):
     )
 
 
-def test_save_files_remove_empty_files(tmp_path):
+def test_save_files_delete_unreferenced_files_by_default(tmp_path):
     (tmp_path / "empty_folder").mkdir(parents=True, exist_ok=True)
     empty_file1 = tmp_path / "empty_file1.csv"
     empty_file2 = tmp_path / "empty_folder/empty_file2.csv"
@@ -59,6 +59,19 @@ def test_save_files_remove_empty_files(tmp_path):
     save_files(SAMPLE_DF.query("__file__ == 'file1.csv'"), tmp_path)
     assert not empty_file1.exists(), "The 'empty_file1.csv' should be removed."
     assert not empty_file2.exists(), "The 'empty_file2.csv' should be removed."
+
+
+def test_save_files_keep_unreferenced_files(tmp_path):
+    (tmp_path / "nested").mkdir(parents=True, exist_ok=True)
+    orphan1 = tmp_path / "orphan1.csv"
+    orphan2 = tmp_path / "nested/orphan2.csv"
+    orphan1.touch()
+    orphan2.touch()
+
+    save_files(SAMPLE_DF.query("__file__ == 'file1.csv'"), tmp_path, keep_unreferenced=True)
+    assert (tmp_path / "file1.csv").exists(), "Referenced file should be created."
+    assert orphan1.exists(), "The 'orphan1.csv' should be kept."
+    assert orphan2.exists(), "The 'orphan2.csv' should be kept."
 
 
 def test_save_files_no_file_column_raise_error(tmp_path):
