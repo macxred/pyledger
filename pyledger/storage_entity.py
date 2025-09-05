@@ -713,7 +713,7 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
         df = df.drop(columns=self.file_column)
         return self.standardize(df, drop_extra_columns=drop_extra_columns)
 
-    def write_directory(self, df: pd.DataFrame | None = None):
+    def write_directory(self, df: pd.DataFrame | None = None, keep_unreferenced: bool = False):
         """Save journal entries to multiple CSV files in the journal directory.
 
         Saves journal entries to several fixed-width CSV files, formatted by
@@ -724,6 +724,8 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
         Args:
             df (pd.DataFrame, optional): The journal DataFrame to save.
                 If not provided, defaults to the current journal data.
+            keep_unreferenced (bool): Keep files in the journal directory that are
+                not referenced by this save. Defaults to False (delete them).
         """
         if df is None:
             df = self.list()
@@ -731,7 +733,11 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
         df = self.standardize(df).copy()
         df[self.file_column] = self._csv_path(df["id"])
         save_files(
-            df, root=self._path, file_column=self.file_column, func=self._write_file
+            df,
+            root=self._path,
+            file_column=self.file_column,
+            func=self._write_file,
+            keep_unreferenced=keep_unreferenced,
         )
         self.list.cache_clear()
         self._on_change()
