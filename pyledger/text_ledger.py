@@ -193,9 +193,12 @@ class TextLedger(StandaloneLedger):
         df = enforce_schema(df, JOURNAL_SCHEMA, sort_columns=True, keep_extra_columns=True)
 
         if not df.empty:
+            # Aggregate transactions in contiguous rows: sort by ID in the order they appear.
+            df["id"] = pd.Categorical(df["id"], categories=df["id"].unique(), ordered=True)
+            df = df.sort_values("id")
             # Record date only on the first row of collective transactions
-            df = df.iloc[self.journal._id_from_path(df["id"]).argsort(kind="mergesort")]
-            df["date"] = df["date"].where(~df.duplicated(subset="id"), None)
+            df.loc[df["id"].duplicated(), "date"] = None
+            # Format amounts to the maximum number of decimal places allowed by the currency.
             increment = self.precision_vectorized(df["currency"], df["date"]).min()
             df["amount"] = self.format_with_precision(df["amount"], increment)
             df["report_amount"] = self.format_with_precision(
