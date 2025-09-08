@@ -195,7 +195,7 @@ class TextLedger(StandaloneLedger):
         if not df.empty:
             # Aggregate transactions in contiguous rows: sort by ID in the order they appear.
             df["id"] = pd.Categorical(df["id"], categories=df["id"].unique(), ordered=True)
-            df = df.sort_values("id")
+            df = df.sort_values("id", kind="mergesort")
             # Record date only on the first row of collective transactions
             df.loc[df["id"].duplicated(), "date"] = None
             # Format amounts to the maximum number of decimal places allowed by the currency.
