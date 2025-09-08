@@ -677,11 +677,13 @@ class CSVJournalEntity(JournalEntity, MultiCSVEntity):
     entries are modified. See `_read_data` for details.
     """
 
-    def _csv_path(self, id: pd.Series) -> pd.Series:
+    @staticmethod
+    def _csv_path(id: pd.Series) -> pd.Series:
         """Extract storage path from journal id."""
         return id.str.replace(":[^:]+$", "", regex=True)
 
-    def _id_from_path(self, id: pd.Series) -> pd.Series:
+    @staticmethod
+    def _id_from_path(id: pd.Series) -> pd.Series:
         """Extract numeric portion of journal id."""
         return id.str.replace("^.*:", "", regex=True).astype(int)
 
