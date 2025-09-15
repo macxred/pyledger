@@ -378,8 +378,8 @@ class LedgerEngine(ABC):
     def sanitize_accounts(self, df: pd.DataFrame, tax_codes: pd.DataFrame = None) -> pd.DataFrame:
         """Discard incoherent account data.
 
-        Discard accounts with invalid currencies, and set invalid tax code references
-        to NA. Removed or modified entries are logged as warnings.
+        Discard accounts with invalid currencies, drop duplicate accounts, and set invalid
+        tax code references to NA. Removed or modified entries are logged as warnings.
 
         If no tax_codes DataFrame is provided, it will be fetched via the `tax_codes.list()` method,
         as the validity of accounts may depend on referenced tax codes.
@@ -392,6 +392,14 @@ class LedgerEngine(ABC):
             pd.DataFrame: The sanitized DataFrame with valid account entries.
         """
         df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=True)
+
+        duplicate_mask = df.duplicated(subset=["account"])
+        if duplicate_mask.any():
+            invalid = df.loc[duplicate_mask, "account"].tolist()
+            self._logger.warning(
+                f"Discarding {len(invalid)} duplicate accounts: {first_elements_as_str(invalid)}."
+            )
+            df = df.loc[~duplicate_mask]
 
         dates = pl.Series(name="date", values=[None] * len(df))
         precision = self.precision_vectorized(

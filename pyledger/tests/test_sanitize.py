@@ -187,6 +187,7 @@ def test_sanitize_accounts(engine, capture_logs):
     ACCOUNT_CSV = """
         group,         account, currency, tax_code, description
         Assets,           1000,      USD,   EXEMPT, VALID_CURR
+        Assets,           1000,      USD,   EXEMPT, DUPLICATE
         Assets,           2001,      XXX,   EXEMPT, INVALID_CURR
         Liabilities,      2002,      USD,         , NO_TAX_CODE
         Revenue,          3000,      USD,  MISSING, INVALID_TAX_CODE
