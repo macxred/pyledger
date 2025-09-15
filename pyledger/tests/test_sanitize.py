@@ -187,6 +187,7 @@ def test_sanitize_accounts(engine, capture_logs):
     ACCOUNT_CSV = """
         group,         account, currency, tax_code, description
         Assets,           1000,      USD,   EXEMPT, VALID_CURR
+        Assets,           1000,      USD,   EXEMPT, DUPLICATE
         Assets,           2001,      XXX,   EXEMPT, INVALID_CURR
         Liabilities,      2002,      USD,         , NO_TAX_CODE
         Revenue,          3000,      USD,  MISSING, INVALID_TAX_CODE
@@ -207,12 +208,18 @@ def test_sanitize_accounts(engine, capture_logs):
     sanitized = engine.sanitize_accounts(standardized_accounts, tax_codes=tax_codes)
     assert_frame_equal(engine.accounts.standardize(expected), sanitized)
     log_messages = capture_logs.getvalue().strip().split("\n")
-    assert len(log_messages) > 0
+    assert len(log_messages) == 3, "Expected strict number of captured logs"
+
+    # Clear captured logs
+    capture_logs.seek(0)
+    capture_logs.truncate(0)
 
     # Test sanitize process with populated system tax codes
     engine.restore(tax_codes=tax_codes)
     sanitized = engine.sanitize_accounts(standardized_accounts)
     assert_frame_equal(engine.accounts.standardize(expected), sanitized)
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) == 4, "Expected strict number of captured logs"
 
 
 def test_sanitized_accounts_tax_codes(engine, capture_logs):
