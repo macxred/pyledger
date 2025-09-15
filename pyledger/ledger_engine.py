@@ -393,11 +393,12 @@ class LedgerEngine(ABC):
         """
         df = enforce_schema(df, ACCOUNT_SCHEMA, keep_extra_columns=True)
 
-        duplicate_mask = df.duplicated(subset=["account"])
+        duplicate_mask = df["account"].duplicated(keep="first")
         if duplicate_mask.any():
-            invalid = df.loc[duplicate_mask, "account"].tolist()
+            duplicated_accounts = df.loc[duplicate_mask, "account"].unique()
             self._logger.warning(
-                f"Discarding {len(invalid)} duplicate accounts: {first_elements_as_str(invalid)}."
+                f"Discarding {len(duplicated_accounts)} duplicate accounts: "
+                f"{first_elements_as_str(duplicated_accounts)}."
             )
             df = df.loc[~duplicate_mask]
 
