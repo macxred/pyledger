@@ -495,8 +495,10 @@ class LedgerEngine(ABC):
                            from ledger entries assigned to the specified profit centers.
 
         Returns:
-            pd.DataFrame: A data frame with ACCOUNT_BALANCE_SCHEMA, providing account and
-                reporting currency balances as separate rows for each account.
+            pd.DataFrame: A DataFrame with `ACCOUNT_BALANCE_SCHEMA`, providing one row per
+            account. The `balance` column is a dict[str, float] mapping currencies to amounts
+            (e.g., {"USD": 120.0, "CHF": -50.0}), while `report_balance` holds the numeric
+            value in the reporting currency.
         """
         # Gather account list
         df = self.accounts.list()[["group", "description", "account", "currency"]]
@@ -510,8 +512,6 @@ class LedgerEngine(ABC):
         df.reset_index(drop=True, inplace=True)
         balances = self.account_balances(df)
         df[["balance", "report_balance"]] = balances[["balance", "report_balance"]]
-        df["balance"] = df.apply(lambda row: row["balance"].get(row["currency"], 0.0), axis=1)
-
         return enforce_schema(df, ACCOUNT_BALANCE_SCHEMA).sort_values("account")
 
     def account_balances(

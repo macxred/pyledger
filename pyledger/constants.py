@@ -98,10 +98,12 @@ ACCOUNT_BALANCE_SCHEMA_CSV = """
     currency,           string[python],       True,         False
     description,        string[python],       True,         False
     group,              string[python],       True,         False
-    balance,            Float64,              True,         False
+    balance,            object,               True,         False  # dict[str, float]
     report_balance,     Float64,              True,         False
 """
-ACCOUNT_BALANCE_SCHEMA = pd.read_csv(StringIO(ACCOUNT_BALANCE_SCHEMA_CSV), skipinitialspace=True)
+ACCOUNT_BALANCE_SCHEMA = pd.read_csv(
+    StringIO(ACCOUNT_BALANCE_SCHEMA_CSV), skipinitialspace=True, comment="#"
+)
 
 
 AGGREGATED_BALANCE_SCHEMA_CSV = """
