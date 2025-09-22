@@ -1920,8 +1920,11 @@ class LedgerEngine(ABC):
             accounts=accounts["account"].tolist(),
             period=row["period"],
             profit_centers=row.get("profit_centers")
-        ).drop(columns=["group", "description", "currency"], errors="ignore")
-
+        )
+        balances["balance"] = [
+            bal.get(cur, 0.0) for bal, cur in zip(balances["balance"], balances["currency"])
+        ]
+        balances = balances.drop(columns=["group", "description", "currency"], errors="ignore")
         balances = balances.merge(
             accounts[["account", "group", "description", "currency", "account_multiplier"]],
             on="account", how="right"
