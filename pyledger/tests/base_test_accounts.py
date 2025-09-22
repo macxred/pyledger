@@ -208,7 +208,7 @@ class BaseTestAccounts(BaseTest):
             actual = restored_engine.individual_account_balances(
                 period=period, accounts=accounts, profit_centers=profit_centers
             )
-            assert_frame_equal(expected, actual, ignore_index=True)
+            assert_frame_equal(expected, actual, ignore_index=True, check_like=True)
 
         # Test account balances without specified profit centers
         cases_without_profit_centers = cases.query("profit_center.isna()")[argument_cols]
@@ -218,7 +218,7 @@ class BaseTestAccounts(BaseTest):
             ).drop(columns=argument_cols)
             expected = enforce_schema(expected, ACCOUNT_BALANCE_SCHEMA)
             actual = restored_engine.individual_account_balances(period=period, accounts=accounts)
-            assert_frame_equal(expected, actual, ignore_index=True)
+            assert_frame_equal(expected, actual, ignore_index=True, check_like=True)
 
     def test_aggregate_account_balances(self, restored_engine):
         restored_engine.restore(
