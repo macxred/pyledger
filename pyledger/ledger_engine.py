@@ -1817,7 +1817,7 @@ class LedgerEngine(ABC):
 
     def report_table(
         self, columns, accounts, staggered=False, prune_level=2, format="typst",
-        format_number: Callable[[float], str] = None
+        format_number: Callable[[float], str] = None, drop_empty=False,
     ):
         """
         Create a multi-period financial report from account balances.
@@ -1855,6 +1855,8 @@ class LedgerEngine(ABC):
             format_number (Callable[[float], str], optional): Function to format numeric values.
                 If None, a default format with number of decimal places corresponding to the
                 reporting currency's precision is applied.
+            drop_empty : bool, default False
+                If True, removes empty rows where all value columns are zero or missing.
 
         Returns:
             str or pd.DataFrame:
@@ -1876,6 +1878,13 @@ class LedgerEngine(ABC):
         # Remove duplicate "group"/"description" columns, keeping the first instance
         drop_columns = sheet.columns.duplicated() & sheet.columns.isin(['group', 'description'])
         sheet = sheet.loc[:, ~drop_columns]
+
+        if drop_empty:
+            # Keep only rows with at least one nonzero/non-NA value
+            value_cols = [c for c in sheet.columns if c not in ["group", "description"]]
+            mask = (sheet[value_cols].notna() & (sheet[value_cols] != 0)).any(axis=1)
+            sheet = sheet.loc[mask].reset_index(drop=True)
+
         report = summarize_groups(
             df=sheet,
             summarize={label: "sum" for label in labels},
