@@ -110,10 +110,11 @@ AGGREGATED_BALANCE_SCHEMA_CSV = """
     column,             dtype,                mandatory,       id
     group,              string[python],       True,          True
     description,        string[python],       True,          True
+    balance,            object,               True,         False  # dict[str, float]
     report_balance,     Float64,              True,         False
 """
 AGGREGATED_BALANCE_SCHEMA = pd.read_csv(
-    StringIO(AGGREGATED_BALANCE_SCHEMA_CSV), skipinitialspace=True
+    StringIO(AGGREGATED_BALANCE_SCHEMA_CSV), skipinitialspace=True, comment="#"
 )
 
 ACCOUNT_HISTORY_SCHEMA_CSV = """

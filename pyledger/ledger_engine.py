@@ -567,9 +567,8 @@ class LedgerEngine(ABC):
 
         Prunes the group path to a specified depth and updates the description
         with the next segment in the path when available, otherwise falling
-        back to the original account description. Finally, sums the
-        report_balance of all within unique combinations of account group
-        and description.
+        back to the original account description. Then sums `report_balance` and aggregates
+        the dict-based `balance` values key by key within each unique (group, description) pair.
 
         Parameters:
             df (pd.DataFrame): A DataFrame in LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA.
@@ -581,8 +580,21 @@ class LedgerEngine(ABC):
         """
         groups = [prune_path(g, d, n=n) for g, d in zip(df["group"], df["description"])]
         df[["group", "description"]] = pd.DataFrame(groups, index=df.index)
-        grouped = df.groupby(["group", "description"], dropna=False, sort=False)["report_balance"]
-        return enforce_schema(grouped.sum().reset_index(), AGGREGATED_BALANCE_SCHEMA)
+
+        def _sum_balance_dicts(balances: pd.Series) -> dict:
+            balances = balances.dropna()
+            return {
+                currency: sum(balance_dict.get(currency, 0) or 0 for balance_dict in balances)
+                for balance_dict in balances
+                for currency in balance_dict.keys()
+            }
+
+        grouped = (
+            df.groupby(["group", "description"], dropna=False, sort=False)
+            .agg(report_balance=("report_balance", "sum"), balance=("balance", _sum_balance_dicts))
+            .reset_index()
+        )
+        return enforce_schema(grouped, AGGREGATED_BALANCE_SCHEMA)
 
     def account_history(
         self,
