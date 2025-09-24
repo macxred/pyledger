@@ -223,53 +223,53 @@ EXPECTED_BALANCES_CSV = """
 EXPECTED_BALANCES = pd.read_csv(StringIO(EXPECTED_BALANCES_CSV), skipinitialspace=True)
 
 EXPECTED_INDIVIDUAL_BALANCES_CSV = """
-        period,  accounts,            profit_center,  group,                          description,                 account, currency,     balance, report_balance
-    2023-12-31, 1000:1015,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-    2024-01-01, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,     120.00, 132.82
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 42000000.00, 298200.00
-              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,        0.00, 0.00
-    2024-01-01,      1000,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
-       2024-Q4, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11255605.63
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,        0.00, 0.00
-              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
-          2024, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,  1076311.79, 1076311.79
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,     -100.00, -100.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10026687.10, 11199940.72
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,     -20.00, -23.26
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 54345678.00, 342620.0
-              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
-       2024-12, 1000:1025,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   300000.00, 300000.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR, 10076638.88, 11255605.63
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,        0.00, 0.00
-              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF, 14285714.29, 100000.00
-    2023-12-31, 1000:1015,                "General", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-    2024-01-01, 1000:1050,                "General", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   800000.00, 800000.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,     120.00, 132.82
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 42000000.00, 298200.00
-              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,        0.00, 0.00
-    2024-01-24,      1000,  "General, Shop, Bakery", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   801200.00, 801200.00
-    2024-03-31, 1000:1050,  "General, Shop, Bakery", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,   801200.00, 801200.00
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,     120.00, 132.82
-              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,        0.00, 0.00
-              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY, 42000000.00, 298200.00
-              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,        0.00, 0.00
+        period,  accounts,            profit_center,  group,                          description,                 account, currency, report_balance,  balance
+    2023-12-31, 1000:1015,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,           0.00,  "{}"
+    2024-01-01, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,      800000.00,  "{USD: 800000.00}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,         132.82,   "{EUR: 120.0}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,      298200.00,  "{JPY: 42000000.0}"
+              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,           0.00,  "{}"
+    2024-01-01,      1000,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,      800000.00,  "{USD: 800000.00}"
+       2024-Q4, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,      300000.00,  "{USD: 300000.0}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,    11255605.63,  "{EUR: 10076638.88}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,      100000.00,  "{CHF: 14285714.29}"
+          2024, 1000:1050,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,     1076311.79,  "{USD: 1076311.79}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,        -100.00,  "{USD: -100.0}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,    11199940.72,  "{EUR: 10026687.1}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,         -23.26,  "{EUR: -20.0}"
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,       342620.0,  "{JPY: 54345678.0}"
+              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,      100000.00,  "{CHF: 14285714.29}"
+       2024-12, 1000:1025,                         , Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,      300000.00,  "{USD: 300000.0}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,    11255605.63,  "{EUR: 10076638.88}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,      100000.00,  "{CHF: 14285714.29}"
+    2023-12-31, 1000:1015,                "General", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,           0.00,  "{}"
+    2024-01-01, 1000:1050,                "General", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,      800000.00,  "{USD: 800000.00}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,         132.82,  "{EUR: 120.0}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,      298200.00,  "{JPY: 42000000.0}"
+              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,           0.00,  "{}"
+    2024-01-24,      1000,  "General, Shop, Bakery", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,      801200.00,  "{USD: 801200.0}"
+    2024-03-31, 1000:1050,  "General, Shop, Bakery", Assets/Cash/Bank of America,     Cash in Bank USD,               1000,      USD,      801200.00,  "{USD: 801200.0}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank USD,         1005,      USD,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Deutsche Bank,       Cash in Bank EUR,               1010,      EUR,         132.82,  "{EUR: 120.0}"
+              ,          ,                         , Assets/Cash/Other Bank,          Cash in other Bank EUR,         1015,      EUR,           0.00,  "{}"
+              ,          ,                         , Assets/Cash/Mitsubishi UFJ,      Cash in Bank JPY,               1020,      JPY,      298200.00,  "{JPY: 42000000.0}"
+              ,          ,                         , Assets/Cash/UBS,                 Cash in Bank CHF,               1025,      CHF,           0.00,  "{}"
 """
 EXPECTED_INDIVIDUAL_BALANCES = pd.read_csv(StringIO(EXPECTED_INDIVIDUAL_BALANCES_CSV), skipinitialspace=True)
 
@@ -487,6 +487,7 @@ class BaseTest(ABC):
     EXPECTED_BALANCES["profit_center"] = EXPECTED_BALANCES["profit_center"].apply(parse_profit_center)
     EXPECTED_BALANCES["balance"] = parse_balance_series(EXPECTED_BALANCES["balance"])
     EXPECTED_INDIVIDUAL_BALANCES = EXPECTED_INDIVIDUAL_BALANCES
+    EXPECTED_INDIVIDUAL_BALANCES["balance"] = parse_balance_series(EXPECTED_INDIVIDUAL_BALANCES["balance"])
     EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES
     EXPECTED_HISTORY = EXPECTED_HISTORY
     EXPECTED_RECONCILIATION = EXPECTED_RECONCILIATION
