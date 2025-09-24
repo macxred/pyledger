@@ -1942,9 +1942,6 @@ class LedgerEngine(ABC):
             period=row["period"],
             profit_centers=row.get("profit_centers")
         )
-        balances["balance"] = [
-            bal.get(cur, 0.0) for bal, cur in zip(balances["balance"], balances["currency"])
-        ]
         balances = balances.drop(columns=["group", "description", "currency"], errors="ignore")
         balances = balances.merge(
             accounts[["account", "group", "description", "currency", "account_multiplier"]],
@@ -1952,9 +1949,7 @@ class LedgerEngine(ABC):
         )
 
         # Apply account multiplier
-        balances["balance"] *= balances["account_multiplier"]
         balances["report_balance"] *= balances["account_multiplier"]
-
         aggregated = self.aggregate_account_balances(balances, n=prune_level)
 
         # Hack: aggregate_account_balances always adds a leading slash, remove it manually
