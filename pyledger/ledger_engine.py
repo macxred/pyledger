@@ -1904,9 +1904,10 @@ class LedgerEngine(ABC):
             mask = (sheet[value_cols].notna() & (sheet[value_cols] != 0)).any(axis=1)
             sheet = sheet.loc[mask].reset_index(drop=True)
 
+        all_labels = [col for col in sheet.columns if any(col.startswith(label) for label in labels)]
         report = summarize_groups(
             df=sheet,
-            summarize={label: "sum" for label in labels},
+            summarize={label: "sum" for label in all_labels},
             group="group",
             description="description",
             leading_space=1,
@@ -1920,12 +1921,19 @@ class LedgerEngine(ABC):
             def format_number(x):
                 return f"{x:,.{decimal_places}f}"
 
-        for label in labels:
+        for label in all_labels:
             report[label] = report[label].map(
                 lambda x: "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
             )
 
-        bold = [0] + (report.index[report["level"].str.match(r"^[HS][0-9]$")] + 1).tolist()
+        report = self.insert_currency_subrows(report, labels, all_labels)
+
+        bold = [0] + (
+            report.index[
+                report["level"].str.fullmatch(r"[HS][0-9]") & (report["level"] != "sub")
+            ] + 1
+        ).tolist()
+
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
         report = report[["description"] + labels]
         report.columns = [""] + labels
@@ -1945,6 +1953,87 @@ class LedgerEngine(ABC):
 
         return report
 
+    @staticmethod
+    def insert_currency_subrows(df: pd.DataFrame, labels: list[str], all_labels: list[str]) -> pd.DataFrame:
+        """
+        For each year in `years`, take columns named YEAR__* and create sub-rows:
+        - 'level' becomes 'sub'
+        - value is moved into YEAR column
+        - other columns are copied
+        Sub-rows are inserted immediately after their parent row, in the order of the YEAR__* columns.
+        """
+        df = df.copy()
+
+        def nonempty(v) -> bool:
+            return pd.notna(v) and str(v).strip() != ""
+
+        # For each year, keep column order: [year, year__USD, year__EUR, ...]
+        per_year_cols = {
+            y: [c for c in all_labels if (c == y) or c.startswith(f"{y}__")]
+            for y in labels
+        }
+
+        out_rows = []
+        base_years = [y for y in labels if y in df.columns]
+
+        for _, row in df.iterrows():
+            # Build per-year lists of display strings: [base, "USD: ..", "EUR: ..", ...]
+            per_year_lists = {}
+            max_len = 0
+            for y in base_years:
+                lst = []
+                cols = per_year_cols.get(y, [])
+                for c in cols:
+                    val = row.get(c, pd.NA)
+                    if not nonempty(val):
+                        lst.append(None)  # placeholder; we'll filter empty rows later
+                        continue
+                    if c == y:
+                        lst.append(str(val))  # base value as-is (preserve formatting)
+                    else:
+                        lst.append(f"{c.split('__', 1)[1]}: {val}")
+                # trim trailing Nones
+                while lst and lst[-1] is None:
+                    lst.pop()
+                per_year_lists[y] = lst
+                max_len = max(max_len, len(lst))
+
+            if max_len == 0:
+                # No values in any year → keep original row untouched
+                out_rows.append(row.to_dict())
+                continue
+
+            # Emit aligned rows
+            for k in range(max_len):
+                new_row = {col: pd.NA for col in df.columns}
+                if k == 0:
+                    new_row["level"] = row.get("level", pd.NA)
+                    new_row["group"] = row.get("group", pd.NA)
+                    new_row["description"] = row.get("description", pd.NA)
+                else:
+                    new_row["level"] = "sub"
+                    # group/description remain NA
+
+                # Fill each year's cell at position k, if present
+                any_val = False
+                for y in base_years:
+                    lst = per_year_lists.get(y, [])
+                    if k < len(lst) and lst[k] is not None:
+                        new_row[y] = lst[k]
+                        any_val = True
+
+                # Skip rows that have no values across all years
+                if any_val:
+                    out_rows.append(new_row)
+
+        out = pd.DataFrame(out_rows, columns=df.columns)
+
+        # Drop all YEAR__CUR columns
+        drop_cols = [c for c in all_labels if "__" in c]
+        out = out.drop(columns=drop_cols, errors="ignore")
+
+        return out
+
     def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
         """Helper to compute balances for a single reporting column."""
         balances = self.individual_account_balances(
@@ -1960,14 +2049,30 @@ class LedgerEngine(ABC):
 
         # Apply account multiplier
         balances["report_balance"] *= balances["account_multiplier"]
+        balances["balance"] = [
+            {k: v * m for k, v in b.items()}
+            for b, m in zip(balances["balance"], balances["account_multiplier"])
+        ]
         aggregated = self.aggregate_account_balances(balances, n=prune_level)
 
         # Hack: aggregate_account_balances always adds a leading slash, remove it manually
         aggregated["group"] = aggregated["group"].str.removeprefix("/")
+        aggregated = aggregated.rename(columns={"report_balance": row["label"]})
 
-        return aggregated[["group", "description", "report_balance"]].rename(
-            columns={"report_balance": row["label"]}
-        )
+        def expand_balance_dicts(series: pd.Series, prefix: str) -> pd.DataFrame:
+            wide = series.apply(pd.Series)
+            if wide.empty:
+                return wide
+            wide = wide.fillna(0.0)
+            wide.columns = [f"{prefix}{c}" for c in wide.columns]
+            return wide
+
+        wide = expand_balance_dicts(aggregated["balance"], prefix=f"{row["label"]}__")
+        if not wide.empty:
+            aggregated = pd.concat([aggregated.drop(columns=["balance"]), wide], axis=1)
+
+        currency_cols = [c for c in aggregated.columns if c.startswith(f"{row["label"]}__")]
+        return aggregated[["group", "description", row["label"]] + currency_cols]
 
     def account_sheet_tables(
         self,
