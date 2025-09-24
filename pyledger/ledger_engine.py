@@ -2034,8 +2034,10 @@ class LedgerEngine(ABC):
 
         return out
 
-    def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
-        """Helper to compute balances for a single reporting column."""
+    def _report_column(
+        self, row, accounts, prune_level=2, currency_balances: bool = False
+    ) -> pd.DataFrame:
+        """Helper to compute balances for a single reporting column config."""
         balances = self.individual_account_balances(
             accounts=accounts["account"].tolist(),
             period=row["period"],
@@ -2057,22 +2059,16 @@ class LedgerEngine(ABC):
 
         # Hack: aggregate_account_balances always adds a leading slash, remove it manually
         aggregated["group"] = aggregated["group"].str.removeprefix("/")
-        aggregated = aggregated.rename(columns={"report_balance": row["label"]})
 
-        def expand_balance_dicts(series: pd.Series, prefix: str) -> pd.DataFrame:
-            wide = series.apply(pd.Series)
-            if wide.empty:
-                return wide
-            wide = wide.fillna(0.0)
-            wide.columns = [f"{prefix}{c}" for c in wide.columns]
-            return wide
-
-        wide = expand_balance_dicts(aggregated["balance"], prefix=f"{row["label"]}__")
-        if not wide.empty:
-            aggregated = pd.concat([aggregated.drop(columns=["balance"]), wide], axis=1)
-
-        currency_cols = [c for c in aggregated.columns if c.startswith(f"{row["label"]}__")]
-        return aggregated[["group", "description", row["label"]] + currency_cols]
+        report_col = f"{row["label"]}__reporting_currency"
+        prefix = f"{row["label"]}__"
+        df = aggregated.rename(columns={"report_balance": report_col})
+        if "balance" in df.columns and currency_balances:
+            wide = pd.DataFrame.from_records(df["balance"]).fillna(0.0)
+            if not wide.empty:
+                df = pd.concat([df.drop(columns=["balance"]), wide.add_prefix(prefix)], axis=1)
+        cols = ["group", "description"] + [c for c in df.columns if c.startswith(prefix)]
+        return df.loc[:, cols]
 
     def account_sheet_tables(
         self,
