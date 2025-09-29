@@ -76,6 +76,32 @@ EXPECTED_TYPST_STAGGERED = (
     "  table.hline(),\n"
     ")\n"
 )
+EXPECTED_TYPST_DROPPED = (
+    "table(\n"
+    "  stroke: none,\n"
+    "  columns: (1fr, auto, auto),\n"
+    "  align: (left, right, right),\n"
+    "  table.header(repeat: true,\n"
+    "    text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+    "  ),\n"
+    "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  table.hline(),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [Bank of America], [1,076,311.79], [],\n"
+    "  [Other Bank], [-123.26], [],\n"
+    "  [Deutsche Bank], [11,199,940.72], [],\n"
+    "  [Mitsubishi UFJ], [342,620.00], [],\n"
+    "  [UBS], [100,000.00], [],\n"
+    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,718,749.25]), text(weight: \"bold\", []),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
+    "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
+    ")\n"
+)
 # flake8: enable
 
 
@@ -102,6 +128,28 @@ Total Tax Recoverable,          360.85,
 Total Assets,                   12'719'110.10,
 """
 EXPECTED_DATAFRAME = pd.read_csv(StringIO(EXPECTED_BALANCE_CSV), index_col=False, skipinitialspace=True)
+
+EXPECTED_BALANCE_DROPPED_CSV = """
+label,                               2024,              2025
+Assets,                         ,
+,                               ,
+Cash,                           ,
+Bank of America,                1'076'311.79,
+Other Bank,                     -123.26,
+Deutsche Bank,                  11'199'940.72,
+Mitsubishi UFJ,                 342'620.00,
+UBS,                            100'000.00,
+Total Cash,                     12'718'749.25,
+,                               ,
+Tax Recoverable,                ,
+VAT Recoverable (Input VAT),    360.85,
+Total Tax Recoverable,          360.85,
+,                               ,
+Total Assets,                   12'719'110.10,
+"""
+EXPECTED_DATAFRAME_DROPPED = pd.read_csv(
+    StringIO(EXPECTED_BALANCE_DROPPED_CSV), index_col=False, skipinitialspace=True
+).fillna("")
 # flake8: enable
 
 
@@ -155,6 +203,17 @@ def test_account_balance_typst_format_staggered(restored_engine, balance_account
     assert balance_table == EXPECTED_TYPST_STAGGERED, "Typst output does not match"
 
 
+def test_account_balance_typst_drop_empty(restored_engine, balance_accounts):
+    balance_table = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        format="typst",
+        drop_empty=True,
+    )
+    assert balance_table == EXPECTED_TYPST_DROPPED
+
+
 def test_account_balance_dataframe_format(restored_engine, balance_accounts):
     balance_table = restored_engine.report_table(
         columns=COLUMNS,
@@ -166,6 +225,18 @@ def test_account_balance_dataframe_format(restored_engine, balance_accounts):
     EXPECTED_DATAFRAME.columns = balance_table.columns
     assert_frame_equal(balance_table, EXPECTED_DATAFRAME.fillna(""), check_dtype=False)
 
+
+def test_account_balance_dataframe_drop_empty_exact(restored_engine, balance_accounts):
+    balance_table = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        format="dataframe",
+        drop_empty=True,
+        format_number=lambda x: f"{x:,.2f}".replace(",", "'"),
+    )
+    EXPECTED_DATAFRAME_DROPPED.columns = balance_table.columns
+    assert_frame_equal(balance_table, EXPECTED_DATAFRAME_DROPPED, check_dtype=False)
 
 def test_duplicate_labels_raises(restored_engine, balance_accounts):
     config_with_duplicates = pd.DataFrame({
