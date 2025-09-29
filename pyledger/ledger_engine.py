@@ -583,10 +583,12 @@ class LedgerEngine(ABC):
 
         def _sum_balance_dicts(balances: pd.Series) -> dict:
             balances = balances.dropna()
+            unique_currencies = {
+                currency for balance_dict in balances for currency in balance_dict
+            }
             return {
-                currency: sum(balance_dict.get(currency, 0) or 0 for balance_dict in balances)
-                for balance_dict in balances
-                for currency in balance_dict.keys()
+                currency: sum(balance_dict.get(currency, 0) for balance_dict in balances)
+                for currency in unique_currencies
             }
 
         grouped = (
