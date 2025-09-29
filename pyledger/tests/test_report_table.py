@@ -44,7 +44,7 @@ EXPECTED_TYPST = (
     "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
-    ")"
+    ")\n"
 )
 
 EXPECTED_TYPST_STAGGERED = (
@@ -74,7 +74,7 @@ EXPECTED_TYPST_STAGGERED = (
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", [12'719'110.10]), text(weight: \"bold\", []),\n"
     "  table.hline(),\n"
-    ")"
+    ")\n"
 )
 # flake8: enable
 
