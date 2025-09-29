@@ -80,7 +80,7 @@ def df_to_typst(
         ))
         row_idx += 1
     result.append(")")
-    return "\n".join(result)
+    return "\n".join(result) + "\n"
 
 
 def _typst_attribute(x: list) -> str:
