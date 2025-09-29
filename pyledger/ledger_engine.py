@@ -567,9 +567,8 @@ class LedgerEngine(ABC):
 
         Prunes the group path to a specified depth and updates the description
         with the next segment in the path when available, otherwise falling
-        back to the original account description. Finally, sums the
-        report_balance of all within unique combinations of account group
-        and description.
+        back to the original account description. Then sums `report_balance` and aggregates
+        the dict-based `balance` values key by key within each unique (group, description) pair.
 
         Parameters:
             df (pd.DataFrame): A DataFrame in LEDGER_ENGINE.ACCOUNT_BALANCE_SCHEMA.
@@ -581,8 +580,23 @@ class LedgerEngine(ABC):
         """
         groups = [prune_path(g, d, n=n) for g, d in zip(df["group"], df["description"])]
         df[["group", "description"]] = pd.DataFrame(groups, index=df.index)
-        grouped = df.groupby(["group", "description"], dropna=False, sort=False)["report_balance"]
-        return enforce_schema(grouped.sum().reset_index(), AGGREGATED_BALANCE_SCHEMA)
+
+        def _sum_balance_dicts(balances: pd.Series) -> dict:
+            balances = balances.dropna()
+            unique_currencies = {
+                currency for balance_dict in balances for currency in balance_dict
+            }
+            return {
+                currency: sum(balance_dict.get(currency, 0) for balance_dict in balances)
+                for currency in unique_currencies
+            }
+
+        grouped = (
+            df.groupby(["group", "description"], dropna=False, sort=False)
+            .agg(report_balance=("report_balance", "sum"), balance=("balance", _sum_balance_dicts))
+            .reset_index()
+        )
+        return enforce_schema(grouped, AGGREGATED_BALANCE_SCHEMA)
 
     def account_history(
         self,
@@ -1930,9 +1944,6 @@ class LedgerEngine(ABC):
             period=row["period"],
             profit_centers=row.get("profit_centers")
         )
-        balances["balance"] = [
-            bal.get(cur, 0.0) for bal, cur in zip(balances["balance"], balances["currency"])
-        ]
         balances = balances.drop(columns=["group", "description", "currency"], errors="ignore")
         balances = balances.merge(
             accounts[["account", "group", "description", "currency", "account_multiplier"]],
@@ -1940,9 +1951,7 @@ class LedgerEngine(ABC):
         )
 
         # Apply account multiplier
-        balances["balance"] *= balances["account_multiplier"]
         balances["report_balance"] *= balances["account_multiplier"]
-
         aggregated = self.aggregate_account_balances(balances, n=prune_level)
 
         # Hack: aggregate_account_balances always adds a leading slash, remove it manually

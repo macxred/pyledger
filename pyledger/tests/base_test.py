@@ -434,26 +434,26 @@ EXPECTED_RECONCILIATION = [{
 ]
 
 EXPECTED_AGGREGATED_BALANCES_CSV = """
-    group,                                       description,                   report_balance
-    /Assets/Cash,                                Bank of America,               1076311.79
-    /Assets/Cash,                                Other Bank,                    -123.26
-    /Assets/Cash,                                Deutsche Bank,                 11199940.72
-    /Assets/Cash,                                Mitsubishi UFJ,                342620.0
-    /Assets/Cash,                                UBS,                           100000.0
-    /Assets/Current Assets,                      Current receivables,           0.0
-    /Assets/Tax Recoverable,                     VAT Recoverable (Input VAT),   360.85
-    /Liabilities/Payables,                       Accounts Payable USD,          700.0
-    /Liabilities/Payables,                       Accounts Payable EUR,          0.0
-    /Liabilities & Equity/Current Liabilities,   Accrued Liabilities,           -607.94
-    /Liabilities & Equity/Shareholder's Equity,  Loss brought forward,          0.0
-    /Liabilities & Equity/Shareholder's Equity,  Profit for the year,           0.0
-    /Equity,                                     Owner's Equity,                -11098332.82
-    /Revenue/Sales,                              Sales Revenue - USD,           -1000.0
-    /Revenue/Sales,                              Sales Revenue - EUR,           -1198.26
-    /Expenses/Cost of Goods Sold,                Purchases,                     3502.64
-    /Expenses/Other,                             Financial,                     -1622168.17
-    /Revenue/Other,                              Financial,                     -5.55
-    /Revenue/Balance,                            Net Profit/Loss for the Year,  0.0
+    group,                                       description,                   report_balance,  balance
+    /Assets/Cash,                                Bank of America,               1076311.79,      "{USD: 1076311.79}"
+    /Assets/Cash,                                Other Bank,                    -123.26,         "{USD: -100.0, EUR: -20.0}"
+    /Assets/Cash,                                Deutsche Bank,                 11199940.72,     "{EUR: 10026687.1}"
+    /Assets/Cash,                                Mitsubishi UFJ,                342620.0,        "{JPY: 54345678.0}"
+    /Assets/Cash,                                UBS,                           100000.0,        "{CHF: 14285714.3}"
+    /Assets/Current Assets,                      Current receivables,           0.0,             "{}"
+    /Assets/Tax Recoverable,                     VAT Recoverable (Input VAT),   360.85,          "{USD: 216.93, EUR: 133.33}"
+    /Liabilities/Payables,                       Accounts Payable USD,          700.0,           "{USD: 700.0}"
+    /Liabilities/Payables,                       Accounts Payable EUR,          0.0,             "{EUR: 0}"
+    /Liabilities & Equity/Current Liabilities,   Accrued Liabilities,           -607.94,         "{USD: -200.0, EUR: -380.96}"
+    /Liabilities & Equity/Shareholder's Equity,  Loss brought forward,          0.0,             "{}"
+    /Liabilities & Equity/Shareholder's Equity,  Profit for the year,           0.0,             "{}"
+    /Equity,                                     Owner's Equity,                -11098332.82,    "{USD: -11098332.82}"
+    /Revenue/Sales,                              Sales Revenue - USD,           -1000.0,         "{USD: -1000.0}"
+    /Revenue/Sales,                              Sales Revenue - EUR,           -1198.26,        "{EUR: -1119.04}"
+    /Expenses/Cost of Goods Sold,                Purchases,                     3502.64,         "{USD: 2783.04, EUR: 666.67}"
+    /Expenses/Other,                             Financial,                     -1622168.17,     "{USD: -1622173.72, EUR: 0}"
+    /Revenue/Other,                              Financial,                     -5.55,           "{USD: -5.55}"
+    /Revenue/Balance,                            Net Profit/Loss for the Year,  0.0,             "{}"
 """
 EXPECTED_AGGREGATED_BALANCES = pd.read_csv(StringIO(EXPECTED_AGGREGATED_BALANCES_CSV), skipinitialspace=True)
 # flake8: enable
@@ -489,5 +489,6 @@ class BaseTest(ABC):
     EXPECTED_INDIVIDUAL_BALANCES = EXPECTED_INDIVIDUAL_BALANCES
     EXPECTED_INDIVIDUAL_BALANCES["balance"] = parse_balance_series(EXPECTED_INDIVIDUAL_BALANCES["balance"])
     EXPECTED_AGGREGATED_BALANCES = EXPECTED_AGGREGATED_BALANCES
+    EXPECTED_AGGREGATED_BALANCES["balance"] = parse_balance_series(EXPECTED_AGGREGATED_BALANCES["balance"])
     EXPECTED_HISTORY = EXPECTED_HISTORY
     EXPECTED_RECONCILIATION = EXPECTED_RECONCILIATION
