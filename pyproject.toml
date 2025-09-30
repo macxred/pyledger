@@ -28,6 +28,7 @@ dependencies = [
     "polars",
     "pyarrow",
     "typst",
+    "pypst",
     "consistent_df @ https://github.com/macxred/consistent_df/tarball/main"
 ]
 
