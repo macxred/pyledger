@@ -1886,11 +1886,16 @@ class LedgerEngine(ABC):
                 - DataFrame if `format="dataframe"` (for further processing).
 
         Raises:
-            ValueError: If `columns["label"]` contains duplicate column names.
+            ValueError:
+            - If `columns["label"]` contains duplicate column names.
+            - If any label contains `"__"` while `currency_balances=True`.
         """
         labels = columns["label"].tolist()
         if len(set(labels)) != len(labels):
             raise ValueError(f"Duplicate column names in `columns['labels']`: {labels}")
+
+        if any("__" in label for label in labels) and currency_balances:
+            raise ValueError("Column labels should not include '__' when `currency_balances=True`")
 
         dfs = [
             self._report_column(
@@ -1933,7 +1938,7 @@ class LedgerEngine(ABC):
             )
 
         if currency_balances:
-            report = self.insert_currency_subrows(report, labels)
+            report = self._flatten_currency_columns(report, labels)
 
         bold = [0] + (
             report.index[
@@ -1976,8 +1981,9 @@ class LedgerEngine(ABC):
 
         # Apply account multiplier
         balances["report_balance"] *= balances["account_multiplier"]
+        reporting_currency = self.reporting_currency
         balances["balance"] = [
-            {k: v * m for k, v in b.items()}
+            {k: v * m for k, v in b.items() if not k == reporting_currency}
             for b, m in zip(balances["balance"], balances["account_multiplier"])
         ]
         aggregated = self.aggregate_account_balances(balances, n=prune_level)
@@ -1985,56 +1991,56 @@ class LedgerEngine(ABC):
         # Hack: aggregate_account_balances always adds a leading slash, remove it manually
         aggregated["group"] = aggregated["group"].str.removeprefix("/")
 
+        prefix = f"{row['label']}__" if currency_balances else ""
+        report_col = f"{prefix}reporting_currency" if currency_balances else row["label"]
+        df = aggregated.rename(columns={"report_balance": report_col})
         if currency_balances:
-            prefix = f"{row["label"]}__"
-            report_col = f"{prefix}reporting_currency"
-            df = aggregated.rename(columns={"report_balance": report_col})
-            wide = pd.DataFrame.from_records(df["balance"]).fillna(0.0)
-            if not wide.empty:
-                df = pd.concat([df.drop(columns=["balance"]), wide.add_prefix(prefix)], axis=1)
-            cols = ["group", "description"] + [c for c in df.columns if c.startswith(prefix)]
-        else:
-            df = aggregated.rename(columns={"report_balance": row["label"]})
-            cols = ["group", "description", row["label"]]
+            expanded = pd.DataFrame.from_records(df["balance"]).fillna(0.0)
+            if not expanded.empty:
+                df = pd.concat([df.drop(columns=["balance"]), expanded.add_prefix(prefix)], axis=1)
 
+        cols = ["group", "description"] + [c for c in df.columns if c.startswith(row["label"])]
         return df.loc[:, cols]
 
-    def _insert_currency_subrows(self, df: pd.DataFrame, labels: list[str]) -> pd.DataFrame:
-        """
-        Create extra rows so each line shows values for all currencies in `labels`.
+    def _flatten_currency_columns(self, df: pd.DataFrame, labels: list[str]) -> pd.DataFrame:
+        """Reshape a wide-format report into a line-per-currency view.
 
-        For each original row:
-        - The "reporting_currency" line stays as is, keeping its level, group, and description.
-        - For every other currency that has values, an extra "sub" line is added.
-        These sub-lines have an empty group/description and show the currency code
-        followed by the value (for example: "USD 100").
-        - If a currency has no values across all labels, no extra line is added.
+        Each row in the input may contain amounts in multiple columns such as
+        `<label>__reporting_currency`, `<label>__USD`, `<label>__CHF`, etc.
+        This method expands such rows so that:
+        - The `reporting_currency` row is preserved as-is, with its original
+          `level`, `group`, and `description`.
+        - For each non-reporting currency that has values in any of the labels,
+          a new "sub" row is created underneath. These rows have empty group/
+          description, `level="sub"`, and show values as `"CURRENCY amount"`.
+        - Sub-rows that are completely empty across all labels are omitted.
         """
         rep = "reporting_currency"
-        lab_cols = {lab: [c for c in df if c.startswith(f"{lab}__")] for lab in labels}
-        parts = []
-
+        label_cols = {
+            label: [c for c in df.columns if c.startswith(label + "__")] for label in labels
+        }
+        res = []
         for _, row in df.iterrows():
             lookup = {
-                lab: {
-                    c.split("__", 1)[1]: str(row[c])
-                    for c in lab_cols[lab] if pd.notna(row[c]) and str(row[c]).strip()
+                label: {
+                    c.split("__", 1)[1]: row[c]
+                    for c in label_cols[label] if pd.notna(row[c]) and str(row[c]).strip()
                 }
-                for lab in labels
+                for label in labels
             }
-            keys = [rep] + sorted({k for d in lookup.values() for k in d} - {rep})
-            for key in keys:
+            currencies = [rep] + sorted({k for d in lookup.values() for k in d} - {rep})
+            for curr in currencies:
                 rec = {
-                    "level": row["level"] if key == rep else "sub",
-                    "group": row["group"] if key == rep else "",
-                    "description": row["description"] if key == rep else "",
+                    "level": row["level"] if curr == rep else "sub",
+                    "group": row["group"] if curr == rep else "",
+                    "description": row["description"] if curr == rep else "",
                 }
-                for lab in labels:
-                    v = lookup[lab].get(key, "")
-                    rec[lab] = v if key == rep else (f"{key} {v}" if v else "")
-                if key == rep or any(rec[lab] for lab in labels):
-                    parts.append(rec)
-        return pd.DataFrame.from_records(parts, columns=["level", "group", "description"] + labels)
+                for label in labels:
+                    bal = lookup[label].get(curr, "")
+                    rec[label] = bal if curr == rep else (f"{curr} {bal}" if bal else "")
+                if curr == rep or any(rec[lab] for lab in labels):
+                    res.append(rec)
+        return pd.DataFrame.from_records(res, columns=["level", "group", "description"] + labels)
 
     def account_sheet_tables(
         self,
