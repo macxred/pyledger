@@ -485,7 +485,7 @@ class LedgerEngine(ABC):
 
         Args:
             accounts (str | int | dict[str, list[int]] | list[int] | None):
-                The range of accounts to be evaluated. See `parse_account_range()` for possible
+                The range of accounts to be evaluated. See `account_range()` for possible
                 formats. If None, the balance of all accounts is returned.
             period (datetime.date | str | None):
                 The time period for which account balances are calculated. See `parse_date_span`
@@ -503,9 +503,8 @@ class LedgerEngine(ABC):
         # Gather account list
         df = self.accounts.list()[["group", "description", "account", "currency"]]
         if accounts is not None:
-            account_dict = self.parse_account_range(accounts)
-            account_list = list(set(account_dict["add"]) - set(account_dict["subtract"]))
-            df = df.loc[df["account"].isin(account_list)]
+            accounts = self.account_range(accounts)
+            df = df.loc[df["account"].isin(accounts)]
 
         df["period"] = period
         df["profit_center"] = [profit_centers] * len(df)
@@ -530,7 +529,7 @@ class LedgerEngine(ABC):
             df (pd.DataFrame): Input DataFrame with rows specifying balance queries.
                 Expected columns include:
                 - 'account': An account identifier, list, or range.
-                See `parse_account_range()` for supported formats.
+                See `account_range()` for supported formats.
                 - 'period' (optional): A cutoff date or date span.
                 See `parse_date_span()` for supported formats.
                 - 'profit_center' (optional): Profit center filter.
@@ -619,7 +618,7 @@ class LedgerEngine(ABC):
                 - Single account (e.g., 1020)
                 - Account range (e.g., "1000:1999")
                 - Combinations using "+" or "-" (e.g., "1000+1020:1025")
-                See `parse_account_range` for details.
+                See `account_range()` for details.
             period (datetime.date | str | int, optional): Period or date for the
                 transactions. Can be specified as a year ("2024"), month ("2024-01"),
                 quarter ("2024-Q1"), or start-end tuple. Defaults to None.
@@ -639,8 +638,7 @@ class LedgerEngine(ABC):
             columns if `drop` is True.
         """
         start, end = parse_date_span(period)
-        accounts = self.parse_account_range(account)
-        accounts = list(set(accounts["add"]) - set(accounts["subtract"]))
+        accounts = self.account_range(account)
         if profit_centers is not None:
             profit_centers = self.parse_profit_centers(profit_centers)
         df = self._fetch_account_history(
@@ -706,9 +704,9 @@ class LedgerEngine(ABC):
             df = df.loc[df["date"] >= pd.to_datetime(start), :]
         return df.reset_index(drop=True)
 
-    def parse_account_range(
-        self, range: str | int | dict[str, list[int]] | list[int]
-    ) -> dict:
+    def account_range(
+        self, range: str | int | dict[str, list[int]] | list[int], mode: str = "list"
+    ) -> dict | list[int]:
         """Convert an account range into a standard format.
 
         Args:
@@ -731,13 +729,16 @@ class LedgerEngine(ABC):
                     Same as the return value.
                 - **list[int]**: A list of account numbers to use, same as `"add"` key
                     in the return value.
-
+            mode (str, optional):
+                - `"parts"` (default): return the dict with `"add"` and `"subtract"` keys.
+                - `"list"`: return a unified list of accounts equal to `set(add) - set(subtract)`.
         Returns:
-            dict: A dictionary with the following structure:
-                - `"add"` (list[int]): Accounts to be included.
-                - `"subtract"` (list[int]): Accounts to be excluded or,
-                  for `account_balance`, subtracted.
-
+            dict | list[int]:
+                - `"parts"`: A dictionary with the following structure:
+                    - `"add"` (list[int]): Accounts to be included.
+                    - `"subtract"` (list[int]): Accounts to be excluded or,
+                      for `account_balance`, subtracted.
+                - `"list"`: A list of accounts equal to `set(add) - set(subtract)`.
         Raises:
             ValueError: If the input format is invalid or no matching accounts are found.
         """
@@ -774,7 +775,6 @@ class LedgerEngine(ABC):
                 elif element.strip() == "-":
                     is_addition = False
                 elif re.fullmatch("^[^:]*[:][^:]*$", element):
-                    # `element` contains exactly one colon (':')
                     sequence = element.split(":")
                     first = int(sequence[0].strip())
                     last = int(sequence[1].strip())
@@ -796,6 +796,8 @@ class LedgerEngine(ABC):
             )
         if not add and not subtract:
             raise ValueError(f"No account matching '{range}'.")
+        if mode == "list":
+            return list(set(add) - set(subtract))
         return {"add": add, "subtract": subtract}
 
     # ----------------------------------------------------------------------
@@ -1591,7 +1593,7 @@ class LedgerEngine(ABC):
         """Mark rows with invalid account references."""
         def is_invalid(x):
             try:
-                acc = self.parse_account_range(x)
+                acc = self.account_range(x, mode="parts")
                 return not acc["add"] and not acc["subtract"]
             except Exception:
                 return True
@@ -1854,7 +1856,7 @@ class LedgerEngine(ABC):
         Args:
             columns (pd.DataFrame): One row per report column. Required:
                 - "period": Accounting period to fetch.
-                    See `parse_account_range()` for supported formats.
+                    See `account_range()` for supported formats.
                 - "label": Column header.
                 - "profit_centers": Profit center filter.
                     See `parse_profit_center_range()` for supported formats.
@@ -1981,7 +1983,7 @@ class LedgerEngine(ABC):
 
         Args:
             accounts (str | int | dict | None): The range of accounts to evaluate.
-                See `parse_account_range()` for accepted formats. If None, history
+                See `account_range()` for accepted formats. If None, history
                 for all accounts is returned.
             period (str): Date range for transactions (e.g., "2024", "2024-01", "2024-Q1").
                 See `parse_date_span` for accepted formats.
@@ -2019,8 +2021,7 @@ class LedgerEngine(ABC):
         if accounts is None:
             accounts = self.accounts.list()["account"]
         else:
-            accounts_range = self.parse_account_range(accounts)
-            accounts = set(accounts_range["add"]) - set(accounts_range["subtract"])
+            accounts = self.account_range(accounts)
 
         if format_number is None:
             def format_number(x: float, precision: float) -> str:

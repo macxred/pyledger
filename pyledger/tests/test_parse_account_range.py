@@ -1,4 +1,4 @@
-"""Test suite for parse_account_range() method."""
+"""Test suite for account_range() method."""
 
 import pytest
 from pyledger import MemoryLedger
@@ -48,9 +48,9 @@ def engine():
         ("1000+1020:1025-1010:1020", {"add": [1000, 1020, 1025], "subtract": [1010, 1015, 1020]}),
     ]
 )
-def test_parse_account_range_valid_inputs(input_value, expected_output, engine):
-    """Test valid inputs for parse_account_range."""
-    assert engine.parse_account_range(input_value) == expected_output
+def test_account_range_valid_inputs(input_value, expected_output, engine):
+    """Test valid inputs for account_range()."""
+    assert engine.account_range(input_value, mode="parts") == expected_output
 
 
 @pytest.mark.parametrize(
@@ -64,7 +64,7 @@ def test_parse_account_range_valid_inputs(input_value, expected_output, engine):
         None,  # None input
     ]
 )
-def test_parse_account_range_invalid_inputs(invalid_input, engine):
-    """Test invalid inputs for parse_account_range, expecting ValueError."""
+def test_account_range_invalid_inputs(invalid_input, engine):
+    """Test invalid inputs for account_range(), expecting ValueError."""
     with pytest.raises(ValueError):
-        engine.parse_account_range(invalid_input)
+        engine.account_range(invalid_input, mode="parts")

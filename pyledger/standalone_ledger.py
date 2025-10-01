@@ -434,9 +434,8 @@ class StandaloneLedger(LedgerEngine):
             return revaluations
 
         def _account_list(account_range: str) -> pd.DataFrame:
-            parsed = self.parse_account_range(account_range)
-            accounts = sorted(set(parsed["add"]) - set(parsed["subtract"]))
-            return pd.DataFrame({"account_range": account_range, "account": accounts})
+            accounts = self.account_range(account_range)
+            return pd.DataFrame({"account_range": account_range, "account": sorted(accounts)})
 
         # Expand account ranges into individual accounts
         account_ranges = pd.concat(_account_list(rng) for rng in revaluations["account"].unique())
@@ -492,7 +491,7 @@ class StandaloneLedger(LedgerEngine):
         if ledger is None:
             ledger = self.serialized_ledger()
 
-        multipliers = self.account_multipliers(self.parse_account_range(account))
+        multipliers = self.account_multipliers(self.account_range(account, mode="parts"))
         multipliers = pd.DataFrame(list(multipliers.items()), columns=["account", "multiplier"])
         rows = ledger["account"].isin(multipliers["account"])
 
@@ -542,7 +541,7 @@ class StandaloneLedger(LedgerEngine):
         1. The `balance` column must not be NA, otherwise discard the row.
         2. `lookup_period` should follow formats supported by `parse_date_span()`,
             otherwise discard the row.
-        3. `lookup_accounts` should follow the format of `parse_account_range()`,
+        3. `lookup_accounts` should follow the format of `account_range()`,
             otherwise discard the row.
         4. `lookup_profit_centers` must reference valid profit centers,
             otherwise discard the row.
@@ -619,7 +618,7 @@ class StandaloneLedger(LedgerEngine):
             if pd.isna(val):
                 return True
             try:
-                accounts = self.parse_account_range(val)
+                accounts = self.account_range(val, mode="parts")
                 return (len(accounts["add"]) == 0) and (len(accounts["subtract"]) == 0)
             except Exception:
                 return True
@@ -729,11 +728,10 @@ class StandaloneLedger(LedgerEngine):
             """
             valid_list = []
             for acc, d in zip(accounts, dates):
-                accounts_range = self.parse_account_range(acc)
-                accounts_set = set(accounts_range["add"]) - set(accounts_range["subtract"])
+                accounts_list = self.account_range(acc)
                 # Assume this row is valid until a missing price definition is found
                 all_valid = True
-                for a in accounts_set:
+                for a in accounts_list:
                     acc_curr = self.account_currency(a)
                     if acc_curr != self.reporting_currency:
                         try:
