@@ -3,7 +3,7 @@
 from pathlib import Path
 import pandas as pd
 import typst
-
+import pypst
 
 def df_to_typst(
     df: pd.DataFrame,
@@ -80,6 +80,19 @@ def df_to_typst(
         ))
         row_idx += 1
     result.append(")")
+
+    table = pypst.Table.from_dataframe(df)
+
+    if columns is None:
+        table.columns = num_columns + 1
+    else:
+        result.columns = ["none"] + columns
+    if align is not None:
+        result.align = align
+
+
+    breakpoint()
+    table = table.render()
     return "\n".join(result) + "\n"
 
 
