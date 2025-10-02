@@ -1,5 +1,6 @@
 """Test suite for testing report_table() method."""
 
+from encodings.punycode import T
 import pytest
 import pandas as pd
 from pyledger.memory_ledger import MemoryLedger
@@ -291,6 +292,7 @@ def test_account_balance_dataframe_drop_empty_exact(restored_engine, balance_acc
     EXPECTED_DATAFRAME_DROPPED.columns = balance_table.columns
     assert_frame_equal(balance_table, EXPECTED_DATAFRAME_DROPPED, check_dtype=False)
 
+
 def test_duplicate_labels_raises(restored_engine, balance_accounts):
     config_with_duplicates = pd.DataFrame({
         "label": ["2024", "2024"],  # duplicate label
@@ -369,3 +371,17 @@ def test_report_table_escapes_special_characters():
     assert result == EXPECTED_ESCAPED
 
 
+def test_invalid_labels_raises(restored_engine, balance_accounts):
+    config_with_invalid_labels = pd.DataFrame({
+        "label": ["20__24", "2024"],  # Label with invalid characters
+        "period": ["2024", "2025"],
+        "profit_centers": [None, None]
+    }, dtype="string")
+
+    with pytest.raises(ValueError, match="Column labels should not include '__'"):
+        restored_engine.report_table(
+            columns=config_with_invalid_labels,
+            accounts=balance_accounts,
+            staggered=False,
+            currency_balances=True,
+        )
