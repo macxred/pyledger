@@ -1946,6 +1946,10 @@ class LedgerEngine(ABC):
             ] + 1
         ).tolist()
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
+        mask = report["level"] == "sub"
+        report.loc[mask, labels] = report.loc[mask, labels].astype(str).apply(
+            lambda col: '#text(fill: gray, size: 0.7em)[' + col + ']'
+        )
         report = report[["description"] + labels]
         report.columns = [""] + labels
 
