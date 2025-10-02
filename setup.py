@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name='pyledger',
     version='0.0.1',
-    python_requires='>3.10',
+    python_requires='>=3.10',
     install_requires=[
         'numpy',
         'pandas',

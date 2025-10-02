@@ -7,7 +7,7 @@ name = "pyledger"
 version = "0.0.1"
 description = "Python package to streamline implementation of or connection to accounting systems."
 readme = "README.md"
-requires-python = ">3.10"
+requires-python = ">=3.10"
 license = {text = "MIT"}
 authors = [
     {name = "MaCX ReD AG"}
