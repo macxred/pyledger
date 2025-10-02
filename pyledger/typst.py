@@ -81,19 +81,22 @@ def df_to_typst(
         row_idx += 1
     result.append(")")
 
+
+
+
+    if df.empty:
+        return ""
+
+    df.index = [""] * len(df)
     table = pypst.Table.from_dataframe(df)
+    table.columns = ["0fr"] + (columns if columns is not None else ["auto"] * num_columns)
+    table.align = ["left"] + (align if align is not None else ["auto"] * num_columns)
+    table.stroke = {"top": "0pt", "bottom": "1pt", "left": "0pt", "right": "0pt"}
+    if len(hline):
+        for index in hline:
+            table.add_hline(index + 1, stroke="1pt")
 
-    if columns is None:
-        table.columns = num_columns + 1
-    else:
-        result.columns = ["none"] + columns
-    if align is not None:
-        result.align = align
-
-
-    breakpoint()
-    table = table.render()
-    return "\n".join(result) + "\n"
+    return table.render()
 
 
 def _typst_attribute(x: list) -> str:

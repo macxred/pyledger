@@ -1922,6 +1922,16 @@ class LedgerEngine(ABC):
 
         bold = [0] + (report.index[report["level"].str.match(r"^[HS][0-9]$")] + 1).tolist()
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
+        mask = report["level"] == "body"
+
+        report.loc[mask, "description"] = report.loc[mask, "description"].apply(
+            lambda x: (
+                f'#text(fill: gray, size: 0.5em)[{str(x)}]'
+                if pd.notna(x) and str(x).strip() != "" else x
+            )
+        )
+        breakpoint()
+
         report = report[["description"] + labels]
         report.columns = [""] + labels
 
