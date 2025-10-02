@@ -1,4 +1,9 @@
+from pathlib import Path
 from setuptools import setup, find_packages
+
+# Read README safely
+readme_path = Path(__file__).parent / "README.md"
+long_description = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
 
 setup(
     name='pyledger',
@@ -18,7 +23,7 @@ setup(
     ],
     description=('Python package to streamline implementation of or '
                  'connection to accounting systems.'),
-    long_description=open('README.md').read(),
+    long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/macxred/pyledger',
     packages=find_packages(),
