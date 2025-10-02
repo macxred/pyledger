@@ -19,6 +19,7 @@ setup(
     description=('Python package to streamline implementation of or '
                  'connection to accounting systems.'),
     long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     url='https://github.com/macxred/pyledger',
     packages=find_packages(),
     exclude_package_data={"": ["assets/*", "assets/**"]},
