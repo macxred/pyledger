@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyledger"
+version = "v0.0.1"
+description = "Python package to streamline implementation of or connection to accounting systems."
+readme = "README.md"
+requires-python = ">3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "MaCX ReD AG"}
+]
+urls = {Homepage = "https://github.com/macxred/pyledger"}
+dependencies = [
+    "numpy",
+    "pandas",
+    "xlsxwriter",
+    "openpyxl",
+    "pyyaml",
+    "pytest",
+    "polars",
+    "pyarrow",
+    "typst",
+    "consistent_df @ https://github.com/macxred/consistent_df/tarball/main"
+]
+
+[project.optional-dependencies]
+dev = [
+    "flake8",
+    "bandit",
+]
+
+[tool.setuptools]
+packages = ["pyledger"]
+
+[tool.setuptools.exclude-package-data]
+"*" = ["assets/*", "assets/**"]
