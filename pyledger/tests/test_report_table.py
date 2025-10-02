@@ -102,6 +102,49 @@ EXPECTED_TYPST_DROPPED = (
     "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
     ")\n"
 )
+
+EXPECTED_TYPST_CURRENCIES = (
+    "table(\n"
+    "  stroke: none,\n"
+    "  columns: (1fr, auto, auto),\n"
+    "  align: (left, right, right),\n"
+    "  table.header(repeat: true,\n"
+    "    text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+    "  ),\n"
+    "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  table.hline(),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [Bank of America], [1,076,311.79], [],\n"
+    "  [Other Bank], [-123.26], [],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[EUR -20.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [Deutsche Bank], [11,199,940.72], [],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[EUR 10,026,687.10]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [Mitsubishi UFJ], [342,620.00], [],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [UBS], [100,000.00], [],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,718,749.25]), text(weight: \"bold\", []),\n"
+    "  [], [#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[EUR 10,026,667.10]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [Current receivables], [], [],\n"
+    "  text(weight: \"bold\", [Total Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[EUR 133.33]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
+    "  [], [#text(fill: gray, size: 0.7em)[EUR 133.33]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
+    "  [], [#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[EUR 10,026,800.43]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  [], [#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    ")\n"
+)
 # flake8: enable
 
 
@@ -212,6 +255,16 @@ def test_account_balance_typst_drop_empty(restored_engine, balance_accounts):
         drop_empty=True,
     )
     assert balance_table == EXPECTED_TYPST_DROPPED
+
+
+def test_account_balance_typst_format_include_currencies(restored_engine, balance_accounts):
+    balance_table = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        currency_balances=True,
+    )
+    assert balance_table == EXPECTED_TYPST_CURRENCIES, "Typst output does not match"
 
 
 def test_account_balance_dataframe_format(restored_engine, balance_accounts):
