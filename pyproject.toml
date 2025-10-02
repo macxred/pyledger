@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyledger"
-version = "v0.0.1"
+version = "0.0.1"
 description = "Python package to streamline implementation of or connection to accounting systems."
 readme = "README.md"
 requires-python = ">3.10"
