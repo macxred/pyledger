@@ -1,5 +1,6 @@
 """Test suite for testing report_table() method."""
 
+from encodings.punycode import T
 import pytest
 import pandas as pd
 from pyledger.memory_ledger import MemoryLedger
