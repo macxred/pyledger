@@ -1,51 +1,5 @@
-from pathlib import Path
-from setuptools import setup, find_packages
+from setuptools import setup
 
-# Read README safely
-readme_path = Path(__file__).parent / "README.md"
-long_description = readme_path.read_text(encoding="utf-8") if readme_path.exists() else ""
-
-setup(
-    name='pyledger',
-    version='0.0.1',
-    python_requires='>=3.10',
-    install_requires=[
-        'numpy',
-        'pandas',
-        'xlsxwriter',
-        'openpyxl',
-        'pyyaml',
-        'pytest',
-        'polars',
-        'pyarrow',
-        'typst',
-        'consistent_df @ https://github.com/macxred/consistent_df/tarball/main'
-    ],
-    description=('Python package to streamline implementation of or '
-                 'connection to accounting systems.'),
-    long_description=long_description,
-    long_description_content_type='text/markdown',
-    author='MaCX ReD AG',
-    url='https://github.com/macxred/pyledger',
-    license='MIT',
-    classifiers=[
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: Developers',
-        'Intended Audience :: Financial and Insurance Industry',
-        'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
-        'Programming Language :: Python :: 3.12',
-        'Topic :: Office/Business :: Financial :: Accounting',
-    ],
-    keywords='accounting ledger bookkeeping double-entry finance',
-    packages=find_packages(),
-    exclude_package_data={"": ["assets/*", "assets/**"]},
-    extras_require={
-        "dev": [
-            "flake8",
-            "bandit",
-        ]
-    }
-)
+# All configuration is now in pyproject.toml
+# This file maintained for backward compatibility
+setup()

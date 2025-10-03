@@ -9,19 +9,13 @@ description = "Python package to streamline implementation of or connection to a
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
-authors = [
-    {name = "MaCX ReD AG"}
-]
+authors = [{name = "MaCX ReD AG"}]
 keywords = ["accounting", "ledger", "bookkeeping", "double-entry", "finance"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Financial and Insurance Industry",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
     "Topic :: Office/Business :: Financial :: Accounting",
 ]
 
@@ -31,7 +25,6 @@ dependencies = [
     "xlsxwriter",
     "openpyxl",
     "pyyaml",
-    "pytest",
     "polars",
     "pyarrow",
     "typst",
@@ -42,13 +35,7 @@ dependencies = [
 Homepage = "https://github.com/macxred/pyledger"
 
 [project.optional-dependencies]
-dev = [
-    "flake8",
-    "bandit",
-]
+dev = ["pytest", "coverage", "flake8", "bandit"]
 
 [tool.setuptools]
 packages = ["pyledger"]
-
-[tool.setuptools.exclude-package-data]
-"*" = ["assets/*", "assets/**"]
