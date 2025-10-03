@@ -1,6 +1,5 @@
 """Test suite for testing report_table() method."""
 
-from encodings.punycode import T
 import pytest
 import pandas as pd
 from pyledger.memory_ledger import MemoryLedger
@@ -118,17 +117,17 @@ EXPECTED_TYPST_CURRENCIES = (
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Bank of America], [1,076,311.79], [],\n"
     "  [Other Bank], [-123.26], [],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[EUR -20.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR -20.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     "  [Deutsche Bank], [11,199,940.72], [],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[EUR 10,026,687.10]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 10,026,687.10]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     "  [Mitsubishi UFJ], [342,620.00], [],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     "  [UBS], [100,000.00], [],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,718,749.25]), text(weight: \"bold\", []),\n"
-    "  [], [#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], [#text(fill: gray, size: 0.7em)[]],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[EUR 10,026,667.10]], [#text(fill: gray, size: 0.7em)[]],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 10,026,667.10]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Current receivables], [], [],\n"
@@ -136,14 +135,14 @@ EXPECTED_TYPST_CURRENCIES = (
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[EUR 133.33]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
-    "  [], [#text(fill: gray, size: 0.7em)[EUR 133.33]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
-    "  [], [#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], [#text(fill: gray, size: 0.7em)[]],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[EUR 10,026,800.43]], [#text(fill: gray, size: 0.7em)[]],\n"
-    "  [], [#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], [#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 10,026,800.43]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
     ")\n"
 )
 # flake8: enable
