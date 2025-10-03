@@ -1950,6 +1950,7 @@ class LedgerEngine(ABC):
         report.loc[mask, labels] = report.loc[mask, labels].astype(str).apply(
             lambda col: '#text(fill: gray, size: 0.7em)[' + col + ']'
         )
+        inset = {idx + 1: {"top": "0.2pt"} for idx in report.index[mask]}
         report = report[["description"] + labels]
         report.columns = [""] + labels
 
@@ -1961,6 +1962,7 @@ class LedgerEngine(ABC):
                 df=report,
                 hline=hline,
                 bold=bold,
+                inset=inset,
                 columns=["1fr"] + ["auto"] * len(labels),
                 align=["left"] + ["right"] * len(labels),
                 colnames=True
