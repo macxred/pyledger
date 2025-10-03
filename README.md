@@ -145,7 +145,7 @@ source ~/.virtualenvs/env_name/bin/activate  # alternative: workon env_name
 ```
 
 To locally modify and test pyledger, clone the repository and
-execute `python setup.py develop` in the repository root folder. This approach
+execute `pip install -e .` in the repository root folder. This approach
 adds a symbolic link to your development directory in Python's search path,
 ensuring immediate access to the latest code version upon (re-)loading the
 package.
