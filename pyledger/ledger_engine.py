@@ -1834,7 +1834,8 @@ class LedgerEngine(ABC):
     def report_table(
         self, columns, accounts, staggered=False, prune_level=2, format="typst",
         format_number: Callable[[float], str] = None, drop_empty=False, raw=False,
-        currency_balances: bool = False, foreign_currency_style: str = None
+        currency_balances: bool = False, foreign_currency_style: str = None,
+        style_matrix: pd.DataFrame = None,
     ):
         """
         Create a multi-period financial report from account balances.
@@ -1883,6 +1884,10 @@ class LedgerEngine(ABC):
                 balance subrows. Default is "#let foreign-currency-balance(body) = text(fill: gray,
                 size: 0.7em)[#body]". When currency_balances=True and format="typst", the table is
                 wrapped in a block scope with this style definition to format currency subrows.
+            style_matrix (pd.DataFrame, optional): DataFrame with columns [row, col, style]
+                for per-cell styling. Each row defines styling for one cell via (row, col) position.
+                The style column contains a dict with 'text' and/or 'cell' keys mapping to
+                Typst's text() and table.cell() properties. Only applicable when format="typst".
 
         Returns:
             str or pd.DataFrame:
@@ -1973,6 +1978,41 @@ class LedgerEngine(ABC):
         report.loc[mask, labels] = report.loc[mask, labels].astype(str).apply(
             lambda col: '#foreign-currency-balance()[' + col + ']'
         )
+        if currency_balances:
+            report = self._flatten_currency_columns(report, labels)
+
+        bold = [0] + (
+            report.index[
+                report["level"].str.fullmatch(r"[HS][0-9]") & (report["level"] != "sub")
+            ] + 1
+        ).tolist()
+        hline = (report.index[report["level"] == "H1"] + 1).tolist()
+
+        # Generate style_matrix for currency sub-rows if currency_balances is enabled
+        mask = report["level"] == "sub"
+        generated_style_matrix = None
+        if currency_balances and mask.any():
+            style_rows = []
+            for idx in report.index[mask]:
+                for col_idx, label in enumerate(labels, start=1):
+                    style_rows.append({
+                        'row': idx + 1,  # +1 for header row
+                        'col': col_idx,  # Start at 1 (col 0 is description)
+                        'style': {
+                            'text': {'fill': 'gray', 'size': '0.7em'},
+                            'cell': {'inset': {'top': '0.2pt'}}
+                        }
+                    })
+            generated_style_matrix = pd.DataFrame(style_rows)
+
+        # Merge generated style_matrix with user-provided style_matrix
+        if generated_style_matrix is not None:
+            if style_matrix is not None:
+                # User provided their own style_matrix, merge them
+                style_matrix = pd.concat([generated_style_matrix, style_matrix], ignore_index=True)
+            else:
+                style_matrix = generated_style_matrix
+
         report = report[["description"] + labels]
         report.columns = [""] + labels
 
@@ -1980,7 +2020,11 @@ class LedgerEngine(ABC):
             if not raw:
                 report.iloc[:, 0] = escape_typst_text(report.iloc[:, 0])
             report = df_to_typst(
-                df=report, hline=hline, bold=bold, inset=inset, colnames=True,
+                df=report,
+                hline=hline,
+                bold=bold,
+                style_matrix=style_matrix,
+                columns=["1fr"] + ["auto"] * len(labels),
                 align=["left"] + ["right"] * len(labels),
                 columns=["1fr"] + ["auto"] * len(labels),
             )
