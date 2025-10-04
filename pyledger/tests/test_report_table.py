@@ -451,3 +451,170 @@ def test_report_table_escapes_special_characters():
     assert result == EXPECTED_ESCAPED
 
 
+def test_invalid_labels_raises(restored_engine, balance_accounts):
+    config_with_invalid_labels = pd.DataFrame({
+        "label": ["20__24", "2024"],  # Label with invalid characters
+        "period": ["2024", "2025"],
+        "profit_centers": [None, None]
+    }, dtype="string")
+
+    with pytest.raises(ValueError, match="Column labels should not include '__'"):
+        restored_engine.report_table(
+            columns=config_with_invalid_labels,
+            accounts=balance_accounts,
+            staggered=False,
+            currency_balances=True,
+        )
+
+
+def test_style_matrix_text_styling(restored_engine, balance_accounts):
+    """Test style_matrix with text properties (weight, fill, size)."""
+    # Note: row 0 is the header, row 1 is first data row
+    style_matrix = pd.DataFrame({
+        'row': [1, 2],  # First and second data rows
+        'col': [0, 1],
+        'style': [
+            {'text': {'weight': 'bold'}},
+            {'text': {'fill': 'gray', 'size': '0.7em'}}
+        ]
+    })
+
+    result = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        style_matrix=style_matrix
+    )
+
+    # Check for text styling with # prefix (Typst function call)
+    assert '#text(weight: \'bold\')' in result or 'text(weight: \'bold\')' in result
+    assert '#text(fill: \'gray\', size: \'0.7em\')' in result
+
+
+def test_style_matrix_cell_styling(restored_engine, balance_accounts):
+    """Test style_matrix with cell properties (inset, fill)."""
+    style_matrix = pd.DataFrame({
+        'row': [2],
+        'col': [1],
+        'style': [
+            {'cell': {'inset': {'top': '0.2pt'}, 'fill': 'yellow'}}
+        ]
+    })
+
+    result = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        style_matrix=style_matrix
+    )
+
+    assert 'table.cell(inset: (top: \'0.2pt\'), fill: \'yellow\')' in result
+
+
+def test_style_matrix_combined_styling(restored_engine, balance_accounts):
+    """Test style_matrix with both text and cell properties."""
+    style_matrix = pd.DataFrame({
+        'row': [3],
+        'col': [0],
+        'style': [
+            {'text': {'weight': 'bold', 'fill': 'red'}, 'cell': {'inset': {'left': '1em'}}}
+        ]
+    })
+
+    result = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        style_matrix=style_matrix
+    )
+
+    assert 'text(weight: \'bold\', fill: \'red\')' in result
+    assert 'table.cell(inset: (left: \'1em\'))' in result
+
+
+def test_style_matrix_schema_validation_error(restored_engine, balance_accounts):
+    """Test style_matrix schema validation catches invalid schema."""
+    # Missing required 'col' column
+    invalid_style_matrix = pd.DataFrame({
+        'row': [0],
+        'style': [{'text': {'weight': 'bold'}}]
+    })
+
+    with pytest.raises(ValueError):
+        restored_engine.report_table(
+            columns=COLUMNS,
+            accounts=balance_accounts,
+            style_matrix=invalid_style_matrix
+        )
+
+
+def test_style_matrix_out_of_bounds_row(restored_engine, balance_accounts):
+    """Test style_matrix validation catches out-of-bounds row index."""
+    balance_table = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        format="dataframe"
+    )
+    max_row = len(balance_table) - 1
+
+    style_matrix = pd.DataFrame({
+        'row': [max_row + 10],  # Out of bounds
+        'col': [0],
+        'style': [{'text': {'weight': 'bold'}}]
+    })
+
+    with pytest.raises(ValueError, match="Invalid row indices"):
+        restored_engine.report_table(
+            columns=COLUMNS,
+            accounts=balance_accounts,
+            style_matrix=style_matrix
+        )
+
+
+def test_style_matrix_out_of_bounds_col(restored_engine, balance_accounts):
+    """Test style_matrix validation catches out-of-bounds col index."""
+    style_matrix = pd.DataFrame({
+        'row': [0],
+        'col': [10],  # Out of bounds (only 3 columns: '', '2024', '2025')
+        'style': [{'text': {'weight': 'bold'}}]
+    })
+
+    with pytest.raises(ValueError, match="Invalid col indices"):
+        restored_engine.report_table(
+            columns=COLUMNS,
+            accounts=balance_accounts,
+            style_matrix=style_matrix
+        )
+
+
+def test_style_matrix_invalid_style_structure(restored_engine, balance_accounts):
+    """Test style_matrix validation catches invalid style dict structure."""
+    # Style must be dict, not string
+    style_matrix = pd.DataFrame({
+        'row': [0],
+        'col': [0],
+        'style': ['not a dict']
+    })
+
+    with pytest.raises(ValueError, match="style must be dict"):
+        restored_engine.report_table(
+            columns=COLUMNS,
+            accounts=balance_accounts,
+            style_matrix=style_matrix
+        )
+
+
+def test_style_matrix_missing_text_cell_keys(restored_engine, balance_accounts):
+    """Test style_matrix validation catches dict without text/cell keys."""
+    style_matrix = pd.DataFrame({
+        'row': [0],
+        'col': [0],
+        'style': [{'invalid_key': 'value'}]  # Must have 'text' or 'cell'
+    })
+
+    with pytest.raises(ValueError, match="must have 'text' and/or 'cell' keys"):
+        restored_engine.report_table(
+            columns=COLUMNS,
+            accounts=balance_accounts,
+            style_matrix=style_matrix
+        )
