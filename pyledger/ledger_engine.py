@@ -1832,7 +1832,8 @@ class LedgerEngine(ABC):
     def report_table(
         self, columns, accounts, staggered=False, prune_level=2, format="typst",
         format_number: Callable[[float], str] = None, drop_empty=False,
-        currency_balances: bool = False
+        currency_balances: bool = False,
+        style_matrix: pd.DataFrame = None,
     ):
         """
         Create a multi-period financial report from account balances.
@@ -1874,6 +1875,10 @@ class LedgerEngine(ABC):
                 If True, removes empty rows where all value columns are zero or missing.
             currency_balances (bool): If True, include curency-specific balance by adding them
                 as a subrows after the reporting currency balance row.
+            style_matrix (pd.DataFrame, optional): DataFrame with columns [row, col, style]
+                for per-cell styling. Each row defines styling for one cell via (row, col) position.
+                The style column contains a dict with 'text' and/or 'cell' keys mapping to
+                Typst's text() and table.cell() properties. Only applicable when format="typst".
 
         Returns:
             str or pd.DataFrame:
@@ -1941,11 +1946,32 @@ class LedgerEngine(ABC):
             ] + 1
         ).tolist()
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
+
+        # Generate style_matrix for currency sub-rows if currency_balances is enabled
         mask = report["level"] == "sub"
-        report.loc[mask, labels] = report.loc[mask, labels].astype(str).apply(
-            lambda col: '#text(fill: gray, size: 0.7em)[' + col + ']'
-        )
-        inset = {idx + 1: {"top": "0.2pt"} for idx in report.index[mask]}
+        generated_style_matrix = None
+        if currency_balances and mask.any():
+            style_rows = []
+            for idx in report.index[mask]:
+                for col_idx, label in enumerate(labels, start=1):
+                    style_rows.append({
+                        'row': idx + 1,  # +1 for header row
+                        'col': col_idx,  # Start at 1 (col 0 is description)
+                        'style': {
+                            'text': {'fill': 'gray', 'size': '0.7em'},
+                            'cell': {'inset': {'top': '0.2pt'}}
+                        }
+                    })
+            generated_style_matrix = pd.DataFrame(style_rows)
+
+        # Merge generated style_matrix with user-provided style_matrix
+        if generated_style_matrix is not None:
+            if style_matrix is not None:
+                # User provided their own style_matrix, merge them
+                style_matrix = pd.concat([generated_style_matrix, style_matrix], ignore_index=True)
+            else:
+                style_matrix = generated_style_matrix
+
         report = report[["description"] + labels]
         report.columns = [""] + labels
 
@@ -1954,7 +1980,7 @@ class LedgerEngine(ABC):
                 df=report,
                 hline=hline,
                 bold=bold,
-                inset=inset,
+                style_matrix=style_matrix,
                 columns=["1fr"] + ["auto"] * len(labels),
                 align=["left"] + ["right"] * len(labels),
                 colnames=True
