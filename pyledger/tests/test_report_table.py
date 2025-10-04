@@ -467,11 +467,9 @@ def test_invalid_labels_raises(restored_engine, balance_accounts):
         )
 
 
-def test_style_matrix_text_styling(restored_engine, balance_accounts):
-    """Test style_matrix with text properties (weight, fill, size)."""
-    # Note: row 0 is the header, row 1 is first data row
+def test_style_matrix_text_weight(restored_engine, balance_accounts):
     style_matrix = pd.DataFrame({
-        'row': [1, 2],  # First and second data rows
+        'row': [1, 2],
         'col': [0, 1],
         'style': [
             {'text': {'weight': 'bold'}},
@@ -486,13 +484,11 @@ def test_style_matrix_text_styling(restored_engine, balance_accounts):
         style_matrix=style_matrix
     )
 
-    # Check for text styling with # prefix (Typst function call)
     assert '#text(weight: \'bold\')' in result or 'text(weight: \'bold\')' in result
     assert '#text(fill: \'gray\', size: \'0.7em\')' in result
 
 
-def test_style_matrix_cell_styling(restored_engine, balance_accounts):
-    """Test style_matrix with cell properties (inset, fill)."""
+def test_style_matrix_cell_inset(restored_engine, balance_accounts):
     style_matrix = pd.DataFrame({
         'row': [2],
         'col': [1],
@@ -511,8 +507,7 @@ def test_style_matrix_cell_styling(restored_engine, balance_accounts):
     assert 'table.cell(inset: (top: \'0.2pt\'), fill: \'yellow\')' in result
 
 
-def test_style_matrix_combined_styling(restored_engine, balance_accounts):
-    """Test style_matrix with both text and cell properties."""
+def test_style_matrix_combined_text_and_cell(restored_engine, balance_accounts):
     style_matrix = pd.DataFrame({
         'row': [3],
         'col': [0],
@@ -532,9 +527,60 @@ def test_style_matrix_combined_styling(restored_engine, balance_accounts):
     assert 'table.cell(inset: (left: \'1em\'))' in result
 
 
+# flake8: noqa: E501
+EXPECTED_TYPST_WITH_STYLE_MATRIX = (
+    "table(\n"
+    "  stroke: none,\n"
+    "  columns: (1fr, auto, auto),\n"
+    "  align: (left, right, right),\n"
+    "  table.header(repeat: true,\n"
+    "    text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+    "  ),\n"
+    "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  table.hline(),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [Bank of America], table.cell(inset: (top: '0.5em'))[#text(fill: 'blue')[1,076,311.79]], [],\n"
+    "  [Other Bank], [-123.26], [],\n"
+    "  [Deutsche Bank], [11,199,940.72], [],\n"
+    "  [Mitsubishi UFJ], [342,620.00], [],\n"
+    "  [UBS], [100,000.00], [],\n"
+    "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,718,749.25]), text(weight: \"bold\", []),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [Current receivables], [], [],\n"
+    "  text(weight: \"bold\", [Total Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+    "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
+    "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
+    "  [], [], [],\n"
+    "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
+    ")\n"
+)
+# flake8: enable
+
+
+def test_style_matrix_exact_output(restored_engine, balance_accounts):
+    style_matrix = pd.DataFrame({
+        'row': [4],
+        'col': [1],
+        'style': [
+            {'text': {'fill': 'blue'}, 'cell': {'inset': {'top': '0.5em'}}}
+        ]
+    })
+
+    result = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        style_matrix=style_matrix
+    )
+
+    assert result == EXPECTED_TYPST_WITH_STYLE_MATRIX
+
+
 def test_style_matrix_schema_validation_error(restored_engine, balance_accounts):
-    """Test style_matrix schema validation catches invalid schema."""
-    # Missing required 'col' column
     invalid_style_matrix = pd.DataFrame({
         'row': [0],
         'style': [{'text': {'weight': 'bold'}}]
@@ -549,7 +595,6 @@ def test_style_matrix_schema_validation_error(restored_engine, balance_accounts)
 
 
 def test_style_matrix_out_of_bounds_row(restored_engine, balance_accounts):
-    """Test style_matrix validation catches out-of-bounds row index."""
     balance_table = restored_engine.report_table(
         columns=COLUMNS,
         accounts=balance_accounts,
@@ -558,7 +603,7 @@ def test_style_matrix_out_of_bounds_row(restored_engine, balance_accounts):
     max_row = len(balance_table) - 1
 
     style_matrix = pd.DataFrame({
-        'row': [max_row + 10],  # Out of bounds
+        'row': [max_row + 10],
         'col': [0],
         'style': [{'text': {'weight': 'bold'}}]
     })
@@ -572,10 +617,9 @@ def test_style_matrix_out_of_bounds_row(restored_engine, balance_accounts):
 
 
 def test_style_matrix_out_of_bounds_col(restored_engine, balance_accounts):
-    """Test style_matrix validation catches out-of-bounds col index."""
     style_matrix = pd.DataFrame({
         'row': [0],
-        'col': [10],  # Out of bounds (only 3 columns: '', '2024', '2025')
+        'col': [10],
         'style': [{'text': {'weight': 'bold'}}]
     })
 
@@ -588,8 +632,6 @@ def test_style_matrix_out_of_bounds_col(restored_engine, balance_accounts):
 
 
 def test_style_matrix_invalid_style_structure(restored_engine, balance_accounts):
-    """Test style_matrix validation catches invalid style dict structure."""
-    # Style must be dict, not string
     style_matrix = pd.DataFrame({
         'row': [0],
         'col': [0],
@@ -605,11 +647,10 @@ def test_style_matrix_invalid_style_structure(restored_engine, balance_accounts)
 
 
 def test_style_matrix_missing_text_cell_keys(restored_engine, balance_accounts):
-    """Test style_matrix validation catches dict without text/cell keys."""
     style_matrix = pd.DataFrame({
         'row': [0],
         'col': [0],
-        'style': [{'invalid_key': 'value'}]  # Must have 'text' or 'cell'
+        'style': [{'invalid_key': 'value'}]
     })
 
     with pytest.raises(ValueError, match="must have 'text' and/or 'cell' keys"):
