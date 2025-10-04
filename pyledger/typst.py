@@ -3,6 +3,51 @@
 from pathlib import Path
 import pandas as pd
 import typst
+from consistent_df import enforce_schema
+
+
+def validate_style_matrix(style_matrix: pd.DataFrame, data_shape: tuple) -> dict:
+    """
+    Validate and convert style matrix to lookup dict.
+
+    Args:
+        style_matrix: DataFrame with columns [row, col, style]
+        data_shape: (n_rows, n_cols) of the data DataFrame
+
+    Returns:
+        dict: {(row, col): style_dict} for fast lookup
+
+    Raises:
+        ValueError: If schema invalid or indices out of bounds
+    """
+    from pyledger.constants import STYLE_MATRIX_SCHEMA
+
+    # Enforce schema
+    style_matrix = enforce_schema(style_matrix, STYLE_MATRIX_SCHEMA)
+
+    # Validate row/col indices
+    n_rows, n_cols = data_shape
+    invalid_rows = style_matrix[style_matrix['row'] >= n_rows]
+    if not invalid_rows.empty:
+        raise ValueError(
+            f"Invalid row indices: {invalid_rows['row'].tolist()}, max allowed: {n_rows-1}"
+        )
+
+    invalid_cols = style_matrix[style_matrix['col'] >= n_cols]
+    if not invalid_cols.empty:
+        raise ValueError(
+            f"Invalid col indices: {invalid_cols['col'].tolist()}, max allowed: {n_cols-1}"
+        )
+
+    # Validate style structure
+    for idx, style in style_matrix['style'].items():
+        if not isinstance(style, dict):
+            raise ValueError(f"Row {idx}: style must be dict, got {type(style).__name__}")
+        if not any(k in style for k in ['text', 'cell']):
+            raise ValueError(f"Row {idx}: style must have 'text' and/or 'cell' keys")
+
+    # Convert to dict for fast lookup
+    return style_matrix.set_index(['row', 'col'])['style'].to_dict()
 
 
 def df_to_typst(
