@@ -214,3 +214,13 @@ ACCOUNT_SHEET_TABLE_COLUMNS_CSV = """
 ACCOUNT_SHEET_TABLE_COLUMNS = pd.read_csv(
     StringIO(ACCOUNT_SHEET_TABLE_COLUMNS_CSV), skipinitialspace=True
 )
+
+STYLE_MATRIX_SCHEMA_CSV = """
+    column,         dtype,              mandatory,    id
+    row,            int,                True,         True
+    col,            int,                True,         True
+    style,          object,             True,         False
+"""
+STYLE_MATRIX_SCHEMA = pd.read_csv(
+    StringIO(STYLE_MATRIX_SCHEMA_CSV), skipinitialspace=True
+)
