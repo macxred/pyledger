@@ -57,7 +57,7 @@ def df_to_typst(
     na_value: str = "",
     hline: list[int] = [],
     bold: list[int] = [],
-    inset: dict[int, dict] = None,
+    style_matrix: pd.DataFrame = None,
     colnames: bool = True,
     repeat_colnames: bool = True,
 ) -> str:
@@ -81,9 +81,10 @@ def df_to_typst(
             Use -1 for a line above the header.
         bold (list[int], optional): Row indices to render in bold.
             Indices are 0-based and include the header if `colnames=True`.
-        inset (dict[int, dict], optional): Dictionary mapping row indices to inset specifications.
-            Keys are 0-based row indices (including header if `colnames=True`).
-            Values are dicts with keys like "top", "bottom", "left", "right" (e.g., {"top": "2pt"}).
+        style_matrix (pd.DataFrame, optional): DataFrame with columns [row, col, style]
+            for per-cell styling. Each row defines styling for one cell via (row, col) position.
+            The style column contains a dict with 'text' and/or 'cell' keys mapping to
+            Typst's text() and table.cell() properties.
         colnames (bool): Whether to include column names as the first row. Defaults to True.
         repeat_colnames (bool): Whether the header repeats on each page if the table spans multiple
             pages. Defaults to True, matching Typst's `table.header(repeat: true)` default.
@@ -93,7 +94,7 @@ def df_to_typst(
 
     Raises:
         ValueError: If `align` or `columns` is provided and its length does not match
-        the number of DataFrame columns.
+        the number of DataFrame columns, or if style_matrix validation fails.
     """
     num_columns = len(df.columns)
     if align is not None and len(align) != num_columns:
@@ -101,6 +102,9 @@ def df_to_typst(
 
     if columns is not None and len(columns) != num_columns:
         raise ValueError(f"`columns` has {len(columns)} elements but expected {num_columns}.")
+
+    # Validate and convert style_matrix to lookup dict
+    style_dict = validate_style_matrix(style_matrix, df.shape) if style_matrix is not None else {}
 
     result = ["table(", "  stroke: none,"]
 
@@ -124,10 +128,9 @@ def df_to_typst(
         row_idx += 1
     # Data rows
     for _, row in df.iterrows():
-        row_inset = inset.get(row_idx) if inset else None
         result.extend(_typst_row(
             row, na_value=na_value, bold=(row_idx in bold), hline=(row_idx in hline),
-            inset=row_inset
+            row_idx=row_idx, style_dict=style_dict
         ))
         row_idx += 1
     result.append(")")
@@ -139,31 +142,65 @@ def _typst_attribute(x: list) -> str:
     return ", ".join(map(str, x))
 
 
-def _typst_row(row: list, na_value: str, bold: bool, hline: bool, inset: dict = None) -> list[str]:
+def _typst_row(
+    row: list, na_value: str, bold: bool, hline: bool, row_idx: int = None, style_dict: dict = None
+) -> list[str]:
     """
     Convert a data frame row to a Typst-formatted table row.
-    Optionally adding a horizontal line at the bottom and custom insets.
+    Optionally adding a horizontal line at the bottom.
+
+    Args:
+        row: Row data to convert
+        na_value: Replacement for NA/NaN values
+        bold: Whether to render entire row in bold
+        hline: Whether to add horizontal line after row
+        row_idx: Row index for looking up cell styles
+        style_dict: Dict mapping (row, col) to style dicts
     """
     cells = [na_value if pd.isna(cell) else cell for cell in list(row)]
 
-    if inset:
-        inset_parts = [f"{k}: {v}" for k, v in inset.items()]
-        inset_spec = ", ".join(inset_parts)
+    # Apply per-cell styling if style_dict provided
+    if style_dict and row_idx is not None:
+        cell_strs = []
+        for col_idx, cell in enumerate(cells):
+            style = style_dict.get((row_idx, col_idx))
+            if style:
+                # Build cell with style
+                cell_content = f"[{cell}]"
 
-        # Wrap each cell in table.cell with custom inset
-        if bold:
-            cell_strs = [
-                f'table.cell(inset: ({inset_spec}))[#text(weight: "bold")[{cell}]],'
-                for cell in cells
-            ]
-        else:
-            cell_strs = [f'table.cell(inset: ({inset_spec}))[{cell}],' for cell in cells]
+                # Apply text properties if present
+                if 'text' in style:
+                    text_props = ", ".join(f'{k}: {repr(v) if isinstance(v, str) else v}'
+                                          for k, v in style['text'].items())
+                    cell_content = f"#text({text_props})[{cell}]"
+
+                # Wrap with table.cell if cell properties present
+                if 'cell' in style:
+                    cell_props = []
+                    for key, val in style['cell'].items():
+                        if isinstance(val, dict):
+                            # Handle nested dicts like inset: {top: "0.2pt"}
+                            nested = ", ".join(f"{k}: {repr(v) if isinstance(v, str) else v}"
+                                             for k, v in val.items())
+                            cell_props.append(f"{key}: ({nested})")
+                        else:
+                            cell_props.append(f"{key}: {repr(val) if isinstance(val, str) else val}")
+                    cell_content = f"table.cell({', '.join(cell_props)})[{cell_content}]"
+
+                cell_strs.append(cell_content + ",")
+            elif bold:
+                # No specific style, but row is bold
+                cell_strs.append(f'text(weight: "bold", [{cell}]),')
+            else:
+                # No styling
+                cell_strs.append(f"[{cell}],")
         row = ["  " + " ".join(cell_strs)]
+    elif bold:
+        # Entire row bold (no per-cell styling)
+        row = ["  " + " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)]
     else:
-        if bold:
-            row = ["  " + " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)]
-        else:
-            row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
+        # No styling
+        row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
 
     if hline:
         row.append("  table.hline(),")
