@@ -1988,7 +1988,6 @@ class LedgerEngine(ABC):
         ).tolist()
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
 
-        # Generate style_matrix for currency sub-rows
         if currency_balances:
             style_matrix = self._generate_currency_subrow_styles(report, labels, style_matrix)
 
@@ -2095,10 +2094,9 @@ class LedgerEngine(ABC):
         if len(row_indices) == 0:
             return base_style_matrix
 
-        # Generate style entries for each cell in specified rows
         style_rows = [
             {
-                'row': idx + 1,  # +1 for header row
+                'row': idx + 1,
                 'col': col_idx,
                 'style': style_fn(idx, col_idx)
             }
@@ -2106,7 +2104,6 @@ class LedgerEngine(ABC):
             for col_idx in range(num_cols)
         ]
 
-        # Merge with base style_matrix
         generated = pd.DataFrame(style_rows)
         return (
             pd.concat([generated, base_style_matrix], ignore_index=True)
@@ -2135,9 +2132,8 @@ class LedgerEngine(ABC):
             return style_matrix
 
         sub_row_indices = report.index[report["level"] == "sub"]
-        num_cols = len(labels) + 1  # description column + label columns
+        num_cols = len(labels) + 1
 
-        # Define styling function for currency sub-rows
         def currency_subrow_style(_row_idx, col_idx):
             return (
                 {'text': {'fill': 'gray', 'size': '0.7em'},
