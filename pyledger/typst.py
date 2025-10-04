@@ -26,17 +26,19 @@ def validate_style_matrix(style_matrix: pd.DataFrame, data_shape: tuple) -> dict
     style_matrix = enforce_schema(style_matrix, STYLE_MATRIX_SCHEMA)
 
     # Validate row/col indices
+    # Note: row indices include header (row 0), so max valid row is n_rows (last data row)
     n_rows, n_cols = data_shape
-    invalid_rows = style_matrix[style_matrix['row'] >= n_rows]
+    invalid_rows = style_matrix[style_matrix['row'] > n_rows]
     if not invalid_rows.empty:
         raise ValueError(
-            f"Invalid row indices: {invalid_rows['row'].tolist()}, max allowed: {n_rows-1}"
+            f"Invalid row indices: {invalid_rows['row'].tolist()}, "
+            f"max allowed: {n_rows} (including header at row 0)"
         )
 
     invalid_cols = style_matrix[style_matrix['col'] >= n_cols]
     if not invalid_cols.empty:
         raise ValueError(
-            f"Invalid col indices: {invalid_cols['col'].tolist()}, max allowed: {n_cols-1}"
+            f"Invalid col indices: {invalid_cols['col'].tolist()}, max allowed: {n_cols - 1}"
         )
 
     # Validate style structure
@@ -165,27 +167,28 @@ def _typst_row(
         for col_idx, cell in enumerate(cells):
             style = style_dict.get((row_idx, col_idx))
             if style:
-                # Build cell with style
-                cell_content = f"[{cell}]"
+                # Build cell content
+                # Start with just the cell value, we'll wrap it as needed
+                cell_content = cell
 
                 # Apply text properties if present
                 if 'text' in style:
-                    text_props = ", ".join(f'{k}: {repr(v) if isinstance(v, str) else v}'
-                                          for k, v in style['text'].items())
-                    cell_content = f"#text({text_props})[{cell}]"
+                    text_props = ", ".join(f'{k}: {v}' for k, v in style['text'].items())
+                    cell_content = f"#text({text_props})[{cell_content}]"
 
                 # Wrap with table.cell if cell properties present
                 if 'cell' in style:
-                    cell_props = []
-                    for key, val in style['cell'].items():
+                    def format_prop(key, val):
                         if isinstance(val, dict):
-                            # Handle nested dicts like inset: {top: "0.2pt"}
-                            nested = ", ".join(f"{k}: {repr(v) if isinstance(v, str) else v}"
-                                             for k, v in val.items())
-                            cell_props.append(f"{key}: ({nested})")
-                        else:
-                            cell_props.append(f"{key}: {repr(val) if isinstance(val, str) else val}")
-                    cell_content = f"table.cell({', '.join(cell_props)})[{cell_content}]"
+                            nested = ", ".join(f"{k}: {v}" for k, v in val.items())
+                            return f"{key}: ({nested})"
+                        return f"{key}: {val}"
+
+                    cell_props = ", ".join(format_prop(k, v) for k, v in style['cell'].items())
+                    cell_content = f"table.cell({cell_props})[{cell_content}]"
+                else:
+                    # No cell styling, just wrap in brackets
+                    cell_content = f"[{cell_content}]"
 
                 cell_strs.append(cell_content + ",")
             elif bold:
