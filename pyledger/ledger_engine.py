@@ -1988,30 +1988,9 @@ class LedgerEngine(ABC):
         ).tolist()
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
 
-        # Generate style_matrix for currency sub-rows if currency_balances is enabled
-        mask = report["level"] == "sub"
-        generated_style_matrix = None
-        if currency_balances and mask.any():
-            style_rows = []
-            for idx in report.index[mask]:
-                for col_idx, label in enumerate(labels, start=1):
-                    style_rows.append({
-                        'row': idx + 1,  # +1 for header row
-                        'col': col_idx,  # Start at 1 (col 0 is description)
-                        'style': {
-                            'text': {'fill': 'gray', 'size': '0.7em'},
-                            'cell': {'inset': {'top': '0.2pt'}}
-                        }
-                    })
-            generated_style_matrix = pd.DataFrame(style_rows)
-
-        # Merge generated style_matrix with user-provided style_matrix
-        if generated_style_matrix is not None:
-            if style_matrix is not None:
-                # User provided their own style_matrix, merge them
-                style_matrix = pd.concat([generated_style_matrix, style_matrix], ignore_index=True)
-            else:
-                style_matrix = generated_style_matrix
+        # Generate style_matrix for currency sub-rows
+        if currency_balances:
+            style_matrix = self._generate_currency_subrow_styles(report, labels, style_matrix)
 
         report = report[["description"] + labels]
         report.columns = [""] + labels
@@ -2092,6 +2071,102 @@ class LedgerEngine(ABC):
         reporting_currency: str
     ) -> pd.DataFrame:
         """Reshape foreign currency dicts into sub-rows for display."""
+        cols = ["group", "description"] + [c for c in df.columns if c.startswith(row["label"])]
+        return df.loc[:, cols]
+
+    def _generate_style_matrix_for_rows(
+        self,
+        row_indices: pd.Index,
+        num_cols: int,
+        style_fn: callable,
+        base_style_matrix: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """Generate style_matrix for specified rows using a style function.
+
+        Args:
+            row_indices: Indices of rows to style
+            num_cols: Total number of columns in the table
+            style_fn: Function(row_idx, col_idx) -> dict that returns style dict for each cell
+            base_style_matrix: Optional style_matrix to merge with
+
+        Returns:
+            pd.DataFrame: Combined style_matrix with generated styles
+        """
+        if len(row_indices) == 0:
+            return base_style_matrix
+
+        # Generate style entries for each cell in specified rows
+        style_rows = [
+            {
+                'row': idx + 1,  # +1 for header row
+                'col': col_idx,
+                'style': style_fn(idx, col_idx)
+            }
+            for idx in row_indices
+            for col_idx in range(num_cols)
+        ]
+
+        # Merge with base style_matrix
+        generated = pd.DataFrame(style_rows)
+        return (
+            pd.concat([generated, base_style_matrix], ignore_index=True)
+            if base_style_matrix is not None
+            else generated
+        )
+
+    def _generate_currency_subrow_styles(
+        self, report: pd.DataFrame, labels: list[str], style_matrix: pd.DataFrame = None
+    ) -> pd.DataFrame:
+        """Generate style_matrix for currency sub-rows.
+
+        Creates styling for currency sub-rows (rows with level='sub'):
+        - Column 0 (description): cell styling only (top inset)
+        - Other columns: text styling (gray, small) + cell styling
+
+        Args:
+            report: DataFrame with 'level' column indicating sub-rows
+            labels: List of column labels for data columns
+            style_matrix: Optional user-provided style_matrix to merge with
+
+        Returns:
+            pd.DataFrame: Combined style_matrix with sub-row styling
+        """
+        if not (report["level"] == "sub").any():
+            return style_matrix
+
+        sub_row_indices = report.index[report["level"] == "sub"]
+        num_cols = len(labels) + 1  # description column + label columns
+
+        # Define styling function for currency sub-rows
+        def currency_subrow_style(_row_idx, col_idx):
+            return (
+                {'text': {'fill': 'gray', 'size': '0.7em'},
+                 'cell': {'inset': {'top': '0.2pt'}}}
+                if col_idx > 0
+                else {'cell': {'inset': {'top': '0.2pt'}}}
+            )
+
+        return self._generate_style_matrix_for_rows(
+            sub_row_indices, num_cols, currency_subrow_style, style_matrix
+        )
+
+    def _flatten_currency_columns(self, df: pd.DataFrame, labels: list[str]) -> pd.DataFrame:
+        """Reshape a wide-format report into a line-per-currency view.
+
+        Each row in the input may contain amounts in multiple columns such as
+        `<label>__reporting_currency`, `<label>__USD`, `<label>__CHF`, etc.
+        This method expands such rows so that:
+        - The `reporting_currency` row is preserved as-is, with its original
+          `level`, `group`, and `description`.
+        - For each non-reporting currency that has values in any of the labels,
+          a new "sub" row is created underneath. These rows have empty group/
+          description, `level="sub"`, and show values as `"CURRENCY amount"`.
+        - Sub-rows that are completely empty across all labels are omitted.
+        """
+        rep = "reporting_currency"
+        label_cols = {
+            label: [c for c in df.columns if c.startswith(label + "__")] for label in labels
+        }
         res = []
         for _, row in df.iterrows():
             lookup = {

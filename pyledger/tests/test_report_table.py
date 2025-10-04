@@ -484,8 +484,8 @@ def test_style_matrix_text_weight(restored_engine, balance_accounts):
         style_matrix=style_matrix
     )
 
-    assert '#text(weight: \'bold\')' in result or 'text(weight: \'bold\')' in result
-    assert '#text(fill: \'gray\', size: \'0.7em\')' in result
+    assert '#text(weight: bold)' in result or 'text(weight: bold)' in result
+    assert '#text(fill: gray, size: 0.7em)' in result
 
 
 def test_style_matrix_cell_inset(restored_engine, balance_accounts):
@@ -504,7 +504,7 @@ def test_style_matrix_cell_inset(restored_engine, balance_accounts):
         style_matrix=style_matrix
     )
 
-    assert 'table.cell(inset: (top: \'0.2pt\'), fill: \'yellow\')' in result
+    assert 'table.cell(inset: (top: 0.2pt), fill: yellow)' in result
 
 
 def test_style_matrix_combined_text_and_cell(restored_engine, balance_accounts):
@@ -523,8 +523,8 @@ def test_style_matrix_combined_text_and_cell(restored_engine, balance_accounts):
         style_matrix=style_matrix
     )
 
-    assert 'text(weight: \'bold\', fill: \'red\')' in result
-    assert 'table.cell(inset: (left: \'1em\'))' in result
+    assert 'text(weight: bold, fill: red)' in result
+    assert 'table.cell(inset: (left: 1em))' in result
 
 
 # flake8: noqa: E501
@@ -540,7 +540,7 @@ EXPECTED_TYPST_WITH_STYLE_MATRIX = (
     "  table.hline(),\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
-    "  [Bank of America], table.cell(inset: (top: '0.5em'))[#text(fill: 'blue')[1,076,311.79]], [],\n"
+    "  [Bank of America], table.cell(inset: (top: 0.5em))[#text(fill: blue)[1,076,311.79]], [],\n"
     "  [Other Bank], [-123.26], [],\n"
     "  [Deutsche Bank], [11,199,940.72], [],\n"
     "  [Mitsubishi UFJ], [342,620.00], [],\n"
