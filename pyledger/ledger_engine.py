@@ -1833,7 +1833,7 @@ class LedgerEngine(ABC):
 
     def report_table(
         self, columns, accounts, staggered=False, prune_level=2, format="typst",
-        format_number: Callable[[float], str] = None, drop_empty=False,
+        format_number: Callable[[float], str] = None, drop_empty=False, raw=False,
     ):
         """
         Create a multi-period financial report from account balances.
@@ -1873,6 +1873,9 @@ class LedgerEngine(ABC):
                 reporting currency's precision is applied.
             drop_empty : bool, default False
                 If True, removes empty rows where all value columns are zero or missing.
+            raw : bool, default False
+                When False, escapes Typst special characters (\\ $ # * @ < >) in description column
+                when format="typst".
 
         Returns:
             str or pd.DataFrame:
@@ -1928,6 +1931,9 @@ class LedgerEngine(ABC):
         report.columns = [""] + labels
 
         if format == "typst":
+            # Escape Typst-sensitive characters in description column only
+            if not raw:
+                report.iloc[:, 0] = escape_typst_text(report.iloc[:, 0])
             return df_to_typst(
                 df=report,
                 hline=hline,
@@ -1972,7 +1978,8 @@ class LedgerEngine(ABC):
         root_url: str | None = None,
         format_number: Callable[[float, float], str] | None = None,
         output: Literal["typst", "dataframe"] = "typst",
-        drop: bool = True
+        drop: bool = True,
+        raw: bool = False
     ) -> dict[str, str | pd.DataFrame]:
         """
         Generate formatted tables with transaction history for each account.
@@ -2005,6 +2012,9 @@ class LedgerEngine(ABC):
                 of decimal digits matching the currency's precision.
             drop (bool): If True, drops redundant information from the DataFrame.
                 For details, see `account_history()`.
+            raw : bool, default False
+                When False, escapes Typst special characters (\\ $ # * @ < >) in text columns
+                when output="typst".
 
         Returns:
             dict[str, str | pd.DataFrame]: A mapping from account numbers to either Typst
@@ -2045,7 +2055,13 @@ class LedgerEngine(ABC):
                 df = enforce_schema(None, ACCOUNT_HISTORY_SCHEMA)
 
             df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
-            df["description"] = escape_typst_text(df["description"])
+
+            # Escape Typst-sensitive characters in all text columns
+            if output == "typst" and not raw:
+                text_columns = ["currency", "tax_code", "profit_center", "description", "source"]
+                cols_to_escape = df.columns.intersection(text_columns)
+                df[cols_to_escape] = df[cols_to_escape].apply(escape_typst_text)
+
             reporting_precision = self.precision_vectorized([self.reporting_currency], [None])[0]
             currencies_precision = self.precision_vectorized(
                 currencies=df["currency"], dates=df["date"], allow_missing=True
@@ -2067,13 +2083,15 @@ class LedgerEngine(ABC):
                     format_threshold(b, reporting_precision) for b in df["report_balance"]
                 ]
             if "document" in df.columns and output == "typst":
-                df["document"] = escape_typst_text(df["document"])
-                df["document"] = df["document"].apply(
-                    lambda x: (
-                        f'#link("{root_url.rstrip("/")}/{x.lstrip("/")}")[{x.strip()}]'
-                        if isinstance(x, str) and x.strip() else ""
+                if not raw:
+                    df["document"] = escape_typst_text(df["document"])
+                if root_url:
+                    df["document"] = df["document"].apply(
+                        lambda x: (
+                            f'#link("{root_url.rstrip("/")}/{x.lstrip("/")}")[{x.strip()}]'
+                            if isinstance(x, str) and x.strip() else ""
+                        )
                     )
-                )
 
             visible_cols = [col for col in columns["column"] if col in df.columns]
             df = df[visible_cols]
