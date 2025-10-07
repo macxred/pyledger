@@ -184,6 +184,26 @@ TARGET_BALANCE_SCHEMA = pd.read_csv(
     StringIO(TARGET_BALANCE_SCHEMA_CSV), skipinitialspace=True
 )
 
+LOAN_SCHEMA_CSV = """
+    column,             dtype,              mandatory,    id
+    account,            Int64,              True,         True
+    start,              datetime64[ns],     True,         True
+    interest_rate,      Float64,            True,         False
+    capitalize,         boolean,            True,         False
+    frequency,          string[python],     True,         False
+    day_count,          string[python],     False,        False
+    interest_account,   Int64,              False,        False
+    contra_account,     Int64,              False,        False
+    booking_frequency,  string[python],     False,        False
+    description,        string[python],     True,         False
+    document,           string[python],     False,        False
+    source,             string[python],     False,        False
+"""
+LOAN_SCHEMA = pd.read_csv(StringIO(LOAN_SCHEMA_CSV), skipinitialspace=True)
+
+VALID_LOAN_FREQUENCIES = ["monthly", "quarterly", "bi-annually", "annually"]
+VALID_DAY_COUNT_CONVENTIONS = ["30/360", "ACT/365", "ACT/360", "ACT/ACT"]
+
 
 ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA_CSV = """
     column,             dtype,                mandatory,       id
