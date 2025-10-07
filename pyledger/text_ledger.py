@@ -19,7 +19,8 @@ from .constants import (
     RECONCILIATION_SCHEMA,
     REVALUATION_SCHEMA,
     TARGET_BALANCE_SCHEMA,
-    TAX_CODE_SCHEMA
+    TAX_CODE_SCHEMA,
+    LOAN_SCHEMA
 )
 from .helpers import write_fixed_width_csv
 from consistent_df import enforce_schema
@@ -113,6 +114,10 @@ class TextLedger(StandaloneLedger):
         )
         self._target_balance = CSVAccountingEntity(
             schema=TARGET_BALANCE_SCHEMA, path=self.root / "settings/target_balance.csv",
+            source_column="source",
+        )
+        self._loans = CSVAccountingEntity(
+            schema=LOAN_SCHEMA, path=self.root / "settings/loans.csv",
             source_column="source",
         )
 
