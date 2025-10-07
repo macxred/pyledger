@@ -783,10 +783,11 @@ class StandaloneLedger(LedgerEngine):
             otherwise discard the row. Normalize to lowercase.
         6. If specified, `day_count` must be one of VALID_DAY_COUNT_CONVENTIONS,
             otherwise discard the row. Accept case-insensitive, normalize to uppercase.
-        7. If specified, `booking_frequency` must be one of VALID_LOAN_FREQUENCIES (case-insensitive),
-            otherwise discard the row. Normalize to lowercase.
+        7. If specified, `booking_frequency` must be one of VALID_LOAN_FREQUENCIES
+            (case-insensitive), otherwise discard the row. Normalize to lowercase.
         8. `interest_account` and `contra_account` must both be present or both absent.
-            If both are present, both must exist in the chart of accounts, otherwise discard the row.
+            If both are present, both must exist in the chart of accounts,
+            otherwise discard the row.
 
         A warning is logged for each dropped entry with the specific reason.
 
@@ -797,109 +798,160 @@ class StandaloneLedger(LedgerEngine):
             pd.DataFrame: A sanitized DataFrame containing only valid loan entries.
         """
         df = enforce_schema(df, LOAN_SCHEMA, keep_extra_columns=True)
-        id_columns = LOAN_SCHEMA.query("id == True")["column"].tolist()
-
-        # Fill NA values in capitalize with False (rule 4)
         df["capitalize"] = df["capitalize"].fillna(False)
+        id_columns = LOAN_SCHEMA.query("id == True")["column"].tolist()
+        invalid_mask = pd.Series(False, index=df.index)
 
-        # Validate start date (rule 1)
-        invalid_date_mask = df["start"].isna()
-        if invalid_date_mask.any():
-            invalid = df.loc[invalid_date_mask, id_columns].to_dict(orient='records')
+        invalid_mask = self._invalid_loan_start_date(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_account(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_interest_rate(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_frequency(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_day_count(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_booking_frequency(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_interest_contra_accounts(df, invalid_mask, id_columns)
+
+        return df[~invalid_mask].reset_index(drop=True)
+
+    def _invalid_loan_start_date(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid start dates."""
+        start_invalid_mask = df["start"].isna()
+        new_invalid_mask = start_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
             self._logger.warning(
-                f"Discarding {len(invalid)} loan entries with invalid start dates: "
-                f"{first_elements_as_str(invalid)}"
+                f"Discarding {new_invalid_mask.sum()} loan entries with invalid start dates: "
+                f"{first_elements_as_str(invalid_records)}"
             )
-            df = df.loc[~invalid_date_mask]
 
-        # Validate account exists (rule 2)
+        return invalid_mask | start_invalid_mask
+
+    def _invalid_loan_account(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with non-existent accounts."""
         valid_accounts = set(self.accounts.list()["account"])
-        invalid_account_mask = ~df["account"].isin(valid_accounts)
-        if invalid_account_mask.any():
-            invalid = df.loc[invalid_account_mask, id_columns].to_dict(orient='records')
-            self._logger.warning(
-                f"Discarding {len(invalid)} loan entries with non-existent accounts: "
-                f"{first_elements_as_str(invalid)}"
-            )
-            df = df.loc[~invalid_account_mask]
+        account_invalid_mask = ~df["account"].isin(valid_accounts)
+        new_invalid_mask = account_invalid_mask & ~invalid_mask
 
-        # Validate interest_rate >= 0 (rule 3)
-        invalid_rate_mask = df["interest_rate"] < 0
-        if invalid_rate_mask.any():
-            invalid = df.loc[invalid_rate_mask, id_columns].to_dict(orient='records')
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
             self._logger.warning(
-                f"Discarding {len(invalid)} loan entries with negative interest rates: "
-                f"{first_elements_as_str(invalid)}"
+                f"Discarding {new_invalid_mask.sum()} loan entries with non-existent accounts: "
+                f"{first_elements_as_str(invalid_records)}"
             )
-            df = df.loc[~invalid_rate_mask]
 
-        # Normalize and validate frequency (rule 5)
+        return invalid_mask | account_invalid_mask
+
+    def _invalid_loan_interest_rate(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with negative interest rates."""
+        rate_invalid_mask = df["interest_rate"] < 0
+        new_invalid_mask = rate_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {new_invalid_mask.sum()} loan entries with negative interest rates: "
+                f"{first_elements_as_str(invalid_records)}"
+            )
+
+        return invalid_mask | rate_invalid_mask
+
+    def _invalid_loan_frequency(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid frequency and normalize valid ones to lowercase."""
         df["frequency"] = df["frequency"].str.lower()
         valid_frequencies_lower = [f.lower() for f in VALID_LOAN_FREQUENCIES]
-        invalid_freq_mask = ~df["frequency"].isin(valid_frequencies_lower)
-        if invalid_freq_mask.any():
-            invalid = df.loc[invalid_freq_mask, id_columns].to_dict(orient='records')
+        frequency_invalid_mask = ~df["frequency"].isin(valid_frequencies_lower)
+        new_invalid_mask = frequency_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
             self._logger.warning(
-                f"Discarding {len(invalid)} loan entries with invalid frequency: "
-                f"{first_elements_as_str(invalid)}"
+                f"Discarding {new_invalid_mask.sum()} loan entries with invalid frequency: "
+                f"{first_elements_as_str(invalid_records)}"
             )
-            df = df.loc[~invalid_freq_mask]
 
-        # Normalize and validate day_count (rule 6)
+        return invalid_mask | frequency_invalid_mask
+
+    def _invalid_loan_day_count(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid day_count and normalize valid ones to uppercase."""
         day_count_specified = df["day_count"].notna()
-        if day_count_specified.any():
-            df.loc[day_count_specified, "day_count"] = df.loc[day_count_specified, "day_count"].str.upper()
-            valid_day_counts_upper = [d.upper() for d in VALID_DAY_COUNT_CONVENTIONS]
-            invalid_day_count_mask = day_count_specified & ~df["day_count"].isin(valid_day_counts_upper)
-            if invalid_day_count_mask.any():
-                invalid = df.loc[invalid_day_count_mask, id_columns].to_dict(orient='records')
-                self._logger.warning(
-                    f"Discarding {len(invalid)} loan entries with invalid day_count: "
-                    f"{first_elements_as_str(invalid)}"
-                )
-                df = df.loc[~invalid_day_count_mask]
 
-        # Normalize and validate booking_frequency (rule 7)
+        if day_count_specified.any():
+            df.loc[day_count_specified, "day_count"] = \
+                df.loc[day_count_specified, "day_count"].str.upper()
+            valid_day_counts_upper = [d.upper() for d in VALID_DAY_COUNT_CONVENTIONS]
+            day_count_invalid_mask = (
+                day_count_specified & ~df["day_count"].isin(valid_day_counts_upper)
+            )
+            new_invalid_mask = day_count_invalid_mask & ~invalid_mask
+
+            if new_invalid_mask.any():
+                invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+                self._logger.warning(
+                    f"Discarding {new_invalid_mask.sum()} loan entries with invalid day_count: "
+                    f"{first_elements_as_str(invalid_records)}"
+                )
+
+            return invalid_mask | day_count_invalid_mask
+
+        return invalid_mask
+
+    def _invalid_loan_booking_frequency(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid booking_frequency and normalize to lowercase."""
         booking_freq_specified = df["booking_frequency"].notna()
+
         if booking_freq_specified.any():
             df.loc[booking_freq_specified, "booking_frequency"] = \
                 df.loc[booking_freq_specified, "booking_frequency"].str.lower()
-            invalid_booking_freq_mask = booking_freq_specified & \
+            valid_frequencies_lower = [f.lower() for f in VALID_LOAN_FREQUENCIES]
+            booking_freq_invalid_mask = booking_freq_specified & \
                 ~df["booking_frequency"].isin(valid_frequencies_lower)
-            if invalid_booking_freq_mask.any():
-                invalid = df.loc[invalid_booking_freq_mask, id_columns].to_dict(orient='records')
-                self._logger.warning(
-                    f"Discarding {len(invalid)} loan entries with invalid booking_frequency: "
-                    f"{first_elements_as_str(invalid)}"
-                )
-                df = df.loc[~invalid_booking_freq_mask]
+            new_invalid_mask = booking_freq_invalid_mask & ~invalid_mask
 
-        # Validate interest_account and contra_account (rule 8)
+            if new_invalid_mask.any():
+                invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+                self._logger.warning(
+                    f"Discarding {new_invalid_mask.sum()} loan entries with invalid "
+                    f"booking_frequency: {first_elements_as_str(invalid_records)}"
+                )
+
+            return invalid_mask | booking_freq_invalid_mask
+
+        return invalid_mask
+
+    def _invalid_loan_interest_contra_accounts(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries where interest_account and contra_account are not both
+        present/absent, or where they are both present but don't exist in accounts."""
         has_interest_account = df["interest_account"].notna()
         has_contra_account = df["contra_account"].notna()
-        both_or_neither_mask = has_interest_account == has_contra_account
+        both_or_neither_invalid = has_interest_account != has_contra_account
+        valid_accounts = set(self.accounts.list()["account"])
+        has_both = has_interest_account & has_contra_account
+        accounts_invalid = has_both & (
+            ~df["interest_account"].isin(valid_accounts)
+            | ~df["contra_account"].isin(valid_accounts)
+        )
+        account_invalid_mask = both_or_neither_invalid | accounts_invalid
+        new_invalid_mask = account_invalid_mask & ~invalid_mask
 
-        if not both_or_neither_mask.all():
-            invalid = df.loc[~both_or_neither_mask, id_columns].to_dict(orient='records')
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
             self._logger.warning(
-                f"Discarding {len(invalid)} loan entries where interest_account and "
-                f"contra_account are not both present or both absent: "
-                f"{first_elements_as_str(invalid)}"
+                f"Discarding {new_invalid_mask.sum()} loan entries with invalid "
+                f"interest_account or contra_account: {first_elements_as_str(invalid_records)}"
             )
-            df = df.loc[both_or_neither_mask]
 
-        # When both are present, validate they exist in accounts
-        has_both = df["interest_account"].notna() & df["contra_account"].notna()
-        if has_both.any():
-            invalid_interest_mask = has_both & ~df["interest_account"].isin(valid_accounts)
-            invalid_contra_mask = has_both & ~df["contra_account"].isin(valid_accounts)
-            invalid_mask = invalid_interest_mask | invalid_contra_mask
-            if invalid_mask.any():
-                invalid = df.loc[invalid_mask, id_columns].to_dict(orient='records')
-                self._logger.warning(
-                    f"Discarding {len(invalid)} loan entries with non-existent "
-                    f"interest_account or contra_account: {first_elements_as_str(invalid)}"
-                )
-                df = df.loc[~invalid_mask]
-
-        return df.reset_index(drop=True)
+        return invalid_mask | account_invalid_mask

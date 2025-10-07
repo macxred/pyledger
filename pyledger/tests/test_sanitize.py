@@ -598,3 +598,54 @@ def test_sanitize_profit_center(engine, capture_logs):
     assert_frame_equal(expected.reset_index(drop=True), sanitized, check_dtype=False)
     log_messages = capture_logs.getvalue().strip().split("\n")
     assert any("Discarding" in msg and "+" in msg for msg in log_messages)
+
+
+def test_sanitize_loans(engine, capture_logs):
+    ACCOUNT_CSV = """
+        group,         account, currency, tax_code, description
+        Assets,           1000,      USD,         , Cash in Bank USD
+        Liabilities,      2000,      USD,         , Loan Payable USD
+        Liabilities,      2010,      EUR,         , Loan Payable EUR
+        Expenses,         7050,      USD,         , Interest Expense
+    """
+    LOANS_CSV = """
+        account, start,      interest_rate, capitalize, frequency,   day_count, interest_account, contra_account, booking_frequency, description
+        2000,    ,           0.05,          True,       monthly,     30/360,    7050,             1000,           quarterly,         Invalid start date (NaT)
+        9999,    2024-01-01, 0.05,          True,       monthly,     30/360,    7050,             1000,           quarterly,         Invalid account (not in chart)
+        2000,    2024-01-01, -0.01,         True,       monthly,     30/360,    7050,             1000,           quarterly,         Invalid interest_rate (negative)
+        2000,    2024-02-01, 0.05,          ,           monthly,     30/360,    7050,             1000,           quarterly,         Missing capitalize (should be filled with False)
+        2000,    2024-03-01, 0.05,          True,       INVALID,     30/360,    7050,             1000,           quarterly,         Invalid frequency
+        2000,    2024-04-01, 0.05,          True,       MONTHLY,     30/360,    7050,             1000,           quarterly,         Case-insensitive frequency (should normalize)
+        2000,    2024-05-01, 0.05,          True,       monthly,     invalid,   7050,             1000,           quarterly,         Invalid day_count
+        2000,    2024-06-01, 0.05,          True,       monthly,     act/365,   7050,             1000,           quarterly,         Case-insensitive day_count (should normalize)
+        2000,    2024-07-01, 0.05,          True,       monthly,     30/360,    7050,             1000,           INVALID,           Invalid booking_frequency
+        2000,    2024-08-01, 0.05,          True,       monthly,     30/360,    7050,             1000,           QUARTERLY,         Case-insensitive booking_frequency (should normalize)
+        2000,    2024-09-01, 0.05,          True,       monthly,     30/360,    9999,             1000,           quarterly,         Invalid interest_account (not in chart)
+        2000,    2024-10-01, 0.05,          True,       monthly,     30/360,    7050,             9999,           quarterly,         Invalid contra_account (not in chart)
+        2000,    2024-11-01, 0.05,          True,       monthly,     30/360,    7050,             ,               quarterly,         Interest account without contra (both must be present or absent)
+        2000,    2024-12-01, 0.05,          True,       monthly,     30/360,    ,                 1000,           quarterly,         Contra account without interest (both must be present or absent)
+        2010,    2024-01-01, 0.03,          False,      quarterly,   ACT/365,   ,                 ,               ,                  Valid EUR loan
+        2000,    2024-01-15, 0.04,          True,       bi-annually, ACT/360,   ,                 ,               ,                  Valid bi-annual loan
+        2000,    2024-02-15, 0.025,         False,      annually,    ACT/ACT,   7050,             1000,           annually,          Valid annual loan with accounts
+    """
+    EXPECTED_LOANS_CSV = """
+        account, start,      interest_rate, capitalize, frequency,   day_count, interest_account, contra_account, booking_frequency, description
+        2000,    2024-02-01, 0.05,          False,      monthly,     30/360,    7050,             1000,           quarterly,         Missing capitalize (should be filled with False)
+        2000,    2024-04-01, 0.05,          True,       monthly,     30/360,    7050,             1000,           quarterly,         Case-insensitive frequency (should normalize)
+        2000,    2024-06-01, 0.05,          True,       monthly,     ACT/365,   7050,             1000,           quarterly,         Case-insensitive day_count (should normalize)
+        2000,    2024-08-01, 0.05,          True,       monthly,     30/360,    7050,             1000,           quarterly,         Case-insensitive booking_frequency (should normalize)
+        2010,    2024-01-01, 0.03,          False,      quarterly,   ACT/365,   ,                 ,               ,                  Valid EUR loan
+        2000,    2024-01-15, 0.04,          True,       bi-annually, ACT/360,   ,                 ,               ,                  Valid bi-annual loan
+        2000,    2024-02-15, 0.025,         False,      annually,    ACT/ACT,   7050,             1000,           annually,          Valid annual loan with accounts
+    """
+
+    accounts = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    loans = pd.read_csv(StringIO(LOANS_CSV), skipinitialspace=True)
+    expected_loans = pd.read_csv(StringIO(EXPECTED_LOANS_CSV), skipinitialspace=True)
+    engine.restore(accounts=accounts)
+
+    sanitized_loans = engine.sanitize_loans(engine.loans.standardize(loans))
+    assert_frame_equal(engine.loans.standardize(expected_loans), sanitized_loans)
+
+    log_messages = capture_logs.getvalue().strip().split("\n")
+    assert len(log_messages) > 0, "Expected log messages for discarded entries"
