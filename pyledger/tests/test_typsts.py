@@ -167,10 +167,59 @@ def test_typst_table_with_mismatched_columns_length():
         df_to_typst(df, align=["left", "right"], columns=["1fr"])
 
 
-def test_escape_typst_text():
+def test_escape_typst_text_basic():
+    """Test basic escaping of Typst special characters."""
     series = pd.Series(["<tag>", "email@host", "1 > 0", None, 123])
     result = escape_typst_text(series)
     expected = pd.Series(["\\<tag\\>", "email\\@host", "1 \\> 0", None, 123])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_escape_typst_text_backslash():
+    """Test that backslashes are escaped first to avoid double-escaping."""
+    series = pd.Series(["path\\to\\file", "already\\<escaped\\>"])
+    result = escape_typst_text(series)
+    expected = pd.Series(["path\\\\to\\\\file", "already\\\\\\<escaped\\\\\\>"])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_escape_typst_text_math_and_code():
+    """Test escaping of math mode ($) and code mode (#) delimiters."""
+    series = pd.Series(["price: $100", "#hashtag", "math: $x^2$", "Tweet #ad"])
+    result = escape_typst_text(series)
+    expected = pd.Series(["price: \\$100", "\\#hashtag", "math: \\$x^2\\$", "Tweet \\#ad"])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_escape_typst_text_emphasis():
+    """Test escaping of emphasis markers (*)."""
+    series = pd.Series(["*bold*", "file_name_v2.txt", "5 * 3 = 15"])
+    result = escape_typst_text(series)
+    expected = pd.Series(["\\*bold\\*", "file_name_v2.txt", "5 \\* 3 = 15"])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_escape_typst_text_all_special_chars():
+    """Test escaping all Typst special characters together."""
+    series = pd.Series(["All: \\ $ # * @ < >"])
+    result = escape_typst_text(series)
+    expected = pd.Series(["All: \\\\ \\$ \\# \\* \\@ \\< \\>"])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_escape_typst_text_empty_and_whitespace():
+    """Test handling of empty strings and whitespace."""
+    series = pd.Series(["", "   ", "\n", "\t"])
+    result = escape_typst_text(series)
+    expected = pd.Series(["", "   ", "\n", "\t"])
+    pd.testing.assert_series_equal(result, expected)
+
+
+def test_escape_typst_text_non_string_types():
+    """Test that non-string types are preserved unchanged."""
+    series = pd.Series([None, 42, 3.14, True, False])
+    result = escape_typst_text(series)
+    expected = pd.Series([None, 42, 3.14, True, False])
     pd.testing.assert_series_equal(result, expected)
 
 

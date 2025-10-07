@@ -116,12 +116,31 @@ def _typst_header_row(row: list, repeat: bool, hline: bool, **kwargs) -> list[st
 
 
 def escape_typst_text(series: pd.Series) -> pd.Series:
-    """Escape Typst-sensitive characters: <, >, and @."""
+    """Escape Typst-sensitive characters in content blocks.
+
+    Escapes special characters that have meaning in Typst markup:
+    - backslash (escape character itself - must be escaped first)
+    - $ (math mode delimiter)
+    - # (code mode prefix)
+    - * (strong emphasis)
+    - @ (reference)
+    - < and > (label delimiters)
+
+    Args:
+        series: A pandas Series containing text values to escape.
+
+    Returns:
+        A pandas Series with Typst special characters escaped.
+    """
     return series.map(
         lambda text: (
-            text.replace("<", "\\<")
-                .replace(">", "\\>")
+            text.replace("\\", "\\\\")  # Must be first to avoid double-escaping
+                .replace("$", "\\$")
+                .replace("#", "\\#")
+                .replace("*", "\\*")
                 .replace("@", "\\@")
+                .replace("<", "\\<")
+                .replace(">", "\\>")
         ) if isinstance(text, str) else text
     )
 

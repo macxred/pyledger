@@ -251,3 +251,68 @@ def test_duplicate_labels_raises(restored_engine, balance_accounts):
             accounts=balance_accounts,
             staggered=False
         )
+
+
+def test_report_table_escapes_special_characters():
+    """Test that Typst special characters are escaped in account descriptions."""
+    COLUMNS_CSV = """
+        label,period,profit_centers
+         2024,  2024,
+    """
+    COLUMNS = pd.read_csv(StringIO(COLUMNS_CSV), skipinitialspace=True, dtype="string")
+    ACCOUNT_CSV = """
+        group,              account, currency, tax_code, description
+        Assets/Cash,           1000,      USD,         , Cash & $100
+        Expenses/Marketing,    5000,      USD,         , Ads #social *bold*
+    """
+    ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    JOURNAL_CSV = """
+        id,    date, account, contra, currency, amount, report_amount, tax_code, profit_center, description, document
+         1, 2024-01,    1000,   5000,      USD, 100.00,              ,         ,              , Payment,
+    """
+    JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
+
+    # flake8: noqa: E501
+    EXPECTED_ESCAPED = (
+        "table(\n"
+        "  stroke: none,\n"
+        "  columns: (1fr, auto),\n"
+        "  align: (left, right),\n"
+        "  table.header(repeat: true,\n"
+        '    text(weight: "bold", []), text(weight: "bold", [2024]),\n'
+        "  ),\n"
+        '  text(weight: "bold", [Assets]), text(weight: "bold", []),\n'
+        "  table.hline(),\n"
+        "  [], [],\n"
+        '  text(weight: "bold", [Cash]), text(weight: "bold", []),\n'
+        "  [Cash & \\$100], [100.00],\n"
+        '  text(weight: "bold", [Total Cash]), text(weight: "bold", [100.00]),\n'
+        "  [], [],\n"
+        '  text(weight: "bold", [Total Assets]), text(weight: "bold", [100.00]),\n'
+        "  [], [],\n"
+        "  [], [],\n"
+        '  text(weight: "bold", [Expenses]), text(weight: "bold", []),\n'
+        "  table.hline(),\n"
+        "  [], [],\n"
+        '  text(weight: "bold", [Marketing]), text(weight: "bold", []),\n'
+        "  [Ads \\#social \\*bold\\*], [-100.00],\n"
+        '  text(weight: "bold", [Total Marketing]), text(weight: "bold", [-100.00]),\n'
+        "  [], [],\n"
+        '  text(weight: "bold", [Total Expenses]), text(weight: "bold", [-100.00]),\n'
+        ")\n"
+    )
+    # flake8: enable
+
+    engine = MemoryLedger()
+    engine.restore(
+        accounts=ACCOUNTS, journal=JOURNAL,
+        configuration=BaseTest.CONFIGURATION, assets=BaseTest.ASSETS, price_history=BaseTest.PRICES,
+    )
+
+    accounts = engine.accounts.list()
+    accounts["account_multiplier"] = 1
+
+    result = engine.report_table(accounts=accounts, columns=COLUMNS)
+    assert result == EXPECTED_ESCAPED
+
+

@@ -117,3 +117,90 @@ def test_accounts_filter_single_account(restored_engine):
         accounts=1020,
     )
     assert set(result.keys()) == {1020}
+
+
+def test_account_sheet_tables_escapes_special_characters():
+    """Test that Typst special characters are escaped in transaction data."""
+    COLUMNS_CSV = """
+        column,       label,        width,  align
+        date,         Date,         auto,   left
+        description,  Description,  2fr,    left
+    """
+    COLUMNS = pd.read_csv(StringIO(COLUMNS_CSV), skipinitialspace=True)
+
+    ACCOUNT_CSV = """
+        group,           account, currency, tax_code, description
+        Assets/Cash,        1000,      USD,         , Cash
+        Expenses/Marketing, 5000,      USD,         , Marketing
+    """
+    ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+
+    JOURNAL_CSV = """
+        id,    date, account, contra, currency, amount, report_amount, tax_code, profit_center, description, document
+         1, 2024-01,    1000,   5000,      USD, 100.00,              ,         ,              , Cost $100 #ad,
+    """
+    JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
+
+    # flake8: noqa: E501
+    EXPECTED_ESCAPED = (
+        "table(\n"
+        "  stroke: none,\n"
+        "  columns: (auto, 2fr),\n"
+        "  align: (left, left),\n"
+        "  table.header(repeat: true,\n"
+        "    [Date], [Description],\n"
+        "  ),\n"
+        "  table.hline(),\n"
+        "  [2024-01-01], [Cost \\$100 \\#ad],\n"
+        ")\n"
+    )
+    # flake8: enable
+
+    engine = MemoryLedger()
+    engine.restore(
+        accounts=ACCOUNTS, journal=JOURNAL,
+        configuration=BaseTest.CONFIGURATION, assets=BaseTest.ASSETS, price_history=BaseTest.PRICES,
+    )
+
+    result = engine.account_sheet_tables(
+        period="2024", columns=COLUMNS, output="typst", accounts=1000
+    )
+
+    assert result[1000] == EXPECTED_ESCAPED
+
+
+def test_account_sheet_tables_dataframe_format_ignores_raw():
+    """Test that raw parameter has no effect when output='dataframe'."""
+    COLUMNS_CSV = """
+        column,       label,        width,  align
+        date,         Date,         auto,   left
+        description,  Description,  2fr,    left
+    """
+    COLUMNS = pd.read_csv(StringIO(COLUMNS_CSV), skipinitialspace=True)
+
+    ACCOUNT_CSV = """
+        group,           account, currency, tax_code, description
+        Assets/Cash,        1000,      USD,         , Cash
+        Expenses/Marketing, 5000,      USD,         , Marketing
+    """
+    ACCOUNTS = pd.read_csv(StringIO(ACCOUNT_CSV), skipinitialspace=True)
+    JOURNAL_CSV = """
+        id,    date, account, contra, currency, amount, report_amount, tax_code, profit_center, description, document
+         1, 2024-01,    1000,   5000,      USD, 100.00,              ,         ,              , Cost $100,
+    """
+    JOURNAL = pd.read_csv(StringIO(JOURNAL_CSV), skipinitialspace=True)
+
+    engine = MemoryLedger()
+    engine.restore(
+        accounts=ACCOUNTS, journal=JOURNAL,
+        configuration=BaseTest.CONFIGURATION, assets=BaseTest.ASSETS, price_history=BaseTest.PRICES,
+    )
+
+    result_escaped = engine.account_sheet_tables(
+        period="2024", columns=COLUMNS, output="dataframe", accounts=1000, raw=False
+    )
+    result_raw = engine.account_sheet_tables(
+        period="2024", columns=COLUMNS, output="dataframe", accounts=1000, raw=True
+    )
+
+    assert_frame_equal(result_escaped[1000], result_raw[1000])
