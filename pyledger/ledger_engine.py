@@ -1941,9 +1941,7 @@ class LedgerEngine(ABC):
             report = self._flatten_currency_columns(report, labels)
 
         bold = [0] + (
-            report.index[
-                report["level"].str.fullmatch(r"[HS][0-9]") & (report["level"] != "sub")
-            ] + 1
+            report.index[report["level"].str.fullmatch(r"[HS][0-9]")] + 1
         ).tolist()
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
         mask = report["level"] == "sub"
