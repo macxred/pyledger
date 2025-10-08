@@ -2014,7 +2014,12 @@ class LedgerEngine(ABC):
             if not expanded.empty:
                 df = pd.concat([df.drop(columns=["balance"]), expanded.add_prefix(prefix)], axis=1)
 
-        cols = ["group", "description"] + [c for c in df.columns if c.startswith(row["label"])]
+        # Select columns for this label: exact match or {label}__ prefix for currency columns
+        if currency_balances:
+            label_cols = [c for c in df.columns if c.startswith(f"{row['label']}__")]
+        else:
+            label_cols = [c for c in df.columns if c == row["label"]]
+        cols = ["group", "description"] + label_cols
         return df.loc[:, cols]
 
     def _flatten_currency_columns(self, df: pd.DataFrame, labels: list[str]) -> pd.DataFrame:
