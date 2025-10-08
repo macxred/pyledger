@@ -104,6 +104,9 @@ EXPECTED_TYPST_DROPPED = (
 )
 
 EXPECTED_TYPST_CURRENCIES = (
+    "{\n"
+    "let foreign-currency-balance(body) = text(fill: gray, size: 0.7em)[#body]\n"
+    "\n"
     "table(\n"
     "  stroke: none,\n"
     "  columns: (1fr, auto, auto),\n"
@@ -117,17 +120,17 @@ EXPECTED_TYPST_CURRENCIES = (
     "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Bank of America], [1,076,311.79], [],\n"
     "  [Other Bank], [-123.26], [],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR -20.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR -20.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     "  [Deutsche Bank], [11,199,940.72], [],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 10,026,687.10]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 10,026,687.10]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     "  [Mitsubishi UFJ], [342,620.00], [],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     "  [UBS], [100,000.00], [],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,718,749.25]), text(weight: \"bold\", []),\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 10,026,667.10]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 10,026,667.10]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [Current receivables], [], [],\n"
@@ -135,15 +138,17 @@ EXPECTED_TYPST_CURRENCIES = (
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
     "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     "  [], [], [],\n"
     "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[EUR 10,026,800.43]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
-    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#text(fill: gray, size: 0.7em)[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 10,026,800.43]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+    "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
     ")\n"
+    "\n"
+    "}\n"
 )
 # flake8: enable
 
@@ -265,6 +270,71 @@ def test_account_balance_typst_format_include_currencies(restored_engine, balanc
         currency_balances=True,
     )
     assert balance_table == EXPECTED_TYPST_CURRENCIES, "Typst output does not match"
+
+
+def test_custom_foreign_currency_style(restored_engine, balance_accounts):
+    """Test that custom foreign_currency_style parameter works."""
+    custom_style = "let foreign-currency-balance(body) = text(fill: blue, size: 0.9em)[#body]"
+
+    balance_table = restored_engine.report_table(
+        columns=COLUMNS,
+        accounts=balance_accounts,
+        staggered=False,
+        currency_balances=True,
+        foreign_currency_style=custom_style,
+    )
+
+    # flake8: noqa: E501
+    expected = (
+        "{\n"
+        "let foreign-currency-balance(body) = text(fill: blue, size: 0.9em)[#body]\n"
+        "\n"
+        "table(\n"
+        "  stroke: none,\n"
+        "  columns: (1fr, auto, auto),\n"
+        "  align: (left, right, right),\n"
+        "  table.header(repeat: true,\n"
+        "    text(weight: \"bold\", []), text(weight: \"bold\", [2024]), text(weight: \"bold\", [2025]),\n"
+        "  ),\n"
+        "  text(weight: \"bold\", [Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+        "  table.hline(),\n"
+        "  [], [], [],\n"
+        "  text(weight: \"bold\", [Cash]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+        "  [Bank of America], [1,076,311.79], [],\n"
+        "  [Other Bank], [-123.26], [],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR -20.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  [Deutsche Bank], [11,199,940.72], [],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 10,026,687.10]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  [Mitsubishi UFJ], [342,620.00], [],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  [UBS], [100,000.00], [],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  text(weight: \"bold\", [Total Cash]), text(weight: \"bold\", [12,718,749.25]), text(weight: \"bold\", []),\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 10,026,667.10]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  [], [], [],\n"
+        "  text(weight: \"bold\", [Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+        "  [Current receivables], [], [],\n"
+        "  text(weight: \"bold\", [Total Current Assets]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+        "  [], [], [],\n"
+        "  text(weight: \"bold\", [Tax Recoverable]), text(weight: \"bold\", []), text(weight: \"bold\", []),\n"
+        "  [VAT Recoverable (Input VAT)], [360.85], [],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  text(weight: \"bold\", [Total Tax Recoverable]), text(weight: \"bold\", [360.85]), text(weight: \"bold\", []),\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 133.33]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  [], [], [],\n"
+        "  text(weight: \"bold\", [Total Assets]), text(weight: \"bold\", [12,719,110.10]), text(weight: \"bold\", []),\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[CHF 14,285,714.30]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[EUR 10,026,800.43]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        "  table.cell(inset: (top: 0.2pt))[], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[JPY 54,345,678.00]], table.cell(inset: (top: 0.2pt))[#foreign-currency-balance()[]],\n"
+        ")\n"
+        "\n"
+        "}\n"
+    )
+    # flake8: enable
+
+    assert balance_table == expected
 
 
 def test_account_balance_dataframe_format(restored_engine, balance_accounts):

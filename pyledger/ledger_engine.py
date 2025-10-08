@@ -1834,7 +1834,7 @@ class LedgerEngine(ABC):
     def report_table(
         self, columns, accounts, staggered=False, prune_level=2, format="typst",
         format_number: Callable[[float], str] = None, drop_empty=False, raw=False,
-        currency_balances: bool = False
+        currency_balances: bool = False, foreign_currency_style: str = None
     ):
         """
         Create a multi-period financial report from account balances.
@@ -1877,8 +1877,12 @@ class LedgerEngine(ABC):
             raw : bool, default False
                 When False, escapes Typst special characters (\\ $ # * @ < >) in description column
                 when format="typst".
-            currency_balances (bool): If True, include curency-specific balance by adding them
-                as a subrows after the reporting currency balance row.
+            currency_balances (bool): If True, include currency-specific balance by adding them
+                as subrows after the reporting currency balance row.
+            foreign_currency_style (str, optional): Typst style definition for foreign currency
+                balance subrows. Default is "#let foreign-currency-balance(body) = text(fill: gray,
+                size: 0.7em)[#body]". When currency_balances=True and format="typst", the table is
+                wrapped in a block scope with this style definition to format currency subrows.
 
         Returns:
             str or pd.DataFrame:
@@ -1890,6 +1894,11 @@ class LedgerEngine(ABC):
             - If `columns["label"]` contains duplicate column names.
             - If any label contains `"__"` while `currency_balances=True`.
         """
+        if foreign_currency_style is None:
+            foreign_currency_style = (
+                "let foreign-currency-balance(body) = text(fill: gray, size: 0.7em)[#body]"
+            )
+
         labels = columns["label"].tolist()
         if len(set(labels)) != len(labels):
             raise ValueError(f"Duplicate column names in `columns['labels']`: {labels}")
@@ -1946,7 +1955,7 @@ class LedgerEngine(ABC):
         hline = (report.index[report["level"] == "H1"] + 1).tolist()
         mask = report["level"] == "sub"
         report.loc[mask, labels] = report.loc[mask, labels].astype(str).apply(
-            lambda col: '#text(fill: gray, size: 0.7em)[' + col + ']'
+            lambda col: '#foreign-currency-balance()[' + col + ']'
         )
         inset = {idx + 1: {"top": "0.2pt"} for idx in report.index[mask]}
         report = report[["description"] + labels]
@@ -1956,7 +1965,7 @@ class LedgerEngine(ABC):
             # Escape Typst-sensitive characters in description column only
             if not raw:
                 report.iloc[:, 0] = escape_typst_text(report.iloc[:, 0])
-            return df_to_typst(
+            report = df_to_typst(
                 df=report,
                 hline=hline,
                 bold=bold,
@@ -1965,6 +1974,8 @@ class LedgerEngine(ABC):
                 align=["left"] + ["right"] * len(labels),
                 colnames=True
             )
+            if currency_balances:
+                report = f"{{\n{foreign_currency_style}\n\n{report}\n}}\n"
 
         return report
 
