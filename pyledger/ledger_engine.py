@@ -1996,9 +1996,8 @@ class LedgerEngine(ABC):
 
         # Apply account multiplier
         balances["report_balance"] *= balances["account_multiplier"]
-        reporting_currency = self.reporting_currency
         balances["balance"] = [
-            {k: v * m for k, v in b.items() if not k == reporting_currency}
+            {k: v * m for k, v in b.items()}
             for b, m in zip(balances["balance"], balances["account_multiplier"])
         ]
         aggregated = self.aggregate_account_balances(balances, n=prune_level)
