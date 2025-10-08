@@ -123,3 +123,19 @@ Core dependencies:
 Development dependencies:
 - `flake8` - Linting
 - `bandit` - Security checks
+
+## Code Style Preferences
+
+### General Style
+- Max line length: 100 characters
+- No empty lines between tightly coupled statements
+- Empty line before `if` statements
+- Empty line before `return` statements
+- Empty line after setup/initialization blocks
+- Avoid unnecessary intermediate variables for simple assignments that can be inlined
+- No obvious comments that explain what the code clearly does
+
+### Pull Request Guidelines
+- **PR Title**: Keep simple and descriptive. Do NOT include issue numbers (e.g., "#239")
+- **PR Body**: Leave empty by default. Only add description as comments if explicitly requested
+- **Linking Issues**: Use PR body or comments to reference issues, not the title
