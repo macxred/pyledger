@@ -1892,7 +1892,6 @@ class LedgerEngine(ABC):
         Raises:
             ValueError:
             - If `columns["label"]` contains duplicate column names.
-            - If any label contains `"__"` while `currency_balances=True`.
         """
         if foreign_currency_style is None:
             foreign_currency_style = (
@@ -1903,31 +1902,38 @@ class LedgerEngine(ABC):
         if len(set(labels)) != len(labels):
             raise ValueError(f"Duplicate column names in `columns['labels']`: {labels}")
 
-        if any("__" in label for label in labels) and currency_balances:
-            raise ValueError("Column labels should not include '__' when `currency_balances=True`")
-
         dfs = [
-            self._report_column(
-                row=row, accounts=accounts,
-                prune_level=prune_level, currency_balances=currency_balances
-            )
+            self._report_column(row=row, accounts=accounts, prune_level=prune_level)
             for row in columns.to_dict("records")
         ]
         sheet = pd.concat(dfs, axis=1)
-        # Remove duplicate "group"/"description" columns, keeping the first instance
         drop_columns = sheet.columns.duplicated() & sheet.columns.isin(['group', 'description'])
         sheet = sheet.loc[:, ~drop_columns]
-
+        reporting_cols = [c for c in sheet.columns if c.endswith("_REPORTING_CURRENCY")]
+        currency_cols = [c for c in sheet.columns if c.endswith("_ACCOUNT_CURRENCY")]
         if drop_empty:
-            # Keep only rows with at least one nonzero/non-NA value
-            value_cols = [c for c in sheet.columns if c not in ["group", "description"]]
-            mask = (sheet[value_cols].notna() & (sheet[value_cols] != 0)).any(axis=1)
+            reporting_mask = (
+                (sheet[reporting_cols].notna() & (sheet[reporting_cols] != 0)).any(axis=1)
+            )
+            currency_mask = sheet[currency_cols].apply(
+                lambda row: any(val for val in row if pd.notna(val)), axis=1
+            )
+            mask = reporting_mask | currency_mask
             sheet = sheet.loc[mask].reset_index(drop=True)
 
-        all_labels = [c for c in sheet.columns if any(c.startswith(label) for label in labels)]
+        def sum_dicts(series):
+            """Sum dict values by key across all rows."""
+            series = series.dropna()
+            if series.empty:
+                return {}
+            all_currencies = {curr for d in series for curr in d}
+            return {curr: sum(d.get(curr, 0) for d in series) for curr in all_currencies}
+
+        summarize_funcs = {col: "sum" for col in reporting_cols}
+        summarize_funcs.update({col: sum_dicts for col in currency_cols})
         report = summarize_groups(
-            df=sheet,
-            summarize={label: "sum" for label in all_labels},
+            df=sheet[["group", "description"] + reporting_cols + currency_cols],
+            summarize=summarize_funcs,
             group="group",
             description="description",
             leading_space=1,
@@ -1941,13 +1947,32 @@ class LedgerEngine(ABC):
             def format_number(x):
                 return f"{x:,.{decimal_places}f}"
 
-        for label in all_labels:
-            report[label] = report[label].map(
+        def format_series(series: pd.Series) -> pd.Series:
+            """Format numeric values in a Series, suppressing small values."""
+            return series.map(
                 lambda x: "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
             )
 
+        # Format reporting currency columns
+        for col in reporting_cols:
+            report[col] = format_series(report[col])
+
         if currency_balances:
-            report = self._flatten_currency_columns(report, labels)
+            # Format currency dicts to strings
+            for col in currency_cols:
+                report[col] = report[col].map(
+                    lambda d: {
+                        curr: format_series(pd.Series([d[curr]])).iloc[0]
+                        for curr in d
+                    } if pd.notna(d) and d else {}
+                )
+            # Flatten into sub-rows
+            report = self._flatten_currency_columns(report, reporting_cols, currency_cols)
+        else:
+            rename_map = {col: col.removesuffix("_REPORTING_CURRENCY") for col in reporting_cols}
+            report = report[["level", "group", "description"] + reporting_cols].rename(
+                columns=rename_map
+            )
 
         bold = [0] + (
             report.index[report["level"].str.fullmatch(r"[HS][0-9]")] + 1
@@ -1979,10 +2004,8 @@ class LedgerEngine(ABC):
 
         return report
 
-    def _report_column(
-        self, row, accounts, prune_level=2, currency_balances: bool = False
-    ) -> pd.DataFrame:
-        """Helper to compute balances for a single reporting column config."""
+    def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
+        """Helper to compute balances for a single reporting column"""
         balances = self.individual_account_balances(
             accounts=accounts["account"].tolist(),
             period=row["period"],
@@ -2005,60 +2028,44 @@ class LedgerEngine(ABC):
         # Hack: aggregate_account_balances always adds a leading slash, remove it manually
         aggregated["group"] = aggregated["group"].str.removeprefix("/")
 
-        prefix = f"{row['label']}__" if currency_balances else ""
-        report_col = f"{prefix}reporting_currency" if currency_balances else row["label"]
-        df = aggregated.rename(columns={"report_balance": report_col})
-        if currency_balances:
-            expanded = pd.DataFrame.from_records(df["balance"]).fillna(0.0)
-            if not expanded.empty:
-                df = pd.concat([df.drop(columns=["balance"]), expanded.add_prefix(prefix)], axis=1)
+        reporting_col = f"{row['label']}_REPORTING_CURRENCY"
+        currency_col = f"{row['label']}_ACCOUNT_CURRENCY"
+        aggregated = aggregated.rename(columns={
+            "report_balance": reporting_col, "balance": currency_col
+        })
+        return aggregated[["group", "description", reporting_col, currency_col]]
 
-        # Select columns for this label: exact match or {label}__ prefix for currency columns
-        if currency_balances:
-            label_cols = [c for c in df.columns if c.startswith(f"{row['label']}__")]
-        else:
-            label_cols = [c for c in df.columns if c == row["label"]]
-        cols = ["group", "description"] + label_cols
-        return df.loc[:, cols]
-
-    def _flatten_currency_columns(self, df: pd.DataFrame, labels: list[str]) -> pd.DataFrame:
-        """Reshape a wide-format report into a line-per-currency view.
-
-        Each row in the input may contain amounts in multiple columns such as
-        `<label>__reporting_currency`, `<label>__USD`, `<label>__CHF`, etc.
-        This method expands such rows so that:
-        - The `reporting_currency` row is preserved as-is, with its original
-          `level`, `group`, and `description`.
-        - For each non-reporting currency that has values in any of the labels,
-          a new "sub" row is created underneath. These rows have empty group/
-          description, `level="sub"`, and show values as `"CURRENCY amount"`.
-        - Sub-rows that are completely empty across all labels are omitted.
-        """
-        rep = "reporting_currency"
-        label_cols = {
-            label: [c for c in df.columns if c.startswith(label + "__")] for label in labels
-        }
+    def _flatten_currency_columns(
+        self, df: pd.DataFrame, reporting_cols: list[str], currency_cols: list[str]
+    ) -> pd.DataFrame:
+        """Reshape foreign currency dicts into sub-rows for display."""
+        labels = [col.removesuffix("_REPORTING_CURRENCY") for col in reporting_cols]
         res = []
         for _, row in df.iterrows():
             lookup = {
-                label: {
-                    c.split("__", 1)[1]: row[c]
-                    for c in label_cols[label] if pd.notna(row[c]) and str(row[c]).strip()
-                }
-                for label in labels
+                label: {"reporting_currency": row[rep_col]} | (row[cur_col] or {})
+                for label, rep_col, cur_col in zip(labels, reporting_cols, currency_cols)
             }
-            currencies = [rep] + sorted({k for d in lookup.values() for k in d} - {rep})
+            should_flatten = row["level"] == "body" or row["level"].startswith("S")
+            currencies = (
+                ["reporting_currency"] + sorted(
+                    {c for d in lookup.values() for c in d} - {"reporting_currency"}
+                ) if should_flatten else ["reporting_currency"]
+            )
             for curr in currencies:
-                rec = {
-                    "level": row["level"] if curr == rep else "sub",
-                    "group": row["group"] if curr == rep else "",
-                    "description": row["description"] if curr == rep else "",
+                main = (curr == "reporting_currency")
+                cols = {
+                    label: lookup[label].get(curr, "") if main
+                    else (f"{curr} {v}" if (v := lookup[label].get(curr, "")) else "")
+                    for label in labels
                 }
-                for label in labels:
-                    bal = lookup[label].get(curr, "")
-                    rec[label] = bal if curr == rep else (f"{curr} {bal}" if bal else "")
-                if curr == rep or any(rec[lab] for lab in labels):
-                    res.append(rec)
+                if main or any(cols.values()):
+                    res.append({
+                        "level": row["level"] if main else "sub",
+                        "group": row["group"] if main else "",
+                        "description": row["description"] if main else "",
+                        **cols
+                    })
         return pd.DataFrame.from_records(res, columns=["level", "group", "description"] + labels)
 
     def account_sheet_tables(
