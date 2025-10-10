@@ -28,6 +28,7 @@ dependencies = [
     "polars",
     "pyarrow",
     "typst",
+    "pytest",
     "consistent_df @ https://github.com/macxred/consistent_df/tarball/main"
 ]
 
@@ -38,4 +39,4 @@ Homepage = "https://github.com/macxred/pyledger"
 dev = ["pytest", "coverage", "flake8", "bandit"]
 
 [tool.setuptools]
-packages = ["pyledger"]
+packages = ["pyledger", "pyledger.tests"]
