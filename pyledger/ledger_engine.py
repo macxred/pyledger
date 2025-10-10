@@ -1902,6 +1902,8 @@ class LedgerEngine(ABC):
         if len(set(labels)) != len(labels):
             raise ValueError(f"Duplicate column names in `columns['labels']`: {labels}")
 
+        reporting_currency = self.reporting_currency
+
         dfs = [
             self._report_column(row=row, accounts=accounts, prune_level=prune_level)
             for row in columns.to_dict("records")
@@ -1938,7 +1940,7 @@ class LedgerEngine(ABC):
             summarize=summarize_funcs, group="group", description="description",
             leading_space=1, staggered=staggered
         )
-        precision = self.precision_vectorized([self.reporting_currency], [None])[0]
+        precision = self.precision_vectorized([reporting_currency], [None])[0]
 
         if format_number is None:
             decimal_places = max(0, int(-math.floor(math.log10(precision))))
@@ -1958,7 +1960,9 @@ class LedgerEngine(ABC):
                         for curr in d
                     } if pd.notna(d) and d else {}
                 )
-            report = self._flatten_currency_columns(report, reporting_cols, currency_cols, labels)
+            report = self._flatten_currency_columns(
+                report, reporting_cols, currency_cols, labels, reporting_currency
+            )
         else:
             report = report[["level", "group", "description"] + reporting_cols].rename(
                 columns=dict(zip(reporting_cols, labels))
@@ -2040,7 +2044,8 @@ class LedgerEngine(ABC):
 
     @staticmethod
     def _flatten_currency_columns(
-        df: pd.DataFrame, reporting_cols: list[str], currency_cols: list[str], labels: list[str]
+        df: pd.DataFrame, reporting_cols: list[str], currency_cols: list[str], labels: list[str],
+        reporting_currency: str
     ) -> pd.DataFrame:
         """Reshape foreign currency dicts into sub-rows for display."""
         res = []
@@ -2050,13 +2055,19 @@ class LedgerEngine(ABC):
                 for label, rep_col, cur_col in zip(labels, reporting_cols, currency_cols)
             }
             should_flatten = row["level"] == "body" or row["level"].startswith("S")
+            foreign_currencies = {c for d in lookup.values() for c in d} - {"reporting_currency"}
             currencies = (
-                ["reporting_currency"] + sorted(
-                    {c for d in lookup.values() for c in d} - {"reporting_currency"}
-                ) if should_flatten else ["reporting_currency"]
+                ["reporting_currency"] + sorted(foreign_currencies) if should_flatten
+                else ["reporting_currency"]
             )
             for curr in currencies:
                 main = (curr == "reporting_currency")
+                # Skip reporting currency sub-row when it's the only foreign currency
+                # and have the same value, as it would redundantly repeat the main row
+                if (not main and curr == reporting_currency
+                        and foreign_currencies == {reporting_currency}):
+                    continue
+
                 cols = {
                     label: lookup[label].get(curr, "") if main
                     else (f"{curr} {v}" if (v := lookup[label].get(curr, "")) else "")
