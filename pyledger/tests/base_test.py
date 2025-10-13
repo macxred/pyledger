@@ -373,6 +373,67 @@ EXPECTED_HISTORY = [{
             2024-05-07,    1000,   5000,      USD, -777.77,   -799.98,       -777.77,        -799.98,   EXEMPT,        Bakery, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
             2024-05-08,    1000,       ,      USD, -999.99,  -1799.97,       -999.99,       -1799.97,         ,        Bakery, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
             2024-05-25,    1010,   5000,      EUR, -800.00,  -2599.97,       -863.52,       -2663.49,   IN_STD,          Cafe, Purchase goods, 2024/payables/2024-05-25.pdf"""
+    }, {
+        "period": "2024-07", "account": "1000", "profit_centers": None, "drop": True, "opening_balance": True, "account_history":
+            """
+                  date, contra, currency,      amount,    balance, tax_code, description, document
+            2024-06-30,       ,      USD,        0.00,  777011.79,         , Opening Balance,"""
+    }, {
+        "period": "2024-05", "account": "1000:1020", "profit_centers": None, "drop": False, "opening_balance": True, "account_history":
+            """
+                  date, account, contra, currency,      amount,     balance, report_amount, report_balance, tax_code, description, document
+            2024-04-30,    1000,       ,      USD,        0.00,   779911.76,          0.00,      779911.76,         , Opening Balance,
+            2024-04-30,    1005,       ,      USD,        0.00,        0.00,          0.00,           0.00,         , Opening Balance,
+            2024-04-30,    1010,       ,      EUR,        0.00,    20120.00,          0.00,       21417.77,         , Opening Balance,
+            2024-04-30,    1015,       ,      EUR,        0.00,        0.00,          0.00,           0.00,         , Opening Balance,
+            2024-04-30,    1020,       ,      JPY,        0.00, 42000000.00,          0.00,      277200.00,         , Opening Balance,
+            2024-05-05,    1000,   5000,      USD,     -555.55, 42799476.21,       -555.55,     1077973.98,   IN_STD, Purchase with tax, 2024/payables/2024-05-05.pdf
+            2024-05-06,    1000,   5000,      USD,     -666.66, 42798809.55,       -666.66,     1077307.32,   IN_RED, Purchase at reduced tax, 2024/payables/2024-05-06.pdf
+            2024-05-07,    1000,   5000,      USD,     -777.77, 42798031.78,       -777.77,     1076529.55,   EXEMPT, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+            2024-05-08,    1000,       ,      USD,     -999.99, 42797031.79,       -999.99,     1075529.56,         , Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf
+            2024-05-24,    1015,       ,      EUR,      -20.00, 42797011.79,        -20.50,     1075509.06,         , Collective transaction - leg with debit account,
+            2024-05-24,    1005,   1000,      USD,     -100.00, 42796911.79,       -100.00,     1075409.06,         , Collective transaction - leg with debit and credit account,
+            2024-05-24,    1010,       ,      EUR,       20.00, 42796931.79,         20.50,     1075429.56,         , Collective transaction - leg with credit account,
+            2024-05-24,    1000,   1005,      USD,      100.00, 42797031.79,        100.00,     1075529.56,         , Collective transaction - leg with debit and credit account,
+            2024-05-24,    1000,       ,      USD,        0.00, 42797031.79,          0.00,     1075529.56,         , Collective transaction with zero amount,
+            2024-05-24,    1000,       ,      USD,     -100.00, 42796931.79,       -100.00,     1075429.56,         , Collective transaction with zero amount,
+            2024-05-24,    1000,       ,      USD,      100.00, 42797031.79,        100.00,     1075529.56,         , Collective transaction with zero amount,
+            2024-05-25,    1010,   5000,      EUR,     -800.00, 42796231.79,       -863.52,     1074666.04,   IN_STD, Purchase goods, 2024/payables/2024-05-25.pdf"""
+    }, {
+        "period": "2024-Q4", "account": "1000", "profit_centers": None, "drop": True, "opening_balance": True, "account_history":
+            """
+                  date, contra, currency,      amount,     balance, tax_code, description, document
+            2024-09-30,       ,      USD,        0.00,   776311.79,         , Opening Balance,
+            2024-12-01,   3000,      USD, 10000000.00, 10776311.79,         , Capital Increase,
+            2024-12-04,       ,      USD, -9500000.00,  1276311.79,         , Convert 9.5 Mio USD at EUR @1.050409356 (9 decimal places)
+            2024-12-05,       ,      USD,  -200000.00,  1076311.79,         , Convert USD to EUR and CHF"""
+    }, {
+        "period": "2024", "account": "1020", "profit_centers": None, "drop": True, "opening_balance": True, "account_history":
+            """
+                  date, currency,       amount,     balance, report_amount, report_balance, description, document
+            2023-12-31,      JPY,         0.00,        0.00,          0.00,           0.00, Opening Balance,
+            2024-01-01,      JPY,  42000000.00, 42000000.00,     298200.00,      298200.00, Opening balance, 2023/financials/balance_sheet.pdf
+            2024-03-31,      JPY,         0.00, 42000000.00,     -21000.00,      277200.00, FX revaluations,
+            2024-06-30,      JPY,         0.00, 42000000.00,     -16800.00,      260400.00, FX revaluations,
+            2024-07-04,      JPY,  12345678.00, 54345678.00,      76386.36,      336786.36, Convert JPY to EUR, 2024/transfers/2024-07-05_JPY-EUR.pdf
+            2024-09-10,      JPY,         0.00, 54345678.00,          5.55,      336791.91, Manual Foreign currency adjustment,"""
+    }, {
+        "period": "2024-03", "account": "1010", "profit_centers": None, "drop": True, "opening_balance": True, "account_history":
+            """
+                  date, contra, currency, amount, balance, report_amount, report_balance, tax_code, description, document
+            2024-02-29,       ,      EUR,   0.00,  120.00,        0.00,         132.82,         , Opening Balance,
+            2024-03-31,       ,      EUR,   0.00,  120.00,       -3.29,         129.53,         , FX revaluations,"""
+    }, {
+        "period": "2024-05", "account": "1000:1020", "profit_centers": "General+Shop+Bakery", "drop": False, "opening_balance": True, "account_history":
+            """
+                  date, account, contra, currency,      amount,     balance, report_amount, report_balance, tax_code, profit_center, description, document
+            2024-04-30,    1000,       ,      USD,        0.00,   779911.76,          0.00,      779911.76,         , Bakery+General+Shop, Opening Balance,
+            2024-04-30,    1005,       ,      USD,        0.00,        0.00,          0.00,           0.00,         , Bakery+General+Shop, Opening Balance,
+            2024-04-30,    1010,       ,      EUR,        0.00,    20120.00,          0.00,       21421.06,         , Bakery+General+Shop, Opening Balance,
+            2024-04-30,    1015,       ,      EUR,        0.00,        0.00,          0.00,           0.00,         , Bakery+General+Shop, Opening Balance,
+            2024-04-30,    1020,       ,      JPY,        0.00, 42000000.00,          0.00,      298200.00,         , Bakery+General+Shop, Opening Balance,
+            2024-05-07,    1000,   5000,      USD,     -777.77, 42799253.99,       -777.77,     1098755.05,   EXEMPT,        Bakery, Tax-Exempt purchase, 2024/payables/2024-05-07.pdf
+            2024-05-08,    1000,       ,      USD,     -999.99, 42798254.00,       -999.99,     1097755.06,         ,        Bakery, Purchase with mixed tax rates, 2024/payables/2024-05-08.pdf"""
     }
 ]
 
