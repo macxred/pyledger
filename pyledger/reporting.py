@@ -28,7 +28,9 @@ def summarize_groups(
         df (pd.DataFrame): Input with `group`, `description`, and summary columns.
         group (str): Column with slash-separated group paths.
         description (str): Column with row labels.
-        summarize (dict): Mapping of columns to aggregation functions.
+        summarize (dict): Mapping of columns to aggregation functions:
+            - String (e.g., "sum"): For numeric columns (Float64 dtype), aggregates using pandas
+            - Callable: For dict columns (object dtype), custom aggregation function
         leading_space (int): Number of header levels to prefix with a gap (hierarchical only).
         staggered (bool): Use cumulative totals instead of per-level totals.
 
@@ -43,22 +45,30 @@ def summarize_groups(
             - 'level' (str): One of 'H1', 'H2', ..., 'S1', 'S2', ..., 'body', or 'gap'
             - 'group' (str): Group identifier for each row
             - 'description' (str): Row label (e.g., header name, item label, or total label)
-            - <summary columns> (Float64): One column per key in `summarize`,
-              containing aggregated values or NA depending on row type
+            - <summary columns>: One column per key in `summarize`.
+              Float64 for numeric columns (string agg), object for dict columns (callable agg).
     """
     required_columns = [group, description] + list(summarize.keys())
     missing = set(required_columns) - set(df.columns)
     if missing:
         raise ValueError(f"DataFrame missing required columns: {missing}.")
 
+    summary_dtypes = [
+        "Float64" if isinstance(agg, str) else "object" for agg in summarize.values()
+    ]
     schema = pd.DataFrame({
         "column": ["level", group, description] + list(summarize.keys()),
-        "dtype": ["string", "string", "string"] + ["Float64"] * len(summarize)
+        "dtype": ["string", "string", "string"] + summary_dtypes
     })
     if df.empty:
         return enforce_schema(None, schema)
 
-    cumulative = pd.DataFrame({col: 0.0 for col in summarize}, index=[0]) if staggered else None
+    if staggered:
+        cumulative = pd.DataFrame({
+            col: 0.0 if isinstance(agg, str) else {} for col, agg in summarize.items()
+        }, index=[0])
+    else:
+        cumulative = None
     result = _summarize_groups(
         df.copy(), group, description, summarize,
         level=1, staggered=staggered, cumulative=cumulative

@@ -1834,6 +1834,7 @@ class LedgerEngine(ABC):
     def report_table(
         self, columns, accounts, staggered=False, prune_level=2, format="typst",
         format_number: Callable[[float], str] = None, drop_empty=False, raw=False,
+        currency_balances: bool = False, foreign_currency_style: str = None
     ):
         """
         Create a multi-period financial report from account balances.
@@ -1876,6 +1877,12 @@ class LedgerEngine(ABC):
             raw : bool, default False
                 When False, escapes Typst special characters (\\ $ # * @ < >) in description column
                 when format="typst".
+            currency_balances (bool): If True, include currency-specific balance by adding them
+                as subrows after the reporting currency balance row.
+            foreign_currency_style (str, optional): Typst style definition for foreign currency
+                balance subrows. Default is "#let foreign-currency-balance(body) = text(fill: gray,
+                size: 0.7em)[#body]". When currency_balances=True and format="typst", the table is
+                wrapped in a block scope with this style definition to format currency subrows.
 
         Returns:
             str or pd.DataFrame:
@@ -1883,70 +1890,129 @@ class LedgerEngine(ABC):
                 - DataFrame if `format="dataframe"` (for further processing).
 
         Raises:
-            ValueError: If `columns["label"]` contains duplicate column names.
+            ValueError:
+            - If `columns["label"]` contains duplicate column names.
         """
+        if foreign_currency_style is None:
+            foreign_currency_style = (
+                "let foreign-currency-balance(body) = text(fill: gray, size: 0.7em)[#body]"
+            )
+
         labels = columns["label"].tolist()
         if len(set(labels)) != len(labels):
             raise ValueError(f"Duplicate column names in `columns['labels']`: {labels}")
+
+        reporting_currency = self.reporting_currency
 
         dfs = [
             self._report_column(row=row, accounts=accounts, prune_level=prune_level)
             for row in columns.to_dict("records")
         ]
         sheet = pd.concat(dfs, axis=1)
-        # Remove duplicate "group"/"description" columns, keeping the first instance
         drop_columns = sheet.columns.duplicated() & sheet.columns.isin(['group', 'description'])
         sheet = sheet.loc[:, ~drop_columns]
+        reporting_cols = [f"{label}_REPORTING_CURRENCY" for label in labels]
+        currency_cols = [f"{label}_ACCOUNT_CURRENCY" for label in labels]
 
         if drop_empty:
-            # Keep only rows with at least one nonzero/non-NA value
-            value_cols = [c for c in sheet.columns if c not in ["group", "description"]]
-            mask = (sheet[value_cols].notna() & (sheet[value_cols] != 0)).any(axis=1)
+            reporting_mask = (
+                (sheet[reporting_cols].notna() & (sheet[reporting_cols] != 0)).any(axis=1)
+            )
+            currency_mask = sheet[currency_cols].apply(
+                lambda row: any(val for val in row if pd.notna(val)), axis=1
+            )
+            mask = reporting_mask | currency_mask
             sheet = sheet.loc[mask].reset_index(drop=True)
 
-        report = summarize_groups(
-            df=sheet,
-            summarize={label: "sum" for label in labels},
-            group="group",
-            description="description",
-            leading_space=1,
-            staggered=staggered
-        )
+        def sum_dicts(series):
+            """Sum dict values by key across all rows."""
+            series = series.dropna()
+            if series.empty:
+                return {}
+            all_currencies = {curr for d in series for curr in d}
+            return {curr: sum(d.get(curr, 0) for d in series) for curr in all_currencies}
 
-        precision = self.precision_vectorized([self.reporting_currency], [None])[0]
+        summarize_funcs = (
+            {col: "sum" for col in reporting_cols} | {col: sum_dicts for col in currency_cols}
+        )
+        report = summarize_groups(
+            df=sheet[["group", "description"] + reporting_cols + currency_cols],
+            summarize=summarize_funcs, group="group", description="description",
+            leading_space=1, staggered=staggered
+        )
+        precision = self.precision_vectorized([reporting_currency], [None])[0]
+
         if format_number is None:
             decimal_places = max(0, int(-math.floor(math.log10(precision))))
 
             def format_number(x):
                 return f"{x:,.{decimal_places}f}"
 
-        for label in labels:
-            report[label] = report[label].map(
-                lambda x: "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
+        for col in reporting_cols:
+            report[col] = self._format_numeric_series(report[col], format_number, precision)
+        if currency_balances:
+            for col in currency_cols:
+                report[col] = report[col].map(
+                    lambda d: {
+                        curr: self._format_numeric_series(
+                            pd.Series([d[curr]]), format_number, precision
+                        ).iloc[0]
+                        for curr in d
+                    } if pd.notna(d) and d else {}
+                )
+            report = self._flatten_currency_columns(
+                report, reporting_cols, currency_cols, labels, reporting_currency
+            )
+        else:
+            report = report[["level", "group", "description"] + reporting_cols].rename(
+                columns=dict(zip(reporting_cols, labels))
             )
 
-        bold = [0] + (report.index[report["level"].str.match(r"^[HS][0-9]$")] + 1).tolist()
-        hline = (report.index[report["level"] == "H1"] + 1).tolist()
+        bold, hline, inset = self._get_typst_formatting_indices(report)
+        mask = report["level"] == "sub"
+        report.loc[mask, labels] = report.loc[mask, labels].astype(str).apply(
+            lambda col: '#foreign-currency-balance()[' + col + ']'
+        )
         report = report[["description"] + labels]
         report.columns = [""] + labels
 
         if format == "typst":
-            # Escape Typst-sensitive characters in description column only
             if not raw:
                 report.iloc[:, 0] = escape_typst_text(report.iloc[:, 0])
-            return df_to_typst(
-                df=report,
-                hline=hline,
-                bold=bold,
-                columns=["1fr"] + ["auto"] * len(labels),
+            report = df_to_typst(
+                df=report, hline=hline, bold=bold, inset=inset, colnames=True,
                 align=["left"] + ["right"] * len(labels),
-                colnames=True
+                columns=["1fr"] + ["auto"] * len(labels),
             )
+            if currency_balances:
+                report = f"{{\n{foreign_currency_style}\n\n{report}\n}}\n"
 
         return report
 
+    @staticmethod
+    def _format_numeric_series(
+        series: pd.Series, format_number: Callable[[float], str], precision: float
+    ) -> pd.Series:
+        """Format numeric values in a Series, suppressing small values below precision threshold."""
+        return series.map(
+            lambda x: "" if pd.isna(x) or abs(x) < precision / 2 else format_number(x)
+        )
+
+    @staticmethod
+    def _get_typst_formatting_indices(report: pd.DataFrame) -> tuple[list[int], list[int], dict]:
+        """Extract indices for bold rows, horizontal lines, and cell insets for Typst formatting."""
+        bold = [0] + (
+            report.index[report["level"].str.fullmatch(r"[HS][0-9]")] + 1
+        ).tolist()
+        hline = (report.index[report["level"] == "H1"] + 1).tolist()
+
+        mask = report["level"] == "sub"
+        inset = {idx + 1: {"top": "0.2pt"} for idx in report.index[mask]}
+
+        return bold, hline, inset
+
     def _report_column(self, row, accounts, prune_level=2) -> pd.DataFrame:
-        """Helper to compute balances for a single reporting column."""
+        """Helper to compute balances for a single reporting column"""
         balances = self.individual_account_balances(
             accounts=accounts["account"].tolist(),
             period=row["period"],
@@ -1960,14 +2026,61 @@ class LedgerEngine(ABC):
 
         # Apply account multiplier
         balances["report_balance"] *= balances["account_multiplier"]
+        balances["balance"] = [
+            {k: v * m for k, v in b.items()}
+            for b, m in zip(balances["balance"], balances["account_multiplier"])
+        ]
         aggregated = self.aggregate_account_balances(balances, n=prune_level)
 
         # Hack: aggregate_account_balances always adds a leading slash, remove it manually
         aggregated["group"] = aggregated["group"].str.removeprefix("/")
 
-        return aggregated[["group", "description", "report_balance"]].rename(
-            columns={"report_balance": row["label"]}
-        )
+        reporting_col = f"{row['label']}_REPORTING_CURRENCY"
+        currency_col = f"{row['label']}_ACCOUNT_CURRENCY"
+        aggregated = aggregated.rename(columns={
+            "report_balance": reporting_col, "balance": currency_col
+        })
+        return aggregated[["group", "description", reporting_col, currency_col]]
+
+    @staticmethod
+    def _flatten_currency_columns(
+        df: pd.DataFrame, reporting_cols: list[str], currency_cols: list[str], labels: list[str],
+        reporting_currency: str
+    ) -> pd.DataFrame:
+        """Reshape foreign currency dicts into sub-rows for display."""
+        res = []
+        for _, row in df.iterrows():
+            lookup = {
+                label: {"reporting_currency": row[rep_col]} | (row[cur_col] or {})
+                for label, rep_col, cur_col in zip(labels, reporting_cols, currency_cols)
+            }
+            should_flatten = row["level"] == "body" or row["level"].startswith("S")
+            foreign_currencies = {c for d in lookup.values() for c in d} - {"reporting_currency"}
+            currencies = (
+                ["reporting_currency"] + sorted(foreign_currencies) if should_flatten
+                else ["reporting_currency"]
+            )
+            for curr in currencies:
+                main = (curr == "reporting_currency")
+                # Skip reporting currency sub-row when it's the only foreign currency
+                # and have the same value, as it would redundantly repeat the main row
+                if (not main and curr == reporting_currency
+                        and foreign_currencies == {reporting_currency}):
+                    continue
+
+                cols = {
+                    label: lookup[label].get(curr, "") if main
+                    else (f"{curr} {v}" if (v := lookup[label].get(curr, "")) else "")
+                    for label in labels
+                }
+                if main or any(cols.values()):
+                    res.append({
+                        "level": row["level"] if main else "sub",
+                        "group": row["group"] if main else "",
+                        "description": row["description"] if main else "",
+                        **cols
+                    })
+        return pd.DataFrame.from_records(res, columns=["level", "group", "description"] + labels)
 
     def account_sheet_tables(
         self,

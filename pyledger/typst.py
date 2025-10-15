@@ -12,6 +12,7 @@ def df_to_typst(
     na_value: str = "",
     hline: list[int] = [],
     bold: list[int] = [],
+    inset: dict[int, dict] = None,
     colnames: bool = True,
     repeat_colnames: bool = True,
 ) -> str:
@@ -35,6 +36,9 @@ def df_to_typst(
             Use -1 for a line above the header.
         bold (list[int], optional): Row indices to render in bold.
             Indices are 0-based and include the header if `colnames=True`.
+        inset (dict[int, dict], optional): Dictionary mapping row indices to inset specifications.
+            Keys are 0-based row indices (including header if `colnames=True`).
+            Values are dicts with keys like "top", "bottom", "left", "right" (e.g., {"top": "2pt"}).
         colnames (bool): Whether to include column names as the first row. Defaults to True.
         repeat_colnames (bool): Whether the header repeats on each page if the table spans multiple
             pages. Defaults to True, matching Typst's `table.header(repeat: true)` default.
@@ -75,8 +79,10 @@ def df_to_typst(
         row_idx += 1
     # Data rows
     for _, row in df.iterrows():
+        row_inset = inset.get(row_idx) if inset else None
         result.extend(_typst_row(
-            row, na_value=na_value, bold=(row_idx in bold), hline=(row_idx in hline)
+            row, na_value=na_value, bold=(row_idx in bold), hline=(row_idx in hline),
+            inset=row_inset
         ))
         row_idx += 1
     result.append(")")
@@ -88,16 +94,32 @@ def _typst_attribute(x: list) -> str:
     return ", ".join(map(str, x))
 
 
-def _typst_row(row: list, na_value: str, bold: bool, hline: bool) -> list[str]:
+def _typst_row(row: list, na_value: str, bold: bool, hline: bool, inset: dict = None) -> list[str]:
     """
     Convert a data frame row to a Typst-formatted table row.
-    Optionally adding a horizontal line at the bottom.
+    Optionally adding a horizontal line at the bottom and custom insets.
     """
     cells = [na_value if pd.isna(cell) else cell for cell in list(row)]
-    if bold:
-        row = ["  " + " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)]
+
+    if inset:
+        inset_parts = [f"{k}: {v}" for k, v in inset.items()]
+        inset_spec = ", ".join(inset_parts)
+
+        # Wrap each cell in table.cell with custom inset
+        if bold:
+            cell_strs = [
+                f'table.cell(inset: ({inset_spec}))[#text(weight: "bold")[{cell}]],'
+                for cell in cells
+            ]
+        else:
+            cell_strs = [f'table.cell(inset: ({inset_spec}))[{cell}],' for cell in cells]
+        row = ["  " + " ".join(cell_strs)]
     else:
-        row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
+        if bold:
+            row = ["  " + " ".join(f'text(weight: "bold", [{cell}]),' for cell in cells)]
+        else:
+            row = ["  " + " ".join(f"[{cell}]," for cell in cells)]
+
     if hline:
         row.append("  table.hline(),")
     return row
