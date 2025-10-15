@@ -171,6 +171,15 @@ TARGET_BALANCE_CSV = """
 """
 TARGET_BALANCE = pd.read_csv(StringIO(TARGET_BALANCE_CSV), skipinitialspace=True)
 
+LOANS_CSV = """
+    account, start,      interest_rate, capitalize, frequency,  day_count, interest_account, contra_account, booking_frequency, description,                           document
+    2000,    2024-01-01, 0.05,          True,       monthly,    30/360,    7050,             1000,           quarterly,         Loan with interest capitalization,     loans/loan_001.pdf
+    2010,    2024-06-01, 0.03,          False,      quarterly,  ACT/365,   ,                 ,               ,                  Loan without interest capitalization,  loans/loan_002.pdf
+    2000,    2024-09-01, 0.04,          True,       bi-annually,ACT/360,   ,                 ,               ,                  Bi-annual loan,                        loans/loan_003.pdf
+    1000,    2024-03-15, 0.025,         False,      annually,   ACT/ACT,   7050,             2000,           annually,          Annual loan with accounts,             loans/loan_004.pdf
+"""
+LOANS = pd.read_csv(StringIO(LOANS_CSV), skipinitialspace=True)
+
 # flake8: noqa: E501
 EXPECTED_BALANCES_CSV = """
     period,       account,            profit_center, report_balance,   balance
@@ -483,6 +492,7 @@ class BaseTest(ABC):
     RECONCILIATION = engine.reconciliation.standardize(RECONCILIATION)
     PROFIT_CENTERS = engine.profit_centers.standardize(PROFIT_CENTERS)
     TARGET_BALANCE = engine.target_balance.standardize(TARGET_BALANCE)
+    LOANS = engine.loans.standardize(LOANS)
     EXPECTED_BALANCES = EXPECTED_BALANCES
     EXPECTED_BALANCES["profit_center"] = EXPECTED_BALANCES["profit_center"].apply(parse_profit_center)
     EXPECTED_BALANCES["balance"] = parse_balance_series(EXPECTED_BALANCES["balance"])

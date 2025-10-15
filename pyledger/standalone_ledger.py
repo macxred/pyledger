@@ -11,7 +11,10 @@ from pyledger.helpers import first_elements_as_str
 from pyledger.storage_entity import AccountingEntity
 from pyledger.time import parse_date_span
 from .decorators import timed_cache
-from .constants import JOURNAL_SCHEMA, REVALUATION_SCHEMA, TARGET_BALANCE_SCHEMA
+from .constants import (
+    JOURNAL_SCHEMA, REVALUATION_SCHEMA, TARGET_BALANCE_SCHEMA, LOAN_SCHEMA,
+    VALID_LOAN_FREQUENCIES, VALID_DAY_COUNT_CONVENTIONS
+)
 from .ledger_engine import LedgerEngine
 from consistent_df import enforce_schema
 
@@ -39,21 +42,26 @@ class StandaloneLedger(LedgerEngine):
     def revaluations(self) -> AccountingEntity:
         return self._revaluations
 
+    @property
+    def loans(self) -> AccountingEntity:
+        return self._loans
+
     # ----------------------------------------------------------------------
     # File Operations
 
     def dump_to_zip(self, archive_path: str):
         """Extend dump_to_zip() to include reconciliation,
-        target balance, and revaluations data in the same archive."""
+        target balance, revaluations, and loans data in the same archive."""
         super().dump_to_zip(archive_path)
         with zipfile.ZipFile(archive_path, 'a') as archive:
             archive.writestr('reconciliation.csv', self.reconciliation.list().to_csv(index=False))
             archive.writestr('target_balance.csv', self.target_balance.list().to_csv(index=False))
             archive.writestr('revaluations.csv', self.revaluations.list().to_csv(index=False))
+            archive.writestr('loans.csv', self.loans.list().to_csv(index=False))
 
     def restore_from_zip(self, archive_path: str):
         """Extend restore_from_zip() to restore reconciliation,
-        target balance, and revaluations data after base restoration."""
+        target balance, revaluations, and loans data after base restoration."""
         super().restore_from_zip(archive_path)
         with zipfile.ZipFile(archive_path, 'r') as archive:
             if 'reconciliation.csv' in archive.namelist():
@@ -62,16 +70,19 @@ class StandaloneLedger(LedgerEngine):
                 self.restore(target_balance=pd.read_csv(archive.open('target_balance.csv')))
             if 'revaluations.csv' in archive.namelist():
                 self.restore(revaluations=pd.read_csv(archive.open('revaluations.csv')))
+            if 'loans.csv' in archive.namelist():
+                self.restore(loans=pd.read_csv(archive.open('loans.csv')))
 
     def restore(
         self, *args,
         reconciliation: pd.DataFrame | None = None,
         target_balance: pd.DataFrame | None = None,
         revaluations: pd.DataFrame | None = None,
+        loans: pd.DataFrame | None = None,
         **kwargs
     ):
         """Extend restore() to restore reconciliation,
-        target balance, and revaluations data after base restoration.
+        target balance, revaluations, and loans data after base restoration.
         """
         super().restore(*args, **kwargs)
         if reconciliation is not None:
@@ -80,14 +91,17 @@ class StandaloneLedger(LedgerEngine):
             self.target_balance.mirror(target_balance, delete=True)
         if revaluations is not None:
             self.revaluations.mirror(revaluations, delete=True)
+        if loans is not None:
+            self.loans.mirror(loans, delete=True)
 
     def clear(self):
         """Extend clear() to delete reconciliation,
-        target balance, and revaluations records after base deletion."""
+        target balance, revaluations, and loans records after base deletion."""
         super().clear()
         self.reconciliation.mirror(None, delete=True)
         self.target_balance.mirror(None, delete=True)
         self.revaluations.mirror(None, delete=True)
+        self.loans.mirror(None, delete=True)
 
     # ----------------------------------------------------------------------
     # Tax Codes
@@ -753,3 +767,191 @@ class StandaloneLedger(LedgerEngine):
             df = df.loc[currency_validation_mask]
 
         return df.reset_index(drop=True)
+
+    # ----------------------------------------------------------------------
+    # Loans
+
+    def sanitize_loans(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Discard incoherent loan data.
+
+        This method applies the following validation rules:
+        1. The `start` date must not be invalid (NaT), otherwise discard the row.
+        2. The `account` must exist in the chart of accounts, otherwise discard the row.
+        3. The `interest_rate` must be >= 0, otherwise discard the row.
+        4. Fill NA values in `capitalize` with False.
+        5. The `frequency` must be one of VALID_LOAN_FREQUENCIES (case-insensitive),
+            otherwise discard the row. Normalize to lowercase.
+        6. If specified, `day_count` must be one of VALID_DAY_COUNT_CONVENTIONS,
+            otherwise discard the row. Accept case-insensitive, normalize to uppercase.
+        7. If specified, `booking_frequency` must be one of VALID_LOAN_FREQUENCIES
+            (case-insensitive), otherwise discard the row. Normalize to lowercase.
+        8. `interest_account` and `contra_account` must both be present or both absent.
+            If both are present, both must exist in the chart of accounts,
+            otherwise discard the row.
+
+        A warning is logged for each dropped entry with the specific reason.
+
+        Args:
+            df (pd.DataFrame): Loan data to sanitize.
+
+        Returns:
+            pd.DataFrame: A sanitized DataFrame containing only valid loan entries.
+        """
+        df = enforce_schema(df, LOAN_SCHEMA, keep_extra_columns=True)
+        df["capitalize"] = df["capitalize"].fillna(False)
+        id_columns = LOAN_SCHEMA.query("id == True")["column"].tolist()
+        invalid_mask = pd.Series(False, index=df.index)
+
+        invalid_mask = self._invalid_loan_start_date(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_account(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_interest_rate(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_frequency(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_day_count(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_booking_frequency(df, invalid_mask, id_columns)
+        invalid_mask = self._invalid_loan_interest_contra_accounts(df, invalid_mask, id_columns)
+
+        return df[~invalid_mask].reset_index(drop=True)
+
+    def _invalid_loan_start_date(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid start dates."""
+        start_invalid_mask = df["start"].isna()
+        new_invalid_mask = start_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {new_invalid_mask.sum()} loan entries with invalid start dates: "
+                f"{first_elements_as_str(invalid_records)}"
+            )
+
+        return invalid_mask | start_invalid_mask
+
+    def _invalid_loan_account(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with non-existent accounts."""
+        valid_accounts = set(self.accounts.list()["account"])
+        account_invalid_mask = ~df["account"].isin(valid_accounts)
+        new_invalid_mask = account_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {new_invalid_mask.sum()} loan entries with non-existent accounts: "
+                f"{first_elements_as_str(invalid_records)}"
+            )
+
+        return invalid_mask | account_invalid_mask
+
+    def _invalid_loan_interest_rate(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with negative interest rates."""
+        rate_invalid_mask = df["interest_rate"] < 0
+        new_invalid_mask = rate_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {new_invalid_mask.sum()} loan entries with negative interest rates: "
+                f"{first_elements_as_str(invalid_records)}"
+            )
+
+        return invalid_mask | rate_invalid_mask
+
+    def _invalid_loan_frequency(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid frequency and normalize valid ones to lowercase."""
+        df["frequency"] = df["frequency"].str.lower()
+        valid_frequencies_lower = [f.lower() for f in VALID_LOAN_FREQUENCIES]
+        frequency_invalid_mask = ~df["frequency"].isin(valid_frequencies_lower)
+        new_invalid_mask = frequency_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {new_invalid_mask.sum()} loan entries with invalid frequency: "
+                f"{first_elements_as_str(invalid_records)}"
+            )
+
+        return invalid_mask | frequency_invalid_mask
+
+    def _invalid_loan_day_count(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid day_count and normalize valid ones to uppercase."""
+        day_count_specified = df["day_count"].notna()
+
+        if day_count_specified.any():
+            df.loc[day_count_specified, "day_count"] = \
+                df.loc[day_count_specified, "day_count"].str.upper()
+            valid_day_counts_upper = [d.upper() for d in VALID_DAY_COUNT_CONVENTIONS]
+            day_count_invalid_mask = (
+                day_count_specified & ~df["day_count"].isin(valid_day_counts_upper)
+            )
+            new_invalid_mask = day_count_invalid_mask & ~invalid_mask
+
+            if new_invalid_mask.any():
+                invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+                self._logger.warning(
+                    f"Discarding {new_invalid_mask.sum()} loan entries with invalid day_count: "
+                    f"{first_elements_as_str(invalid_records)}"
+                )
+
+            return invalid_mask | day_count_invalid_mask
+
+        return invalid_mask
+
+    def _invalid_loan_booking_frequency(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries with invalid booking_frequency and normalize to lowercase."""
+        booking_freq_specified = df["booking_frequency"].notna()
+
+        if booking_freq_specified.any():
+            df.loc[booking_freq_specified, "booking_frequency"] = \
+                df.loc[booking_freq_specified, "booking_frequency"].str.lower()
+            valid_frequencies_lower = [f.lower() for f in VALID_LOAN_FREQUENCIES]
+            booking_freq_invalid_mask = booking_freq_specified & \
+                ~df["booking_frequency"].isin(valid_frequencies_lower)
+            new_invalid_mask = booking_freq_invalid_mask & ~invalid_mask
+
+            if new_invalid_mask.any():
+                invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+                self._logger.warning(
+                    f"Discarding {new_invalid_mask.sum()} loan entries with invalid "
+                    f"booking_frequency: {first_elements_as_str(invalid_records)}"
+                )
+
+            return invalid_mask | booking_freq_invalid_mask
+
+        return invalid_mask
+
+    def _invalid_loan_interest_contra_accounts(
+        self, df: pd.DataFrame, invalid_mask: pd.Series, id_columns: list
+    ) -> pd.Series:
+        """Mark loan entries where interest_account and contra_account are not both
+        present/absent, or where they are both present but don't exist in accounts."""
+        has_interest_account = df["interest_account"].notna()
+        has_contra_account = df["contra_account"].notna()
+        both_or_neither_invalid = has_interest_account != has_contra_account
+        valid_accounts = set(self.accounts.list()["account"])
+        has_both = has_interest_account & has_contra_account
+        accounts_invalid = has_both & (
+            ~df["interest_account"].isin(valid_accounts)
+            | ~df["contra_account"].isin(valid_accounts)
+        )
+        account_invalid_mask = both_or_neither_invalid | accounts_invalid
+        new_invalid_mask = account_invalid_mask & ~invalid_mask
+
+        if new_invalid_mask.any():
+            invalid_records = df.loc[new_invalid_mask, id_columns].to_dict(orient='records')
+            self._logger.warning(
+                f"Discarding {new_invalid_mask.sum()} loan entries with invalid "
+                f"interest_account or contra_account: {first_elements_as_str(invalid_records)}"
+            )
+
+        return invalid_mask | account_invalid_mask

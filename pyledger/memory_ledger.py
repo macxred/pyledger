@@ -12,6 +12,7 @@ from .constants import (
     TARGET_BALANCE_SCHEMA,
     TAX_CODE_SCHEMA,
     REVALUATION_SCHEMA,
+    LOAN_SCHEMA,
 )
 
 
@@ -60,6 +61,7 @@ class MemoryLedger(StandaloneLedger):
         self._profit_centers = DataFrameEntity(PROFIT_CENTER_SCHEMA)
         self._reconciliation = DataFrameEntity(RECONCILIATION_SCHEMA)
         self._target_balance = DataFrameEntity(TARGET_BALANCE_SCHEMA)
+        self._loans = DataFrameEntity(LOAN_SCHEMA)
 
     # ----------------------------------------------------------------------
     # Currency
