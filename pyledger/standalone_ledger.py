@@ -322,7 +322,7 @@ class StandaloneLedger(LedgerEngine):
                 continue
 
             base_entry = {
-                "id": f"target_balance:{row["date"]}:{idx}",
+                "id": f"target_balance:{row['date']}:{idx}",
                 "date": row["date"],
                 "currency": currency,
                 "description": row["description"],

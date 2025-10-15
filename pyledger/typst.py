@@ -109,7 +109,7 @@ def _typst_header_row(row: list, repeat: bool, hline: bool, **kwargs) -> list[st
     Reuses _typst_row for cell rendering. Optionally adds a horizontal line after the header.
     """
     inner = "  " + _typst_row(row, hline=False, **kwargs)[0]
-    row = [f"  table.header(repeat: {"true" if repeat else "false"},", inner, "  ),"]
+    row = [f"  table.header(repeat: {'true' if repeat else 'false'},", inner, "  ),"]
     if hline:
         row.append("  table.hline(),")
     return row
