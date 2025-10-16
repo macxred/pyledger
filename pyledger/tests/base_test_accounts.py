@@ -262,7 +262,8 @@ class BaseTestAccounts(BaseTest):
         for case in filter(lambda c: c["profit_centers"] is not None, self.EXPECTED_HISTORY):
             df = restored_engine.account_history(
                 account=case["account"], period=case["period"],
-                profit_centers=case["profit_centers"], drop=case["drop"]
+                profit_centers=case["profit_centers"], drop=case["drop"],
+                opening_balance=case.get("opening_balance", False)
             )
             expected_df = format_expected_df(case["account_history"], drop=case["drop"])
             assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])
@@ -272,7 +273,8 @@ class BaseTestAccounts(BaseTest):
         restored_engine.restore(profit_centers=[], journal=JOURNAL)
         for case in filter(lambda c: c["profit_centers"] is None, self.EXPECTED_HISTORY):
             df = restored_engine.account_history(
-                account=case["account"], period=case["period"], drop=case["drop"]
+                account=case["account"], period=case["period"], drop=case["drop"],
+                opening_balance=case.get("opening_balance", False)
             )
             expected_df = format_expected_df(case["account_history"], drop=case["drop"])
             assert_frame_equal(df, expected_df, check_like=True, ignore_columns=["id"])

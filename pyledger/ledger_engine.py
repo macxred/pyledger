@@ -602,7 +602,8 @@ class LedgerEngine(ABC):
         account: int | str | dict,
         period: datetime.date = None,
         profit_centers: str | list[str] | set[str] = None,
-        drop: bool = False
+        drop: bool = False,
+        opening_balance: bool = False
     ) -> pd.DataFrame:
         """
         Return the transaction history for the specified account(s).
@@ -631,6 +632,10 @@ class LedgerEngine(ABC):
                 - "report_amount" and "report_balance" if only reporting currency
                 accounts are queried
                 Defaults to False.
+            opening_balance: If True, prepends opening balance row(s) showing
+                the account balance as of the day before the period start.
+                For single accounts, adds one opening balance row.
+                For account ranges (e.g., "1000:1999"), adds one row per account.
 
         Returns:
             pd.DataFrame: Transaction history in JOURNAL_SCHEMA with additional
@@ -641,9 +646,41 @@ class LedgerEngine(ABC):
         accounts = self.account_range(account)
         if profit_centers is not None:
             profit_centers = self.parse_profit_centers(profit_centers)
+
         df = self._fetch_account_history(
             accounts, start=start, end=end, profit_centers=profit_centers
         )
+
+        if opening_balance and start is not None:
+            opening_date = start - datetime.timedelta(days=1)
+            opening_balances = self.individual_account_balances(
+                accounts=accounts, period=opening_date, profit_centers=profit_centers
+            )
+
+            opening_rows = []
+            for _, row in opening_balances.iterrows():
+                account_number = row["account"]
+                account_currency = self.account_currency(account_number)
+                currency_balance = row["balance"].get(account_currency, 0.0)
+                profit_center_value = (
+                    pd.NA if profit_centers is None else "+".join(sorted(profit_centers))
+                )
+                opening_rows.append({
+                    "account": account_number,
+                    "date": pd.Timestamp(opening_date),
+                    "description": "Opening Balance",
+                    "currency": account_currency,
+                    "amount": 0.0,
+                    "report_amount": 0.0,
+                    "balance": currency_balance,
+                    "report_balance": row.get("report_balance", 0.0),
+                    "profit_center": profit_center_value
+                })
+
+            if opening_rows:
+                opening_df = enforce_schema(pd.DataFrame(opening_rows), ACCOUNT_HISTORY_SCHEMA)
+                df = pd.concat([opening_df, df], ignore_index=True).reset_index(drop=True)
+
         df = enforce_schema(df, schema=ACCOUNT_HISTORY_SCHEMA)
 
         if drop:
