@@ -204,6 +204,26 @@ LOAN_SCHEMA = pd.read_csv(StringIO(LOAN_SCHEMA_CSV), skipinitialspace=True)
 VALID_LOAN_FREQUENCIES = ["monthly", "quarterly", "bi-annually", "annually"]
 VALID_DAY_COUNT_CONVENTIONS = ["30/360", "ACT/365", "ACT/360", "ACT/ACT"]
 
+PRINCIPAL_HISTORY_SCHEMA_CSV = """
+    column,             dtype,              mandatory,    id
+    date,               datetime64[ns],     True,         False
+    balance,            Float64,            True,         False
+    description,        string[python],     True,         False
+"""
+PRINCIPAL_HISTORY_SCHEMA = pd.read_csv(
+    StringIO(PRINCIPAL_HISTORY_SCHEMA_CSV), skipinitialspace=True
+)
+
+INTEREST_CALCULATION_SCHEMA_CSV = """
+    column,             dtype,              mandatory,    id
+    date,               datetime64[ns],     True,         False
+    amount,             Float64,            True,         False
+    days,               int,                True,         False
+    description,        string[python],     True,         False
+"""
+INTEREST_CALCULATION_SCHEMA = pd.read_csv(
+    StringIO(INTEREST_CALCULATION_SCHEMA_CSV), skipinitialspace=True
+)
 
 ACCOUNT_SHEET_REPORT_CONFIG_SCHEMA_CSV = """
     column,             dtype,                mandatory,       id
