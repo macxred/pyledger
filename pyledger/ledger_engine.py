@@ -25,13 +25,16 @@ from .constants import (
     ACCOUNT_SHEET_TABLE_COLUMNS,
     ASSETS_SCHEMA,
     DEFAULT_DATE,
+    INTEREST_CALCULATION_SCHEMA,
     JOURNAL_SCHEMA,
     PRICE_SCHEMA,
+    PRINCIPAL_HISTORY_SCHEMA,
     PROFIT_CENTER_SCHEMA,
     RECONCILIATION_SCHEMA,
     TAX_CODE_SCHEMA,
     DEFAULT_ASSETS,
-    AGGREGATED_BALANCE_SCHEMA
+    AGGREGATED_BALANCE_SCHEMA,
+    VALID_DAY_COUNT_CONVENTIONS,
 )
 from .storage_entity import AccountingEntity
 from . import excel
@@ -698,6 +701,67 @@ class LedgerEngine(ABC):
 
         return df
 
+    def calculate_interest(
+        self,
+        principal_history: pd.DataFrame,
+        interest_rate: float,
+        day_count: str = "ACT/365"
+    ) -> pd.DataFrame:
+        """Calculate interest based on principal balance history.
+
+        This method computes interest for each period in the principal history,
+        returning a DataFrame with calculated interest amounts. The calculation
+        uses the balance at each transaction date and applies the specified
+        interest rate using the chosen day count convention.
+
+        Args:
+            principal_history (pd.DataFrame): A DataFrame with PRINCIPAL_HISTORY_SCHEMA.
+                Must be sorted by date in ascending order.
+            interest_rate (float): Annual interest rate as a decimal (e.g., 0.05 for 5%).
+            day_count (str, optional): Day count convention from VALID_DAY_COUNT_CONVENTIONS.
+                Defaults to "ACT/365".
+
+        Returns:
+            pd.DataFrame: A DataFrame with INTEREST_CALCULATION_SCHEMA.
+
+        Raises:
+            ValueError: If principal_history is empty, required columns are missing,
+                       or day_count convention is invalid.
+        """
+        history = enforce_schema(principal_history, PRINCIPAL_HISTORY_SCHEMA)
+
+        if not history["date"].is_monotonic_increasing:
+            self._logger.warning("Principal history is not sorted by date, sorting now")
+            history = history.sort_values("date")
+
+        if history["date"].duplicated().any():
+            self._logger.warning("Principal history has duplicate dates, keeping first occurrence")
+            history = history.drop_duplicates(subset="date", keep="first")
+
+        interest_entries = []
+        rows = history.reset_index(drop=True).to_dict("records")
+        for current, next_row in zip(rows[:-1], rows[1:]):
+            if pd.isna(current["balance"]) or current["balance"] == 0:
+                continue
+
+            day_factor = self._calculate_day_count_factor(
+                current["date"], next_row["date"], day_count
+            )
+            interest = current["balance"] * interest_rate * day_factor
+            days = (next_row["date"] - current["date"]).days
+
+            interest_entries.append({
+                "date": next_row["date"],
+                "amount": interest,
+                "days": days,
+                "description": (
+                    f"Interest from {current['date'].date()} "
+                    f"to {next_row['date'].date()}"
+                )
+            })
+
+        return enforce_schema(pd.DataFrame(interest_entries), INTEREST_CALCULATION_SCHEMA)
+
     def _fetch_account_history(
         self, account: int | list[int], start: datetime.date = None, end: datetime.date = None,
         profit_centers: list[str] | str = None
@@ -1056,6 +1120,63 @@ class LedgerEngine(ABC):
                 )
             invalid_ids = invalid_ids.union(new_invalid_ids)
         return invalid_ids
+
+    @staticmethod
+    def _calculate_day_count_factor(
+        start_date: datetime.date | pd.Timestamp,
+        end_date: datetime.date | pd.Timestamp,
+        convention: str = "ACT/365"
+    ) -> float:
+        """Calculate the day count factor for interest calculations.
+
+        Args:
+            start_date: Start date of the period.
+            end_date: End date of the period.
+            convention (str): Day count convention from VALID_DAY_COUNT_CONVENTIONS.
+                Defaults to "ACT/365".
+
+        Returns:
+            float: The day count factor representing the fractional year.
+
+        Raises:
+            ValueError: If an unsupported day count convention is provided.
+        """
+        if convention not in VALID_DAY_COUNT_CONVENTIONS:
+            raise ValueError(
+                f"Unsupported day count convention: '{convention}'. "
+                f"Supported conventions: {', '.join(VALID_DAY_COUNT_CONVENTIONS)}"
+            )
+
+        if isinstance(start_date, pd.Timestamp):
+            start_date = start_date.date()
+        if isinstance(end_date, pd.Timestamp):
+            end_date = end_date.date()
+
+        if convention == "30/360":
+            d1 = min(start_date.day, 30)
+            d2 = min(end_date.day, 30) if d1 == 30 else end_date.day
+            days = (
+                360 * (end_date.year - start_date.year)
+                + 30 * (end_date.month - start_date.month)
+                + (d2 - d1)
+            )
+            return days / 360.0
+
+        elif convention == "ACT/365":
+            delta = end_date - start_date
+            return delta.days / 365.0
+
+        elif convention == "ACT/360":
+            delta = end_date - start_date
+            return delta.days / 360.0
+
+        else:  # ACT/ACT
+            delta = end_date - start_date
+            # Count days in leap vs non-leap years
+            days_in_year = 366 if start_date.year % 4 == 0 and (
+                start_date.year % 100 != 0 or start_date.year % 400 == 0
+            ) else 365
+            return delta.days / days_in_year
 
     @staticmethod
     def amount_multiplier(df: pd.DataFrame) -> np.ndarray:
